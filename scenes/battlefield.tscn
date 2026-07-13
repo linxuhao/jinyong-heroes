@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/battlefield.gd" id="1"]
+
+[node name="Battlefield" type="Node2D"]
+script = ExtResource("1")
+
+[node name="SummitBackdrop" type="ColorRect" parent="."]
+anchors_preset = 0
+mouse_filter = 2
+color = Color(0.25, 0.35, 0.55, 1.0)
+
+[node name="Grid" type="TileMap" parent="."]
+cell_quadrant_size = 64
+tile_set = null
+
+[node name="Characters" type="Node2D" parent="."]
