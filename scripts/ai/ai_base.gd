@@ -6,7 +6,6 @@
 ## Subclasses override evaluate() and get_retreat_threshold().
 ## Instances are created with .new() in battlefield.gd and assigned to
 ## enemy.ai_controller.
-class_name AIControllerBase
 extends RefCounted
 
 # ---------------------------------------------------------------------------

@@ -6,8 +6,7 @@
 ## between retreat and re-engage each evaluation.
 ##
 ## Skill[0]: Dragon Palm — 3-tile line AoE, high damage, long cooldown.
-class_name AIControllerNorthBeggar
-extends AIControllerBase
+extends "res://scripts/ai/ai_base.gd"
 
 ## Toggles between RETREAT and APPROACH every other evaluation when
 ## below retreat threshold.

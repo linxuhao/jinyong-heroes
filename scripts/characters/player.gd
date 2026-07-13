@@ -5,6 +5,9 @@
 ## Lives in battlefield as a child of the Battlefield scene.
 extends Node2D
 
+const CharacterData = preload("res://scripts/data/character_data.gd")
+const SkillData = preload("res://scripts/data/skill_data.gd")
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -29,10 +32,10 @@ var health: int = 100
 var max_health: int = 100
 
 ## The CharacterData resource set by battlefield during setup.
-var character_data: CharacterData = null
+var character_data = null
 
 ## Array of SkillData resources (from character_data).
-var skills: Array[SkillData] = []
+var skills: Array = []
 
 ## Per-skill remaining cooldown in seconds (parallel to skills array).
 ## Initialised to 0.0 (ready) by setup().
@@ -70,7 +73,7 @@ const MOVE_DURATION: float = 0.15
 
 ## Initialise the player with a CharacterData resource.
 ## Called by battlefield.gd after instantiating this scene.
-func setup(data: CharacterData) -> void:
+func setup(data) -> void:
 	character_data = data
 
 	# Health.
@@ -281,7 +284,7 @@ func _handle_click_targeting() -> void:
 				return
 
 			# Check range: skill.range must satisfy Chebyshev distance.
-			var skill: SkillData = skills[selected_skill_index]
+			var skill = skills[selected_skill_index]
 			if not _is_in_range(enemy, skill.range):
 				# Out of range — silently ignore.
 				return

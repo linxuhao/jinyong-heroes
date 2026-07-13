@@ -1,4 +1,3 @@
-class_name SkillData
 extends Resource
 
 ## Data-only resource defining a martial arts skill's parameters.

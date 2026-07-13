@@ -4,8 +4,7 @@
 ## retreats. Applies poison DoT on its venom strike skill.
 ##
 ## Skill[0]: Venom Strike — heavy melee attack with poison DoT.
-class_name AIControllerWestPoison
-extends AIControllerBase
+extends "res://scripts/ai/ai_base.gd"
 
 
 func get_retreat_threshold() -> float:

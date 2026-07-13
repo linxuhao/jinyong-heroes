@@ -6,8 +6,7 @@
 ## attack. Retreats at 30% HP.
 ##
 ## Skill[0]: Divine Burst — area burst skill, effective at close range.
-class_name AIControllerCentralDivine
-extends AIControllerBase
+extends "res://scripts/ai/ai_base.gd"
 
 ## Timestamp (seconds via Time.get_ticks_msec/1000.0) when the enemy was
 ## last attacked. Set externally by enemy.gd or via signal. Initialised

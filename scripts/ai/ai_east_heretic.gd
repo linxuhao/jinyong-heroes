@@ -4,8 +4,7 @@
 ## player closes to melee (range 1) or when HP drops below 25%.
 ##
 ## Skill[0]: Poison Cloud — AoE DoT at range 2-3.
-class_name AIControllerEastHeretic
-extends AIControllerBase
+extends "res://scripts/ai/ai_base.gd"
 
 
 func get_retreat_threshold() -> float:

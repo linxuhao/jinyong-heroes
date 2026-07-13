@@ -4,8 +4,7 @@
 ## battle when HP drops below 30%. Retreats at 20% HP.
 ##
 ## Skill[0]: Healing Touch — self-heal skill (used once when low).
-class_name AIControllerSouthEmperor
-extends AIControllerBase
+extends "res://scripts/ai/ai_base.gd"
 
 ## Whether the self-heal has been used this battle.
 var _heal_used: bool = false
