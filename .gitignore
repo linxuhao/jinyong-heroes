@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+.godot/
+export_presets.cfg
+*.translation
+.DS_Store
+Thumbs.db
