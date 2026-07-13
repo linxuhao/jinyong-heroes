@@ -6,6 +6,9 @@
 ## HUD setup, and tutorial start.
 extends Node2D
 
+const SkillData = preload("res://scripts/data/skill_data.gd")
+const CharacterData = preload("res://scripts/data/character_data.gd")
+
 # ---------------------------------------------------------------------------
 # Constants (mirror GridManager for convenience)
 # ---------------------------------------------------------------------------
@@ -149,7 +152,7 @@ func _setup_tilemap(floor_tex: ImageTexture, border_tex: ImageTexture) -> void:
 func _create_all_skill_data() -> Dictionary:
 	var skills: Dictionary = {}
 
-	var sd: SkillData
+	var sd
 
 	# Sorrowful Palms (黯然销魂掌) — Yang Guo skill 1
 	sd = SkillData.new()
@@ -266,7 +269,7 @@ func _create_all_skill_data() -> Dictionary:
 ## Create all CharacterData resources. Returns a Dictionary keyed by name.
 func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	var chars: Dictionary = {}
-	var cd: CharacterData
+	var cd
 	var s: Dictionary = all_skills
 
 	# Yang Guo (player)
@@ -349,7 +352,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 # ---------------------------------------------------------------------------
 
 ## Load player.tscn, instance it, set up at starting position, return the node.
-func _instantiate_player(data: CharacterData) -> Node:
+func _instantiate_player(data) -> Node:
 	var player_scene: PackedScene = preload("res://scenes/player.tscn")
 	var player: Node = player_scene.instantiate()
 
@@ -404,7 +407,7 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 	var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
 
 	for name_key in positions.keys():
-		var data: CharacterData = all_data[name_key] as CharacterData
+		var data = all_data[name_key]
 		if data == null:
 			continue
 
@@ -416,11 +419,11 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 
 		# Create the AI controller instance.
 		var ai_class_name: String = data.ai_class
-		var ai_controller: AIControllerBase = null
+		var ai_controller = null
 		if ai_map.has(ai_class_name):
 			var ai_script: GDScript = ai_map[ai_class_name] as GDScript
 			if ai_script != null:
-				ai_controller = ai_script.new() as AIControllerBase
+				ai_controller = ai_script.new()
 
 		# Call setup with character data and AI controller.
 		enemy.setup(data, ai_controller)

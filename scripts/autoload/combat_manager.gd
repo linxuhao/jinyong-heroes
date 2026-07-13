@@ -8,6 +8,8 @@
 ## GridManager (occupancy, movement) and GameManager (enemy tracking, win/lose).
 extends Node
 
+const SkillData = preload("res://scripts/data/skill_data.gd")
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -458,7 +460,7 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 	if skills_arr == null or skill_index >= skills_arr.size():
 		return null
 
-	var skill: SkillData = skills_arr[skill_index] as SkillData
+	var skill = skills_arr[skill_index]
 	if skill == null:
 		return null
 

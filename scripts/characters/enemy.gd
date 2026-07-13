@@ -6,6 +6,9 @@
 ## Player but is driven by an AI accumulator tick instead of keyboard input.
 extends Node2D
 
+const CharacterData = preload("res://scripts/data/character_data.gd")
+const SkillData = preload("res://scripts/data/skill_data.gd")
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -27,10 +30,10 @@ var health: int = 100
 var max_health: int = 100
 
 ## The CharacterData resource set by battlefield during setup.
-var character_data: CharacterData = null
+var character_data = null
 
 ## Array of SkillData resources (from character_data).
-var skills: Array[SkillData] = []
+var skills: Array = []
 
 ## Per-skill remaining cooldown in seconds (parallel to skills array).
 ## Initialised to 0.0 (ready) by setup().
@@ -45,7 +48,7 @@ var fsm_state: String = "IDLE"
 
 ## Pluggable AI controller (AIControllerBase, RefCounted — NOT a Node).
 ## Set by battlefield.gd after instantiation.
-var ai_controller: AIControllerBase = null
+var ai_controller = null
 
 ## Accumulator for AI decision ticks. Ticks up by delta every frame,
 ## triggers AI evaluation when >= 0.5 seconds.
@@ -77,7 +80,7 @@ const AI_TICK_INTERVAL: float = 0.5
 
 ## Initialise the enemy with a CharacterData resource and AI controller.
 ## Called by battlefield.gd after instantiating this scene.
-func setup(data: CharacterData, ai: AIControllerBase) -> void:
+func setup(data, ai) -> void:
 	character_data = data
 
 	# Health.

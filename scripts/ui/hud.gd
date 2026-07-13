@@ -2,6 +2,8 @@
 ## and pause button. Lives on CanvasLayer layer 10.
 extends CanvasLayer
 
+const SkillData = preload("res://scripts/data/skill_data.gd")
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -95,7 +97,7 @@ func _populate_skill_buttons(player: Node) -> void:
 		if i >= hotkeys.size():
 			break
 
-		var skill: SkillData = skills[i] as SkillData
+		var skill = skills[i]
 		if skill == null:
 			continue
 

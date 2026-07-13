@@ -2,6 +2,8 @@
 ## Shows cooldown overlay (gray fill from top), hotkey label, and skill name.
 extends Button
 
+const SkillData = preload("res://scripts/data/skill_data.gd")
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -18,7 +20,7 @@ signal skill_selected(index: int)
 var skill_index: int = -1
 
 ## Reference to the SkillData resource for this button.
-var _skill_data: SkillData = null
+var _skill_data = null
 
 # ---------------------------------------------------------------------------
 # Node references
@@ -33,7 +35,7 @@ var _skill_data: SkillData = null
 
 ## Configure this button with a skill and hotkey label.
 ## hotkey is a string like "1" or "2".
-func setup(skill: SkillData, hotkey: String) -> void:
+func setup(skill, hotkey: String) -> void:
 	_skill_data = skill
 
 	if is_instance_valid(_hotkey_label):
