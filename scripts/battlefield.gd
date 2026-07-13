@@ -107,6 +107,8 @@ func _setup_tilemap(floor_tex: ImageTexture, border_tex: ImageTexture) -> void:
 
 	var atlas_tex: ImageTexture = ImageTexture.create_from_image(atlas_img)
 
+	var atlas_source: TileSetAtlasSource = TileSetAtlasSource.new()
+
 	# Set the atlas texture.
 	atlas_source.texture = atlas_tex
 
