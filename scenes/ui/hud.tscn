@@ -1,0 +1,36 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/skill_button.tscn" id="2"]
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1")
+
+[node name="HealthBarContainer" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="SkillBar" type="HBoxContainer" parent="."]
+anchors_preset = 10
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = -60.0
+offset_right = 160.0
+offset_bottom = -20.0
+
+[node name="SkillButton1" type="Button" parent="SkillBar" instance=ExtResource("2")]
+
+[node name="SkillButton2" type="Button" parent="SkillBar" instance=ExtResource("2")]
+
+[node name="PauseButton" type="Button" parent="."]
+anchors_preset = 3
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 44.0
+text = "⏸ Pause"
