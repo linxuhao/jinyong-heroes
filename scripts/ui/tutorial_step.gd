@@ -43,5 +43,4 @@ func show_step(title: String, body: String, show_skip: bool) -> void:
 
 
 ## Hide the entire overlay.
-func hide() -> void:
-	visible = false
+## (Inherits hide() from CanvasLayer — visible = false is implicit.)

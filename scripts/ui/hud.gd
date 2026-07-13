@@ -175,11 +175,9 @@ func _on_player_cooldowns_updated(cooldowns: Array) -> void:
 	for i in range(skill_buttons.size()):
 		if i < cooldowns.size():
 			var btn = skill_buttons[i]
-			var cooldown: float = cooldowns[i]
-			# Determine total cooldown from the button's skill data.
+			var cooldown_remaining: float = cooldowns[i]
+			# Determine total cooldown from the button's stored skill data.
 			var total: float = 0.0
-			if btn.has_method("update_cooldown"):
-				# Get the skill's cooldown from its stored data.
-				if "_skill_data" in btn and btn._skill_data != null:
-					total = btn._skill_data.cooldown
-				btn.update_cooldown(cooldown, total)
+			if "_skill_data" in btn and btn._skill_data != null:
+				total = btn._skill_data.cooldown
+			btn.update_cooldown(cooldown_remaining, total)
