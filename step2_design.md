@@ -222,16 +222,23 @@ actions:
 ```
 
 ### surface (observable nodes and their script variables)
+
+Node names match the actual scene tree. `Player` is the root node of `player.tscn`;
+`HealthBar` is the root node of `health_bar.tscn` (one instance per character, placed
+under `HUD/HealthBarContainer`).
+
 ```yaml
 surface:
   HUD:
     - visible
+  Player:
+    - health
+    - max_health
+    - grid_pos
+    - global_position
+    - selected_skill_index
   HealthBar:
     - visible
-    - global_position
-  YangGuo:
-    - health
-    - grid_pos
     - global_position
 ```
 
