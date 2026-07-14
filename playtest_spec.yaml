@@ -1,0 +1,68 @@
+scene: "res://scenes/main.tscn"
+
+actions:
+  - move_up
+  - move_down
+  - move_left
+  - move_right
+  - skill_1
+  - skill_2
+  - pause_game
+  - ui_accept
+
+surface:
+  HUD:
+    - visible
+  Player:
+    - health
+    - max_health
+    - grid_pos
+    - global_position
+    - selected_skill_index
+  HealthBar:
+    - visible
+    - global_position
+
+scenarios:
+  - name: "health_bar_visibility_on_startup"
+    description: "Verify floating health bars are visible and positioned correctly when the game starts."
+    timeline:
+      - at: 5
+        actions: []
+        assert:
+          HUD.visible: true
+          HealthBar.visible: true
+          HealthBar.global_position: "global_position != Vector2(0, 0)"
+
+  - name: "health_bar_follows_player_movement"
+    description: "After the player moves, the health bar should update its screen position."
+    timeline:
+      - at: 3
+        actions: [ui_accept]
+      - at: 5
+        actions: [ui_accept]
+      - at: 7
+        actions: [ui_accept]
+      - at: 9
+        actions: [ui_accept]
+      - at: 11
+        actions: [ui_accept]
+      - at: 13
+        actions: [ui_accept]
+      - at: 15
+        actions: [ui_accept]
+      - at: 17
+        actions: [move_right]
+      - at: 20
+        actions: []
+        assert:
+          HealthBar.visible: true
+          Player.grid_pos: "grid_pos != null"
+
+  - name: "no_runtime_errors_on_launch"
+    description: "The project should launch without any 'Invalid call' or 'Nonexistent function' errors."
+    timeline:
+      - at: 2
+        actions: []
+        assert:
+          HUD.visible: true

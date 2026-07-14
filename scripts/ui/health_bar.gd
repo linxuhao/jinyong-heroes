@@ -78,7 +78,7 @@ func follow_character() -> void:
 	if camera == null:
 		return
 
-	var screen_pos: Vector2 = camera.unproject_position(_char_node.global_position)
+	var screen_pos: Vector2 = camera.get_canvas_transform() * _char_node.global_position
 	global_position = screen_pos + Vector2(-60, -50)
 	visible = true
 
