@@ -59,12 +59,14 @@ func _ready() -> void:
 	# 8. Instantiate the five enemies.
 	var enemy_list: Array[Node] = _instantiate_enemies(all_characters)
 
-	# 9. Wire the HUD.
-	_wire_hud(player_node, enemy_list)
+	# 9. Wire the HUD (deferred — HUD._ready() hasn't run yet,
+	#    so its @onready vars (health bar container, skill bar) are null).
+	_wire_hud.call_deferred(player_node, enemy_list)
 
-	# 10. Store tutorial overlay reference and start tutorial.
-	_wire_tutorial_overlay()
-	TutorialManager.start()
+	# 10. Store tutorial overlay reference and start tutorial (also deferred
+	#    for the same reason — TutorialOverlay may not be ready yet).
+	_wire_tutorial_overlay.call_deferred()
+	TutorialManager.start.call_deferred()
 
 
 # ---------------------------------------------------------------------------
