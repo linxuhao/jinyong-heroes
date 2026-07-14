@@ -449,18 +449,22 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 ## Find the HUD CanvasLayer and call its setup method with player and enemies.
 func _wire_hud(player: Node, enemies: Array[Node]) -> void:
 	# The HUD is on its own CanvasLayer in the main scene. Since battlefield
-	# is instanced into main, we walk up to the root then find the HUD layer.
-	var root: Window = get_window()
-	if root == null:
-		return
-
-	var hud: CanvasLayer = root.get_node_or_null("HUDLayer") as CanvasLayer
+	# is instanced into main, we walk up to the parent (Main) which has
+	# HUDLayer as a direct child.
+	var hud: CanvasLayer = get_parent().get_node_or_null("HUDLayer") as CanvasLayer
 	if hud == null:
-		# Try alternative: search the entire scene tree.
-		hud = _find_hud_recursively(self)
+		# Try alternative: search the entire scene tree from the parent.
+		hud = _find_hud_recursively(get_parent())
 
-	if hud != null and hud.has_method("setup"):
-		hud.setup(player, enemies)
+	# setup() lives on the HUD node INSIDE the HUDLayer wrapper (the layer is a
+	# plain CanvasLayer with no script), so descend to it — otherwise the HUD is
+	# never initialised: health bars aren't created and skill buttons stay unbound.
+	var target: Node = hud
+	if hud != null and not hud.has_method("setup"):
+		target = hud.get_node_or_null("HUD")
+
+	if target != null and target.has_method("setup"):
+		target.setup(player, enemies)
 
 
 ## Recursively search for a CanvasLayer named "HUDLayer" in the scene tree.
@@ -482,14 +486,12 @@ func _find_hud_recursively(node: Node) -> CanvasLayer:
 
 ## Find the Tutorial CanvasLayer and pass it to TutorialManager.set_overlay().
 func _wire_tutorial_overlay() -> void:
-	var root: Window = get_window()
-	if root == null:
-		return
-
-	var tutorial_layer: CanvasLayer = root.get_node_or_null("TutorialLayer") as CanvasLayer
+	# The TutorialLayer is a child of the parent (Main), not a direct child
+	# of the Window, so look up via get_parent().
+	var tutorial_layer: CanvasLayer = get_parent().get_node_or_null("TutorialLayer") as CanvasLayer
 	if tutorial_layer == null:
-		# Recurse to find it.
-		tutorial_layer = _find_tutorial_layer_recursively(self)
+		# Recurse to find it from the parent.
+		tutorial_layer = _find_tutorial_layer_recursively(get_parent())
 
 	if tutorial_layer != null:
 		TutorialManager.set_overlay(tutorial_layer)
