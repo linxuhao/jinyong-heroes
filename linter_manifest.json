@@ -1,5 +1,7 @@
 {
   "ext_to_linter": {
-    ".md": "basic"
+    ".md": "basic",
+    ".json": "basic",
+    ".yaml": "basic"
   }
 }
