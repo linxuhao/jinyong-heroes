@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .godot/
+*.uid
 export_presets.cfg
 *.translation
 .DS_Store
