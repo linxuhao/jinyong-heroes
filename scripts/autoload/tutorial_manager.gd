@@ -97,20 +97,24 @@ const _STEP_BODIES: Dictionary = {
 		+ "time on the grid.\n\nTry moving now!"
 	),
 	STEP_BASIC_ATTACK: (
-		"Move adjacent to an enemy, then [b]left-click[/b] on them to perform "
-		+ "a basic attack.\n\nTry attacking an enemy!"
+		"Move adjacent to an enemy, then press [b]J[/b] (or [b]left-click[/b] "
+		+ "them) to perform a basic attack.\n\nTry attacking an enemy!"
 	),
 	STEP_SKILL_1: (
 		"Press [b]1[/b] to select Sorrowful Palms, then click an adjacent "
-		+ "enemy.\nHigh damage with knockback. 4s cooldown."
+		+ "enemy.\nHigh damage with knockback. 4s cooldown.\n\n"
+			+ "Press [b]J[/b] to fire the selected skill at the nearest enemy "
+			+ "in range (or click a target)."
 	),
 	STEP_SKILL_2: (
 		"Press [b]2[/b] to select Heavy Iron Sword.\n"
-		+ "Line AoE attack hitting enemies in a 2-tile line. 3s cooldown."
+		+ "Line AoE attack hitting enemies in a 2-tile line. 3s cooldown.\n\n"
+			+ "Press [b]J[/b] to fire the selected skill at the nearest enemy "
+			+ "in range (or click a target)."
 	),
 	STEP_PAUSE: (
-		"Press [b]Space[/b] or [b]Escape[/b] to pause/unpause combat at any "
-		+ "time.\nUse this to plan your next move!"
+		"Press [b]Escape[/b] to pause/unpause combat at any time.\n\n"
+		+ "Use this to plan your next move!"
 	),
 	STEP_COMBAT_START: (
 		"The tutorial is complete. Defeat all Five Greats!\n\n"
