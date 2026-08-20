@@ -288,12 +288,12 @@ func _handle_click_targeting() -> void:
 		if enemy.grid_pos != click_grid:
 			continue
 
-	# Found an enemy at the clicked grid position — delegate to the shared
-	# targeting routine (skill vs basic attack, gates, range, auto-deselect).
-	_try_attack_target(enemy)
+		# Found an enemy at the clicked grid position — delegate to the shared
+		# targeting routine (skill vs basic attack, gates, range, auto-deselect).
+		_try_attack_target(enemy)
 
-	# Only act on the first matched enemy.
-	break
+		# Only act on the first matched enemy.
+		break
 
 
 ## Execute an attack (or selected skill) against the given target enemy.
