@@ -54,6 +54,42 @@
       "seed": 1020,
       "transparent": false,
       "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, wide panoramic landscape, misty mountain summit at dawn, distant peaks and clouds, no characters, no buildings in foreground"
+    },
+    {
+      "path": "res://assets/audio/hit.wav",
+      "seed": 2001,
+      "transparent": null,
+      "prompt": "short percussive impact sound for a martial-arts game, punchy thud with a sharp attack, no music, no voices"
+    },
+    {
+      "path": "res://assets/audio/hurt.wav",
+      "seed": 2002,
+      "transparent": null,
+      "prompt": "short pained grunt sound effect for a martial-arts game, quick human reaction, no music"
+    },
+    {
+      "path": "res://assets/audio/move.wav",
+      "seed": 2003,
+      "transparent": null,
+      "prompt": "soft cloth footstep sound for a martial-arts game, quiet shuffle on stone, no music, no voices"
+    },
+    {
+      "path": "res://assets/audio/select.wav",
+      "seed": 2004,
+      "transparent": null,
+      "prompt": "short UI click confirm sound for a game menu, crisp and clean, no music, no voices"
+    },
+    {
+      "path": "res://assets/audio/victory.wav",
+      "seed": 2005,
+      "transparent": null,
+      "prompt": "short triumphant victory fanfare jingle for a wuxia game, traditional Chinese instruments, no voices"
+    },
+    {
+      "path": "res://assets/audio/music.wav",
+      "seed": 2006,
+      "transparent": null,
+      "prompt": "ambient wuxia background music bed, soft guzheng and bamboo flute, slow and calm, low volume, no voices, no drums"
     }
   ]
 }
