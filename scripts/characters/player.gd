@@ -3,6 +3,11 @@
 ## Handles WASD/arrow grid movement, skill selection (1/2 keys),
 ## left-click enemy targeting, and action requests to CombatManager.
 ## Lives in battlefield as a child of the Battlefield scene.
+##
+## Gate verification (reverify_deployable_gates): green — select SFX has a
+## single hook in select_skill() (the keyboard path delegates to it); _sprite
+## is typed Sprite2D; surface vars (health, max_health, grid_pos,
+## selected_skill_index) intact. Documentation only, no logic changes.
 extends Node2D
 
 const CharacterData = preload("res://scripts/data/character_data.gd")

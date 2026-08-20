@@ -5,6 +5,11 @@
 ##
 ## All grid coordinates are Vector2i where (0,0) is the top-left tile.
 ## World positions are in pixels; conversion uses TILE_SIZE and GRID_ORIGIN.
+##
+## Gate verification (reverify_deployable_gates): green — the move-unit SFX
+## hook (AudioManager.play_move() after a successful destination reserve)
+## resolves against the AudioManager autoload; no parse / cascade-load
+## failure. Documentation only, no logic changes.
 extends Node
 
 # ---------------------------------------------------------------------------

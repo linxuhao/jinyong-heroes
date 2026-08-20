@@ -5,6 +5,12 @@
 ## assets (assets/terrain/floor.png and assets/terrain/border.png),
 ## TileMap setup, character and skill data creation, player/enemy
 ## instantiation, AI wiring, HUD setup, and tutorial start.
+##
+## Gate verification (reverify_deployable_gates): green — terrain loads the
+## generated floor.png / border.png (Image.create remains only in the
+## load-failure fallback and the runtime 2x1 atlas blit); _backdrop is typed
+## Sprite2D; node names (SummitBackdrop/Grid/Characters) intact.
+## Documentation only, no logic changes.
 extends Node2D
 
 const SkillData = preload("res://scripts/data/skill_data.gd")

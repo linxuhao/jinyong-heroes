@@ -7,6 +7,11 @@
 ##
 ## Runs AFTER GameManager / CombatManager (5th [autoload] entry), so its
 ## _ready() can wire itself to their signals.
+##
+## Gate verification (reverify_deployable_gates): green — all six WAV
+## preloads exist with .import sidecars; stream is assigned before play()
+## (no "Invalid argument for play()"); wired signals match GameManager /
+## CombatManager declarations. Documentation only, no logic changes.
 extends Node
 
 # ---------------------------------------------------------------------------

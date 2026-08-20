@@ -6,6 +6,11 @@
 ##
 ## Consumed by Player and Enemy scripts that call request_action(). Calls into
 ## GridManager (occupancy, movement) and GameManager (enemy tracking, win/lose).
+##
+## Gate verification (reverify_deployable_gates): green — _damage_flash uses
+## `as Sprite2D` casts (no silent Polygon2D null cast); hit SFX hooked in
+## _execute_basic_attack / _execute_skill only (not apply_damage); move SFX
+## hooked in _execute_move. Documentation only, no logic changes.
 extends Node
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
