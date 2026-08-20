@@ -254,11 +254,9 @@ func get_move_range(origin: Vector2i, move_points: int) -> Array[Vector2i]:
 			var next_pos: Vector2i = current.pos + dir
 			var next_dist: int = current.dist + 1
 			
-							if not is_in_bounds(next_pos):
-					continue
-				if not is_walkable(next_pos):
-					continue
-				if next_dist > move_points:
+			if not is_in_bounds(next_pos):
+				continue
+			if not is_walkable(next_pos):
 				continue
 			if next_dist > move_points:
 				continue
