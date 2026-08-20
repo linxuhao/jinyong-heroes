@@ -127,7 +127,8 @@ func _play_sfx(stream: AudioStream) -> void:
 		return
 	if stream == null:
 		return
-	_sfx_player.play(stream)
+	_sfx_player.stream = stream
+	_sfx_player.play()
 
 ## Restarts the music bed when it reaches its natural end. The generated WAV
 ## has no authored loop point, so we restart instead of looping (a small seam
