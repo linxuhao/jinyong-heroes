@@ -108,7 +108,7 @@ It preloads the six WAVs, runs SFX on a player with `max_polyphony = 8`, keeps t
 
 ## Technical Notes
 
-- **Godot version**: 4.4.
+- **Godot version**: targets 4.4 (the brief's pin); the existing `project.godot` `config/features` records `4.7` — pre-existing and unrelated to the presentation-layer change, and the project compiles/runs under the current toolchain.
 - **Filtering**: characters/backdrop use per-node Linear filtering (`texture_filter = 2`); the terrain atlas stays Nearest to avoid tile-edge bleeding; the global `default_texture_filter` is unchanged.
 - **Anchoring**: sprites are feet-anchored at their tile centre via `centered = true` + `offset.y = -height/2`.
 - **Autoload singletons**: `GameManager`, `GridManager`, `CombatManager`, `TutorialManager`, `AudioManager`.
