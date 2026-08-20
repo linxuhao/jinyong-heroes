@@ -157,7 +157,10 @@ func move_unit(unit: Node, from_pos: Vector2i, to_pos: Vector2i) -> bool:
 		# happen since we already checked, but guard anyway).
 		reserve_tile(from_pos, unit)
 		return false
-	
+
+	# Move SFX — player path; fires only when the destination was reserved.
+	AudioManager.play_move()
+
 	# Animate the movement.
 	if unit is Node2D:
 		var tween: Tween = create_tween()

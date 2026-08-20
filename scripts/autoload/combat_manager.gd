@@ -407,6 +407,9 @@ func _execute_move(unit: Node, params: Dictionary) -> Tween:
 		GridManager.reserve_tile(from_pos, unit)
 		return null
 
+	# Move SFX — AI path; fires only when the destination was reserved.
+	AudioManager.play_move()
+
 	# Update unit's grid_pos.
 	unit.grid_pos = to_pos
 
@@ -432,6 +435,10 @@ func _execute_basic_attack(unit: Node, target: Node) -> Tween:
 	if target == null or not is_instance_valid(target):
 		return null
 
+	# Hit SFX — one play per valid basic attack. Deliberately NOT in
+	# apply_damage(), which also fires per DoT tick and would spam.
+	AudioManager.play_hit()
+
 	# Determine damage from the attacker's character_data.
 	var damage: int = 10  # default fallback
 	if "character_data" in unit and unit.character_data != null:
@@ -439,7 +446,7 @@ func _execute_basic_attack(unit: Node, target: Node) -> Tween:
 
 	apply_damage(target, damage)
 
-	# Damage flash — modulate the target's Polygon2D white, then back.
+	# Damage flash — overbright modulate flash on the target's Sprite2D.
 	return _damage_flash(target)
 
 
@@ -463,6 +470,9 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 	var skill = skills_arr[skill_index]
 	if skill == null:
 		return null
+
+	# Hit SFX — one play per valid skill execution, before damage is applied.
+	AudioManager.play_hit()
 
 	# --- Primary target damage ---
 	if skill.damage > 0:
@@ -567,28 +577,28 @@ func _handle_death(target: Node) -> void:
 
 
 ## Create a damage flash effect on a target Node2D.
-## Modulates Polygon2D children white for 0.1s, then back to normal.
-## Returns the tween so the caller can await it.
+## Modulates Sprite2D children overbright for 0.1s, then restores the
+## original modulate. Returns the tween so the caller can await it.
 func _damage_flash(target: Node) -> Tween:
 	if target == null or not is_instance_valid(target):
 		return null
 	if not target is Node2D:
 		return null
 
-	# Find a Polygon2D child (or use the target itself if it's a Polygon2D).
+	# Find a Sprite2D child (or use the target itself if it's a Sprite2D).
 	var poly: Node2D = null
-	if target is Polygon2D:
+	if target is Sprite2D:
 		poly = target
 	else:
-		poly = target.get_node_or_null("Sprite") as Polygon2D
+		poly = target.get_node_or_null("Sprite") as Sprite2D
 		if poly == null:
-			poly = target.get_child(0) as Polygon2D
+			poly = target.get_child(0) as Sprite2D
 
 	if poly == null:
 		return null
 
 	var original_modulate: Color = poly.modulate
-	poly.modulate = Color.WHITE
+	poly.modulate = Color(2, 2, 2)
 
 	var flash_tween: Tween = create_tween()
 	flash_tween.bind_node(target)
