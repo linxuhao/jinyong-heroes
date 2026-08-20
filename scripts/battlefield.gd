@@ -21,7 +21,7 @@ const GRID_HEIGHT: int = 11
 # Node references
 # ---------------------------------------------------------------------------
 
-@onready var _backdrop: ColorRect = $SummitBackdrop
+@onready var _backdrop: Sprite2D = $SummitBackdrop
 @onready var _tilemap: TileMap = $Grid
 @onready var _characters_container: Node2D = $Characters
 
@@ -36,14 +36,7 @@ func _ready() -> void:
 	# 2. Build the TileSet and paint the grid.
 	_setup_tilemap(textures.floor, textures.border)
 
-	# 3. Size the backdrop to cover grid + padding.
-	_backdrop.size = Vector2(
-		GRID_WIDTH * TILE_SIZE + 128,
-		GRID_HEIGHT * TILE_SIZE + 128
-	)
-	_backdrop.position = Vector2(-64, -64)
-
-	# 4. Pass TileMap to GridManager and build the AStar graph.
+	# 3. Pass TileMap to GridManager and build the AStar graph.
 	GridManager.set_tilemap(_tilemap)
 	GridManager.setup_grid()
 
@@ -73,16 +66,25 @@ func _ready() -> void:
 # Procedural tile textures
 # ---------------------------------------------------------------------------
 
-## Create 64×64 procedural tile textures for floor and border.
-## Returns a Dictionary with keys "floor" and "border" (ImageTexture values).
+## Create the 64×64 tile textures for floor and border from the generated
+## PNG assets. Returns a Dictionary with keys "floor" and "border"
+## (Texture2D values). Falls back to procedural tiles if a PNG is missing.
 func _create_tile_textures() -> Dictionary:
-	var floor_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
-	floor_img.fill(Color(0.3, 0.6, 0.2, 1.0))  # grass green
-	var floor_tex: ImageTexture = ImageTexture.create_from_image(floor_img)
+	var floor_tex: Texture2D = load("res://assets/terrain/floor.png")
+	var border_tex: Texture2D = load("res://assets/terrain/border.png")
 
-	var border_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
-	border_img.fill(Color(0.35, 0.35, 0.35, 1.0))  # stone gray
-	var border_tex: ImageTexture = ImageTexture.create_from_image(border_img)
+	# Fallback: if the generated PNGs are missing, rebuild the old procedural
+	# tiles so the game never hard-crashes.
+	if floor_tex == null:
+		push_warning("Battlefield: res://assets/terrain/floor.png missing — using procedural fallback")
+		var floor_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+		floor_img.fill(Color(0.3, 0.6, 0.2, 1.0))  # grass green
+		floor_tex = ImageTexture.create_from_image(floor_img)
+	if border_tex == null:
+		push_warning("Battlefield: res://assets/terrain/border.png missing — using procedural fallback")
+		var border_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+		border_img.fill(Color(0.35, 0.35, 0.35, 1.0))  # stone gray
+		border_tex = ImageTexture.create_from_image(border_img)
 
 	return {
 		floor = floor_tex,
@@ -96,7 +98,7 @@ func _create_tile_textures() -> Dictionary:
 
 ## Create a TileSet with two tiles (floor=0, border=1), assign textures,
 ## and paint the 15×11 grid.
-func _setup_tilemap(floor_tex: ImageTexture, border_tex: ImageTexture) -> void:
+func _setup_tilemap(floor_tex: Texture2D, border_tex: Texture2D) -> void:
 	var tileset: TileSet = TileSet.new()
 
 	# Configure tile size.
