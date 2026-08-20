@@ -1,0 +1,59 @@
+{
+  "style_block": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting",
+  "assets": [
+    {
+      "path": "res://assets/characters/yang_guo.png",
+      "seed": 1001,
+      "transparent": true,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a young swordsman in deep blue robes holding a heavy iron sword, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+    },
+    {
+      "path": "res://assets/characters/east_heretic.png",
+      "seed": 1002,
+      "transparent": true,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, an elegant middle-aged scholar in teal-blue robes playing a jade flute, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+    },
+    {
+      "path": "res://assets/characters/west_poison.png",
+      "seed": 1003,
+      "transparent": true,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a fierce fighter in dark purple robes with a faint green poison aura, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+    },
+    {
+      "path": "res://assets/characters/south_emperor.png",
+      "seed": 1004,
+      "transparent": true,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a regal monk in imperial golden-yellow robes, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+    },
+    {
+      "path": "res://assets/characters/north_beggar.png",
+      "seed": 1005,
+      "transparent": true,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a ragged beggar in faded red robes with a wine gourd, powerful stance, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+    },
+    {
+      "path": "res://assets/characters/central_divine.png",
+      "seed": 1006,
+      "transparent": true,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a Taoist immortal in pale gray-white robes with a divine aura, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+    },
+    {
+      "path": "res://assets/terrain/floor.png",
+      "seed": 1010,
+      "transparent": false,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, top-down seamless square tile, subtle texture variation"
+    },
+    {
+      "path": "res://assets/terrain/border.png",
+      "seed": 1011,
+      "transparent": false,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, top-down seamless square rock wall tile with stone edges"
+    },
+    {
+      "path": "res://assets/backdrop/summit.png",
+      "seed": 1020,
+      "transparent": false,
+      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, wide panoramic landscape, misty mountain summit at dawn, distant peaks and clouds, no characters, no buildings in foreground"
+    }
+  ]
+}
