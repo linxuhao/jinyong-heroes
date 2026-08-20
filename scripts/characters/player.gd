@@ -58,12 +58,6 @@ var selected_skill_index: int = -1
 # Constants
 # ---------------------------------------------------------------------------
 
-## Circle segment count for the procedural Polygon2D shape.
-const CIRCLE_SEGMENTS: int = 32
-
-## Circle radius in pixels.
-const CIRCLE_RADIUS: float = 28.0
-
 ## Movement animation duration in seconds (matches GridManager's tween).
 const MOVE_DURATION: float = 0.15
 
@@ -360,21 +354,3 @@ func _apply_sprite_visuals() -> void:
 		return
 	_sprite.modulate = Color.WHITE
 	_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
-
-
-## Generate a filled circle polygon for the Sprite Polygon2D.
-func _generate_circle_polygon() -> void:
-	if _sprite == null:
-		return
-
-	var points: PackedVector2Array = []
-	var angle_step: float = TAU / CIRCLE_SEGMENTS
-
-	for i in range(CIRCLE_SEGMENTS):
-		var angle: float = i * angle_step
-		points.append(Vector2(
-			cos(angle) * CIRCLE_RADIUS,
-			sin(angle) * CIRCLE_RADIUS
-		))
-
-	_sprite.set_polygon(points)
