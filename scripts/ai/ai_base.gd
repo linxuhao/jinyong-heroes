@@ -135,7 +135,7 @@ func _move_away(enemy: Node, player: Node) -> Dictionary:
 	# Try each direction until we find a valid tile.
 	for dir_vec in directions:
 		var target_pos: Vector2i = enemy_pos + dir_vec
-		if GridManager.is_in_bounds(target_pos) and not GridManager.is_occupied(target_pos):
+		if GridManager.is_walkable(target_pos) and not GridManager.is_occupied(target_pos):
 			return {
 				action = "move",
 				target = enemy,

@@ -78,6 +78,15 @@ func setup_grid() -> void:
 					var nid: int = ny * GRID_WIDTH + nx
 					if not astar.are_points_connected(id, nid):
 						astar.connect_points(id, nid, true)
+	
+	# Permanently disable the border-ring points (walls). The graph is STATIC
+	# GEOMETRY — occupancy never toggles points (see reserve_tile/free_tile),
+	# so interior endpoints (player/enemy tiles) are always enabled and
+	# find_path returns a real path even when the destination is occupied.
+	for y in range(GRID_HEIGHT):
+		for x in range(GRID_WIDTH):
+			if not is_walkable(Vector2i(x, y)):
+				astar.set_point_disabled(y * GRID_WIDTH + x, true)
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +119,20 @@ func is_in_bounds(grid_pos: Vector2i) -> bool:
 		and grid_pos.y >= 0 and grid_pos.y < GRID_HEIGHT)
 
 
+## Returns true if the given grid position is walkable: it must be inside the
+## battlefield bounds AND not on the border ring (which is painted as stone
+## walls). Border tiles are permanently disabled in the AStar graph, so the
+## AStar geometry is static — occupancy never disables points.
+func is_walkable(grid_pos: Vector2i) -> bool:
+	if not is_in_bounds(grid_pos):
+		return false
+	if grid_pos.x == 0 or grid_pos.x == GRID_WIDTH - 1:
+		return false
+	if grid_pos.y == 0 or grid_pos.y == GRID_HEIGHT - 1:
+		return false
+	return true
+
+
 ## Returns true if a unit currently occupies the given grid position.
 func is_occupied(grid_pos: Vector2i) -> bool:
 	return occupancy.has(grid_pos)
@@ -129,18 +152,18 @@ func reserve_tile(grid_pos: Vector2i, unit: Node) -> bool:
 	
 	occupancy[grid_pos] = unit
 	
-	# Disable the AStar point so pathfinding routes around this tile.
-	if astar != null and astar.has_point(_point_id(grid_pos)):
-		astar.set_point_disabled(_point_id(grid_pos), true)
+	# NOTE: occupancy intentionally does NOT disable the AStar point. The graph
+	# is static geometry (walls only); disabling the player's endpoint made
+	# get_id_path return an empty array (Godot returns [] when an endpoint is
+	# disabled), so enemies could never path to the player.
 	
 	return true
 
 
-## Clear occupancy for a tile, re-enabling the AStar point.
+## Clear occupancy for a tile. Occupancy does not mutate the AStar graph
+## (static geometry), so this only removes the dictionary entry.
 func free_tile(grid_pos: Vector2i) -> void:
-	if occupancy.erase(grid_pos):
-		if astar != null and astar.has_point(_point_id(grid_pos)):
-			astar.set_point_disabled(_point_id(grid_pos), false)
+	occupancy.erase(grid_pos)
 
 
 ## Move a unit from one tile to another. Animates with a Tween.
@@ -149,6 +172,8 @@ func free_tile(grid_pos: Vector2i) -> void:
 ## though this method also validates.
 func move_unit(unit: Node, from_pos: Vector2i, to_pos: Vector2i) -> bool:
 	if not is_in_bounds(to_pos):
+		return false
+	if not is_walkable(to_pos):
 		return false
 	if is_occupied(to_pos):
 		return false
@@ -229,7 +254,11 @@ func get_move_range(origin: Vector2i, move_points: int) -> Array[Vector2i]:
 			var next_pos: Vector2i = current.pos + dir
 			var next_dist: int = current.dist + 1
 			
-			if not is_in_bounds(next_pos):
+							if not is_in_bounds(next_pos):
+					continue
+				if not is_walkable(next_pos):
+					continue
+				if next_dist > move_points:
 				continue
 			if next_dist > move_points:
 				continue
