@@ -25,6 +25,7 @@ GameManager="*res://scripts/autoload/game_manager.gd"
 GridManager="*res://scripts/autoload/grid_manager.gd"
 CombatManager="*res://scripts/autoload/combat_manager.gd"
 TutorialManager="*res://scripts/autoload/tutorial_manager.gd"
+AudioManager="*res://scripts/autoload/audio_manager.gd"
 
 [input]
 
