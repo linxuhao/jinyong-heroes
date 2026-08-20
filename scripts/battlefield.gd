@@ -1,9 +1,10 @@
 ## Battlefield — Main battlefield controller
 ##
 ## Attached to battlefield.tscn. Orchestrates the full battlefield
-## initialisation: procedural tile textures, TileMap setup, character
-## and skill data creation, player/enemy instantiation, AI wiring,
-## HUD setup, and tutorial start.
+## initialisation: terrain tile textures loaded from the generated PNG
+## assets (assets/terrain/floor.png and assets/terrain/border.png),
+## TileMap setup, character and skill data creation, player/enemy
+## instantiation, AI wiring, HUD setup, and tutorial start.
 extends Node2D
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
@@ -30,7 +31,7 @@ const GRID_HEIGHT: int = 11
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	# 1. Create procedural tile textures.
+	# 1. Load the generated terrain tile textures.
 	var textures: Dictionary = _create_tile_textures()
 
 	# 2. Build the TileSet and paint the grid.
@@ -63,18 +64,19 @@ func _ready() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Procedural tile textures
+# Terrain tile textures (loaded from generated PNGs)
 # ---------------------------------------------------------------------------
 
-## Create the 64×64 tile textures for floor and border from the generated
+## Load the 64×64 tile textures for floor and border from the generated
 ## PNG assets. Returns a Dictionary with keys "floor" and "border"
-## (Texture2D values). Falls back to procedural tiles if a PNG is missing.
+## (Texture2D values). Falls back to a plain flat-color tile (last resort)
+## if a PNG is missing.
 func _create_tile_textures() -> Dictionary:
 	var floor_tex: Texture2D = load("res://assets/terrain/floor.png")
 	var border_tex: Texture2D = load("res://assets/terrain/border.png")
 
-	# Fallback: if the generated PNGs are missing, rebuild the old procedural
-	# tiles so the game never hard-crashes.
+	# Fallback: if a generated PNG is missing, build a plain flat-color tile
+	# so the game never hard-crashes.
 	if floor_tex == null:
 		push_warning("Battlefield: res://assets/terrain/floor.png missing — using procedural fallback")
 		var floor_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
