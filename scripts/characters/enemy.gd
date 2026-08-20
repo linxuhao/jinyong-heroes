@@ -65,12 +65,6 @@ var _ai_accumulator: float = 0.0
 # Constants
 # ---------------------------------------------------------------------------
 
-## Diamond half-radius in pixels (point-to-centre distance).
-const DIAMOND_RADIUS: float = 28.0
-
-## Diamond polygon vertex count.
-const DIAMOND_POINTS: int = 4
-
 ## Character name → preloaded portrait texture. Keys MUST match the
 ## character_name values set in battlefield.gd.
 const TEXTURE_PATHS: Dictionary = {
@@ -241,18 +235,3 @@ func _apply_character_visuals() -> void:
 	sprite.texture = tex
 	sprite.modulate = Color.WHITE
 	sprite.offset = Vector2(0, -(tex.get_height() / 2.0))  # feet at tile centre
-
-
-## Generate a filled diamond polygon for the Sprite node.
-func _generate_diamond_polygon() -> void:
-	if _sprite == null:
-		return
-
-	var points: PackedVector2Array = [
-		Vector2(0.0, -DIAMOND_RADIUS),    # top
-		Vector2(DIAMOND_RADIUS, 0.0),     # right
-		Vector2(0.0, DIAMOND_RADIUS),     # bottom
-		Vector2(-DIAMOND_RADIUS, 0.0),    # left
-	]
-
-	_sprite.set_polygon(points)
