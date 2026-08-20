@@ -124,4 +124,4 @@ It preloads the six WAVs, runs SFX on a player with `max_polyphony = 8`, keeps t
 ./run_tests.sh
 ```
 
-Runs a compile check (which triggers the Godot import pass for the new PNG/WAV assets) then a headless 5-second playtest against `playtest_spec.yaml`, checking for parse and runtime errors.
+Runs a compile check (which triggers the Godot import pass for the new PNG/WAV assets) then a headless 5-second playtest against `playtest_spec.yaml`, checking for parse and runtime errors. A passing run requires both a clean compile and a playtest that actually executes frames (`frames > 0`) — a parse failure skips the playtest entirely.
