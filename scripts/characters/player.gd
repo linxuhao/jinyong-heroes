@@ -51,7 +51,7 @@ var selected_skill_index: int = -1
 # Node references
 # ---------------------------------------------------------------------------
 
-@onready var _sprite: Polygon2D = $Sprite
+@onready var _sprite: Sprite2D = $Sprite
 @onready var _name_label: Label = $NameLabel
 
 # ---------------------------------------------------------------------------
@@ -90,9 +90,11 @@ func setup(data) -> void:
 	# positioning the node).
 	grid_pos = GridManager.world_to_grid(position)
 
-	# Visual appearance.
-	if _sprite != null:
-		_sprite.color = data.color
+	# Visual appearance (defensive: _sprite is null before add_child, so the
+	# authoritative application happens in _ready() via _apply_sprite_visuals()).
+	if _sprite != null and _sprite.texture != null:
+		_sprite.modulate = Color.WHITE
+		_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
 	if _name_label != null:
 		_name_label.text = data.character_name
 
@@ -109,6 +111,9 @@ func select_skill(index: int) -> void:
 	else:
 		selected_skill_index = index
 
+	# Play the select SFX (single hook shared by HUD buttons and 1/2 keys).
+	AudioManager.play_select()
+
 
 ## Returns whether the player is currently animating a movement tween.
 ## Used by CombatManager.is_unit_busy().
@@ -121,7 +126,8 @@ func get_is_moving() -> bool:
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	_generate_circle_polygon()
+	# Apply the generated-art sprite visuals (modulate + feet anchor).
+	_apply_sprite_visuals()
 
 	# Snap to grid position if not already set.
 	if grid_pos == Vector2i(-1, -1):
@@ -245,11 +251,9 @@ func _try_select_skill(index: int) -> void:
 	if not TutorialManager.is_input_allowed(action_name):
 		return
 
-	if selected_skill_index == index:
-		# Toggle off.
-		selected_skill_index = -1
-	else:
-		selected_skill_index = index
+	# Delegate to select_skill() so the keyboard path and the HUD button path
+	# share one toggle + select-SFX hook.
+	select_skill(index)
 
 
 # ---------------------------------------------------------------------------
@@ -346,6 +350,16 @@ func _is_in_range(enemy: Node, range_val: int) -> bool:
 	var enemy_pos: Vector2i = enemy.grid_pos
 	return abs(grid_pos.x - enemy_pos.x) <= range_val \
 		and abs(grid_pos.y - enemy_pos.y) <= range_val
+
+
+## Apply presentation-only sprite visuals (modulate + feet anchor).
+## Called from _ready() where _sprite (@onready) is live and the .tscn texture
+## is loaded; guarded so it is safe to call from setup() too.
+func _apply_sprite_visuals() -> void:
+	if _sprite == null or _sprite.texture == null:
+		return
+	_sprite.modulate = Color.WHITE
+	_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
 
 
 ## Generate a filled circle polygon for the Sprite Polygon2D.
