@@ -7,25 +7,24 @@ actions:
   - move_right
   - skill_1
   - skill_2
+  - basic_attack
   - pause_game
   - ui_accept
 
 surface:
-  HUD:
-    - visible
-  Player:
-    - health
-    - max_health
-    - grid_pos
-    - global_position
-    - selected_skill_index
-  HealthBar:
-    - visible
-    - global_position
+  HUD: [visible]
+  Player: [health, max_health, grid_pos, global_position, selected_skill_index]
+  HealthBar: [visible, global_position]
+  East_Heretic: [fsm_state, health, max_health, grid_pos]
+  West_Poison: [fsm_state, health, max_health, grid_pos]
+  South_Emperor: [fsm_state, health, max_health, grid_pos]
+  North_Beggar: [fsm_state, health, max_health, grid_pos]
+  Central_Divine: [fsm_state, health, max_health, grid_pos]
+  GameManager: [current_state]
 
 scenarios:
   - name: "health_bar_visibility_on_startup"
-    description: "Verify floating health bars are visible and positioned correctly when the game starts."
+    description: "Floating health bars are visible and positioned at startup."
     timeline:
       - at: 5
         actions: []
@@ -35,34 +34,91 @@ scenarios:
           HealthBar.global_position: "global_position != Vector2(0, 0)"
 
   - name: "health_bar_follows_player_movement"
-    description: "After the player moves, the health bar should update its screen position."
+    description: "After tutorial and a move, the health bar follows the player and battle starts."
     timeline:
-      - at: 3
-        actions: [ui_accept]
-      - at: 5
-        actions: [ui_accept]
-      - at: 7
-        actions: [ui_accept]
-      - at: 9
-        actions: [ui_accept]
-      - at: 11
-        actions: [ui_accept]
-      - at: 13
-        actions: [ui_accept]
-      - at: 15
-        actions: [ui_accept]
-      - at: 17
-        actions: [move_right]
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 17, actions: [move_right] }
       - at: 20
         actions: []
         assert:
           HealthBar.visible: true
-          Player.grid_pos: "grid_pos != null"
+          Player.grid_pos: "changed"
+          HealthBar.global_position: "changed"
+          GameManager.current_state: 'current_state == "BATTLE"'
 
   - name: "no_runtime_errors_on_launch"
-    description: "The project should launch without any 'Invalid call' or 'Nonexistent function' errors."
+    description: "The project launches without runtime errors."
     timeline:
       - at: 2
         actions: []
         assert:
           HUD.visible: true
+
+  - name: "enemy_ai_approaches_player"
+    description: "After tutorial, enemy AI leaves IDLE and damages the idle player."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 150
+        actions: []
+        assert:
+          West_Poison.fsm_state: "changed"
+          North_Beggar.fsm_state: "changed"
+      - at: 240
+        actions: []
+        assert:
+          Player.health: 'health < max_health'
+
+  - name: "keyboard_basic_attack_hits_enemy"
+    description: "Press basic_attack (J) adjacent to Central Divine to damage him."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [move_up] }
+      - { at: 35, actions: [move_up] }
+      - { at: 50, actions: [move_up] }
+      - { at: 65, actions: [basic_attack] }
+      - at: 200
+        actions: []
+        assert:
+          Player.grid_pos: "changed"
+          Central_Divine.health: 'health < max_health'
+
+  - name: "defeat_by_standing_still"
+    description: "Standing still after tutorial, the aggressive AI converge and defeat the player (LOST)."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 150
+        actions: []
+        assert:
+          West_Poison.fsm_state: "changed"
+      - at: 240
+        actions: []
+        assert:
+          Player.health: "changed"
+      - at: 300
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "LOST"'
