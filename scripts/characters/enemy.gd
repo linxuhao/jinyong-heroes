@@ -58,7 +58,7 @@ var _ai_accumulator: float = 0.0
 # Node references
 # ---------------------------------------------------------------------------
 
-@onready var _sprite: Polygon2D = $Sprite
+@onready var _sprite: Sprite2D = $Sprite
 @onready var _name_label: Label = $NameLabel
 
 # ---------------------------------------------------------------------------
@@ -70,6 +70,16 @@ const DIAMOND_RADIUS: float = 28.0
 
 ## Diamond polygon vertex count.
 const DIAMOND_POINTS: int = 4
+
+## Character name → preloaded portrait texture. Keys MUST match the
+## character_name values set in battlefield.gd.
+const TEXTURE_PATHS: Dictionary = {
+	"East Heretic": preload("res://assets/characters/east_heretic.png"),
+	"West Poison": preload("res://assets/characters/west_poison.png"),
+	"South Emperor": preload("res://assets/characters/south_emperor.png"),
+	"North Beggar": preload("res://assets/characters/north_beggar.png"),
+	"Central Divine": preload("res://assets/characters/central_divine.png"),
+}
 
 ## AI evaluation interval in seconds.
 const AI_TICK_INTERVAL: float = 0.5
@@ -104,8 +114,7 @@ func setup(data, ai) -> void:
 	grid_pos = GridManager.world_to_grid(position)
 
 	# Visual appearance.
-	if _sprite != null:
-		_sprite.color = data.color
+	_apply_character_visuals()
 	if _name_label != null:
 		_name_label.text = data.character_name
 
@@ -127,8 +136,6 @@ func reset_ai_timer() -> void:
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	_generate_diamond_polygon()
-
 	# Snap to grid position if not already set.
 	if grid_pos == Vector2i(-1, -1):
 		grid_pos = GridManager.world_to_grid(position)
@@ -214,7 +221,29 @@ func _distance(a: Vector2i, b: Vector2i) -> int:
 	return max(abs(a.x - b.x), abs(a.y - b.y))
 
 
-## Generate a filled diamond polygon for the Sprite Polygon2D.
+## Assign the character portrait texture, tint and feet anchor to the Sprite.
+## Resolves the node via get_node_or_null so it works even when called from
+## setup() BEFORE the node enters the tree (@onready _sprite is null then).
+func _apply_character_visuals() -> void:
+	var sprite: Sprite2D = _sprite
+	if sprite == null:
+		sprite = get_node_or_null("Sprite") as Sprite2D
+	if sprite == null:
+		return
+
+	var name_key: String = character_data.character_name if character_data != null else ""
+	var tex: Texture2D = TEXTURE_PATHS.get(name_key, null)
+	if tex == null:
+		# Null-safe fallback: sprite stays texture-less (invisible), logic intact.
+		push_warning("Enemy texture not found for character: %s" % name_key)
+		return
+
+	sprite.texture = tex
+	sprite.modulate = Color.WHITE
+	sprite.offset = Vector2(0, -(tex.get_height() / 2.0))  # feet at tile centre
+
+
+## Generate a filled diamond polygon for the Sprite node.
 func _generate_diamond_polygon() -> void:
 	if _sprite == null:
 		return
