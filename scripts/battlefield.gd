@@ -444,7 +444,13 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 		GridManager.reserve_tile(grid_pos, enemy)
 
 		# Add to scene tree.
-		_characters_container.add_child(enemy)
+			# Unique, surface-addressable node name for the playtest contract
+			# (e.g. "East Heretic" → "East_Heretic"). Set before add_child so
+			# the node enters the tree already named.
+			enemy.name = data.character_name.replace(" ", "_")
+
+			# Add to scene tree.
+			_characters_container.add_child(enemy)
 
 		# Register with GameManager.
 		GameManager.register_enemy(enemy)

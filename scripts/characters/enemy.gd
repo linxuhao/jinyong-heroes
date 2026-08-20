@@ -109,8 +109,7 @@ func setup(data, ai) -> void:
 
 	# Visual appearance.
 	_apply_character_visuals()
-	if _name_label != null:
-		_name_label.text = data.character_name
+	_apply_name_label()
 
 
 ## Returns whether the enemy is currently animating a movement tween.
@@ -235,3 +234,15 @@ func _apply_character_visuals() -> void:
 	sprite.texture = tex
 	sprite.modulate = Color.WHITE
 	sprite.offset = Vector2(0, -(tex.get_height() / 2.0))  # feet at tile centre
+
+
+## Apply the character's display name to the NameLabel under the enemy.
+## Resolves the node via get_node_or_null so it works even when called from
+## setup() BEFORE the node enters the tree (@onready _name_label is null then).
+func _apply_name_label() -> void:
+	var label: Label = _name_label
+	if label == null:
+		label = get_node_or_null("NameLabel") as Label
+	if label == null:
+		return
+	label.text = character_data.character_name if character_data != null else ""

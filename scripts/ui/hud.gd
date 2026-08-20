@@ -36,7 +36,10 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	_health_bars.clear()
 
 	# --- Player health bar ---
-	_create_health_bar(player, "Yang Guo")
+	var player_name: String = "Player"
+	if "character_data" in player and player.character_data != null:
+		player_name = player.character_data.character_name
+	_create_health_bar(player, player_name)
 
 	# --- Enemy health bars ---
 	for enemy in enemies:
@@ -72,8 +75,10 @@ func _create_health_bar(character: Node, display_name: String) -> void:
 	if "max_health" in character:
 		max_hp = character.max_health
 
-	bar.setup(display_name, max_hp, character)
+	# Add the bar to the tree BEFORE setup() so health_bar.gd's @onready
+	# refs ($Bar / $NameLabel) are live inside setup().
 	_health_bar_container.add_child(bar)
+	bar.setup(display_name, max_hp, character)
 	_health_bars.append(bar)
 
 

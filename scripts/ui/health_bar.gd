@@ -29,12 +29,26 @@ var _last_ratio: float = 1.0
 func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	_char_node = char_node
 
-	if is_instance_valid(_name_label):
-		_name_label.text = char_name
+	# Defensively resolve the child nodes so setup() is call-order independent:
+	# when setup() runs BEFORE add_child(), the @onready members are still null,
+	# so fall back to get_node_or_null and write the resolved refs BACK to the
+	# members (update_health()/follow_character() rely on them).
+	var bar: ProgressBar = _bar
+	if bar == null:
+		bar = get_node_or_null("Bar") as ProgressBar
+		if bar != null:
+			_bar = bar
+	if bar != null:
+		bar.max_value = max_hp
+		bar.value = max_hp
 
-	if is_instance_valid(_bar):
-		_bar.max_value = max_hp
-		_bar.value = max_hp
+	var label: Label = _name_label
+	if label == null:
+		label = get_node_or_null("NameLabel") as Label
+		if label != null:
+			_name_label = label
+	if label != null:
+		label.text = char_name
 
 	# Connect to the character's health_changed signal.
 	if char_node != null and is_instance_valid(char_node):
@@ -79,7 +93,12 @@ func follow_character() -> void:
 		return
 
 	var screen_pos: Vector2 = camera.get_canvas_transform() * _char_node.global_position
-	global_position = screen_pos + Vector2(-60, -50)
+	screen_pos += Vector2(-60, -50)
+	# Clamp so the bar never clips off the viewport edges.
+	var vp: Vector2 = get_viewport_rect().size
+	global_position = Vector2(
+		clampf(screen_pos.x, 4.0, vp.x - size.x - 4.0),
+		clampf(screen_pos.y, 4.0, vp.y - size.y - 4.0))
 	visible = true
 
 # ---------------------------------------------------------------------------
