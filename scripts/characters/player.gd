@@ -94,8 +94,9 @@ func setup(data) -> void:
 	if _sprite != null and _sprite.texture != null:
 		_sprite.modulate = Color.WHITE
 		_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
-	if _name_label != null:
-		_name_label.text = data.character_name
+	# Apply the character name to the label (defensive: also re-applied from
+	# _ready() in case setup() runs before add_child, leaving @onready null).
+	_apply_name_label()
 
 	# Deselect any skill.
 	selected_skill_index = -1
@@ -129,6 +130,10 @@ func get_is_moving() -> bool:
 func _ready() -> void:
 	# Apply the generated-art sprite visuals (modulate + feet anchor).
 	_apply_sprite_visuals()
+
+	# Re-apply the character name label (idempotent; setup() may have run
+	# before this node was added to the tree, so @onready refs were null).
+	_apply_name_label()
 
 	# Snap to grid position if not already set.
 	if grid_pos == Vector2i(-1, -1):
@@ -189,7 +194,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_select_skill(1)
 		get_viewport().set_input_as_handled()
 
-	# --- Pause toggle (Space / Escape) ---
+	# --- Keyboard basic attack / skill execution (J) ---
+	# Fires the selected skill (or basic attack) at the nearest enemy in range.
+	elif event.is_action_pressed("basic_attack"):
+		_try_keyboard_attack()
+		get_viewport().set_input_as_handled()
+
+	# --- Pause toggle (Escape) ---
 	elif event.is_action_pressed("pause_game"):
 		if TutorialManager.is_input_allowed("pause"):
 			CombatManager.toggle_pause()
@@ -215,8 +226,8 @@ func _try_move(direction: Vector2i) -> void:
 
 	var target: Vector2i = grid_pos + direction
 
-	# Validate bounds.
-	if not GridManager.is_in_bounds(target):
+	# Validate walkability (in-bounds and not a border wall tile).
+	if not GridManager.is_walkable(target):
 		return
 
 	# Validate occupancy.
@@ -277,40 +288,85 @@ func _handle_click_targeting() -> void:
 		if enemy.grid_pos != click_grid:
 			continue
 
-		# Found an enemy at the clicked grid position.
-		# Determine whether to use a skill or basic attack.
-		if selected_skill_index >= 0:
-			# Using a skill.
-			var skill_action: String = "skill_1" if selected_skill_index == 0 else "skill_2"
-			if not TutorialManager.is_input_allowed(skill_action):
-				return
-			if skill_cooldowns[selected_skill_index] > 0.0:
-				# Cooldown not ready — silently ignore.
-				return
+	# Found an enemy at the clicked grid position — delegate to the shared
+	# targeting routine (skill vs basic attack, gates, range, auto-deselect).
+	_try_attack_target(enemy)
 
-			# Check range: skill.range must satisfy Chebyshev distance.
-			var skill = skills[selected_skill_index]
-			if not _is_in_range(enemy, skill.range):
-				# Out of range — silently ignore.
-				return
+	# Only act on the first matched enemy.
+	break
 
-			_execute_skill(selected_skill_index, enemy)
-			selected_skill_index = -1  # Auto-deselect after use.
 
-		else:
-			# Basic attack.
-			if not TutorialManager.is_input_allowed("basic_attack"):
-				return
+## Execute an attack (or selected skill) against the given target enemy.
+## Shared by the left-click path and the keyboard basic_attack path so both
+## inputs run through identical gates: tutorial permission, cooldown, range,
+## then request to CombatManager, then skill auto-deselect.
+func _try_attack_target(enemy: Node) -> void:
+	if selected_skill_index >= 0:
+		# Using a skill.
+		var skill_action: String = "skill_1" if selected_skill_index == 0 else "skill_2"
+		if not TutorialManager.is_input_allowed(skill_action):
+			return
+		if skill_cooldowns[selected_skill_index] > 0.0:
+			# Cooldown not ready — silently ignore.
+			return
 
-			# Must be adjacent (Chebyshev distance <= 1).
-			if not _is_adjacent(enemy.grid_pos):
-				# Out of range — silently ignore.
-				return
+		# Check range: skill.range must satisfy Chebyshev distance.
+		var skill = skills[selected_skill_index]
+		if not _is_in_range(enemy, skill.range):
+			# Out of range — silently ignore.
+			return
 
-			_execute_basic_attack(enemy)
+		_execute_skill(selected_skill_index, enemy)
+		selected_skill_index = -1  # Auto-deselect after use.
 
-		# Only act on the first matched enemy.
-		break
+	else:
+		# Basic attack.
+		if not TutorialManager.is_input_allowed("basic_attack"):
+			return
+
+		# Must be adjacent (Chebyshev distance <= 1).
+		if not _is_adjacent(enemy.grid_pos):
+			# Out of range — silently ignore.
+			return
+
+		_execute_basic_attack(enemy)
+
+
+## Keyboard basic attack / skill execution: fire the selected skill (or a basic
+## attack when no skill is selected) at the nearest enemy in range. Silent
+## no-op when no enemy is in range (mirrors the click path's out-of-range
+## ignore).
+func _try_keyboard_attack() -> void:
+	var range_val: int = 1
+	if selected_skill_index >= 0:
+		range_val = skills[selected_skill_index].range
+	var target: Node = _pick_nearest_enemy_in_range(range_val)
+	if target != null:
+		_try_attack_target(target)
+
+
+## Find the nearest living enemy within the given Chebyshev range of the
+## player's grid position, using GameManager.get_enemies_alive() registration
+## order (East Heretic, West Poison, South Emperor, North Beggar, Central
+## Divine). Strictly-nearest wins; ties keep the first in iteration order, so
+## the result is fully deterministic. No facing state. Returns null if none.
+func _pick_nearest_enemy_in_range(range_val: int) -> Node:
+	var enemies: Array[Node] = GameManager.get_enemies_alive()
+	var best: Node = null
+	var best_dist: int = 999999
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		if not ("grid_pos" in enemy):
+			continue
+		var enemy_pos: Vector2i = enemy.grid_pos
+		var dist: int = max(abs(grid_pos.x - enemy_pos.x), abs(grid_pos.y - enemy_pos.y))
+		if dist > range_val:
+			continue
+		if dist < best_dist:
+			best_dist = dist
+			best = enemy
+	return best
 
 
 # ---------------------------------------------------------------------------
@@ -361,3 +417,15 @@ func _apply_sprite_visuals() -> void:
 		return
 	_sprite.modulate = Color.WHITE
 	_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
+
+
+## Apply the character's data-driven name to the NameLabel. Resolves the label
+## defensively (setup() may run before add_child, leaving the @onready ref
+## null) and is idempotent, so it is safe to call from both setup() and
+## _ready(). No-op if the label or character data is unavailable.
+func _apply_name_label() -> void:
+	var lbl: Label = _name_label
+	if lbl == null:
+		lbl = get_node_or_null("NameLabel") as Label
+	if lbl != null and character_data != null:
+		lbl.text = character_data.character_name
