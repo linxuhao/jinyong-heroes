@@ -39,6 +39,13 @@ signal damage_dealt(target: Node, amount: int, is_lethal: bool)
 const QUEUE_CAPACITY: int = 10
 const PAUSE_DEBOUNCE_MS: int = 100
 
+## Maximum time (seconds) to wait for an action tween's `finished` signal
+## before giving up. Killed tweens (e.g. a tween bound to a node that was
+## queue_free'd on death) never emit `finished`, which would otherwise hang
+## _drain_action_queue forever. Longest action tween is 0.15s move + 0.1s
+## flash, so 0.6s is a generous cap.
+const TWEEN_TIMEOUT_SEC: float = 0.6
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -149,13 +156,13 @@ func is_unit_busy(unit: Node) -> bool:
 		if entry.unit == unit:
 			return true
 
-	# Check if the unit's own is_moving flag is set.
-	if unit.has_method("get_is_moving") or ("is_moving" in unit and unit.is_moving):
+	# Check the unit's ACTUAL moving state. Every Player/Enemy defines
+	# get_is_moving(), so testing method existence alone would return true for
+	# everyone and freeze all AI in IDLE — test the return value instead.
+	if "is_moving" in unit and bool(unit.is_moving):
 		return true
-
-	# Fallback: check for any property that signals busy state.
-	if "is_moving" in unit:
-		return unit.is_moving
+	if unit.has_method("get_is_moving") and bool(unit.get_is_moving()):
+		return true
 
 	return false
 
@@ -232,7 +239,7 @@ func apply_knockback(target: Node, direction: Vector2i, tiles: int) -> void:
 		var next_pos: Vector2i = final_pos + direction
 
 		# Stop if out of bounds.
-		if not GridManager.is_in_bounds(next_pos):
+		if not GridManager.is_in_bounds(next_pos) or not GridManager.is_walkable(next_pos):
 			break
 
 		# Stop if the tile is occupied (by someone other than self).
@@ -345,9 +352,11 @@ func _drain_action_queue() -> void:
 			entry.params
 		)
 
-		# Await the tween's completion before processing the next action.
+		# Await the tween's completion (watchdog-capped) before processing the next
+			# action. A tween bound to a node that died mid-action never emits
+			# `finished`; the watchdog guarantees the queue keeps draining.
 		if tween != null and is_instance_valid(tween):
-			await tween.finished
+			await _await_tween_safe(tween)
 
 		# After the action completes, if the unit is an enemy, trigger its AI
 		# to re-evaluate (reset its decision timer).
@@ -401,6 +410,8 @@ func _execute_move(unit: Node, params: Dictionary) -> Tween:
 
 	# Validate destination.
 	if not GridManager.is_in_bounds(to_pos):
+		return null
+	if not GridManager.is_walkable(to_pos):
 		return null
 	if GridManager.is_occupied(to_pos) and to_pos != from_pos:
 		return null
@@ -557,6 +568,23 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 # Internal — Helpers
 # ---------------------------------------------------------------------------
 
+## Await a tween's `finished` signal, but never hang: if the tween is null,
+## freed, or killed before finishing (e.g. its bound node was queue_free'd),
+## give up after TWEEN_TIMEOUT_SEC and return. The `done` flag is a 1-element
+## Array because GDScript lambdas capture local variables BY VALUE — assigning
+## a bare local inside the lambda never propagates back to this scope, while
+## mutating a shared Array element does.
+func _await_tween_safe(tween: Tween) -> void:
+	if tween == null:
+		return
+
+	var done: Array = [false]
+	tween.finished.connect(func(): done[0] = true, CONNECT_ONE_SHOT)
+	var timer := get_tree().create_timer(TWEEN_TIMEOUT_SEC, true)
+	while not done[0] and timer.time_left > 0.0:
+		await get_tree().process_frame
+
+
 ## Handle death of a character node.
 ## Distinguishes between player death and enemy death.
 func _handle_death(target: Node) -> void:
@@ -608,7 +636,9 @@ func _damage_flash(target: Node) -> Tween:
 	poly.modulate = Color(2, 2, 2)
 
 	var flash_tween: Tween = create_tween()
-	flash_tween.bind_node(target)
+	# Bind to CombatManager (never freed) so the tween survives target death.
+	# The modulate-restore callback already guards with is_instance_valid(poly).
+	flash_tween.bind_node(self)
 	flash_tween.tween_callback(func():
 		if is_instance_valid(poly):
 			poly.modulate = original_modulate
