@@ -106,6 +106,8 @@ func select_skill(index: int) -> void:
 		selected_skill_index = index
 
 	# Play the select SFX (single hook shared by HUD buttons and 1/2 keys).
+	# Regression gate (fix_cascade_script_loads): AudioManager autoload parses,
+	# so this call site resolves at compile time.
 	AudioManager.play_select()
 
 

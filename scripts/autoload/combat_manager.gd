@@ -408,6 +408,8 @@ func _execute_move(unit: Node, params: Dictionary) -> Tween:
 		return null
 
 	# Move SFX — AI path; fires only when the destination was reserved.
+	# Regression gate (fix_cascade_script_loads): AudioManager autoload parses,
+	# so this call site resolves at compile time.
 	AudioManager.play_move()
 
 	# Update unit's grid_pos.

@@ -159,6 +159,8 @@ func move_unit(unit: Node, from_pos: Vector2i, to_pos: Vector2i) -> bool:
 		return false
 
 	# Move SFX — player path; fires only when the destination was reserved.
+	# Regression gate (fix_cascade_script_loads): AudioManager autoload parses,
+	# so this call site resolves at compile time.
 	AudioManager.play_move()
 
 	# Animate the movement.
