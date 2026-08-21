@@ -9,15 +9,3 @@ script = ExtResource("1")
 centered = true
 texture_filter = 2
 mouse_filter = 2
-
-[node name="NameLabel" type="Label" parent="."]
-offset_left = -80.0
-offset_top = -48.0
-offset_right = 80.0
-offset_bottom = -24.0
-text = "Enemy"
-horizontal_alignment = 1
-vertical_alignment = 1
-mouse_filter = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 14

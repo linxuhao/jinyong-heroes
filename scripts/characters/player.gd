@@ -52,12 +52,15 @@ var is_moving: bool = false
 ## Index of the currently selected skill, or -1 for basic attack.
 var selected_skill_index: int = -1
 
+## World-px top edge of the sprite texture rect, updated every frame by
+## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
+var sprite_top: float = 0.0
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
 
 @onready var _sprite: Sprite2D = $Sprite
-@onready var _name_label: Label = $NameLabel
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -94,10 +97,6 @@ func setup(data) -> void:
 	if _sprite != null and _sprite.texture != null:
 		_sprite.modulate = Color.WHITE
 		_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
-	# Apply the character name to the label (defensive: also re-applied from
-	# _ready() in case setup() runs before add_child, leaving @onready null).
-	_apply_name_label()
-
 	# Deselect any skill.
 	selected_skill_index = -1
 
@@ -131,10 +130,6 @@ func _ready() -> void:
 	# Apply the generated-art sprite visuals (modulate + feet anchor).
 	_apply_sprite_visuals()
 
-	# Re-apply the character name label (idempotent; setup() may have run
-	# before this node was added to the tree, so @onready refs were null).
-	_apply_name_label()
-
 	# Snap to grid position if not already set.
 	if grid_pos == Vector2i(-1, -1):
 		grid_pos = GridManager.world_to_grid(position)
@@ -142,6 +137,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Clamp the sprite into the artwork rect every frame (before the state gate
+	# so sprite_top is updated during TUTORIAL too).
+	_refresh_sprite_clamp()
+
 	# Only tick cooldowns during active battle, and only when unpaused.
 	var state: String = GameManager.get_state()
 	if state != "BATTLE":
@@ -419,13 +418,17 @@ func _apply_sprite_visuals() -> void:
 	_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
 
 
-## Apply the character's data-driven name to the NameLabel. Resolves the label
-## defensively (setup() may run before add_child, leaving the @onready ref
-## null) and is idempotent, so it is safe to call from both setup() and
-## _ready(). No-op if the label or character data is unavailable.
-func _apply_name_label() -> void:
-	var lbl: Label = _name_label
-	if lbl == null:
-		lbl = get_node_or_null("NameLabel") as Label
-	if lbl != null and character_data != null:
-		lbl.text = character_data.character_name
+## Clamp the sprite's offset so the whole texture rect stays inside the board
+## artwork rect, and publish sprite_top for playtest assertions. Idempotent:
+## only writes _sprite.offset when the clamp changes it. Called every frame at
+## the top of _process() (before state gates), so top-row enemies are clamped
+## during TUTORIAL too. The clamp is authoritative per frame — it refines any
+## feet anchor set by _apply_sprite_visuals().
+func _refresh_sprite_clamp() -> void:
+	if _sprite == null or _sprite.texture == null:
+		return
+	var tex_size: Vector2 = _sprite.texture.get_size()
+	var desired: Vector2 = GridManager.clamp_sprite_offset(position, tex_size)
+	if _sprite.offset != desired:
+		_sprite.offset = desired
+	sprite_top = position.y + desired.y - tex_size.y / 2.0

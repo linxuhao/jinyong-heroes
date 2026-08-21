@@ -42,6 +42,10 @@ var skill_cooldowns: Array[float] = []
 ## True while a movement tween is playing. Set/cleared by CombatManager.
 var is_moving: bool = false
 
+## World-px top edge of the sprite texture rect, updated every frame by
+## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
+var sprite_top: float = 0.0
+
 ## Current FSM state label. One of: "IDLE", "APPROACH", "ATTACK",
 ## "SKILL", "RETREAT". Updated by AI evaluation results.
 var fsm_state: String = "IDLE"
@@ -59,7 +63,6 @@ var _ai_accumulator: float = 0.0
 # ---------------------------------------------------------------------------
 
 @onready var _sprite: Sprite2D = $Sprite
-@onready var _name_label: Label = $NameLabel
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -109,7 +112,6 @@ func setup(data, ai) -> void:
 
 	# Visual appearance.
 	_apply_character_visuals()
-	_apply_name_label()
 
 
 ## Returns whether the enemy is currently animating a movement tween.
@@ -136,6 +138,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Clamp the sprite into the artwork rect every frame (before the state gate
+	# so sprite_top is updated during TUTORIAL too).
+	_refresh_sprite_clamp()
+
 	# Only tick during active battle, and only when unpaused.
 	var state: String = GameManager.get_state()
 	if state != "BATTLE":
@@ -236,13 +242,17 @@ func _apply_character_visuals() -> void:
 	sprite.offset = Vector2(0, -(tex.get_height() / 2.0))  # feet at tile centre
 
 
-## Apply the character's display name to the NameLabel under the enemy.
-## Resolves the node via get_node_or_null so it works even when called from
-## setup() BEFORE the node enters the tree (@onready _name_label is null then).
-func _apply_name_label() -> void:
-	var label: Label = _name_label
-	if label == null:
-		label = get_node_or_null("NameLabel") as Label
-	if label == null:
+## Clamp the sprite's offset so the whole texture rect stays inside the board
+## artwork rect, and publish sprite_top for playtest assertions. Idempotent:
+## only writes _sprite.offset when the clamp changes it. Called every frame at
+## the top of _process() (before state gates), so top-row enemies are clamped
+## during TUTORIAL too. The clamp is authoritative per frame — it refines any
+## feet anchor set by _apply_character_visuals().
+func _refresh_sprite_clamp() -> void:
+	if _sprite == null or _sprite.texture == null:
 		return
-	label.text = character_data.character_name if character_data != null else ""
+	var tex_size: Vector2 = _sprite.texture.get_size()
+	var desired: Vector2 = GridManager.clamp_sprite_offset(position, tex_size)
+	if _sprite.offset != desired:
+		_sprite.offset = desired
+	sprite_top = position.y + desired.y - tex_size.y / 2.0
