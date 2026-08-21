@@ -29,8 +29,11 @@ AudioManager="*res://scripts/autoload/audio_manager.gd"
 
 [display]
 
-window/size/viewport_width=1088
-window/size/viewport_height=832
+window/size/viewport_width=960
+window/size/viewport_height=704
+window/size/resizable=true
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
 
 [input]
 
