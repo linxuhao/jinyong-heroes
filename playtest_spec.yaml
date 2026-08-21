@@ -12,15 +12,19 @@ actions:
   - ui_accept
 
 surface:
-  HUD: [visible]
-  Player: [health, max_health, grid_pos, global_position, selected_skill_index]
-  HealthBar: [visible, global_position]
-  East_Heretic: [fsm_state, health, max_health, grid_pos]
+  HUD: [visible, size]
+  Player: [health, max_health, grid_pos, global_position, selected_skill_index, sprite_top]
+  HealthBar: [visible, global_position, size, name_text]
+  East_Heretic: [fsm_state, health, max_health, grid_pos, sprite_top]
   West_Poison: [fsm_state, health, max_health, grid_pos]
   South_Emperor: [fsm_state, health, max_health, grid_pos]
   North_Beggar: [fsm_state, health, max_health, grid_pos]
-  Central_Divine: [fsm_state, health, max_health, grid_pos]
+  Central_Divine: [fsm_state, health, max_health, grid_pos, sprite_top]
+  SkillBar: [visible, size, global_position]
+  SkillButton1: [visible, text]
+  PauseButton: [visible, global_position]
   GameManager: [current_state]
+  Battlefield: [board_aligned]
 
 scenarios:
   - name: "health_bar_visibility_on_startup"
@@ -122,3 +126,68 @@ scenarios:
         actions: []
         assert:
           GameManager.current_state: 'current_state == "LOST"'
+
+  - name: "hud_layout_visible_during_battle"
+    description: "After the tutorial, the battle HUD (skill bar, skill buttons, pause button) is visible and laid out inside the 960x704 viewport."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 20
+        actions: []
+        assert:
+          GameManager.current_state: "changed"
+          HUD.visible: true
+          HUD.size: "size == Vector2(960, 704)"
+          SkillBar.visible: true
+          SkillBar.size.x: "size.x > 0"
+          SkillButton1.visible: true
+          SkillButton1.text: 'text == "Sorrowful Palms"'
+          PauseButton.visible: true
+          PauseButton.global_position.y: "global_position.y >= 0"
+      - at: 25
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "BATTLE"'
+          SkillBar.global_position.y: "global_position.y >= 0 and global_position.y + size.y <= 704"
+
+  - name: "health_bars_show_real_names_single_label"
+    description: "The surviving health-bar label shows the player's real name and lives inside the bar rect (the duplicate floating name labels are gone)."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 20
+        actions: []
+        assert:
+          GameManager.current_state: "changed"
+          HealthBar.visible: true
+          HealthBar.name_text: 'name_text == "Yang Guo"'
+          HealthBar.size.y: "size.y >= 40"
+
+  - name: "top_row_sprites_inside_artwork_grid_aligned"
+    description: "Top-row enemy sprites stay inside the artwork rect (no poke above the battlefield) and the backdrop is fitted to the 960x704 board."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 20
+        actions: []
+        assert:
+          GameManager.current_state: "changed"
+          Central_Divine.sprite_top: "sprite_top >= 0.0"
+          East_Heretic.sprite_top: "sprite_top >= 0.0"
+          Player.sprite_top: "sprite_top >= 0.0"
+          Battlefield.board_aligned: true
