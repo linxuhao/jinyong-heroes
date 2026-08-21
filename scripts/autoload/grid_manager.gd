@@ -133,6 +133,25 @@ func is_walkable(grid_pos: Vector2i) -> bool:
 	return true
 
 
+## Offset for a centered sprite whose feet sit at `position` (preferred offset
+## (0,-half.y)), clamped so the whole texture rect stays inside the board
+## artwork rect [0, GRID_WIDTH*TILE_SIZE] x [0, GRID_HEIGHT*TILE_SIZE].
+## Returns the preferred feet-anchor offset when no clamp is needed.
+static func clamp_sprite_offset(position: Vector2, tex_size: Vector2) -> Vector2:
+	var half: Vector2 = tex_size / 2.0
+	var board: Vector2 = Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE)
+	var offset := Vector2(0.0, -half.y)  # preferred: feet at node position
+	# Guard: if the texture is larger than the board on either axis, keep the
+	# preferred offset rather than inverting the clamp bounds.
+	if tex_size.x >= board.x or tex_size.y >= board.y:
+		return offset
+	var origin: Vector2 = position + offset
+	var clamped := Vector2(
+		clampf(origin.x, half.x, board.x - half.x),
+		clampf(origin.y, half.y, board.y - half.y))
+	return clamped - position
+
+
 ## Returns true if a unit currently occupies the given grid position.
 func is_occupied(grid_pos: Vector2i) -> bool:
 	return occupancy.has(grid_pos)
