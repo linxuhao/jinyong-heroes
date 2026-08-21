@@ -1,6 +1,6 @@
 ## HUD — Main UI layer containing floating health bars, skill buttons,
 ## and pause button. Lives on CanvasLayer layer 10.
-extends CanvasLayer
+extends Control
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
 
