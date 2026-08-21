@@ -32,6 +32,10 @@ const GRID_HEIGHT: int = 11
 @onready var _tilemap: TileMap = $Grid
 @onready var _characters_container: Node2D = $Characters
 
+## Observable for the playtest contract: true when the SummitBackdrop sprite
+## spans exactly the board rect [0,960]x[0,704] after the runtime fit (W7).
+var board_aligned: bool = false
+
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
@@ -46,6 +50,10 @@ func _ready() -> void:
 	# 3. Pass TileMap to GridManager and build the AStar graph.
 	GridManager.set_tilemap(_tilemap)
 	GridManager.setup_grid()
+
+	# 4. Fit the SummitBackdrop to span the board rect exactly (W7). Runs
+	#    before the first frame so board_aligned is set for the playtest gate.
+	_fit_backdrop_to_board()
 
 	# 5. Create all skill data (referenced by character data).
 	var all_skills: Dictionary = _create_all_skill_data()
@@ -154,6 +162,29 @@ func _setup_tilemap(floor_tex: Texture2D, border_tex: Texture2D) -> void:
 	for y in range(GRID_HEIGHT):
 		_tilemap.set_cell(0, Vector2i(0, y), 0, Vector2i(1, 0))           # left edge
 		_tilemap.set_cell(0, Vector2i(GRID_WIDTH - 1, y), 0, Vector2i(1, 0))  # right edge
+
+
+# ---------------------------------------------------------------------------
+# Backdrop fit to board (W7)
+# ---------------------------------------------------------------------------
+
+## Fit the SummitBackdrop sprite to exactly span the board rect [0,960]x[0,704],
+## regardless of the PNG's native size, and record whether the alignment landed.
+## Presentation-only: a runtime fit-to-rect transform, no art regeneration.
+func _fit_backdrop_to_board() -> void:
+	if _backdrop == null or _backdrop.texture == null:
+		return
+	var tex_size: Vector2 = _backdrop.texture.get_size()
+	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
+		return
+	var board := Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE)  # (960, 704)
+	_backdrop.scale = Vector2(board.x / tex_size.x, board.y / tex_size.y)
+	_backdrop.position = board / 2.0
+	var half: Vector2 = tex_size * _backdrop.scale / 2.0
+	var top_left: Vector2 = _backdrop.position - half
+	var bottom_right: Vector2 = _backdrop.position + half
+	board_aligned = top_left.is_equal_approx(Vector2.ZERO) \
+		and bottom_right.is_equal_approx(board)
 
 
 # ---------------------------------------------------------------------------
