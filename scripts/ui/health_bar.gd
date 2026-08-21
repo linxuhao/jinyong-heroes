@@ -12,6 +12,10 @@ var _char_node: Node = null
 ## Cached ratio for color blending.
 var _last_ratio: float = 1.0
 
+## The character display name shown on the label. Always set by setup(),
+## even if the label node is missing, so it is safe to assert on.
+var name_text: String = ""
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -49,6 +53,10 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 			_name_label = label
 	if label != null:
 		label.text = char_name
+
+	# Always record the name (unconditionally, outside the label-null guard)
+	# so the observable is set in every setup() path.
+	name_text = char_name
 
 	# Connect to the character's health_changed signal.
 	if char_node != null and is_instance_valid(char_node):
@@ -88,11 +96,12 @@ func follow_character() -> void:
 		visible = false
 		return
 
-	var camera: Camera2D = get_viewport().get_camera_2d()
-	if camera == null:
-		return
-
-	var screen_pos: Vector2 = camera.get_canvas_transform() * _char_node.global_position
+	# get_final_transform() composes the viewport's global (stretch) transform
+	# with the canvas (camera) transform, mapping the character's world position
+	# into the window-pixel space where this non-following-layer Control lives.
+	# At the default scale-1 window it is numerically identical to the old
+	# camera.get_canvas_transform(), so existing assertions stay valid.
+	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
 	screen_pos += Vector2(-60, -50)
 	# Clamp so the bar never clips off the viewport edges.
 	var vp: Vector2 = get_viewport_rect().size
