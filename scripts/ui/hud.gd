@@ -7,6 +7,24 @@ extends Control
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
 
+## Display aliases for health-bar name labels: short English names, no
+## ellipsis (design/30_presentation.md explicitly allows shorter names).
+## Only the health-bar display layer is affected — character_data.character_name,
+## node names, turn-order names and order_names stay canonical and unchanged.
+const _DISPLAY_ALIASES := {
+	"Yang Guo": "Yang Guo",
+	"East Heretic": "E. Heretic",
+	"West Poison": "W. Poison",
+	"South Emperor": "S. Emperor",
+	"North Beggar": "N. Beggar",
+	"Central Divine": "C. Divine",
+}
+
+## Map a canonical character name to its short display alias; unknown names
+## are returned unchanged (fallback names like "Player"/"Enemy" unaffected).
+func _alias_for(name: String) -> String:
+	return _DISPLAY_ALIASES.get(name, name)
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -44,7 +62,7 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	var player_name: String = "Player"
 	if "character_data" in player and player.character_data != null:
 		player_name = player.character_data.character_name
-	_create_health_bar(player, player_name)
+	_create_health_bar(player, _alias_for(player_name))
 
 	# --- Enemy health bars ---
 	for enemy in enemies:
@@ -55,7 +73,7 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 			char_name = enemy.character_data.character_name
 		elif "name" in enemy:
 			char_name = enemy.name
-		_create_health_bar(enemy, char_name)
+		_create_health_bar(enemy, _alias_for(char_name))
 
 	# --- Skill buttons ---
 	_populate_skill_buttons(player)

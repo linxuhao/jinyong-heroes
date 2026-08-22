@@ -16,6 +16,17 @@ var _last_ratio: float = 1.0
 ## even if the label node is missing, so it is safe to assert on.
 var name_text: String = ""
 
+## Bar width in pixels (= Bar.size.x). Refreshed in setup() and every frame
+## from follow_character() so the geometric "<= 64 px (one cell)" assertion
+## reads the live layout.
+var bar_width: float = 0.0
+
+## Edge-clamp displacement: distance between the current root center and the
+## desired (pre-clamp) root center. ~0 when unclamped (character mid-viewport),
+## grows by the clamp offset when pinned to a viewport edge. Computed inside
+## follow_character(), BEFORE the clamp lines.
+var follow_delta: float = 0.0
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -47,6 +58,19 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	if bar != null:
 		bar.max_value = max_hp
 		bar.value = max_hp
+		bar_width = bar.size.x
+		# Dark-red background stylebox so the bar reads as a health bar even at
+		# low fill; the 1px dark border keeps it visible against the backdrop.
+		# Fill color stays driven by the existing green/yellow/red modulate
+		# logic in update_health() — no fill stylebox override.
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.35, 0.05, 0.05)
+		sb.border_width_left = 1
+		sb.border_width_top = 1
+		sb.border_width_right = 1
+		sb.border_width_bottom = 1
+		sb.border_color = Color(0.05, 0.05, 0.05)
+		bar.add_theme_stylebox_override("background", sb)
 
 	var label: Label = _name_label
 	if label == null:
@@ -107,6 +131,15 @@ func follow_character() -> void:
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
 	screen_pos += Vector2(-60, -50)
+	# follow_delta: pre-clamp displacement of the root center from its desired
+	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
+	# the bar is unclamped and free-following; grows only when a viewport edge
+	# pins the bar away from the character's projected position.
+	follow_delta = (global_position + size * 0.5).distance_to(screen_pos + size * 0.5)
+	# Keep the live bar-width observable in sync every frame (defensive: only
+	# when the bar node is actually present).
+	if is_instance_valid(_bar):
+		bar_width = _bar.size.x
 	# Clamp so the bar never clips off the viewport edges.
 	var vp: Vector2 = get_viewport_rect().size
 	global_position = Vector2(
