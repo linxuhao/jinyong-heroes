@@ -20,7 +20,7 @@ actions:
   - tutorial_next
 
 surface:
-  CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log, last_turn_actor]
+  CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log, last_turn_actor, debug_await_total, debug_await_timeouts, debug_await_frames, debug_round_frame, debug_reflect_hits]
   GameManager: [current_state]
   Player: [health, max_health, grid_pos, moves_left, moved, acted, turns_taken, selected_skill_index, skill_cooldowns, shield, status_names, energy, sprite_top]
   East_Heretic:   [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names, sprite_top]
@@ -31,17 +31,17 @@ surface:
   HUD: [visible, size, skill8_right_edge, round_pause_overlap]
   RoundIndicator: [visible, current_round, active_actor, order_names]
   SkillBar: [visible, size, global_position]
-  SkillButton1: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton2: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton3: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton4: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton5: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton6: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton7: [visible, text, fahui_text, disabled, hp_gated]
-  SkillButton8: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton1: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton2: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton3: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton4: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton5: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton6: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
+  SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
   PauseButton: [visible, global_position]
-  HealthBar: [visible, global_position, size, name_text]
-  Battlefield: [board_aligned]
+  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta]
+  Battlefield: [board_aligned, grid_lines_visible]
 
 scenarios:
   - name: round_one_snapshot_and_turn_order
@@ -367,3 +367,36 @@ scenarios:
           CombatManager.current_round: 'current_round >= 8 and current_round <= 12'
           Player.health: 'health >= 75 and health <= 200'
           Player.turns_taken: "changed"
+
+  - name: ui_geometry_readability
+    description: "Grid overlay is visible above the backdrop; the health bar is <= 64 px (one cell) and tracks the player across a scripted move; the 8th skill button's right edge stays inside the viewport; the round indicator never overlaps the pause button; the four skill-button states are data-distinct (phase-locked 5-8, ready 1)."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 30
+        actions: []
+        assert:
+          Battlefield.grid_lines_visible: true
+          HealthBar.bar_width: 'bar_width <= 64'
+          HUD.skill8_right_edge: 'skill8_right_edge <= 960'
+          HUD.round_pause_overlap: 'round_pause_overlap == false'
+          SkillButton5.state_text: 'state_text == "phase_locked"'
+          SkillButton8.state_text: 'state_text == "phase_locked"'
+          SkillButton1.state_text: 'state_text == "ready"'
+          HealthBar.follow_delta: 'follow_delta <= 24'
+      # --- Scripted move: the player walks 3 tiles up; the health bar must
+      #     track the character (follow_delta stays small) and actually move
+      #     (global_position differential). ---
+      - { at: 40, actions: [move_up] }
+      - { at: 55, actions: [move_up] }
+      - { at: 70, actions: [move_up] }
+      - at: 85
+        actions: []
+        assert:
+          HealthBar.follow_delta: 'follow_delta <= 24'
+          HealthBar.global_position: "changed"
