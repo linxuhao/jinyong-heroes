@@ -26,6 +26,7 @@ that **shipped**, never the one that was merely planned.
 | `10_systems.md` | the decided rules — turn structure, movement, resolution, resources, progression, AI |
 | `20_content.md` | roster / skills / levels / items, as tables with the real numbers |
 | `30_presentation.md` | resolution & stretch, art style, audio, UI layout, input map |
+| `40_progression.md` | **decided but not yet built** — the design of a segment that has no code yet |
 | `90_decisions.md` | rejected ideas + why · open questions |
 | `99_changelog.md` | append-only, one entry per run that changed the design |
 
@@ -39,8 +40,12 @@ order; there is no other index to keep in sync.
 1. **Edit surgically.** Change the lines that changed. Never regenerate a file
    wholesale — that is how three runs' worth of decisions disappear in one turn.
 2. **`99_changelog.md` is append-only.** Never rewrite or delete an entry.
-3. **Only what is implemented** belongs in `10_`/`20_`/`30_`. Planned-but-absent
-   goes to `90_decisions.md` under open questions.
+3. **Only what is implemented** belongs in `10_`/`20_`/`30_`. There are three
+   tiers and a decision moves through them in one direction:
+   `90_decisions.md` (not decided) → `40_progression.md` (decided, no code)
+   → `10_`/`20_`/`30_` (shipped). When a segment lands, move its rules up a
+   tier and delete them from the lower one — a rule that lives in two files
+   will disagree with itself within two runs.
 4. **Numbers here are the source of truth** for implementers. Vague here becomes
    invented in the code.
 
