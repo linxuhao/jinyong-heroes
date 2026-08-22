@@ -546,8 +546,8 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 		apply_knockback(target, kb_dir, skill.knockback)
 
 	# --- DoT ---
-	if skill.dot_damage > 0 and skill.dot_duration > 0:
-		apply_dot(target, skill.dot_damage, skill.dot_duration)
+	if skill.dot_damage > 0 and skill.dot_rounds > 0:
+		apply_dot(target, skill.dot_damage, skill.dot_rounds)
 
 	# --- Heal ---
 	if skill.heal_amount > 0:

@@ -11,3 +11,9 @@ extends Resource
 @export var skills: Array = []
 @export var ai_class: String = ""         # e.g. "AIControllerEastHeretic"
 @export var color: Color = Color.WHITE    # placeholder shape color
+@export var initiative: int = 0           # 身法 value; drives turn order
+@export var energy: int = 0               # 内力 pool (display only; player 180, enemies 0)
+@export var internal_arts: Array = []     # Array of GongfaData
+@export var external_arts: Array = []     # Array of GongfaData
+@export var passive_id: String = ""       # primary internal art's passive
+@export var team: int = 0                 # 0 = player, 1 = Five Greats

@@ -203,12 +203,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "High melee damage with knockback. 4s cooldown."
 	sd.damage = 25
 	sd.range = 1
-	sd.cooldown = 4.0
+	sd.cooldown = 4
 	sd.aoe_shape = "single"
 	sd.aoe_size = 0
 	sd.knockback = 1
 	sd.dot_damage = 0
-	sd.dot_duration = 0.0
+	sd.dot_rounds = 0
 	sd.heal_amount = 0
 	skills.sorrowful_palms = sd
 
@@ -218,12 +218,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "Line AoE, 2-tile reach. 3s cooldown."
 	sd.damage = 15
 	sd.range = 2
-	sd.cooldown = 3.0
+	sd.cooldown = 3
 	sd.aoe_shape = "line"
 	sd.aoe_size = 2
 	sd.knockback = 0
 	sd.dot_damage = 0
-	sd.dot_duration = 0.0
+	sd.dot_rounds = 0
 	sd.heal_amount = 0
 	skills.heavy_iron_sword = sd
 
@@ -233,12 +233,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "Ranged AoE poison, applies DoT. 5s cooldown."
 	sd.damage = 8
 	sd.range = 3
-	sd.cooldown = 5.0
+	sd.cooldown = 5
 	sd.aoe_shape = "square"
 	sd.aoe_size = 1
 	sd.knockback = 0
 	sd.dot_damage = 4
-	sd.dot_duration = 4.0
+	sd.dot_rounds = 4
 	sd.heal_amount = 0
 	skills.poison_cloud = sd
 
@@ -248,12 +248,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "Melee poison strike with DoT. 3s cooldown."
 	sd.damage = 12
 	sd.range = 1
-	sd.cooldown = 3.0
+	sd.cooldown = 3
 	sd.aoe_shape = "single"
 	sd.aoe_size = 0
 	sd.knockback = 0
 	sd.dot_damage = 5
-	sd.dot_duration = 3.0
+	sd.dot_rounds = 3
 	sd.heal_amount = 0
 	skills.venom_strike = sd
 
@@ -263,12 +263,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "Heals self. 15s cooldown."
 	sd.damage = 0
 	sd.range = 0
-	sd.cooldown = 15.0
+	sd.cooldown = 15
 	sd.aoe_shape = "single"
 	sd.aoe_size = 0
 	sd.knockback = 0
 	sd.dot_damage = 0
-	sd.dot_duration = 0.0
+	sd.dot_rounds = 0
 	sd.heal_amount = 30
 	skills.healing_light = sd
 
@@ -278,12 +278,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "Powerful line AoE with knockback. 6s cooldown."
 	sd.damage = 30
 	sd.range = 3
-	sd.cooldown = 6.0
+	sd.cooldown = 6
 	sd.aoe_shape = "line"
 	sd.aoe_size = 3
 	sd.knockback = 2
 	sd.dot_damage = 0
-	sd.dot_duration = 0.0
+	sd.dot_rounds = 0
 	sd.heal_amount = 0
 	skills.dragon_palm = sd
 
@@ -293,12 +293,12 @@ func _create_all_skill_data() -> Dictionary:
 	sd.description = "Cross-shaped AoE, moderate damage. 5s cooldown."
 	sd.damage = 20
 	sd.range = 2
-	sd.cooldown = 5.0
+	sd.cooldown = 5
 	sd.aoe_shape = "cross"
 	sd.aoe_size = 2
 	sd.knockback = 0
 	sd.dot_damage = 0
-	sd.dot_duration = 0.0
+	sd.dot_rounds = 0
 	sd.heal_amount = 0
 	skills.divine_burst = sd
 

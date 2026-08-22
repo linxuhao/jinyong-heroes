@@ -7,10 +7,20 @@ extends Resource
 @export var description: String = ""
 @export var damage: int = 0
 @export var range: int = 1
-@export var cooldown: float = 0.0
-@export var aoe_shape: String = "single"  # "single", "line", "cross", "square"
+@export var cooldown: int = 0             # cooldown in ROUNDS (was float seconds)
+@export var aoe_shape: String = "single"  # "single", "line", "cross", "square", "adjacent"
 @export var aoe_size: int = 0             # radius in tiles (1 = self + adjacent 3x3)
 @export var knockback: int = 0            # tiles pushed back (0 = none)
 @export var dot_damage: int = 0           # damage per tick (0 = none)
-@export var dot_duration: float = 0.0     # seconds
+@export var dot_rounds: int = 0           # DoT duration in ROUNDS (replaces float dot_duration)
 @export var heal_amount: int = 0          # 0 = not a heal
+@export var aoe_origin: String = "self"   # "self"|"target"|"landing"
+@export var shield_amount: int = 0        # shield granted (0 = none)
+@export var shield_rounds: int = 0        # shield duration in rounds
+@export var jump_tiles: int = 0           # jump displacement (3 for jump techniques)
+@export var status_applied: String = ""   # "poison"|"move_minus_next_turn"|"no_techniques_next_turn"|
+                                          #  "no_move_next_turn"|"init_minus_20"|"toad_charge"|"hazard_zone"
+@export var ignore_damage_reduction: bool = false   # e.g. Solar Finger bypasses DR
+@export var hp_gate_below_ratio: float = 0.0        # usable only below this HP fraction (0.5 = Seventeen Forms)
+@export var target_friendly: bool = false           # heal/affect allies (e.g. Primal Breath)
+@export var is_finisher: bool = false               # 绝招 flag for display
