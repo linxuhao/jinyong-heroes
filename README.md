@@ -1,8 +1,8 @@
 # Huashan Sword Tournament (华山论剑)
 
-A **Godot 4** tactical wuxia RPG — five Grandmasters face Yang Guo on a summit grid, and the duel is playable end-to-end. Real-time-with-pause grid combat with skills, per-Grandmaster enemy AI, floating health bars, and a keyboard-completable tutorial.
+A **Godot 4** tactical wuxia RPG — five Grandmasters face Yang Guo on a summit grid, and the duel is playable end-to-end. **Turn-based grid combat** with per-round initiative order, a move + one action turn structure, per-Grandmaster deterministic AI, round-based cooldowns and damage-over-time, floating health bars, a round/actor HUD, and a keyboard-completable tutorial.
 
-This build turns the previous art/audio-only demo into a working game **and fixes the entire presentation layer**: the game opens at the board's native size and fills/scales with its window, the battle HUD (skill bar + cooldowns + pause) is visible on top of the battlefield, each fighter shows exactly one non-overlapping name label, top-row sprites stay inside the illustrated battlefield, and the grid aligns with the artwork.
+This build replaces the previous real-time-with-pause combat with a **strictly sequential turn engine**: every surviving unit acts exactly once per round in initiative order (highest 身法 first), each turn is a movement budget plus one action (basic attack / technique / wait), cooldowns and DoT tick by round at the unit's own turn start, and enemy AI decides exactly once per enemy turn (zero RNG).
 
 ## Quick Start
 
@@ -15,44 +15,56 @@ This build turns the previous art/audio-only demo into a working game **and fixe
 
 | Action | Input |
 |--------|-------|
-| Move | WASD / Arrow keys |
-| Select skill | 1 / 2 (or click the HUD skill buttons) |
-| Basic attack | **J** (left-click an enemy to target the same way) |
-| Fire selected skill | **J** — fires at the nearest enemy in range (or left-click a specific target) |
+| Move (one tile per press, 4-tile budget) | WASD / Arrow keys |
+| Select technique | **1–8** (or click the HUD skill buttons) |
+| Execute selected technique / basic attack | **J** (left-click an enemy to target the same way) |
+| End turn | **Space** |
 | Advance tutorial | Enter / Space |
 | Pause / unpause | Escape |
 
+- Every turn = move up to your movement range **plus** one action, in any order. Space ends the turn at any point (with or without remaining budget).
 - Press `J` with no skill selected to perform a basic attack on the **nearest adjacent** enemy.
-- Select a skill with `1`/`2`, then press `J` to fire it at the nearest enemy within that skill's range (auto-deselects after use).
-- Defeat all five Grandmasters to win; let your health reach zero to lose. Victory/Defeat overlay text ends the battle.
-- Health bars float above characters and follow them, clamped so they never clip off the top edge.
+- Select a skill with `1`–`8`, then press `J` to fire it at the nearest valid target (auto-deselects after use).
+- **Two-phase unlock**: techniques `5`–`8` (Melancholy Palms) are locked until **round 4**; technique `8` (Seventeen Melancholy Forms) additionally requires HP **below 50%**.
+- Each unit acts once per round in initiative order: Yang Guo (88) → East Heretic (85) → Central Divine (80) → South Emperor (76) → North Beggar (74) → West Poison (70).
+- Defeat all five Grandmasters to win; let your health reach zero to lose.
 
-## The Five Grandmasters (live AI)
+## The Five Grandmasters (deterministic AI)
 
-Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that becomes active once the battle starts:
+Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decides **once per enemy turn** via a deterministic priority list over cooldown/range/HP facts — no timers, no RNG:
 
 | Grandmaster | Behaviour |
 |-------------|-----------|
-| West Poison (西毒欧阳锋) | Aggressive rush — never retreats, melee poison strikes |
-| North Beggar (北丐洪七公) | High-damage brawler — Dragon Palm line-AoE with knockback |
-| East Heretic (东邪黄药师) | Ranged poison specialist — kites at range 2-3, Poison Cloud DoT |
-| South Emperor (南帝段智兴) | Balanced melee — self-heals once when low |
-| Central Divine (中神通王重阳) | Defensive counter-attacker — stays IDLE until provoked |
+| West Poison (西毒欧阳锋) | Melee poison strikes, Toad Squat charge, line-AoE knockback; reflects melee damage (蛤蟆反震) |
+| North Beggar (北丐洪七公) | High-damage Dragon Palm brawler with line/AoE knockback + Dog-Beating Staff at range 2; −15% all damage taken (丐帮铁骨) |
+| East Heretic (东邪黄药师) | Ranged specialist — Falling Petals, technique/movement seals, Peach Blossom Maze zones, global initiative debuff; counters attacks from ≤3 tiles (弹指神通) |
+| South Emperor (南帝段智兴) | Balanced ranged — Solar Finger ignores DR, heals self/ally (先天调息), regenerates each round and heals once below 40% (一阳续命) |
+| Central Divine (中神通王重阳) | Defensive sword + shield (罡气护体), global dispel; survives the first fatal blow at 1 HP (先天罡气) |
 
-## Presentation Layer (this run)
+## Turn System
 
-- **Window fills & scales**: `project.godot [display]` pins the base viewport to **960×704** (exactly the 15×11 × 64 px board, the backdrop and the camera view) with `window/stretch/mode="canvas_items"` + `window/stretch/aspect="keep"` + `resizable=true`. The grey margin is removed outright; on resize the board scales to fill the window and letterboxes with engine-black bars outside the design rect (board aspect preserved, crisp vector HUD text).
-- **Visible battle HUD**: the HUD lives on a single `HUDLayer` CanvasLayer (layer 10, `follow_viewport_enabled=false`), so it always draws above the world canvas regardless of sprite `z_index`. The `SkillBar` is re-anchored bottom-center inside the viewport; the `PauseButton` sits top-right.
-- **One label per fighter**: the duplicate floating name labels were removed. The single surviving label lives **inside** each health-bar rect (64 px wide = one tile, font 12, `clip_text` + ellipsis) so adjacent fighters can never overlap by construction.
-- **No top-row poke**: every character sprite is clamped per frame (feet-anchor preserved whenever possible) so its whole texture rect stays inside the 960×704 artwork rect.
-- **Grid/artwork aligned**: `SummitBackdrop` is fitted to the board rect at runtime (`_fit_backdrop_to_board()`), so artwork, tile grid and viewport coincide regardless of the PNG's native size.
+- **Round snapshot**: at round start, all living units are sorted by effective initiative (身法, minus 20 while a 碧海潮生 debuff is active) descending, ties broken by registration order (player first, then East → West → South → North → Central). Godot's `sort_custom` is unstable, so the engine uses a decorate-sort-undecorate insertion sort for determinism.
+- **Turn-start lifecycle** (exact order): cooldown decrement (int rounds) → DoT/status ticks → constant regen (神雕之力 +16, 一阳续命 +13) → the unit acts.
+- **Damage pipeline**: attack side `round(base × buffs × fa_hui_du)` → defense side `round(output × (1 − DR))`. 发挥度 (1.3 in the tutorial) applies to damage / heal / shield / DoT-tick values only — never cooldown, range, knockback, or duration.
+- **Pause** is a boolean gate (no `Engine.time_scale`); the turn flow is event-driven and simply halts at unit boundaries while paused.
+
+## 功法 (Gongfa) Data Structure
+
+`scripts/data/gongfa_data.gd` models internal/external martial arts. Internal arts produce the energy pool (内力 180 for Yang Guo) and a passive id; external arts produce technique lists. Every art exposes `get_fa_hui_du()` which returns **1.3** — an interface-only stub (the 甲乙丙丁 prerequisite cascade is deliberately not implemented this run).
+
+## HUD
+
+- **Skill bar** (8 buttons, `SkillButton1..8`): technique name, hotkey, a 发挥度 rating label (`ERRATIC` / `NORMAL` / `OVERDRIVE` + multiplier — all tutorial arts show `OVERDRIVE x1.3`), and a round-based cooldown overlay. Buttons disable when phase-locked, on cooldown, or (button 8) HP-gated.
+- **Round indicator** (top-center): `Round N`, `Active: <name>`, `Order: <names>`.
+- **Energy label**: `Qi: 180` (display only — no technique costs this run).
+- All new HUD text is English + digits only.
 
 ## Project Structure
 
 ```
 jinyong-play/
 ├── project.godot                 # Engine config, autoload singletons, input map, display/stretch
-├── playtest_spec.yaml            # Headless playtest contract (actions / surface / scenarios)
+├── playtest_spec.yaml            # Headless playtest contract (actions / surface / 9 scenarios)
 ├── run_tests.sh                  # CLI test runner (compile + headless playtest)
 ├── resources.md                  # Asset/tool reference notes
 ├── assets/
@@ -68,19 +80,19 @@ jinyong-play/
 │   ├── enemy.tscn                # Shared enemy scene (5 characters)
 │   └── ui/                       # HUD, health bar, skill button, tutorial overlay
 └── scripts/
-    ├── battlefield.gd            # Terrain/tilemap build, character + AI wiring, HUD/tutorial hookup, backdrop fit
+    ├── battlefield.gd            # Terrain/tilemap build, character + skill data, AI wiring, HUD/tutorial hookup
     ├── autoload/
     │   ├── game_manager.gd       # State machine: TUTORIAL → BATTLE → WON | LOST
-    │   ├── grid_manager.gd       # Grid coords, occupancy, AStar2D pathfinding, range/AoE, sprite clamp
-    │   ├── combat_manager.gd     # Action queue, damage/heal/DoT/knockback, death handling
+    │   ├── grid_manager.gd       # Grid coords, occupancy, AStar2D, range/AoE (origin/size/team), sprite clamp
+    │   ├── combat_manager.gd     # Turn engine + damage/status/passive pipeline + death handling
     │   ├── tutorial_manager.gd   # 7-step keyboard-completable tutorial + input gating
     │   └── audio_manager.gd      # SFX + music playback
     ├── characters/
-    │   ├── player.gd             # Input, keyboard/click targeting, skill selection, sprite clamp
-    │   └── enemy.gd              # AI accumulator, FSM state, per-character visuals, sprite clamp
-    ├── ai/                       # ai_base + 5 per-Grandmaster controllers
-    ├── data/                     # character_data.gd, skill_data.gd
-    └── ui/                       # hud.gd, health_bar.gd, skill_button.gd, etc.
+    │   ├── player.gd             # Turn budgets, 1-8 input, J, Space, gates, targeting, sprite clamp
+    │   └── enemy.gd              # Turn state, per-character visuals, sprite clamp
+    ├── ai/                       # ai_base + 5 per-Grandmaster deterministic controllers
+    ├── data/                     # character_data.gd, skill_data.gd, gongfa_data.gd
+    └── ui/                       # hud.gd, health_bar.gd, skill_button.gd, round_indicator.gd, etc.
 ```
 
 ## Key Interfaces
@@ -91,61 +103,45 @@ jinyong-play/
 
 ### Input actions (`project.godot` `[input]`)
 
-`move_up`, `move_down`, `move_left`, `move_right`, `skill_1`, `skill_2`, `basic_attack` (physical key `J` = 74), `pause_game` (Escape), plus the built-in `ui_accept` (Enter/Space) for tutorial advancement. Every action the game reads is declared here.
+`move_up`, `move_down`, `move_left`, `move_right`, `skill_1`..`skill_8` (digits 1–8), `basic_attack` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the built-in `ui_accept`.
 
 ### `CombatManager` public API
 
-| Method | Behaviour |
+| Member | Behaviour |
 |--------|-----------|
-| `request_action(unit, action, target, params)` | Enqueue an action (`"move"`, `"basic_attack"`, `"skill"`) into the serialized FIFO queue |
-| `is_unit_busy(unit) -> bool` | True if the unit is being processed, has a queued action, or is currently moving |
-| `apply_damage(target, amount)` | Clamp health ≥ 0, emit `damage_dealt`/`health_changed`, handle death |
-| `apply_dot(target, dmg, duration, tick_interval)` | Register a damage-over-time effect |
-| `apply_knockback(target, direction, tiles)` | Tile-by-tile knockback respecting bounds/occupancy/walls |
-| `apply_heal(target, amount)` | Clamp to `max_health`, emit `health_changed` |
-| `pause()` / `unpause()` / `toggle_pause()` | Toggle `Engine.time_scale` with debounce |
+| `current_round` / `phase` / `active_unit_name` / `turn_order` / `turn_log` / `last_turn_actor` | Observable turn-engine state (assertable surface) |
+| `is_player_turn()` | True while the player's turn is active |
+| `end_current_turn()` | End the active unit's turn (Space for the player; engine for enemies) |
+| `begin_turn(unit)` | Turn-start lifecycle: cooldown → DoT/status → regen |
+| `execute_move_path(unit, path)` / `execute_action(unit, action, target, params)` | Execute movement / `"basic_attack"` / `"skill"` with tween-awaited animation |
+| `apply_damage(target, amount, source, is_melee, ignore_dr)` | Two-stage damage pipeline + fatal guard + counter/reflect |
+| `apply_heal` / `apply_shield` / `apply_dot` / `apply_status` | Heal / shield / DoT / status application |
+| `get_fa_hui_du(gongfa)` | Delegates to the `GongfaData` stub (1.3) |
+| `pause()` / `unpause()` / `toggle_pause()` | Boolean pause gate (no `Engine.time_scale`) |
 
-Signals: `paused`, `unpaused`, `action_executed`, `damage_dealt`.
+Signals: `round_started`, `turn_started`, `turn_ended`, `phase_changed`, `action_executed`, `damage_dealt`, `paused`, `unpaused`.
 
 ### `GridManager` public API
 
-| Method | Behaviour |
-|--------|-----------|
-| `is_in_bounds(grid_pos)` | Inside the 15×11 grid rect |
-| `is_walkable(grid_pos)` | In-bounds **and** not on the border wall ring |
-| `is_occupied(grid_pos)` / `reserve_tile` / `free_tile` | Occupancy bookkeeping (does **not** mutate the AStar graph) |
-| `find_path(from, to)` | AStar2D path over static geometry (walls disabled once) |
-| `get_move_range(origin, points)` | BFS flood-fill respecting walls + occupancy |
-| `get_units_in_range(origin, range)` / `get_units_in_aoe(...)` | Target queries (Chebyshev distance) |
-| `grid_to_world` / `world_to_grid` | Pixel ↔ tile conversion |
-| `clamp_sprite_offset(position, tex_size)` | (static) feet-anchor sprite offset clamped inside the board artwork rect |
+`is_in_bounds`, `is_walkable`, `is_occupied` / `reserve_tile` / `free_tile`, `find_path`, `get_move_range`, `get_units_in_range`, `get_tiles_in_aoe`, `get_units_in_aoe` (origin / shape / size / direction / team filter), `grid_to_world` / `world_to_grid`, `clamp_sprite_offset`.
 
 ### `GameManager` public API
 
-`get_state()`, `start_battle()`, `end_battle(won)`, `register_enemy`, `unregister_enemy`, `get_enemies_alive()`, `set_player`, `get_player`. State machine: `TUTORIAL → BATTLE → WON | LOST`.
+`get_state()`, `start_battle()`, `end_battle(won)`, `register_enemy`, `unregister_enemy` (auto-win on empty list), `get_enemies_alive()`, `set_player`, `get_player`.
 
 ### Playtest surface contract (`playtest_spec.yaml`)
 
-Observable nodes/variables (additive to the original surface):
-
-- `HUD` (`visible`, `size`) — the full-rect Control under `HUDLayer`.
-- `Player` (`health`, `max_health`, `grid_pos`, `global_position`, `selected_skill_index`, `sprite_top`).
-- `HealthBar` (`visible`, `global_position`, `size`, `name_text`) — the player's bar.
-- `East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`, `Central_Divine` (each exposing `fsm_state`, `health`, `max_health`, `grid_pos`; `sprite_top` on `East_Heretic`/`Central_Divine`).
-- `SkillBar` (`visible`, `size`, `global_position`), `SkillButton1` (`visible`, `text`), `PauseButton` (`visible`, `global_position`).
-- `GameManager` (`current_state`), `Battlefield` (`board_aligned`).
+Observable nodes/variables include `CombatManager` (`current_round`, `phase`, `active_unit_name`, `turn_order`, `turn_log`, `last_turn_actor`), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`, the 8 `SkillButton*` nodes (`text`, `fahui_text`, `disabled`), `RoundIndicator`, `EnergyLabel`, `HealthBar`, and `Battlefield.board_aligned`.
 
 ## Technical Notes
 
 - **Godot version**: targets 4.4 (the brief's pin); `project.godot` `config/features` records `4.7` — pre-existing and unrelated, and the project compiles/runs under the current toolchain.
-- **Display/stretch**: base viewport is 960×704 with `canvas_items` + `keep`. At the default window the stretch scale is exactly 1, so the composition is identical to a no-stretch 960×704 setup (all prior assertion values hold); on resize the board scales to fill and letterboxes with engine bars.
-- **World→screen conversion**: health bars use `get_viewport().get_final_transform()` (global/stretch × canvas/camera) so they stay glued to their characters at any window size — numerically identical to the old camera transform at scale 1.
-- **Static AStar graph**: occupancy no longer disables graph points; only the border wall ring is disabled once in `setup_grid()`. Occupancy is re-checked at move time.
-- **Queue safety**: `_await_tween_safe()` caps every action-tween await at `TWEEN_TIMEOUT_SEC` (0.6 s) so a tween killed by a node's `queue_free()` can never hang the action queue.
-- **Keyboard targeting**: `_pick_nearest_enemy_in_range()` resolves the nearest living enemy deterministically (registration order tie-break) — no facing state.
-- **Layout**: the border ring is non-walkable (matching the painted stone walls); the skill bar sits over the bottom border row (non-walkable, never covers a fighter); health bars are clamped to the viewport with their label inside the bar rect.
-- **Names**: exactly one name label per fighter (inside the health bar), data-driven from `CharacterData.character_name`; no label renders the placeholder text `"Name"` or `"Enemy"` after `setup()`.
-- **Sprite anchoring**: sprites are feet-anchored at their tile centre via `offset.y = -height/2`, then per-frame clamped so the whole texture stays inside the artwork rect.
+- **Stable initiative sort**: decorate-sort-undecorate with a registration-index tie-break (Godot's `sort_custom` is unstable, and 碧海潮生's −20 debuff can create ties mid-battle).
+- **Tween safety**: `_await_tween_safe()` caps every action tween at `TWEEN_TIMEOUT_SEC` (0.6 s) so a tween killed by `queue_free()` can never hang the turn loop.
+- **Deterministic AI**: zero RNG — pure priority lists over cooldown/range/HP facts; the terminal playtest scenario is reproducible by construction.
+- **Rounding**: GDScript `round()` rounds half away from zero; `45 * 1.3` is exactly 58.5 in double → canonical 59.
+- **Static AStar graph**: only the border wall ring is disabled once; occupancy is re-checked at move time.
+- **Layout**: border ring is non-walkable; the skill bar sits over the bottom border row; health bars are clamped to the viewport with their label inside the bar rect.
 - **Tweens/async**: `create_tween()` + `await` (Godot 4 API), no `yield`.
 
 ## Testing
@@ -154,10 +150,6 @@ Observable nodes/variables (additive to the original surface):
 ./run_tests.sh
 ```
 
-Runs a compile check (which triggers the Godot import pass) followed by a headless playtest against `playtest_spec.yaml`. The six original scenarios prove gameplay (enemy `fsm_state` leaves `IDLE`, `basic_attack` damages an enemy, enemy actions damage the player, a terminal scenario reaches `LOST`). Three new scenarios are the presentation-layer regression net:
-
-- `hud_layout_visible_during_battle` — asserts `HUD.size == Vector2(960, 704)`, and that `SkillBar`, `SkillButton1` (text `"Sorrowful Palms"`) and `PauseButton` are visible and laid out inside the viewport during `BATTLE`.
-- `health_bars_show_real_names_single_label` — asserts `HealthBar.name_text == "Yang Guo"` and `HealthBar.size.y >= 40` (the label lives inside the bar rect).
-- `top_row_sprites_inside_artwork_grid_aligned` — asserts `Central_Divine.sprite_top >= 0`, `East_Heretic.sprite_top >= 0`, `Player.sprite_top >= 0` and `Battlefield.board_aligned == true`.
+Runs a compile check (which triggers the Godot import pass) followed by a headless playtest against `playtest_spec.yaml`. Nine scenarios cover: round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, the two-phase unlock + HP gate, 先天罡气 fatal guard, and a terminal victory within 8–12 rounds with player HP between 15% and 40% (54–144 of 360).
 
 A passing run requires a clean compile and a playtest that executes frames with no `input_dead` scenarios, zero runtime errors, and every assertion green.
