@@ -1,16 +1,21 @@
 ## CombatManager (autoload)
 ##
-## Real-Time-with-Pause (RTWP) combat manager singleton. Owns pause/unpause
-## state, the action queue (FIFO serialized via tweens), damage/heal/DoT/
-## knockback application, and death handling.
+## Turn-based combat manager singleton. Owns the sequential turn engine
+## (round snapshot with a stable initiative sort, one turn per unit per round,
+## round-based cooldown/DoT/status ticking at the unit's own turn start), the
+## two-stage damage pipeline (attack side round(base x buffs x fa_hui_du),
+## defense side round(output x (1 - DR_total))), the per-unit status table,
+## passives (regen, DR tags, counter/reflect, fatal guard, below-40% heal),
+## hazard zones, boolean-gate pause, and death handling.
 ##
-## Consumed by Player and Enemy scripts that call request_action(). Calls into
-## GridManager (occupancy, movement) and GameManager (enemy tracking, win/lose).
+## Consumed by Player / Enemy scripts (end_current_turn, is_player_turn,
+## execute_action) and by the HUD (current_round / phase / active_unit_name /
+## turn_order). Calls into GridManager (occupancy, movement, AoE) and
+## GameManager (enemy tracking, win/lose).
 ##
-## Gate verification (reverify_deployable_gates): green — _damage_flash uses
-## `as Sprite2D` casts (no silent Polygon2D null cast); hit SFX hooked in
-## _execute_basic_attack / _execute_skill only (not apply_damage); move SFX
-## hooked in _execute_move. Documentation only, no logic changes.
+## The RTWP action queue / timer-driven AI path is REMOVED: turn order is
+## driven by 身法 (initiative), the player's turn is event-driven (Space ends
+## it), and enemy AI is invoked exactly once per enemy turn.
 extends Node
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
@@ -19,10 +24,22 @@ const SkillData = preload("res://scripts/data/skill_data.gd")
 # Signals
 # ---------------------------------------------------------------------------
 
-## Emitted when the game is paused (Engine.time_scale set to 0).
+## Emitted when a new round begins. Passes the round number.
+signal round_started(current_round: int)
+
+## Emitted when a unit's turn begins. Passes the unit node.
+signal turn_started(unit: Node)
+
+## Emitted when a unit's turn ends. Passes the unit node.
+signal turn_ended(unit: Node)
+
+## Emitted when the engine phase changes.
+signal phase_changed(phase: String)
+
+## Emitted when the game is paused.
 signal paused()
 
-## Emitted when the game is unpaused (Engine.time_scale set to 1.0).
+## Emitted when the game is unpaused.
 signal unpaused()
 
 ## Emitted after an action is executed. Passes the unit and action name.
@@ -36,43 +53,92 @@ signal damage_dealt(target: Node, amount: int, is_lethal: bool)
 # Constants
 # ---------------------------------------------------------------------------
 
-const QUEUE_CAPACITY: int = 10
 const PAUSE_DEBOUNCE_MS: int = 100
 
 ## Maximum time (seconds) to wait for an action tween's `finished` signal
 ## before giving up. Killed tweens (e.g. a tween bound to a node that was
 ## queue_free'd on death) never emit `finished`, which would otherwise hang
-## _drain_action_queue forever. Longest action tween is 0.15s move + 0.1s
-## flash, so 0.6s is a generous cap.
+## the turn loop forever. Longest action tween is 0.15s move + 0.1s flash,
+## so 0.6s is a generous cap.
 const TWEEN_TIMEOUT_SEC: float = 0.6
 
+## Fallback fa_hui_du when no GongfaData resource is available (every tutorial
+## art returns 1.3 via the GongfaData stub).
+const DEFAULT_FA_HUI_DU: float = 1.3
+
 # ---------------------------------------------------------------------------
-# State
+# Public state (assertable surface)
 # ---------------------------------------------------------------------------
 
-## Whether the game is currently paused.
+## The current round number (starts at 1 when the battle begins).
+var current_round: int = 0
+
+## Engine phase: "IDLE" (pre-battle), "PLAYER_TURN", "ENEMY_TURN", "ROUND_END".
+var phase: String = "IDLE"
+
+## Name of the unit whose turn is active ("" while idle).
+var active_unit_name: String = ""
+
+## Initiative order snapshot for the current round (unit names, first to act).
+var turn_order: Array[String] = []
+
+## Names of units in the order their turns ended (observable log).
+var turn_log: Array[String] = []
+
+## Name of the unit that ended the previous turn.
+var last_turn_actor: String = ""
+
+## Whether the game is currently paused (boolean gate; no Engine.time_scale).
 var is_paused: bool = false
 
-## FIFO action queue. Each entry: {unit: Node, action: String, target: Node,
-## params: Dictionary}
-var action_queue: Array[Dictionary] = []
+## Active hazard zones (桃花迷阵). Maps Vector2i -> {rounds: int, owner: Node}.
+var hazard_zones: Dictionary = {}
 
-## Whether an action is currently being processed (tween animation playing).
-var _processing_action: bool = false
-
-## The unit currently being processed (for is_unit_busy checks).
-var _current_action_unit: Node = null
-
-## Active damage-over-time effects.
-## Each entry: {target: Node, damage_per_tick: int, ticks_remaining: int,
-##              tick_interval: float, time_since_last_tick: float}
-var active_dots: Array[Dictionary] = []
+# ---------------------------------------------------------------------------
+# Private state
+# ---------------------------------------------------------------------------
 
 ## Timestamp (ms) of the last pause toggle, for debounce.
 var _last_pause_toggle: int = 0
 
+## Unit nodes in the current round's initiative order (parallel to turn_order).
+var _turn_order_units: Array = []
+
+## The unit whose turn is active.
+var _active_unit: Node = null
+
+## Set by end_current_turn() so the awaited player-turn branch can resume.
+var _player_turn_done: bool = false
+
+## 弹指神通 counter flags, keyed by unit instance id, reset at each round start.
+var _finger_dart_used: Dictionary = {}
+
+## 先天罡气 fatal-guard-used flags, keyed by unit instance id (once per battle).
+var _innate_qi_used: Dictionary = {}
+
+## 一阳续命 below-40% one-time heal flags, keyed by unit instance id.
+var _one_yang_used: Dictionary = {}
+
 # ---------------------------------------------------------------------------
-# Public API — Pause / unpause
+# Wiring
+# ---------------------------------------------------------------------------
+
+## Idempotently connect to the battle-start signal. The round loop is a
+## long-running coroutine kicked off exactly once from here.
+func _ready() -> void:
+	if not GameManager.battle_started.is_connected(_on_battle_started):
+		GameManager.battle_started.connect(_on_battle_started)
+
+
+## Begin the turn-based battle: round 1 snapshot and the first turn.
+func _on_battle_started() -> void:
+	if phase != "IDLE":
+		return
+	current_round = 1
+	_begin_round()
+
+# ---------------------------------------------------------------------------
+# Public API — Pause / unpause (boolean gate only, NO Engine.time_scale)
 # ---------------------------------------------------------------------------
 
 ## Returns whether the game is currently paused.
@@ -80,27 +146,20 @@ func get_is_paused() -> bool:
 	return is_paused
 
 
-## Pause the game. Sets Engine.time_scale to 0, emitting paused signal.
-## No-op if already paused.
+## Pause the game (boolean gate). Emits paused. No-op if already paused.
 func pause() -> void:
 	if is_paused:
 		return
-
 	is_paused = true
-	Engine.time_scale = 0.0
 	paused.emit()
 
 
-## Unpause the game. Sets Engine.time_scale to 1.0, emitting unpaused signal.
-## Then drains the action queue. No-op if not paused.
+## Unpause the game. Emits unpaused. No-op if not paused.
 func unpause() -> void:
 	if not is_paused:
 		return
-
 	is_paused = false
-	Engine.time_scale = 1.0
 	unpaused.emit()
-	_drain_action_queue()
 
 
 ## Toggle pause/unpause with a 100ms debounce to prevent flickering from
@@ -109,115 +168,486 @@ func toggle_pause() -> void:
 	var now: int = Time.get_ticks_msec()
 	if now - _last_pause_toggle < PAUSE_DEBOUNCE_MS:
 		return
-
 	_last_pause_toggle = now
-
 	if is_paused:
 		unpause()
 	else:
 		pause()
 
-# ---------------------------------------------------------------------------
-# Public API — Action queue
-# ---------------------------------------------------------------------------
 
-## Request an action to be executed. Enqueues the action in the FIFO queue.
-## If the queue is full (>= QUEUE_CAPACITY), returns false without enqueuing.
-## If not paused and no action is currently processing, immediately drains
-## the queue. Returns true on successful enqueue.
-func request_action(unit: Node, action: String, target: Node,
-		params: Dictionary = {}) -> bool:
-	if action_queue.size() >= QUEUE_CAPACITY:
-		return false
-
-	action_queue.append({
-		unit = unit,
-		action = action,
-		target = target,
-		params = params,
-	})
-
-	# Start draining if not paused and not already processing.
-	if not is_paused and not _processing_action:
-		_drain_action_queue()
-
-	return true
-
-
-## Returns true if the given unit is "busy" — either currently being processed
-## by an action, has a pending action in the queue, or is currently moving.
-func is_unit_busy(unit: Node) -> bool:
-	# Check if currently being processed.
-	if _current_action_unit != null and _current_action_unit == unit:
-		return true
-
-	# Check for pending actions in the queue.
-	for entry in action_queue:
-		if entry.unit == unit:
-			return true
-
-	# Check the unit's ACTUAL moving state. Every Player/Enemy defines
-	# get_is_moving(), so testing method existence alone would return true for
-	# everyone and freeze all AI in IDLE — test the return value instead.
-	if "is_moving" in unit and bool(unit.is_moving):
-		return true
-	if unit.has_method("get_is_moving") and bool(unit.get_is_moving()):
-		return true
-
-	return false
+## Returns true while the player's turn is active.
+func is_player_turn() -> bool:
+	return phase == "PLAYER_TURN"
 
 # ---------------------------------------------------------------------------
-# Public API — Damage / Heal / DoT / Knockback
+# Turn engine — round loop
 # ---------------------------------------------------------------------------
 
-## Apply damage to a target. Clamps health to >= 0. Emits damage_dealt.
-## If the target's health reaches 0, handles death:
-##   - Player death: calls GameManager.end_battle(false).
-##   - Enemy death: calls GameManager.unregister_enemy(target),
-##     GridManager.free_tile(target.grid_pos), then queue_free.
-func apply_damage(target: Node, amount: int) -> void:
+## Snapshot the initiative order for a new round and start the first turn.
+## Alive units = the player + living enemies. Order = effective initiative
+## DESC (身法, minus 20 while an init_minus_20 status is active), tie-broken
+## by registration index ASC (player = 0, then enemy registration order).
+##
+## The sort is DECORATE-SORT-UNDECORATE with a stable insertion sort: Godot's
+## Array.sort_custom is NOT stable, and 碧海潮生's -20 debuff can create ties
+## mid-battle, so a strict total order with the unique registration index as
+## the secondary key is mandatory for deterministic playtests.
+func _begin_round() -> void:
+	if phase == "PLAYER_TURN" or phase == "ENEMY_TURN":
+		return  # A turn is already in progress — re-entry guard.
+	_set_phase("ROUND_END")
+
+	# Reset once-per-round passives.
+	_finger_dart_used = {}
+
+	# --- Build the round-order snapshot (decorate) ---
+	var units: Array = [GameManager.get_player()]
+	for e in GameManager.get_enemies_alive():
+		units.append(e)
+
+	var entries: Array = []
+	for i in range(units.size()):
+		var u = units[i]
+		if u == null or not is_instance_valid(u):
+			continue
+		if "health" in u and int(u.health) <= 0:
+			continue
+		entries.append([_effective_initiative(u), i, u])
+
+	# --- Stable insertion sort: effective_init DESC, registration index ASC ---
+	for i in range(1, entries.size()):
+		var key: Array = entries[i]
+		var j: int = i - 1
+		while j >= 0 and _round_entry_before(key, entries[j]):
+			entries[j + 1] = entries[j]
+			j -= 1
+		entries[j + 1] = key
+
+	# --- Undecorate into unit list + name snapshot ---
+	_turn_order_units = []
+	turn_order = []
+	for entry in entries:
+		_turn_order_units.append(entry[2])
+		turn_order.append(_name_of(entry[2]))
+
+	round_started.emit(current_round)
+	_next_turn()
+
+
+## Compare two decorated round entries: true when `a` sorts before `b`
+## (higher effective initiative first; ties broken by earlier registration).
+func _round_entry_before(a: Array, b: Array) -> bool:
+	if a[0] != b[0]:
+		return a[0] > b[0]
+	return a[1] < b[1]
+
+
+## Advance to the next unit's turn. Dead units pop; an empty queue ends the
+## round. The player's turn is event-driven (awaits Space via
+## end_current_turn()); enemy turns run their AI exactly once and execute the
+## resulting move path + action with tween-awaited animation.
+func _next_turn() -> void:
+	if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
+		return
+
+	# Pop dead heads (units killed earlier this round never act).
+	while not _turn_order_units.is_empty():
+		var head: Node = _turn_order_units[0] as Node
+		if head == null or not is_instance_valid(head):
+			_turn_order_units.pop_front()
+			continue
+		if "health" in head and int(head.health) <= 0:
+			_turn_order_units.pop_front()
+			continue
+		break
+
+	if _turn_order_units.is_empty():
+		_end_round()
+		return
+
+	var unit: Node = _turn_order_units.pop_front() as Node
+	_active_unit = unit
+	active_unit_name = _name_of(unit)
+
+	var is_player_unit: bool = _is_player(unit)
+	_set_phase("PLAYER_TURN" if is_player_unit else "ENEMY_TURN")
+	turn_started.emit(unit)
+
+	begin_turn(unit)
+
+	# A unit that dies during its own turn-start ticks (DoT, 先天一炁, ...)
+	# records its turn and does not act.
+	if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
+		return
+	if "health" in unit and int(unit.health) <= 0:
+		end_current_turn()
+		return
+
+	if is_player_unit:
+		# Event-driven: wait for the player to press Space (end_current_turn).
+		_player_turn_done = false
+		while not _player_turn_done \
+				and GameManager.get_state() not in ["WON", "LOST"]:
+			await get_tree().process_frame
+		return  # end_current_turn() already continued the loop.
+
+	# --- Enemy turn: AI decides ONCE, then move path + one action. ---
+	while is_paused:
+		await get_tree().process_frame
+
+	var decision: Dictionary = _evaluate_ai(unit)
+
+	if not decision.is_empty():
+		var move_path: Array = decision.get("move_path", [])
+		var action: String = decision.get("action", "")
+		var target: Node = decision.get("target", null)
+		var skill_index: int = decision.get("skill_index", -1)
+		var params: Dictionary = decision.get("params", {})
+
+		if target == null or not is_instance_valid(target):
+			target = GameManager.get_player()
+
+		# Legacy single-step "move" decision -> normalize to a move path.
+		if action == "move":
+			if move_path.is_empty() and params.has("to"):
+				move_path = [unit.grid_pos, params.to]
+			action = ""
+
+		# Surface observability: let the AI declare its FSM state.
+		if "fsm_state" in unit:
+			var fsm: String = decision.get("fsm_state", "")
+			if fsm != "":
+				unit.fsm_state = fsm
+
+		if not move_path.is_empty():
+			await execute_move_path(unit, move_path)
+			if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
+				return
+
+		if action != "" and action != "wait":
+			if params.is_empty() and action == "skill" and skill_index >= 0:
+				params = { skill_index = skill_index }
+			await execute_action(unit, action, target, params)
+			if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
+				return
+
+	if "acted" in unit:
+		unit.acted = true
+	end_current_turn()
+
+
+## End the current round and begin the next one.
+func _end_round() -> void:
+	_set_phase("ROUND_END")
+	current_round += 1
+	_begin_round()
+
+
+## End the active unit's turn: increment turns_taken, log the actor, clear
+## one-turn restrictions, emit turn_ended, and advance to the next unit.
+## Called by the player (Space) and by the engine after enemy turns.
+func end_current_turn() -> void:
+	var unit: Node = _active_unit
+	if unit == null or not is_instance_valid(unit):
+		_player_turn_done = true
+		return
+
+	if "turns_taken" in unit:
+		unit.turns_taken += 1
+
+	var name: String = _name_of(unit)
+	turn_log.append(name)
+	last_turn_actor = name
+
+	if unit.has_method("clear_this_turn_restrictions"):
+		unit.clear_this_turn_restrictions()
+	else:
+		# Defensive fallback: consume the "next turn" restriction statuses.
+		_remove_status(unit, "move_minus_next_turn")
+		_remove_status(unit, "no_techniques_next_turn")
+		_remove_status(unit, "no_move_next_turn")
+
+	turn_ended.emit(unit)
+	_player_turn_done = true
+	_next_turn()
+
+# ---------------------------------------------------------------------------
+# Turn-start lifecycle (design 10_systems §5.2) — exact order:
+#   1) cooldown decrement    2) DoT/status ticks (incl. hazard zone lifetime)
+#   3) constant regen        4) the unit acts
+# ---------------------------------------------------------------------------
+
+## Run the unit's turn-start lifecycle. Called by the engine before the unit
+## acts (both player and enemy turns).
+func begin_turn(unit: Node) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+
+	# Reset this turn's budgets.
+	if "moved" in unit:
+		unit.moved = false
+	if "acted" in unit:
+		unit.acted = false
+	var move_range: int = _move_range_of(unit)
+	if "moves_left" in unit:
+		unit.moves_left = move_range
+	# "Next turn" restrictions apply for this turn.
+	if _has_status(unit, "no_move_next_turn"):
+		unit.moves_left = 0
+	elif _has_status(unit, "move_minus_next_turn"):
+		unit.moves_left = max(move_range - 2, 0)
+
+	# (1) Cooldowns decrement by round at the unit's own turn start.
+	if "skill_cooldowns" in unit and unit.skill_cooldowns != null:
+		for i in range(unit.skill_cooldowns.size()):
+			if int(unit.skill_cooldowns[i]) > 0:
+				unit.skill_cooldowns[i] = int(unit.skill_cooldowns[i]) - 1
+		if unit.has_signal("cooldowns_updated"):
+			unit.cooldowns_updated.emit(unit.skill_cooldowns.duplicate())
+
+	# (2) DoT / status ticks.
+	_tick_statuses(unit)
+	_tick_hazard_zones(unit)
+
+	# (3) Constant regen from the primary internal art's passive.
+	var passive: String = _passive_of(unit)
+	match passive:
+		"shen_diao_power":
+			apply_heal(unit, 16)  # round(12 * 1.3)
+		"one_yang_renewal":
+			apply_heal(unit, 13)  # round(10 * 1.3)
+
+	# (4) The unit acts (driven by the turn engine / player input).
+
+
+## Tick round-based status durations at the owner's turn start. Poison DoT
+## entries deal their stored tick damage (captured at application time) and
+## then decrement; shield / init debuff / toad-charge durations decrement and
+## expire at 0. "Next turn" restriction statuses are NOT ticked here — they
+## persist through the turn and are cleared at its end.
+func _tick_statuses(unit: Node) -> void:
+	if unit == null or not ("statuses" in unit) or unit.statuses == null:
+		return
+	var i: int = 0
+	while i < unit.statuses.size():
+		var st: Dictionary = unit.statuses[i]
+		var id: String = st.get("id", "")
+		var rounds: int = st.get("rounds", 0)
+
+		if id == "move_minus_next_turn" or id == "no_techniques_next_turn" \
+				or id == "no_move_next_turn":
+			i += 1
+			continue
+
+		if id == "poison" and rounds > 0:
+			var tick: int = int(st.get("params", {}).get("tick", 0))
+			if tick > 0:
+				apply_damage(unit, tick, st.get("params", {}).get("source", null), false)
+
+		rounds -= 1
+		st["rounds"] = rounds
+		if rounds <= 0:
+			if id == "shield" and "shield" in unit:
+				unit.shield = 0
+			unit.statuses.remove_at(i)
+			continue
+		i += 1
+	_refresh_status_names(unit)
+
+
+## Decrement hazard-zone lifetimes at the caster's turn start; zones that hit
+## 0 are removed.
+func _tick_hazard_zones(unit: Node) -> void:
+	var tiles_to_remove: Array[Vector2i] = []
+	for tile in hazard_zones.keys():
+		var zone: Dictionary = hazard_zones[tile]
+		if zone.get("owner", null) == unit:
+			zone["rounds"] = int(zone.get("rounds", 0)) - 1
+			if zone["rounds"] <= 0:
+				tiles_to_remove.append(tile)
+	for tile in tiles_to_remove:
+		hazard_zones.erase(tile)
+
+# ---------------------------------------------------------------------------
+# Public API — Damage / Heal / Shield / DoT / Status / Knockback
+# ---------------------------------------------------------------------------
+
+## Apply damage to a target through the two-stage pipeline:
+##   attack side (already computed by the caller): round(base x buffs x fhd)
+##   defense side (here): round(output x (1 - DR_total))
+## DR tags: 丐帮铁骨 -15% all damage; 神雕之力 -20% melee (Chebyshev <= 1).
+## ignore_damage_reduction (一阳指) skips all DR tags.
+## Order: DR -> shield absorb -> HP -> 先天罡气 fatal guard (before death) ->
+## death handling -> 一阳续命 below-40% heal -> counter/reflect (owner alive).
+func apply_damage(target: Node, amount: int, source: Node = null,
+		is_melee: bool = false, ignore_dr: bool = false) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-
-	# Ensure the target has a health property.
 	if not ("health" in target and "max_health" in target):
 		return
+	if amount <= 0:
+		return
 
-	var old_health: int = target.health
-	target.health = max(target.health - amount, 0)
-	var is_lethal: bool = target.health <= 0
+	# --- Defense side: damage reduction ---
+	var actual: int = amount
+	if not ignore_dr:
+		var dr: float = _damage_reduction(target, is_melee)
+		actual = int(round(amount * (1.0 - dr)))
+	if actual < 0:
+		actual = 0
+
+	# --- Shield absorb ---
+	var shield_amount: int = int(target.shield) if "shield" in target else 0
+	if shield_amount > 0:
+		var absorbed: int = min(shield_amount, actual)
+		target.shield = shield_amount - absorbed
+		actual -= absorbed
+		if int(target.shield) <= 0:
+			_remove_status(target, "shield")
+
+	# --- HP ---
+	target.health = max(int(target.health) - actual, 0)
+	var is_lethal: bool = int(target.health) <= 0
+
+	# --- 先天罡气 fatal guard BEFORE death handling (DoT ticks included) ---
+	if is_lethal and _passive_of(target) == "innate_qi" \
+			and not bool(_innate_qi_used.get(target.get_instance_id(), false)):
+		target.health = 1
+		is_lethal = false
+		_innate_qi_used[target.get_instance_id()] = true
+		_clear_negative_statuses(target)
 
 	damage_dealt.emit(target, amount, is_lethal)
-
-	# Emit health_changed signal if the target exposes it.
 	if target.has_signal("health_changed"):
 		target.health_changed.emit(target.health, target.max_health)
 
-	# Handle death.
+	# --- 一阳续命: one-time +78 when surviving a hit below 40% HP ---
+	if not is_lethal and int(target.health) > 0 \
+			and _passive_of(target) == "one_yang_renewal" \
+			and not bool(_one_yang_used.get(target.get_instance_id(), false)):
+		var ratio: float = float(target.health) / float(target.max_health)
+		if ratio < 0.4:
+			_one_yang_used[target.get_instance_id()] = true
+			apply_heal(target, 78)  # round(60 * 1.3)
+
 	if is_lethal:
 		_handle_death(target)
+		return
+
+	# --- Counter / reflect (passive owner survived the triggering damage) ---
+	_trigger_counter_reflect(target, source, is_melee)
 
 
-## Apply a damage-over-time effect to a target. Calculates number of ticks
-## from duration / tick_interval and appends to active_dots.
-func apply_dot(target: Node, damage_per_tick: int, duration: float,
-		tick_interval: float = 1.0) -> void:
+## 弹指神通 counter (13, once per round, attacker within 3 tiles) and
+## 蛤蟆反震 reflect (16, melee attacker) — both untyped (skip DR tags),
+## triggered after the triggering damage fully resolves, only while the
+## passive owner is still alive.
+func _trigger_counter_reflect(target: Node, source: Node, is_melee: bool) -> void:
+	if source == null or not is_instance_valid(source):
+		return
+	if source == target:
+		return
+	if not ("health" in source) or int(source.health) <= 0:
+		return
+	match _passive_of(target):
+		"finger_dart":
+			if bool(_finger_dart_used.get(target.get_instance_id(), false)):
+				return
+			if _distance_between(target, source) <= 3:
+				_finger_dart_used[target.get_instance_id()] = true
+				apply_damage(source, 13, target, false, true)  # round(10*1.3)
+		"toad_reflect":
+			if is_melee:
+				apply_damage(source, 16, target, false, true)  # round(12*1.3)
+
+
+## Apply a fully-cooked heal amount (the caller already applied the fa_hui_du
+## multiplier). Clamps health to max_health. Emits health_changed.
+func apply_heal(target: Node, amount: int) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-	if damage_per_tick <= 0 or duration <= 0 or tick_interval <= 0:
+	if not ("health" in target and "max_health" in target):
+		return
+	if amount <= 0:
+		return
+	target.health = min(int(target.health) + amount, int(target.max_health))
+	if target.has_signal("health_changed"):
+		target.health_changed.emit(target.health, target.max_health)
+
+
+## Grant a shield absorbing `amount` (already cooked) for `rounds` rounds.
+## Overwrites any existing shield pool and refreshes its duration.
+func apply_shield(target: Node, amount: int, rounds: int) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	if amount <= 0 or rounds <= 0:
+		return
+	if "shield" in target:
+		target.shield = amount
+	_ensure_statuses(target)
+	for st in target.statuses:
+		if st.get("id", "") == "shield":
+			st["rounds"] = rounds
+			st["params"] = { amount = amount }
+			_refresh_status_names(target)
+			return
+	target.statuses.append({
+		id = "shield", kind = "positive", rounds = rounds, params = { amount = amount },
+	})
+	_refresh_status_names(target)
+
+
+## Apply a damage-over-time effect. The tick value round(base_tick x fhd) is
+## captured AT APPLICATION TIME and stored in the poison status; each tick
+## deals that stored value at the victim's turn start. Multiple DoTs stack.
+func apply_dot(target: Node, base_tick: int, rounds: int,
+		fa_hui_du: float) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	if base_tick <= 0 or rounds <= 0:
+		return
+	_ensure_statuses(target)
+	var tick: int = int(round(base_tick * fa_hui_du))
+	target.statuses.append({
+		id = "poison", kind = "negative", rounds = rounds,
+		params = { tick = tick, source = null },
+	})
+	_refresh_status_names(target)
+
+
+## Apply a status effect to a unit. Poison delegates to apply_dot (the tick
+## is cooked with the given fa_hui_du); round-valued statuses decrement at the
+## owner's turn start.
+func apply_status(target: Node, status_id: String,
+		params: Dictionary = {}) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	_ensure_statuses(target)
+	if status_id == "poison":
+		apply_dot(target, int(params.get("tick", 0)),
+			int(params.get("rounds", 1)), DEFAULT_FA_HUI_DU)
 		return
 
-	var ticks: int = int(duration / tick_interval)
-	if ticks <= 0:
-		ticks = 1
-
-	active_dots.append({
-		target = target,
-		damage_per_tick = damage_per_tick,
-		ticks_remaining = ticks,
-		tick_interval = tick_interval,
-		time_since_last_tick = 0.0,
-	})
+	var entry: Dictionary = {
+		id = status_id, kind = "positive", rounds = 1, params = params,
+	}
+	match status_id:
+		"init_minus_20":
+			entry.kind = "negative"
+			entry.rounds = 2
+		"move_minus_next_turn":
+			entry.kind = "negative"
+		"no_techniques_next_turn":
+			entry.kind = "negative"
+		"no_move_next_turn":
+			entry.kind = "negative"
+		"toad_charge":
+			# Buff for the next round's first technique: survives to that
+			# turn's start (2 -> 1) and through it; consumed on use or at
+			# that turn's end.
+			entry.rounds = 2
+	target.statuses.append(entry)
+	_refresh_status_names(target)
 
 
 ## Apply knockback to a target. Moves the target `tiles` tiles in the given
@@ -271,101 +701,120 @@ func apply_knockback(target: Node, direction: Vector2i, tiles: int) -> void:
 			GridManager.grid_to_world(final_pos), 0.15)
 
 
-## Apply healing to a target. Clamps health to max_health. Emits health_changed.
-func apply_heal(target: Node, amount: int) -> void:
-	if target == null or not is_instance_valid(target):
+## Remove all kind == "negative" statuses from a unit (先天罡气 guard).
+func _clear_negative_statuses(target: Node) -> void:
+	if target == null or not ("statuses" in target) or target.statuses == null:
 		return
-	if not ("health" in target and "max_health" in target):
-		return
-
-	var old_health: int = target.health
-	target.health = min(target.health + amount, target.max_health)
-
-	if target.has_signal("health_changed"):
-		target.health_changed.emit(target.health, target.max_health)
-
-# ---------------------------------------------------------------------------
-# Process — DoT tick
-# ---------------------------------------------------------------------------
-
-func _process(delta: float) -> void:
-	# No DoT ticking while paused.
-	if is_paused:
-		return
-
-	_tick_dots(delta)
-
-
-## Tick all active damage-over-time effects.
-func _tick_dots(delta: float) -> void:
 	var i: int = 0
-	while i < active_dots.size():
-		var dot: Dictionary = active_dots[i]
-
-		# Skip if the target is no longer valid.
-		if dot.target == null or not is_instance_valid(dot.target):
-			active_dots.remove_at(i)
-			continue
-
-		dot.time_since_last_tick += delta
-
-		if dot.time_since_last_tick >= dot.tick_interval:
-			# Apply one tick of damage.
-			dot.time_since_last_tick -= dot.tick_interval
-			apply_damage(dot.target, dot.damage_per_tick)
-			dot.ticks_remaining -= 1
-
-		# Remove expired DoTs.
-		if dot.ticks_remaining <= 0:
-			active_dots.remove_at(i)
+	while i < target.statuses.size():
+		if target.statuses[i].get("kind", "") == "negative":
+			target.statuses.remove_at(i)
 		else:
 			i += 1
+	_refresh_status_names(target)
+
+
+## Remove every positive status (shield, toad_charge, ...) — 先天一炁 dispel.
+func _dispel_buffs(target: Node) -> void:
+	if target == null or not ("statuses" in target) or target.statuses == null:
+		return
+	var i: int = 0
+	while i < target.statuses.size():
+		var st: Dictionary = target.statuses[i]
+		if st.get("kind", "") == "positive":
+			if st.get("id", "") == "shield" and "shield" in target:
+				target.shield = 0
+			target.statuses.remove_at(i)
+		else:
+			i += 1
+	_refresh_status_names(target)
+
+
+## Remove all entries with the given status id.
+func _remove_status(target: Node, status_id: String) -> void:
+	if target == null or not ("statuses" in target) or target.statuses == null:
+		return
+	var i: int = 0
+	while i < target.statuses.size():
+		if target.statuses[i].get("id", "") == status_id:
+			target.statuses.remove_at(i)
+		else:
+			i += 1
+	_refresh_status_names(target)
+
+
+## Make sure a unit carries a statuses array (contract: present during battle).
+func _ensure_statuses(target: Node) -> void:
+	if target == null:
+		return
+	if not ("statuses" in target):
+		target.set("statuses", [])
+	if target.statuses == null:
+		target.set("statuses", [])
+
+
+## Keep the observable status_names array in sync with the statuses table.
+func _refresh_status_names(unit: Node) -> void:
+	if unit == null or not ("status_names" in unit):
+		return
+	var names: Array[String] = []
+	if "statuses" in unit and unit.statuses != null:
+		for st in unit.statuses:
+			names.append(str(st.get("id", "")))
+	unit.status_names = names
 
 # ---------------------------------------------------------------------------
-# Internal — Action execution
+# (Seconds-based DoT ticking REMOVED — round-based DoTs resolve at the
+# victim's turn start inside begin_turn() / _tick_statuses().)
 # ---------------------------------------------------------------------------
 
-## Drain the action queue FIFO. Each action is executed with an await on its
-## tween before the next action begins, ensuring serialised execution.
-func _drain_action_queue() -> void:
-	if _processing_action:
+# ---------------------------------------------------------------------------
+# Public API — Action execution
+# ---------------------------------------------------------------------------
+
+## Execute a move path tile by tile (tween-awaited). Each step consumes 1
+## movement point and applies the 桃花迷阵 zone penalty on entry (-2 to the
+## remaining move budget, clamped at 0; the caster's own zones are ignored).
+func execute_move_path(unit: Node, path: Array) -> void:
+	if unit == null or not is_instance_valid(unit) or path.is_empty():
 		return
-	if action_queue.is_empty():
-		return
 
-	_processing_action = true
-
-	while not action_queue.is_empty():
-		var entry: Dictionary = action_queue.pop_front()
-		_current_action_unit = entry.unit as Node
-
-		# Skip if the unit is no longer valid.
-		if entry.unit == null or not is_instance_valid(entry.unit):
-			_current_action_unit = null
+	var moved_any: bool = false
+	for i in range(1, path.size()):
+		if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
+			return
+		var to_pos: Vector2i = path[i] as Vector2i
+		if not ("grid_pos" in unit) or to_pos == unit.grid_pos:
 			continue
-
-		# Execute the action and capture the tween (if any) for awaiting.
-		var tween: Tween = _execute_action(
-			entry.unit,
-			entry.action,
-			entry.target,
-			entry.params
-		)
-
-		# Await the tween's completion (watchdog-capped) before processing the next
-			# action. A tween bound to a node that died mid-action never emits
-			# `finished`; the watchdog guarantees the queue keeps draining.
-		if tween != null and is_instance_valid(tween):
+		if not GridManager.is_in_bounds(to_pos) or not GridManager.is_walkable(to_pos):
+			continue
+		if GridManager.is_occupied(to_pos):
+			continue
+		if "moves_left" in unit and int(unit.moves_left) <= 0:
+			return
+		if "moves_left" in unit:
+			unit.moves_left = int(unit.moves_left) - 1
+		var tween: Tween = _execute_move(unit, { to = to_pos })
+		if tween != null:
 			await _await_tween_safe(tween)
+		moved_any = true
+		# 桃花迷阵: entering a zone tile slows the mover (except the caster).
+		if hazard_zones.has(to_pos) \
+				and hazard_zones[to_pos].get("owner", null) != unit \
+				and "moves_left" in unit:
+			unit.moves_left = max(int(unit.moves_left) - 2, 0)
+	if moved_any and "moved" in unit:
+		unit.moved = true
 
-		# After the action completes, if the unit is an enemy, trigger its AI
-		# to re-evaluate (reset its decision timer).
-		if entry.unit != null and is_instance_valid(entry.unit):
-			if entry.unit.has_method("reset_ai_timer"):
-				entry.unit.reset_ai_timer()
 
-	_current_action_unit = null
-	_processing_action = false
+## Execute one action ("basic_attack" | "skill") and await its animation.
+## Only successful executions set cooldown / acted (handled inside the
+## executors); invalid executions are silent no-ops.
+func execute_action(unit: Node, action: String, target: Node,
+		params: Dictionary) -> void:
+	var tween: Tween = _execute_action(unit, action, target, params)
+	if tween != null and is_instance_valid(tween):
+		await _await_tween_safe(tween)
 
 
 ## Execute a single action. Returns a Tween if one was created (so the caller
@@ -447,40 +896,41 @@ func _execute_move(unit: Node, params: Dictionary) -> Tween:
 	return null
 
 
-## Execute a basic attack. Applies damage and plays a damage flash effect.
-## Returns a tween for the flash effect, or null.
+## Execute a basic attack: attack-side round(base x primary-internal-art fhd),
+## then the two-stage pipeline. Sets acted on success. Returns a flash tween.
 func _execute_basic_attack(unit: Node, target: Node) -> Tween:
 	if target == null or not is_instance_valid(target):
+		return null
+	if not ("health" in target):
 		return null
 
 	# Hit SFX — one play per valid basic attack. Deliberately NOT in
 	# apply_damage(), which also fires per DoT tick and would spam.
 	AudioManager.play_hit()
 
-	# Determine damage from the attacker's character_data.
-	var damage: int = 10  # default fallback
+	# Base damage from the attacker's character_data; cook with the primary
+	# internal art's fa_hui_du (design 10_systems §4.0).
+	var base: int = 10  # default fallback
 	if "character_data" in unit and unit.character_data != null:
-		damage = unit.character_data.attack_damage
+		base = int(unit.character_data.attack_damage)
+	var output: int = int(round(base * _internal_fhd(unit)))
 
-	apply_damage(target, damage)
+	apply_damage(target, output, unit, _is_melee(unit, target))
 
-	# Damage flash — overbright modulate flash on the target's Sprite2D.
+	if "acted" in unit:
+		unit.acted = true
 	return _damage_flash(target)
 
 
-## Execute a skill action. Looks up the skill by skill_index in the unit's
-## skills array. Applies damage, AoE, knockback, DoT, and/or heal as defined
-## by the SkillData resource. Starts the cooldown for the skill.
-## Returns a tween for effects, or null.
+## Execute a skill: gate checks (cooldown, technique seal, HP gate), jump
+## displacement, then damage / DoT / status / knockback / heal / shield per
+## the SkillData. Starts the cooldown and sets acted ONLY on successful
+## execution. Returns a tween for effects, or null (not consumed).
 func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
-	if target == null or not is_instance_valid(target):
-		return null
-
 	var skill_index: int = params.get("skill_index", -1)
 	if skill_index < 0:
 		return null
 
-	# Get the skill data from the unit's skills array.
 	var skills_arr = unit.skills if "skills" in unit else null
 	if skills_arr == null or skill_index >= skills_arr.size():
 		return null
@@ -489,80 +939,186 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 	if skill == null:
 		return null
 
+	# --- Execution gates (failure -> skill NOT consumed) ---
+	if "skill_cooldowns" in unit and skill_index < unit.skill_cooldowns.size():
+		if int(unit.skill_cooldowns[skill_index]) > 0:
+			return null
+	if _has_status(unit, "no_techniques_next_turn"):
+		return null
+	if skill.hp_gate_below_ratio > 0.0:
+		var hp_ratio: float = float(unit.health) / float(unit.max_health) \
+			if int(unit.max_health) > 0 else 1.0
+		if hp_ratio >= skill.hp_gate_below_ratio:
+			return null
+
+	# --- Jump displacement (landing tile becomes the AoE origin) ---
+	var origin: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
+	var jump_tween: Tween = null
+	if skill.jump_tiles > 0:
+		var landing: Vector2i = _compute_jump_landing(unit, int(skill.jump_tiles))
+		if landing == unit.grid_pos:
+			return null  # No valid landing — skill NOT consumed.
+		origin = landing
+		jump_tween = _displace_unit(unit, landing)
+
 	# Hit SFX — one play per valid skill execution, before damage is applied.
 	AudioManager.play_hit()
 
-	# --- Primary target damage ---
+	var fhd: float = _external_fhd_for_skill(unit, skill)
+	var buffs: float = _consume_toad_charge(unit)  # 蛤蟆蹲 x1.5 (damage only)
+	var damage: int = 0
 	if skill.damage > 0:
-		apply_damage(target, skill.damage)
+		damage = int(round(float(skill.damage) * buffs * fhd))
 
-	# --- AoE damage ---
-	if skill.aoe_shape != "single" and skill.aoe_size > 0:
-		var origin: Vector2i = Vector2i.ZERO
-		if "grid_pos" in unit:
-			origin = unit.grid_pos
-
-		# Determine direction for line AoE.
+	# --- Resolve hit targets ---
+	var hit_units: Array[Node] = []
+	if skill.aoe_shape == "global":
+		hit_units = _hostile_units_of(unit)
+	elif skill.aoe_shape == "single":
+		if skill.target_friendly:
+			if target != null and is_instance_valid(target):
+				hit_units = [target]
+			else:
+				hit_units = [unit]
+		elif target != null and is_instance_valid(target):
+			hit_units = [target]
+	else:
+		var aoe_origin: Vector2i = origin
+		if skill.aoe_origin == "target" and target != null and "grid_pos" in target:
+			aoe_origin = target.grid_pos
 		var direction: Vector2i = Vector2i.ZERO
 		if skill.aoe_shape == "line":
-			direction = params.get("direction", Vector2i.ZERO)
-			if direction == Vector2i.ZERO:
-				# Auto-detect direction toward target.
-				if "grid_pos" in target:
-					var t_pos: Vector2i = target.grid_pos
-					if t_pos.x > origin.x:
-						direction = Vector2i(1, 0)
-					elif t_pos.x < origin.x:
-						direction = Vector2i(-1, 0)
-					elif t_pos.y > origin.y:
-						direction = Vector2i(0, 1)
-					elif t_pos.y < origin.y:
-						direction = Vector2i(0, -1)
-
-		var aoe_targets: Array[Node] = GridManager.get_units_in_aoe(
-			origin, skill.aoe_shape, skill.aoe_size, direction
-		)
-
-		# Apply AoE damage to all targets except the primary (already hit).
-		for aoe_target in aoe_targets:
-			if aoe_target != target:
-				apply_damage(aoe_target, skill.damage)
-
-	# --- Knockback ---
-	if skill.knockback > 0 and "grid_pos" in target:
-		# Calculate knockback direction away from the attacker.
-		var unit_pos: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
-		var target_pos: Vector2i = target.grid_pos
-		var kb_dir: Vector2i = Vector2i(
-			sign(target_pos.x - unit_pos.x),
-			sign(target_pos.y - unit_pos.y)
-		)
-		# Prefer cardinal direction (pick axis with larger delta).
-		if abs(target_pos.x - unit_pos.x) >= abs(target_pos.y - unit_pos.y):
-			kb_dir.y = 0
+			direction = _line_direction(aoe_origin, target)
+		if skill.target_friendly:
+			var foe: Node = _first_hostile_unit_of(unit)
+			hit_units = GridManager.get_units_in_aoe(aoe_origin, skill.aoe_shape,
+				skill.aoe_size, direction, foe)
 		else:
-			kb_dir.x = 0
+			hit_units = GridManager.get_units_in_aoe(aoe_origin, skill.aoe_shape,
+				skill.aoe_size, direction, unit)
 
-		apply_knockback(target, kb_dir, skill.knockback)
+	# --- Self-buffs / zones (always target the caster) ---
+	match skill.status_applied:
+		"toad_charge":
+			apply_status(unit, "toad_charge")
+		"hazard_zone":
+			_place_hazard_zone(unit, skill)
+	if skill.shield_amount > 0:
+		apply_shield(unit,
+			int(round(float(skill.shield_amount) * _internal_fhd(unit))),
+			int(skill.shield_rounds))
 
-	# --- DoT ---
-	if skill.dot_damage > 0 and skill.dot_rounds > 0:
-		apply_dot(target, skill.dot_damage, skill.dot_rounds)
+	# --- Per-hit effects: damage, DoT, status, knockback ---
+	for h in hit_units:
+		if h == null or not is_instance_valid(h):
+			continue
+		if damage > 0:
+			apply_damage(h, damage, unit, _is_melee(unit, h),
+				bool(skill.ignore_damage_reduction))
+		if skill.dot_damage > 0 and skill.dot_rounds > 0:
+			apply_dot(h, int(skill.dot_damage), int(skill.dot_rounds), fhd)
+		var status_id: String = skill.status_applied
+		if status_id == "dispel_hostile_buffs":
+			_dispel_buffs(h)
+		elif status_id != "" and status_id != "poison" \
+				and status_id != "toad_charge" and status_id != "hazard_zone":
+			apply_status(h, status_id)
+		if skill.knockback > 0 and "grid_pos" in h:
+			_apply_knockback_from(h, unit, int(skill.knockback))
 
 	# --- Heal ---
 	if skill.heal_amount > 0:
-		apply_heal(target, skill.heal_amount)
-		# Also heal the caster if the skill has self-heal flag.
-		var heal_self: bool = params.get("heal_self", false)
-		if heal_self and unit != target:
-			apply_heal(unit, skill.heal_amount)
+		var heal_targets: Array[Node] = []
+		if skill.target_friendly:
+			heal_targets = hit_units
+			if heal_targets.is_empty() and target != null and is_instance_valid(target):
+				heal_targets = [target]
+		else:
+			heal_targets = [unit]
+		for h in heal_targets:
+			apply_heal(h, int(round(float(skill.heal_amount) * fhd)))
 
-	# --- Start cooldown ---
+	# --- Start cooldown (only on successful execution) ---
 	if "skill_cooldowns" in unit and skill_index < unit.skill_cooldowns.size():
-		unit.skill_cooldowns[skill_index] = skill.cooldown
+		unit.skill_cooldowns[skill_index] = int(skill.cooldown)
+	if unit.has_signal("cooldowns_updated"):
+		unit.cooldowns_updated.emit(unit.skill_cooldowns.duplicate())
+	if "acted" in unit:
+		unit.acted = true
 
-	# Damage flash on primary target.
-	return _damage_flash(target)
+	# Return the primary tween (jump displacement if any, else damage flash).
+	if jump_tween != null:
+		return jump_tween
+	if target != null and is_instance_valid(target):
+		return _damage_flash(target)
+	return _damage_flash(unit)
+
+
+## Place a 桃花迷阵 hazard zone: every tile in the square AoE around the
+## caster becomes a zone for 3 rounds (its own lifetime, decremented at the
+## caster's turn start).
+func _place_hazard_zone(unit: Node, skill) -> void:
+	var center: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
+	var tiles: Array[Vector2i] = GridManager.get_tiles_in_aoe(center,
+		"square", max(int(skill.aoe_size), 1))
+	for tile in tiles:
+		hazard_zones[tile] = { rounds = 3, owner = unit }
+
+
+## Jump displacement: up to `tiles` tiles along the A* path toward the nearest
+## hostile unit, landing on the furthest walkable, unoccupied tile. Returns
+## the landing tile (== start when no valid landing exists).
+func _compute_jump_landing(unit: Node, tiles: int) -> Vector2i:
+	var start: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
+	var foe: Node = _nearest_hostile_unit(unit)
+	if foe == null or not is_instance_valid(foe) or not ("grid_pos" in foe):
+		return start
+	var path: Array[Vector2i] = GridManager.find_path(start, foe.grid_pos)
+	var landing: Vector2i = start
+	for i in range(1, min(path.size(), tiles + 1)):
+		var tile: Vector2i = path[i]
+		if not GridManager.is_in_bounds(tile) or not GridManager.is_walkable(tile):
+			break
+		if GridManager.is_occupied(tile) and tile != start:
+			break
+		landing = tile
+	return landing
+
+
+## Teleport a unit to a tile (occupancy + position). Returns the tween, or
+## null if the displacement was invalid.
+func _displace_unit(unit: Node, to_pos: Vector2i) -> Tween:
+	var from_pos: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
+	if from_pos == to_pos:
+		return null
+	GridManager.free_tile(from_pos)
+	if not GridManager.reserve_tile(to_pos, unit):
+		GridManager.reserve_tile(from_pos, unit)
+		return null
+	unit.grid_pos = to_pos
+	if unit is Node2D:
+		var tween: Tween = create_tween()
+		tween.bind_node(unit)
+		tween.tween_property(unit, "position", GridManager.grid_to_world(to_pos), 0.15)
+		return tween
+	return null
+
+
+## Knockback direction away from `unit`, applied via apply_knockback.
+func _apply_knockback_from(target: Node, unit: Node, tiles: int) -> void:
+	if target == null or not ("grid_pos" in target):
+		return
+	if unit == null or not ("grid_pos" in unit):
+		return
+	var unit_pos: Vector2i = unit.grid_pos
+	var target_pos: Vector2i = target.grid_pos
+	var kb_dir: Vector2i = Vector2i(sign(target_pos.x - unit_pos.x),
+		sign(target_pos.y - unit_pos.y))
+	if abs(target_pos.x - unit_pos.x) >= abs(target_pos.y - unit_pos.y):
+		kb_dir.y = 0
+	else:
+		kb_dir.x = 0
+	apply_knockback(target, kb_dir, tiles)
 
 # ---------------------------------------------------------------------------
 # Internal — Helpers
@@ -645,3 +1201,232 @@ func _damage_flash(target: Node) -> Tween:
 	).set_delay(0.1)
 
 	return flash_tween
+
+
+## Call an AI controller's evaluate() exactly once per enemy turn. Supports
+## both the new single-argument contract (evaluate(enemy) -> {move_path,
+## action, target, skill_index, params}) and the legacy three-argument one
+## (evaluate(enemy, player, delta)).
+func _evaluate_ai(unit: Node) -> Dictionary:
+	var ai = unit.ai_controller if "ai_controller" in unit else null
+	if ai == null or not ai.has_method("evaluate"):
+		return {}
+	var n_args: int = -1
+	for m in ai.get_method_list():
+		if m.has("name") and m.name == "evaluate":
+			n_args = int(m.args.size())
+			break
+	var result: Variant = {}
+	if n_args >= 3:
+		result = ai.evaluate(unit, GameManager.get_player(), 0.0)
+	else:
+		result = ai.evaluate(unit)
+	if result is Dictionary:
+		return result
+	return {}
+
+# ---------------------------------------------------------------------------
+# Stat / data helpers
+# ---------------------------------------------------------------------------
+
+## Display name of a unit (character_name, falling back to the node name).
+func _name_of(unit: Node) -> String:
+	if unit == null:
+		return ""
+	if "character_data" in unit and unit.character_data != null \
+			and "character_name" in unit.character_data \
+			and unit.character_data.character_name != "":
+		return str(unit.character_data.character_name)
+	return str(unit.name)
+
+
+## True when the unit is the player character.
+func _is_player(unit: Node) -> bool:
+	var p: Node = GameManager.get_player()
+	if p == null:
+		return unit.name == "Player" or unit.name == "YangGuo"
+	return unit.get_instance_id() == p.get_instance_id()
+
+
+func _initiative_of(unit: Node) -> int:
+	if unit == null:
+		return 0
+	if "initiative" in unit:
+		return int(unit.initiative)
+	if "character_data" in unit and unit.character_data != null \
+			and "initiative" in unit.character_data:
+		return int(unit.character_data.initiative)
+	return 0
+
+
+## Effective initiative for round snapshots: 身法 minus 20 while an
+## init_minus_20 status is active (碧海潮生).
+func _effective_initiative(unit: Node) -> int:
+	var eff: int = _initiative_of(unit)
+	if _has_status(unit, "init_minus_20"):
+		eff -= 20
+	return eff
+
+
+func _move_range_of(unit: Node) -> int:
+	if unit == null:
+		return 1
+	if "character_data" in unit and unit.character_data != null \
+			and "move_range" in unit.character_data:
+		return int(unit.character_data.move_range)
+	return 1
+
+
+## The unit's primary internal art passive id (shen_diao_power, finger_dart,
+## toad_reflect, one_yang_renewal, beggar_iron_bone, innate_qi).
+func _passive_of(unit: Node) -> String:
+	if unit == null:
+		return ""
+	if "passive_id" in unit:
+		return str(unit.passive_id)
+	if "character_data" in unit and unit.character_data != null \
+			and "passive_id" in unit.character_data:
+		return str(unit.character_data.passive_id)
+	return ""
+
+
+## True when the unit carries the given status with at least 1 round left.
+func _has_status(unit: Node, status_id: String) -> bool:
+	if unit == null or not ("statuses" in unit) or unit.statuses == null:
+		return false
+	for st in unit.statuses:
+		if st.get("id", "") == status_id and st.get("rounds", 0) >= 1:
+			return true
+	return false
+
+
+## fa_hui_du of the unit's primary internal art (basic attacks / passives).
+func _internal_fhd(unit: Node) -> float:
+	var fhd: float = DEFAULT_FA_HUI_DU
+	if unit != null and "character_data" in unit and unit.character_data != null:
+		var arts = unit.character_data.internal_arts
+		if arts != null and arts.size() > 0 and arts[0] != null:
+			fhd = get_fa_hui_du(arts[0])
+	return fhd
+
+
+## fa_hui_du of the external art that produced `skill`.
+func _external_fhd_for_skill(unit: Node, skill) -> float:
+	var fhd: float = DEFAULT_FA_HUI_DU
+	if unit != null and "character_data" in unit and unit.character_data != null:
+		var arts = unit.character_data.external_arts
+		if arts != null:
+			for art in arts:
+				if art != null and "techniques" in art and art.techniques != null:
+					if skill in art.techniques:
+						return get_fa_hui_du(art)
+	return fhd
+
+
+## Delegate to the GongfaData fa_hui_du stub (1.3 tutorial-wide). The real
+## prerequisite (甲乙丙丁 cascade) calculation is NOT implemented this run.
+func get_fa_hui_du(gongfa) -> float:
+	if gongfa != null and gongfa.has_method("get_fa_hui_du"):
+		return float(gongfa.get_fa_hui_du(null))
+	return DEFAULT_FA_HUI_DU
+
+
+## Defense-side damage reduction: 丐帮铁骨 -15% all damage; 神雕之力 -20%
+## melee (Chebyshev distance <= 1 at resolution).
+func _damage_reduction(target: Node, is_melee: bool) -> float:
+	var dr: float = 0.0
+	match _passive_of(target):
+		"beggar_iron_bone":
+			dr += 0.15
+		"shen_diao_power":
+			if is_melee:
+				dr += 0.2
+	return dr
+
+
+## 蛤蟆蹲 charge: returns 1.5 and consumes the status when the unit has an
+## active charge (next round's first technique), else 1.0.
+func _consume_toad_charge(unit: Node) -> float:
+	if unit == null or not ("statuses" in unit) or unit.statuses == null:
+		return 1.0
+	for st in unit.statuses:
+		if st.get("id", "") == "toad_charge" and st.get("rounds", 0) >= 1:
+			unit.statuses.erase(st)
+			_refresh_status_names(unit)
+			return 1.5
+	return 1.0
+
+
+## Melee = Chebyshev distance <= 1 at resolution time.
+func _is_melee(a: Node, b: Node) -> bool:
+	if a == null or b == null:
+		return false
+	if not ("grid_pos" in a and "grid_pos" in b):
+		return false
+	return _chebyshev(a.grid_pos, b.grid_pos) <= 1
+
+
+func _distance_between(a: Node, b: Node) -> int:
+	if a == null or b == null:
+		return 999999
+	if not ("grid_pos" in a and "grid_pos" in b):
+		return 999999
+	return _chebyshev(a.grid_pos, b.grid_pos)
+
+
+static func _chebyshev(a: Vector2i, b: Vector2i) -> int:
+	return max(abs(a.x - b.x), abs(a.y - b.y))
+
+
+## All units hostile to the given unit (player vs enemies_alive, else player).
+func _hostile_units_of(unit: Node) -> Array[Node]:
+	var result: Array[Node] = []
+	if _is_player(unit):
+		for e in GameManager.get_enemies_alive():
+			if is_instance_valid(e):
+				result.append(e)
+	else:
+		var p: Node = GameManager.get_player()
+		if p != null and is_instance_valid(p):
+			result.append(p)
+	return result
+
+
+func _first_hostile_unit_of(unit: Node) -> Node:
+	var foes: Array[Node] = _hostile_units_of(unit)
+	if foes.is_empty():
+		return null
+	return foes[0]
+
+
+func _nearest_hostile_unit(unit: Node) -> Node:
+	var foes: Array[Node] = _hostile_units_of(unit)
+	var best: Node = null
+	var best_dist: int = 999999
+	if unit == null or not ("grid_pos" in unit):
+		return null
+	for foe in foes:
+		if foe == null or not is_instance_valid(foe) or not ("grid_pos" in foe):
+			continue
+		var d: int = _chebyshev(unit.grid_pos, foe.grid_pos)
+		if d < best_dist:
+			best_dist = d
+			best = foe
+	return best
+
+
+## Cardinal direction from origin toward the target (for line AoEs).
+func _line_direction(origin: Vector2i, target: Node) -> Vector2i:
+	if target == null or not is_instance_valid(target) or not ("grid_pos" in target):
+		return Vector2i.ZERO
+	var t: Vector2i = target.grid_pos
+	if abs(t.x - origin.x) >= abs(t.y - origin.y):
+		return Vector2i(sign(t.x - origin.x), 0)
+	return Vector2i(0, sign(t.y - origin.y))
+
+
+## Set the engine phase and emit phase_changed on change.
+func _set_phase(p: String) -> void:
+	if phase != p:
+		phase = p
+		phase_changed.emit(p)
