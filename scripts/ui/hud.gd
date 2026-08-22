@@ -242,6 +242,29 @@ func _refresh_skill_button_states(player: Node) -> void:
 		if btn.has_method("update_cooldown"):
 			btn.update_cooldown(remaining, total)
 
+			# Four-state derivation (priority: phase_locked > cooldown >
+			# hp_gated > ready), written every frame as observables and applied
+			# visually via _apply_state. The `disabled` computation above stays
+			# untouched — the states are the data the visuals are built from.
+			var state := "ready"
+			if phase_locked:
+				state = "phase_locked"
+			elif on_cooldown:
+				state = "cooldown"
+			elif hp_gated:
+				state = "hp_gated"
+			if "state_text" in btn:
+				btn.state_text = state
+			if "cooldown_remaining" in btn:
+				btn.cooldown_remaining = remaining
+			# Selected overlay: compare the player's chosen skill index against
+			# the button's own skill_index (not the loop index i). The player
+			# may not expose selected_skill_index (tutorial/pre-battle) — guard.
+			if "selected_skill_index" in player:
+				btn.selected = (int(player.selected_skill_index) == int(btn.skill_index))
+			if btn.has_method("_apply_state"):
+				btn._apply_state(state)
+
 # ---------------------------------------------------------------------------
 # Signal handlers
 # ---------------------------------------------------------------------------

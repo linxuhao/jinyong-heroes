@@ -32,6 +32,20 @@ var fahui_text: String = ""
 ## Independent of phase lock / cooldown — observable for the playtest surface.
 var hp_gated: bool = false
 
+## Observable four-state button state, written EVERY frame by the HUD
+## (_refresh_skill_button_states): "ready" | "cooldown" | "phase_locked" |
+## "hp_gated". Never assigned here — this script only renders from it.
+var state_text: String = ""
+
+## Observable remaining cooldown rounds (0 = ready), written every frame by
+## the HUD; drives the CooldownLabel number shown over the cooldown overlay.
+var cooldown_remaining: int = 0
+
+## Observable selection flag: true when the player's currently selected skill
+## is this button (player.selected_skill_index == skill_index). Written every
+## frame by the HUD; drives the golden selected border (已选中 state).
+var selected: bool = false
+
 ## Reference to the SkillData resource for this button.
 var _skill_data = null
 
@@ -42,6 +56,8 @@ var _skill_data = null
 @onready var _cooldown_overlay: ColorRect = $CooldownOverlay
 @onready var _hotkey_label: Label = $HotkeyLabel
 @onready var _fahui_label: Label = $FahuiLabel
+@onready var _cooldown_label: Label = $CooldownLabel
+@onready var _state_tag: Label = $StateTag
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -123,6 +139,62 @@ func update_cooldown(remaining: int, total: int) -> void:
 		overlay.anchor_bottom = progress
 		overlay.offset_top = 0.0
 		overlay.offset_bottom = 0.0
+
+
+## Apply the four-state visual presentation for this button. The state data
+## (state_text / cooldown_remaining / selected) is derived and written EVERY
+## frame by the HUD; this function only turns that data into visuals. The four
+## states are pairwise distinguishable (design/30_presentation.md item 2):
+##   ready        -> default style, full modulate, no tag, no number
+##   cooldown     -> slight desaturation + remaining-rounds NUMBER over the
+##                   existing dark top-fill overlay (the overlay itself is
+##                   driven by update_cooldown, untouched here)
+##   phase_locked -> gray tint + "LOCKED" tag
+##   hp_gated     -> red tint + "HP" tag
+## The golden selected border (已选中) is layered on top of any state and never
+## changes state_text.
+func _apply_state(state: String) -> void:
+	# Ready: default appearance, full modulate.
+	if state == "ready":
+		modulate = Color(1, 1, 1, 1)
+		if _cooldown_label != null:
+			_cooldown_label.visible = false
+		if _state_tag != null:
+			_state_tag.text = ""
+	# Cooldown: slight desaturation + remaining-rounds number over the overlay.
+	elif state == "cooldown":
+		modulate = Color(0.78, 0.78, 0.82, 1.0)
+		if _cooldown_label != null:
+			_cooldown_label.visible = true
+			_cooldown_label.text = str(cooldown_remaining)
+		if _state_tag != null:
+			_state_tag.text = ""
+	# Phase lock (palm arts locked before round 4): gray tint + LOCKED tag.
+	elif state == "phase_locked":
+		modulate = Color(0.55, 0.55, 0.6)
+		if _state_tag != null:
+			_state_tag.text = "LOCKED"
+		if _cooldown_label != null:
+			_cooldown_label.visible = false
+	# HP gate (Seventeen Forms above 50% max health): red tint + HP tag.
+	elif state == "hp_gated":
+		modulate = Color(0.85, 0.4, 0.4)
+		if _state_tag != null:
+			_state_tag.text = "HP"
+		if _cooldown_label != null:
+			_cooldown_label.visible = false
+
+	# Selected overlay: bright golden border via a "normal" StyleBoxFlat
+	# override, layered on top of the four states (a selected button is never
+	# disabled, so "normal" is the rendered stylebox).
+	if selected:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.22, 0.22, 0.26, 1.0)
+		sb.border_color = Color(1.0, 0.84, 0.0, 1.0)
+		sb.set_border_width_all(2)
+		add_theme_stylebox_override("normal", sb)
+	else:
+		remove_theme_stylebox_override("normal")
 
 # ---------------------------------------------------------------------------
 # Signal handling

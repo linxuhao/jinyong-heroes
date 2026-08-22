@@ -212,33 +212,33 @@ func _create_all_skill_data() -> Dictionary:
 	skills["heavy_edge"] = _skill("Heavy Edge",
 		"Single-target heavy strike with knockback. 1 round cooldown.",
 		45, 1, 1, "single", 0, "self", 1)
-	skills["grand_simplicity"] = _skill("Grand Simplicity",
+	skills["grand_simplicity"] = _skill("Great Craft",
 		"Line attack reaching 3 tiles. 2 round cooldown.",
 		38, 3, 2, "line", 3, "self", 0)
-	skills["thousand_force_cleave"] = _skill("Thousand-Force Cleave",
+	skills["thousand_force_cleave"] = _skill("Cleave",
 		"Cross strike with 2-tile arms centered on self. 3 round cooldown.",
 		34, 2, 3, "cross", 2, "self", 0)
-	var boundless_seas = _skill("Boundless Seas",
+	var boundless_seas = _skill("Boundless",
 		"Finisher: shockwave around self with radius 2. 6 round cooldown.",
 		70, 2, 6, "square", 2, "self", 0)
 	boundless_seas.is_finisher = true
 	skills["boundless_seas"] = boundless_seas
 
 	# --- Yang Guo: Melancholy Palms (hotkeys 5-8) ---
-	skills["heart_rending_strike"] = _skill("Heart-Rending Strike",
+	skills["heart_rending_strike"] = _skill("Heart Strike",
 		"Single-target palm strike. 1 round cooldown.",
 		38, 1, 1, "single", 0, "self", 0)
-	var dragging_mire = _skill("Dragging Mire",
+	var dragging_mire = _skill("Mud Drag",
 		"Single-target palm strike that reduces the target's next move. 2 round cooldown.",
 		25, 1, 2, "single", 0, "self", 0)
 	dragging_mire.status_applied = "move_minus_next_turn"
 	skills["dragging_mire"] = dragging_mire
-	var wandering_valley = _skill("Wandering Valley",
+	var wandering_valley = _skill("Valley Jump",
 		"Jump up to 3 tiles and strike all units adjacent to the landing tile. 3 round cooldown.",
 		20, 3, 3, "adjacent", 0, "landing", 0)
 	wandering_valley.jump_tiles = 3
 	skills["wandering_valley"] = wandering_valley
-	var seventeen_forms = _skill("Seventeen Melancholy Forms",
+	var seventeen_forms = _skill("17 Forms",
 		"Finisher: strike all adjacent units with heavy knockback. Usable only below 50% HP. 8 round cooldown.",
 		70, 0, 8, "adjacent", 0, "self", 2)
 	seventeen_forms.hp_gate_below_ratio = 0.5
