@@ -1,7 +1,8 @@
 ## AIControllerCentralDivine — 中神通王重阳 AI
 ##
-## Defensive counter-attacker. Maintains Qi Aegis, dispels hostile buffs
-## with Primal Unity, and unleashes Seven Stars / Quanzhen Sword up close.
+## Defensive counter-attacker (approaches and holds melee). Maintains Qi
+## Aegis, dispels hostile buffs with Primal Unity, and unleashes Seven Stars
+## / Quanzhen Sword up close.
 ##
 ## Skill index map (from battlefield.gd):
 ##   0 quanzhen_sword · 1 seven_stars · 2 qi_aegis · 3 primal_unity

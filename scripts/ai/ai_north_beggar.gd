@@ -1,7 +1,7 @@
 ## AIControllerNorthBeggar — 北丐洪七公 AI
 ##
-## High-damage melee brawler. Charges the player, unloads Dragon Palms in
-## priority order, and uses the Dog-Beating Staff at range 2.
+## High-damage melee brawler. Charges the player and stays in melee, unloads
+## Dragon Palms in priority order, and uses the Dog-Beating Staff at range 2.
 ##
 ## Skill index map (from battlefield.gd):
 ##   0 proud_dragon_regret · 1 flying_dragon · 2 dragon_in_the_field

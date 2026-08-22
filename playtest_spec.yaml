@@ -327,7 +327,9 @@ scenarios:
       - { at: 985, actions: [basic_attack] }
       - { at: 1000, actions: [end_turn] }
       # --- Round 4 (debuff expired, player FIRST; palm arts unlocked and HP well
-      #     below 180): Seventeen Melancholy Forms (adjacent, 70 -> 91, cd8). ---
+      #     below 180 — the skill_8 HP gate needs health < 180, i.e. below 50%
+      #     of 360, which three rounds of enemy focus-fire guarantee by now):
+      #     Seventeen Melancholy Forms (adjacent, 70 -> 91, cd8). ---
       - { at: 1030, actions: [skill_8] }
       - { at: 1045, actions: [basic_attack] }
       - { at: 1060, actions: [end_turn] }

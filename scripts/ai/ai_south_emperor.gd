@@ -2,7 +2,7 @@
 ##
 ## Balanced healer. Heals self (or the most wounded ally) whenever Primal
 ## Breath is ready, then fights at range 1-2 with Solar Finger / Acupoint
-## Lock / Six-Pulse Volley.
+## Lock / Six-Pulse Volley; approaches to range 2, inside the player's AoE.
 ##
 ## Skill index map (from battlefield.gd):
 ##   0 solar_finger · 1 acupoint_lock · 2 primal_breath · 3 six_pulse_volley

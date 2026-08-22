@@ -12,9 +12,10 @@ extends RefCounted
 # ---------------------------------------------------------------------------
 
 ## Evaluate the situation and return a decision dictionary. Called ONCE per
-## enemy turn by CombatManager. Pure function of the enemy's cooldowns /
-## health / grid_pos, the player's grid_pos / health, and allies' health —
-## zero RNG, zero delta, zero per-instance mutable state.
+## enemy turn by CombatManager's turn engine (never on a timer). Pure
+## function of the enemy's cooldowns / health / grid_pos, the player's
+## grid_pos / health, and allies' health — zero RNG, zero delta, zero
+## per-instance mutable state.
 ##
 ## Keys:
 ##   move_path: Array[Vector2i]  # index 0 = current tile; engine walks 1..end

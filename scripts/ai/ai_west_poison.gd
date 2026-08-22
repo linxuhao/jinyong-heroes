@@ -45,7 +45,8 @@ func evaluate(enemy: Node) -> Dictionary:
 			fsm_state = "ATTACK",
 		}
 	# 5) Toad Squat charge when the player is beyond reach but within
-	#    move_range + 1 (stand and charge).
+	#    move_range + 1 (stand and charge; staying planted keeps him inside
+	#    the approach lane and the player's radius-2 AoE envelope).
 	if _is_skill_ready(enemy, 1) and dist >= 2 and dist <= 4:
 		return {
 			move_path = [], action = "skill", target = enemy,

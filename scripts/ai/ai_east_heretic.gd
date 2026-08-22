@@ -47,7 +47,8 @@ func evaluate(enemy: Node) -> Dictionary:
 			move_path = [], action = "skill", target = enemy,
 			skill_index = 2, fsm_state = "SKILL",
 		}
-	# 5) In basic range (22 @ 3) — ranged basic attack.
+	# 5) In basic range (22 @ 3) — hold and shoot from range 3, never retreat,
+	#    keeping East Heretic inside the player's radius-2 AoE envelope.
 	if dist <= 3:
 		return {
 			move_path = [], action = "basic_attack", target = player,
