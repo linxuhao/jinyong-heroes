@@ -33,9 +33,9 @@ Three independent problem domains, each with a different verification path:
 | Stale code comments only (no logic change): `player.gd` :171/:184 "180 of 360" — the gate itself derives from `max_health` and follows to 250 automatically; `combat_manager.gd` :455/:517/:1377 "−20% melee" wording | 360 / −20% | **500 / −50% wording** |
 | `playtest_spec.yaml` snapshots: `Player.health: 360`, terminal band `54..144` | 360 / 54–144 | **500 / 75–200** |
 
-This run therefore implements the already-decided design numbers — it adds **no new design change** and does not need a "设计变更" section. All other content numbers (enemy HP/damage/cooldowns, skill values, ×1.3, round() rules) are untouched. The percentage rules hold: **−50% is flat; percentages never take the fhd multiplier.** Victory band: 15–40% of 500 = **75–200**. The 17 Forms HP gate: 50% of 500 = **< 250** (the code computes the gate from `max_health`, so it follows automatically).
+This run therefore implements the already-decided design numbers and rules — it adds **no new design change** and does not need a "设计变更" section. It **follows the upstream weapon-class melee/ranged rule** (design/10_systems.md §2.2, changelog `jinyong-ux`): melee ⇔ the external art's weapon class is 刀/剑/长兵/拳掌/轻功/横练; ranged ⇔ 指/暗器/奇门毒/乐器; shape, reach, and damage do not participate; basic attacks classify by the character's 主修外功. The code-visible consequence for the current roster is exactly **two skill classifications flip** relative to the old distance-based heuristic (detailed in §4.3): **jade_flute_acupoint → ranged** (jade flute is an instrument; reach 1 does not make it melee) and **hidden_dragon → melee** (降龙 is fist-palm). All other content numbers (enemy HP/damage/cooldowns, skill values, ×1.3, round() rules) are untouched. The percentage rules hold: **−50% is flat; percentages never take the fhd multiplier.** Victory band: 15–40% of 500 = **75–200**. The 17 Forms HP gate: 50% of 500 = **< 250** (the code computes the gate from `max_health`, so it follows automatically).
 
-**Stale text to ignore:** `design/20_content.md`'s 一阳指 line still says "无视 −20% 减伤" — a reference to the old reduction. Solar Finger is range-2 (ranged) and bypasses the melee DR anyway; the existing `ignore_damage_reduction` flag is **harmless and must not be changed** (do not add any "pierce" that double-applies).
+The stale "一阳指 ignores −20% DR" line in `design/20_content.md` has been **removed at design source** (a ranged art never meets the melee reduction, so the note was moot). Solar Finger's existing `ignore_damage_reduction` flag is harmless and **must not be changed** — do NOT add any "pierce" that double-applies.
 
 ---
 
@@ -142,13 +142,33 @@ Total intake over R rounds must satisfy `500 + 26R − HP_final` → **508–633
 - **Rounds 8–10: ≈ 25–50/round** from the last straggler.
 - **Death bound:** cumulative intake < 500 + 26×r at every round r.
 
-Post-DR melee hits are 12–24 each (West basic 34→17, Ling Snake 31→16, Du Sha 23→12; North basic 36→18, Kang Long 47→24; Central basic 34→17, Quanzhen 42→21, Qixing 34→17) — the design's intended "not deadly" baseline. Ranged hits are **unreduced** and are the budget drivers: East basic **29**@3, Luoying **18**, Yuxiao **26**, Bihai **23** (global), counter **13**; South basic **31**@2, Yiyangzhi **39**, Dianxue **16**, Liu Mai **44**; North Qianlong **62** (r2). Chips feed the budget too: West reflect **16** per melee hit on him, East counter **13** per attack within 3 (max 1/round), poison DoTs unreduced (10×2, 8×2).
+Post-DR melee hits are 12–31 each (West basic 34→17, Ling Snake 31→16, Du Sha 23→12, Toad Nest 52→26; North basic 36→18, Kang Long 47→24, **Qianlong 62→31**; Central basic 34→17, Quanzhen 42→21, Qixing 34→17, Primal Unity 39→20) — the design's intended "not deadly" baseline. Ranged hits are **unreduced** and are the budget drivers: East basic **29**@3, Luoying **18**, **Yuxiao 26** (jade_flute_acupoint is an instrument → ranged, see §4.3), Bihai **23** (global), counter **13**; South basic **31**@2, Yiyangzhi **39**, Dianxue **16**, Liu Mai **44**. Chips feed the budget too: West reflect **16** per melee hit on him, East counter **13** per attack within 3 (max 1/round), poison DoTs unreduced (10×2, 8×2).
 
-### 4.3 Melee vs ranged classification (Architect's ruling)
+**Net effect of the two §4.3 flips on this budget:** jade_flute_acupoint was post-DR 13 and is now **26 unreduced** (+13 per cast; cd3 → expect 2–3 casts over the fight under the §4.4 East policy, one of them inside the rounds 1–3 ramp). hidden_dragon was 62 unreduced and is now **31 post-DR** (−31 per cast; cd6 → at most one cast by round 8, a second only if the fight reaches round 12). Net over an 8–12-round fight: **+26..+39 − 31..62 = −36..+8** — neutral-to-slightly-cooler, inside the band's tuning tolerance, so the envelope bounds stand: **508–633 for R=8, 612–737 for R=12, steering target ≈560–685 for R=10**. The >354-by-round-4 gate gains +13 from the early Flute cast; Qianlong cannot affect it. Both flips bend the profile the right way (hotter early, cooler late). If the measured trace still misses the band, tune the §4.4 predicates — the classification itself is not a balance knob.
 
-**Ranged ⇔ the attack's declared reach is > 1.** The enumerated ranged set (bypasses −50%) is exactly: East Heretic **basic attack / falling_petals / tidal_melody** (his jade_flute_acupoint is a control skill whose damage classifies melee — see below), South Emperor **basic / solar_finger / six_pulse_volley**, North Beggar **hidden_dragon (Qianlong)**. **Everything else is melee** — including the borderline reach-based skills: West's **toad_swarm (line 4)** and **basic**, Central's **primal_unity (global)** and **seven_stars (cross 2)**, North's **dragon_in_the_field (line 3)** and **flying_dragon (landing 3×3)**, East's **jade_flute_acupoint**.
+### 4.3 Melee vs ranged classification (follows design/10_systems.md §2.2 — not a new ruling)
 
-Implementation: replace the current distance-at-resolution `_is_melee(unit, target)` heuristic (combat_manager.gd ~:1404) with a **declaration-based** classification — `_is_melee_attack(unit, skill_or_basic)` = `reach <= 1` OR skill id in the borderline-melee set `{toad_swarm, primal_unity, seven_stars, dragon_in_the_field, flying_dragon, jade_flute_acupoint}`. Basic attacks classify by `attack_range <= 1`. This drives both the Shen Diao DR and the West Poison reflect trigger. 弹指神通 counter stays **distance-based** (within 3 tiles, once/round) — unchanged. Solar Finger's `ignore_damage_reduction` flag stays unchanged (no double-apply).
+Melee vs ranged is decided by the **weapon class of the external art (外功门类)** the attack belongs to. Shape, reach, and damage do not participate (design/10_systems.md §2.2, changelog `jinyong-ux`):
+
+- **Melee:** 刀 blade · 剑 sword · 长兵 polearm · 拳掌 fist-palm · 轻功 qinggong · 横练 hardening
+- **Ranged:** 指 finger · 暗器 hidden weapon · 奇门毒 poison-craft · 乐器 instrument
+
+Finger arts are ranged because what they deliver is projected force (一阳指 / 六脉神剑), not contact. **Basic attacks classify by the character's primary external art** (the 主修外功 column of design/20_content.md, which already carries the class tag): East → 乐器 → ranged; West → 拳掌 → melee; South → 指 → ranged; North → 拳掌 → melee; Central → 剑 → melee; Yang Guo → 剑 → melee.
+
+**Per-skill table, derived from design/20_content.md (no reach check, no id set):**
+
+| Character | Skill | Declaring art (class) | Result |
+|---|---|---|---|
+| East Heretic | basic / falling_petals / tidal_melody | 碧海潮生曲 (乐器) | ranged |
+| East Heretic | **jade_flute_acupoint** | 碧海潮生曲 (乐器) | **ranged** — flipped: reach 1 does not make it melee |
+| West Poison | basic / ling_snake / du_sha / toad_swarm | 灵蛇拳 (拳掌) | melee |
+| South Emperor | basic / solar_finger / acupoint / six_pulse_volley | 一阳指 (指) | ranged |
+| North Beggar | basic / kang_long / dragon_in_the_field / flying_dragon / **hidden_dragon** | 降龙二十一掌 (拳掌) | melee — **hidden_dragon flipped**: 降龙 is fist-palm |
+| Central Divine | basic / quanzhen_sword / seven_stars / primal_unity | 全真剑法 (剑) | melee |
+
+(Primal Breath, Qi Aegis, Peach Blossom Maze deal no damage — classification irrelevant.)
+
+Implementation: replace the current distance-at-resolution `_is_melee(unit, target)` heuristic (combat_manager.gd ~:1404) with a **weapon-class lookup** — `_is_melee_attack(unit, skill_or_basic)` returns true iff the skill's declaring external art's weapon class is in the melee set; basic attacks look up the unit's 主修外功. This drives both the Shen Diao DR and the West Poison reflect trigger. 弹指神通's counter stays **distance-based** (within 3 tiles, once/round) — it is a trigger condition, not a damage class. Solar Finger's `ignore_damage_reduction` flag stays untouched (the stale "ignores −20%" line was removed at design source; a ranged art never meets the melee reduction — do NOT add a pierce).
 
 ### 4.4 AI engagement policy (the only legal balance knobs, with the timeline)
 
@@ -227,7 +247,7 @@ The `disabled=true`-only rendering is invisible. Fix in `scenes/ui/skill_button.
 
 | ID | Component | Files | Responsibility | Key interfaces |
 |---|---|---|---|---|
-| C1 | Turn engine hardening | `scripts/autoload/combat_manager.gd`, `scripts/autoload/grid_manager.gd` | Check-then-cast on stored refs (§3.2); declaration-based melee classification (§4.3); number-follow (§1.1) | `_next_turn`, `get_units_in_range`, `get_units_in_aoe`, `_is_melee_attack`, `_damage_reduction` |
+| C1 | Turn engine hardening | `scripts/autoload/combat_manager.gd`, `scripts/autoload/grid_manager.gd` | Check-then-cast on stored refs (§3.2); weapon-class melee classification per design/10_systems.md §2.2 (§4.3); number-follow (§1.1) | `_next_turn`, `get_units_in_range`, `get_units_in_aoe`, `_is_melee_attack`, `_damage_reduction` |
 | C2 | Content factory | `scripts/battlefield.gd` | Player 500 HP / regen 20 / alias table / short skill display names / `grid_lines_visible` | `_create_character_data`, `_create_all_skill_data` |
 | C3 | AI controllers | `scripts/ai/ai_base.gd`, `ai_east_heretic.gd`, `ai_south_emperor.gd`, `ai_west_poison.gd`, `ai_north_beggar.gd`, `ai_central_divine.gd` | §4.4 engagement policy; pure functions of state, zero RNG | `evaluate(enemy) -> Dictionary {move_path, action, target, skill_index, params, fsm_state}` |
 | C4 | Grid overlay | `scripts/grid_lines.gd` (NEW), `scenes/battlefield.tscn` | Cell lines above backdrop/tiles | `_draw()` |
@@ -341,7 +361,7 @@ Godot 4.4 GDScript only (no third-party libraries): `is_instance_valid()` + unty
 
 - The alias table (`battlefield.gd`) is the single place future rosters extend health-bar/short display names; `character_name` (turn-order identity) stays canonical.
 - The geometric-observable pattern (GDScript computes, YAML reads) is the reusable template for all future spatial asserts — never raw `get_global_rect()` expressions in YAML.
-- The melee/ranged classification table (`_is_melee_attack`) is the one place reach semantics live; future content declares reach and gets the right DR for free.
+- The melee/ranged classification (`_is_melee_attack`) is the one place weapon-class semantics live; future content declares its art's weapon class (a field it already carries) and gets the right DR for free — no reach checks, no per-skill id sets.
 - **Non-goals preserved:** no cultivation system / faction select / world map; no learning-prerequisite logic (fa hui du stays 1.3); no elemental counters; no CJK fonts; no change to enemy content numbers; no change to the six protected scenarios' behavior asserts; no removal of `TWEEN_TIMEOUT_SEC`/`_await_tween_safe`.
 
 ## 10. Rollback & Validation Strategy
@@ -352,7 +372,7 @@ No irreversible operations exist (no DB, no batch data rewrite; all edits are te
 
 1. **T1** — Freed-object hardening (C1, §3): the four mandatory sites + audit comments. Gate: parse + playtest zero errors.
 2. **T2** — Design-follow numbers (C1/C2, §1.1): 500 HP / −50% DR / regen 20; update the §7.5 content snapshots. Gate: protected scenarios green with 500.
-3. **T3** — Melee/ranged classification (C1, §4.3). Gate: protected scenarios still green (they don't exercise the new classification edge cases); terminal run still deterministic.
+3. **T3** — Melee/ranged classification (C1, §4.3). Gate: protected scenarios still green; terminal run still deterministic; and the two flipped skills verified specifically — a jade_flute_acupoint hit on the player is **NOT** reduced by Shen Diao DR (intake 26, not 13), and a hidden_dragon hit **IS** reduced (intake 31, not 62).
 4. **T4** — AI engagement policy (C3, §4.4). Gate: terminal intake trace matches §4.2; WON in [8,12], HP in [75,200].
 5. **T5** — Terminal + dot scenario re-time (§7.6, §7.5). Gate: full `run_tests.sh` green.
 6. **T6** — Grid overlay (C4, §5.1). Gate: `grid_lines_visible` assert + 5_vision grid check.
@@ -367,6 +387,6 @@ Tasks 1–3 are order-dependent (T3 builds on T2); T4–T5 depend on T3; T6–T9
 
 - **Design overrides the brief's stale HP snapshot:** victory band is **75–200 (15–40% of 500)**, not 54–144; the 17 Forms gate is **< 250**, not < 180. (`step1_goals.json` / brief text still cite 360 — pre-change snapshots.)
 - "Health-bar size ≤ 64 px" targets the **Bar width** (`HealthBar.bar_width`), not the root control (the name label above may be wider); the alias table guarantees no label truncation.
-- `_is_melee` becomes declaration-based (§4.3); 弹指神通 counter stays distance-based; Solar Finger's `ignore_damage_reduction` is untouched.
+- `_is_melee` becomes a **weapon-class lookup** per design/10_systems.md §2.2 (§4.3), replacing the distance heuristic; exactly two current-roster skills flip (jade_flute_acupoint → ranged, hidden_dragon → melee); 弹指神通 counter stays distance-based; Solar Finger's `ignore_damage_reduction` is untouched.
 - The 5_vision recognizability checks are external and cross-frame; this repo only supplies the geometric/data asserts.
 - `GameManager.current_round` and `Player.health` freeze at victory (engine early-returns after WON) — the frame-2999 assert is the victory-moment sample by construction.
