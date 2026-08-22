@@ -9,6 +9,13 @@
 extends "res://scripts/ai/ai_base.gd"
 
 
+## Balance lever (step2_design §4.4 ranged-pair throttle): when true,
+## Six-Pulse Volley is held until the player is below 50% HP. Default false —
+## the protected scenarios' verdicts depend on the default behavior, and only
+## this const changes behavior, never the code path.
+const SIX_PULSE_LOW_HP_ONLY: bool = false
+
+
 func evaluate(enemy: Node) -> Dictionary:
 	if enemy == null:
 		return {}
@@ -41,9 +48,13 @@ func evaluate(enemy: Node) -> Dictionary:
 			move_path = [], action = "skill", target = player,
 			skill_index = 1, fsm_state = "SKILL",
 		}
-	# 4) Six-Pulse Volley (line 3) — cardinal line within 3.
+	# 4) Six-Pulse Volley (line 3) — cardinal line within 3. When
+	#    SIX_PULSE_LOW_HP_ONLY is set, it waits until the player is below
+	#    half HP; when false (default) the guard is unchanged.
 	if _is_skill_ready(enemy, 3) \
-			and _aligned_in_line(enemy.grid_pos, player.grid_pos) and dist <= 3:
+			and _aligned_in_line(enemy.grid_pos, player.grid_pos) and dist <= 3 \
+			and (not SIX_PULSE_LOW_HP_ONLY \
+					or int(player.health) * 2 < int(player.max_health)):
 		return {
 			move_path = [], action = "skill", target = player,
 			skill_index = 3, fsm_state = "SKILL",
