@@ -23,13 +23,14 @@ Three independent problem domains, each with a different verification path:
 
 ### 1.1 Design-follow note (not a design change)
 
-`design/20_content.md` is authoritative and already records (changelog `jinyong-ux`): Yang Guo **500 HP**, Shen Diao regen **20/round (26 after ×1.3)**, melee DR **−50% (flat, no fhd multiplier)**. The **code is stale** in four places:
+`design/20_content.md` is authoritative and already records (changelog `jinyong-ux`): Yang Guo **500 HP**, Shen Diao regen **20/round (26 after ×1.3)**, melee DR **−50% (flat, no fhd multiplier)**. The **code is stale** in these places (four functional sites + comment-only wording):
 
 | Site | Code (stale) | Design (authoritative) |
 |---|---|---|
 | `scripts/battlefield.gd` ~:443 `cd.max_health = 360` | 360 | **500** |
-| `scripts/autoload/combat_manager.gd` `_damage_reduction` `dr += 0.2` | −20% | **−50%** (`dr += 0.5`) |
-| Shen Diao regen constant in `combat_manager.gd` turn-start lifecycle | 12 (→16 after ×1.3) | **20 (→26 after ×1.3)** |
+| `scripts/autoload/combat_manager.gd` :1386 `_damage_reduction` `dr += 0.2` | −20% | **−50%** (`dr += 0.5`) |
+| `scripts/autoload/combat_manager.gd` :455 `apply_heal(unit, 16)  # round(12 * 1.3)` | 12 base | **20 base** (`apply_heal(unit, 26)  # round(20 * 1.3)`) |
+| Stale code comments only (no logic change): `player.gd` :171/:184 "180 of 360" — the gate itself derives from `max_health` and follows to 250 automatically; `combat_manager.gd` :455/:517/:1377 "−20% melee" wording | 360 / −20% | **500 / −50% wording** |
 | `playtest_spec.yaml` snapshots: `Player.health: 360`, terminal band `54..144` | 360 / 54–144 | **500 / 75–200** |
 
 This run therefore implements the already-decided design numbers — it adds **no new design change** and does not need a "设计变更" section. All other content numbers (enemy HP/damage/cooldowns, skill values, ×1.3, round() rules) are untouched. The percentage rules hold: **−50% is flat; percentages never take the fhd multiplier.** Victory band: 15–40% of 500 = **75–200**. The 17 Forms HP gate: 50% of 500 = **< 250** (the code computes the gate from `max_health`, so it follows automatically).
@@ -212,7 +213,7 @@ The `disabled=true`-only rendering is invisible. Fix in `scenes/ui/skill_button.
 
 ### 5.4 Round indicator vs pause button (design item 6) + compact order text
 
-- **`scenes/ui/hud.tscn`:** RoundIndicator stays top-center but its rect must not reach the PauseButton (top-right, x ≈ 820–952). Set RoundIndicator offsets to a narrower box (e.g. left −180 / right 180 → x 300–660) **and** shorten the order line.
+- **`scenes/ui/hud.tscn`:** RoundIndicator stays top-center but its rect must not reach the PauseButton (top-right, measured rect x ≈ 820–952, y 8–44). Current offsets (−240/+240 → x 240–720) already clear the pause *rect* at scale 1, but the OrderLabel (480 px wide, `clip_text` default-off) overflows its box and paints its text over the pause area — that is the visible 压盖. Set RoundIndicator offsets to a narrower box (e.g. left −180 / right 180 → x 300–660) **and** shorten the order line so the drawn text stays inside the box.
 - **`scripts/ui/round_indicator.gd`:** the `OrderLabel` text must fit its box with **no clip/ellipsis**. Compact format using short tokens: `"Order: YG > EH > CD > SE > NB > WP"` (map via the same alias table; `order_names` observable keeps the full names — asserts on `order_names` stay green).
 - **Overlap guard in code:** `hud.gd` computes a new observable **`round_pause_overlap: bool`** every frame: `RoundIndicator.get_global_rect().intersects(PauseButton.get_global_rect())`. YAML asserts `false` (plain property read — see §7.4).
 
