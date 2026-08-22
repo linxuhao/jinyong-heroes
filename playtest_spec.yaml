@@ -251,6 +251,7 @@ scenarios:
         actions: []
         assert:
           CombatManager.current_round: 'current_round == 4'
+          SkillButton1.hp_gated: false
           SkillButton5.disabled: false
           SkillButton6.disabled: false
           SkillButton7.disabled: false
