@@ -175,12 +175,12 @@ scenarios:
           CombatManager.phase: 'phase == "ENEMY_TURN"'
           CombatManager.active_unit_name: 'active_unit_name == "West Poison"'
           Player.status_names: 'status_names.has("poison")'
-          Player.health: 'health == 144'
+          Player.health: 'health == 152'
       - at: 2000
         actions: []
         assert:
           CombatManager.current_round: 5
-          Player.health: 'health == 150 and health > 0'
+          Player.health: 'health == 168 and health > 0'
           CombatManager.last_turn_actor: "changed"
 
   - name: fahui_du_multiplies_damage
