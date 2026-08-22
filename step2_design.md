@@ -21,7 +21,7 @@ The existing execution primitives are **kept and driven by the new engine**: `_e
 | Turn = move + one action, any order; Space ends turn | Per-unit `moves_left` / `moved` / `acted` budgets; `end_turn` action | Playtest S2/S3 |
 | Cooldowns tick by round, not seconds | `skill_cooldowns: Array[int]`, decrement at own turn start | Playtest S4 |
 | DoT resolves at victim's turn start, duration in rounds | Per-unit DoT table ticked in `begin_turn` | Playtest S5 |
-| 发挥度 ×1.3 actually applies to damage | Attack-side `round(base × 1.3)` in the damage pipeline | Playtest S6 (45 → 58) |
+| 发挥度 ×1.3 actually applies to damage | Attack-side `round(base × 1.3)` in the damage pipeline | Playtest S6 (45 → 59) |
 | Yang Guo + Five Greats match `design/20_content.md` | Data factory rewritten from the record; no derived formulas | Implementer review + terminal scenario |
 | HUD shows 发挥度 + round/actor/initiative order | `SkillButton*.fahui_text`, `RoundIndicator.*` | Playtest S6/S7 |
 | Space = end turn, Escape = pause, 1–8 techniques, two-phase unlock | `project.godot [input]`, player input gates, skill-bar unlock state | Playtest S7 + manual |
@@ -131,7 +131,7 @@ _end_round():
 Exact order (assertable):
 1. **Cooldown decrement** — each `skill_cooldowns[i] > 0` → `-1`.
 2. **DoT / status ticks** — each active poison DoT ticks damage (`apply_damage`), then `rounds -= 1`; status durations decrement (shield, init debuff, zone lifetimes, 蛤蟆蹲 charge); "next turn" restriction statuses (拖泥带水 / 玉箫点穴 / 点穴) apply their restriction for this turn.
-3. **Constant regen** — 神雕之力 +12, 一阳续命 +10 (no 发挥度; passives are not techniques).
+3. **Constant regen** — 神雕之力 +16, 一阳续命 +13 (base 12 / 10 × the unit's primary internal art 发挥度 1.3, per design 10_systems §4.0).
 4. **Unit acts.**
 
 DoT tick value = `round(base_tick × fa_hui_du)` computed **at application time** and stored in the unit's DoT table (发挥度 does not change mid-battle). Poison 8 → 10/tick, 6 → 8/tick. Multiple DoTs stack as separate entries; death removes a unit's DoTs with it.
@@ -161,24 +161,24 @@ Each entry: `{id, kind: "negative"|"positive", rounds: int, params: Dictionary}`
 ### 4.1 发挥度 (fa hui du)
 
 - `GongfaData.get_fa_hui_du(unit) -> float` returns **1.3** for every unit in the tutorial — an interface-only stub; the prerequisite (甲乙丙丁 cascade) calculation is NOT implemented this run (brief).
-- Applies to technique **damage / heal / shield** values and **DoT per-tick damage only**. Never to cooldown, range, knockback tiles, durations, or jump distance.
-- **Does NOT apply** to: basic attacks (普攻 is a derived stat, not a 功法-produced technique), 弹指神通 counterattacks, 蛤蟆反震 reflects (passives are not techniques). Documented interpretation, see §7.2.
+- **一条规则,没有例外**(design/10_systems.md §4.0):每个数字吃它出身那门功法的发挥度。招式的伤害 / 治疗 / 护盾 / DoT 跳数 → 该招式所属**外功**;**普攻伤害**与**强大特征产生的伤害与回复**(弹指神通反击、蛤蟆反震、神雕之力回复、一阳续命回复)→ 该单位主修**内功**。教程战全员 1.3,故普攻:杨过 30→39、北丐 28→36、西毒 26→34、中神通 26→34、南帝 24→31、东邪 22→29;弹指神通 10→13;蛤蟆反震 12→16;神雕之力回复 12→16;一阳续命 10→13、60→78。
+- **仍不吃乘数**:冷却、射程、击退格数、持续轮数、位移格数、内力池。
 - Display labels (English): value < 1.0 → `ERRATIC`, 1.0–1.2 → `NORMAL`, 1.3 → `OVERDRIVE`. All tutorial buttons show `OVERDRIVE x1.3`.
 
 ### 4.2 Two-stage damage pipeline (design 10_systems §4.3)
 
 ```
-Attack side:  output = round(base_damage × buff_multipliers × fa_hui_du)     # e.g. 45 × 1.3 = 58.5 → 58
-Defense side: actual = round(output × (1 − DR_total))                        # e.g. 58 × 0.85 = 49.3 → 49
+Attack side:  output = round(base_damage × buff_multipliers × fa_hui_du)     # e.g. 45 × 1.3 = 58.5 → 59
+Defense side: actual = round(output × (1 − DR_total))                        # e.g. 59 × 0.85 = 50.15 → 50
 ```
 
 - `buff_multipliers` = attack-side buffs only (蛤蟆蹲 ×1.5 — composed multiplicatively with 发挥度 before the single round).
 - `DR_total` = product of defense-side reduction tags on the target: 丐帮铁骨 (all −15%), 神雕之力 (melee −20%). A technique flagged `ignore_damage_reduction` (一阳指) skips ALL DR tags.
 - **Melee definition:** Chebyshev distance(attacker, target) ≤ 1 at resolution time. 神雕之力's −20% and 蛤蟆反震's trigger use this definition.
-- Counter/reflect damage (弹指神通 10, 蛤蟆反震 12) is untyped direct damage: no 发挥度, no DR, no shield interaction beyond normal HP subtraction; triggers **after** the triggering damage fully resolves, only if the trigger source is still alive (East Heretic must survive the hit to counter; West Poison must survive to reflect). Counter limited to once per round (flag reset at round start).
-- **Order inside `apply_damage`:** lethal check → 先天罡气 fatal guard (if target is Central Divine and trait unused: HP = 1, clear negative statuses, mark used — applies to DoT ticks too) → otherwise death handling. 一阳续命 below-40% one-time +60 triggers only when the damaging instance leaves the unit alive (HP > 0 after the hit) and HP% < 40% for the first time.
+- Counter/reflect damage (弹指神通 10 → 13, 蛤蟆反震 12 → 16 — eats the source's **primary internal art** 发挥度, per design 10_systems §4.0) is untyped direct damage: skips DR tags, no shield interaction beyond normal HP subtraction; triggers **after** the triggering damage fully resolves, only if the trigger source is still alive (East Heretic must survive the hit to counter; West Poison must survive to reflect). Counter limited to once per round (flag reset at round start).
+- **Order inside `apply_damage`:** lethal check → 先天罡气 fatal guard (if target is Central Divine and trait unused: HP = 1, clear negative statuses, mark used — applies to DoT ticks too) → otherwise death handling. 一阳续命 below-40% one-time +78 (60 × 1.3) triggers only when the damaging instance leaves the unit alive (HP > 0 after the hit) and HP% < 40% for the first time.
 - Heal/shield: `round(base × fa_hui_du)` then apply. 先天调息 35 → 46; 罡气护体 50 → 65.
-- All arithmetic uses GDScript **double** floats then `round()`; the design's canonical example 45 × 1.3 = 58.5 → 58 holds under double arithmetic (58.4999…) and must pass in playtest S6.
+- GDScript `round()` rounds **half away from zero**. `45 * 1.3` is **exactly 58.5** in double (verified in-engine, not 58.4999…), so the canonical example is **59**. Same for every base ending in 5: 25→33, 35→46, 15→20, 5→7. Compute `round(v * mult)`; never hand-roll `int(v * mult + 0.5)`.
 
 ### 4.3 Expected ×1.3 cook values (implementer reference; compute via `round(v * 1.3)`, assert at least the bold ones)
 
@@ -188,11 +188,11 @@ Defense side: actual = round(output × (1 − DR_total))                        
 | 6 | 8 | 22 | 29 | 36 | 47 |
 | 12 | 16 | 24 | 31 | 38 | 49 |
 | 14 | 18 | 25 | 33 | 40 | 52 |
-| 18 | 23 | 26 | 34 | 45 | **58** |
+| 18 | 23 | 26 | 34 | 45 | **59** |
 | 30 | 39 | 32 | 42 | 48 | 62 |
 | 34 | 44 | 70 | 91 | 50 | 65 |
 
-Defense side example (丐帮铁骨): 58 × 0.85 → 49 (design's canonical example). 神雕之力 melee: × 0.8, e.g. 26 → 21.
+Defense side example (丐帮铁骨): 59 × 0.85 → 50 (design's canonical example). 神雕之力 melee: × 0.8, e.g. 26 → 21.
 
 ### 4.4 AoE origins (design 10_systems §5.5)
 
@@ -343,7 +343,7 @@ Update: turn-based description, controls table (WASD/arrows move with a 4-tile b
 
 ### 6.2 Interpretations (consistent readings of the record, no number changes)
 
-1. 发挥度 does not apply to 普攻, 弹指神通 counter, or 蛤蟆反震 reflect — they are not 功法-produced techniques (record §4: "该功法产出的全部招式").
+1. 普攻与强大特征吃**主修内功**的发挥度,招式吃其**外功**的发挥度(record §4.0 的单一规则)。上一版把普攻/反击/反震列为豁免,已作废。
 2. Initiative = the 身法 value (record §1: 先攻由身法决定; 20_content lists identical values).
 3. Enemy 内力值 not listed in the record → energy field exists but only the player's 180 is displayed.
 4. 桃花迷阵: −2 applies to the entering unit's current-turn remaining movement; the zone's "3 rounds" is its own lifetime, decremented at the caster's turn start.
@@ -445,7 +445,7 @@ Notes for PM: array assertions (`turn_order[0]`, `status_names`, `skill_cooldown
 
 **S5 `dot_resolves_at_victim_turn_start`** — scripted: `end_turn` ×N until West Poison is adjacent and uses 灵蛇缠身 (deterministic AI); assert `Player.status_names` contains poison and health is down by the direct hit only (no tick yet); `end_turn` once more; at the player's turn start assert health dropped by exactly **10** (round(8 × 1.3)), and again at the next player turn start (2-round DoT). *(brief: "DoT resolves at the victim's turn start")*
 
-**S6 `fahui_du_1_3_applies_to_damage`** — after tutorial: move adjacent to East Heretic (no DR passive), select `skill_1`, J; assert `East_Heretic.health` dropped by exactly **58** (45 × 1.3 = 58.5 → 58, the design's canonical example), `SkillButton1.fahui_text == "OVERDRIVE x1.3"`, and all 8 buttons' `fahui_text` is `"OVERDRIVE x1.3"`. *(brief: "the 发挥度 multiplier (1.3 × base) actually applies to damage")*
+**S6 `fahui_du_1_3_applies_to_damage`** — after tutorial: move adjacent to East Heretic (no DR passive), select `skill_1`, J; assert `East_Heretic.health` dropped by exactly **59** (45 × 1.3 = 58.5 → 59, GDScript round() 逢半远离零), `SkillButton1.fahui_text == "OVERDRIVE x1.3"`, and all 8 buttons' `fahui_text` is `"OVERDRIVE x1.3"`. *(brief: "the 发挥度 multiplier (1.3 × base) actually applies to damage")*
 
 **S7 `two_phase_skill_unlock_and_hp_gate`** — rounds 1–3: `SkillButton5..8.disabled == true` (palm arts locked) while `SkillButton1..4` enabled; on `current_round == 4`: buttons 5–8 enabled; while `Player.health >= 180` (50% of 360): `SkillButton8.disabled == true` (Seventeen Forms HP gate) — later, after HP drops below 180, assert it enables.
 
@@ -523,7 +523,7 @@ All changes are file edits (git-reversible). The RTWP machinery is removed, not 
 
 1. The gate runs headless at the project's 960×704 base size; the harness is wall-clock driven, so round-based assertions must read `CombatManager` state, not timestamps. Enemy turns take ~1–2 s wall-clock (5 units × tween awaits); PM sizes frame gaps accordingly.
 2. `Expression` assertions evaluate plain script variables on live nodes; arrays may or may not be indexable — PM verifies and uses scalar fallbacks (§8 note).
-3. GDScript `round()` uses double arithmetic: the design's canonical 45 × 1.3 → 58.5 → **58** must hold (it does: 58.4999…). Implementers compute `round(v * 1.3)`; never `int(v * 1.3 + 0.5)` by hand.
+3. GDScript `round()` 逢半远离零,且 `45 * 1.3` 在 double 里精确等于 58.5 —— 故 canonical 值是 **59**(引擎实测)。实现一律 `round(v * mult)`。
 4. `ui_accept` (Space/Enter) and `end_turn` (Space) coexist: `TutorialManager` consumes `ui_accept` only while `is_active`; the player's `end_turn` handler gates on `GameManager.get_state() == "BATTLE"` and its own turn.
 5. Balance target (8–12 rounds, 15–40% HP) is reachable by tuning AI behavior only; if it proves unreachable, this is reported to the user as a design conflict, not silently fixed by changing content numbers.
 6. Deterministic enemy registration/iteration order is East Heretic, West Poison, South Emperor, North Beggar, Central Divine (battlefield dictionary insertion order) — it is the initiative tie-break order and the heal-target tie-break order.
