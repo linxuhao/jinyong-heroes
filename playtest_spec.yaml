@@ -31,14 +31,14 @@ surface:
   HUD: [visible, size]
   RoundIndicator: [visible, current_round, active_actor, order_names]
   SkillBar: [visible, size, global_position]
-  SkillButton1: [visible, text, fahui_text, disabled]
-  SkillButton2: [visible, text, fahui_text, disabled]
-  SkillButton3: [visible, text, fahui_text, disabled]
-  SkillButton4: [visible, text, fahui_text, disabled]
-  SkillButton5: [visible, text, fahui_text, disabled]
-  SkillButton6: [visible, text, fahui_text, disabled]
-  SkillButton7: [visible, text, fahui_text, disabled]
-  SkillButton8: [visible, text, fahui_text, disabled]
+  SkillButton1: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton2: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton3: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton4: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton5: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton6: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton7: [visible, text, fahui_text, disabled, hp_gated]
+  SkillButton8: [visible, text, fahui_text, disabled, hp_gated]
   PauseButton: [visible, global_position]
   HealthBar: [visible, global_position, size, name_text]
   Battlefield: [board_aligned]
@@ -108,7 +108,7 @@ scenarios:
       - { at: 13, actions: [ui_accept] }
       - { at: 15, actions: [ui_accept] }
       - { at: 20, actions: [end_turn] }
-      - at: 500
+      - at: 700
         actions: []
         assert:
           CombatManager.current_round: 2
@@ -150,7 +150,7 @@ scenarios:
           Player.skill_cooldowns: "skill_cooldowns[0] == 0"
 
   - name: dot_resolves_at_victim_turn_start
-    description: "West Poison's Spirit Serpent poison ticks at the player's own turn start for round(8*1.3)=10 per tick."
+    description: "West Poison applies Spirit Serpent poison mid-round 4; the player's round-5 turn start ticks round(8*1.3)=10, masked to a net +6 by the Shen Diao regen (+16)."
     timeline:
       - { at: 3, actions: [ui_accept] }
       - { at: 5, actions: [ui_accept] }
@@ -159,19 +159,29 @@ scenarios:
       - { at: 11, actions: [ui_accept] }
       - { at: 13, actions: [ui_accept] }
       - { at: 15, actions: [ui_accept] }
-      - { at: 20, actions: [end_turn] }
+      - { at: 20, actions: [move_up] }
+      - { at: 35, actions: [move_up] }
+      - { at: 50, actions: [move_up] }
+      - { at: 65, actions: [skill_1] }
+      - { at: 80, actions: [basic_attack] }
+      - { at: 95, actions: [end_turn] }
       - { at: 400, actions: [end_turn] }
       - { at: 800, actions: [end_turn] }
       - { at: 1200, actions: [end_turn] }
-      - at: 1600
+      - at: 1280
         actions: []
         assert:
-          Player.status_names: "changed"
+          CombatManager.current_round: 4
+          CombatManager.phase: 'phase == "ENEMY_TURN"'
+          CombatManager.active_unit_name: 'active_unit_name == "West Poison"'
+          Player.status_names: 'status_names.has("poison")'
+          Player.health: 'health == 144'
       - at: 2000
         actions: []
         assert:
-          Player.status_names: 'status_names.has("poison") or health < 360'
-          Player.health: "changed"
+          CombatManager.current_round: 5
+          Player.health: 'health == 150 and health > 0'
+          CombatManager.last_turn_actor: "changed"
 
   - name: fahui_du_multiplies_damage
     description: "Heavy Edge 45 * 1.3 = round(58.5) = 59 damage, and all 8 buttons show OVERDRIVE x1.3."
@@ -206,7 +216,7 @@ scenarios:
           Central_Divine.health: 'health == 71'
 
   - name: two_phase_skill_unlock_and_hp_gate
-    description: "Rounds 1-3 lock palm arts (5-8); round 4 unlocks 5-7 while 8 stays HP-gated above 50% HP."
+    description: "Rounds 1-3 phase-lock palm arts (buttons 5-8); round 4 unlocks 5-7, and button 8's HP gate (usable only below 50% HP) is tracked by the pure hp_gated predicate."
     timeline:
       - { at: 3, actions: [ui_accept] }
       - { at: 5, actions: [ui_accept] }
@@ -218,9 +228,18 @@ scenarios:
       - at: 30
         actions: []
         assert:
+          CombatManager.current_round: 1
+          Player.health: 360
           SkillButton1.disabled: false
+          SkillButton2.disabled: false
+          SkillButton3.disabled: false
+          SkillButton4.disabled: false
           SkillButton5.disabled: true
+          SkillButton6.disabled: true
+          SkillButton7.disabled: true
           SkillButton8.disabled: true
+          SkillButton8.hp_gated: true
+          SkillButton1.hp_gated: false
       - { at: 40, actions: [end_turn] }
       - { at: 500, actions: [end_turn] }
       - { at: 1000, actions: [end_turn] }
@@ -233,7 +252,10 @@ scenarios:
         assert:
           CombatManager.current_round: 'current_round == 4'
           SkillButton5.disabled: false
-          SkillButton8.disabled: true
+          SkillButton6.disabled: false
+          SkillButton7.disabled: false
+          SkillButton8.disabled: false
+          SkillButton8.hp_gated: false
 
   - name: central_divine_innate_qi_fatal_guard
     description: "Central Divine's first lethal blow keeps him at 1 HP (先天罡气); a second lethal blow kills him."

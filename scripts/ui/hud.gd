@@ -203,6 +203,11 @@ func _refresh_skill_button_states(player: Node) -> void:
 		var on_cooldown: bool = i < cooldowns.size() and int(cooldowns[i]) > 0
 		var hp_gated: bool = i == 7 and "health" in player \
 			and int(player.health) >= gate_hp
+		# Expose the pure HP-gate predicate on the button (playtest surface),
+		# independent of phase lock / cooldown. hp_gated is computed here every
+		# frame; skill_button.gd declares the var but never writes it.
+		if "hp_gated" in btn:
+			btn.hp_gated = hp_gated
 		btn.disabled = phase_locked or on_cooldown or hp_gated
 
 		# Cooldown overlay: remaining rounds / total rounds (ints).

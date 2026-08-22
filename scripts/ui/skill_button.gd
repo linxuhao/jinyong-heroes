@@ -26,6 +26,12 @@ var skill_index: int = -1
 ## (English + digits only).
 var fahui_text: String = ""
 
+## Pure HP-gate predicate (Seventeen Forms only): true when this button is
+## skill index 7 and the player's current HP is >= 50% of max health. Written
+## EVERY frame by the HUD (_refresh_skill_button_states); never assigned here.
+## Independent of phase lock / cooldown — observable for the playtest surface.
+var hp_gated: bool = false
+
 ## Reference to the SkillData resource for this button.
 var _skill_data = null
 
