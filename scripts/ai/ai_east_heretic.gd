@@ -1,7 +1,10 @@
 ## AIControllerEastHeretic — 东邪黄药师 AI
 ##
-## Ranged controller. Keeps distance 2-3, debuffs the player's initiative
-## whenever possible, and retreats when the player closes to melee.
+## Ranged controller. Debuffs the player's initiative whenever possible,
+## uses utility skills at range 3, and holds position to basic attack —
+## staying inside the player's radius-2 AoE envelope (cluster-friendly;
+## the old adjacent-retreat rule is removed so he stops scattering the
+## melee cluster the player lures in for AoE clearing).
 ##
 ## Skill index map (from battlefield.gd):
 ##   0 falling_petals · 1 jade_flute_acupoint · 2 peach_blossom_maze
@@ -44,14 +47,11 @@ func evaluate(enemy: Node) -> Dictionary:
 			move_path = [], action = "skill", target = enemy,
 			skill_index = 2, fsm_state = "SKILL",
 		}
-	# 5) Player adjacent — retreat to keep distance 2-3.
-	if dist == 1:
-		return _move_away(enemy, player)
-	# 6) In basic range (22 @ 3) — ranged basic attack.
+	# 5) In basic range (22 @ 3) — ranged basic attack.
 	if dist <= 3:
 		return {
 			move_path = [], action = "basic_attack", target = player,
 			fsm_state = "ATTACK",
 		}
-	# 7) Approach to preferred range 3.
+	# 6) Approach to preferred range 3.
 	return _approach_decision(enemy, player, 3)

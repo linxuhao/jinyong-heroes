@@ -294,8 +294,9 @@ scenarios:
           Central_Divine.health: "changed"
 
   - name: terminal_victory_8_12_rounds_hp_15_40
-    description: "Full scripted battle reaches WON within 8-12 rounds with player HP 15%-40% (54-144 of 360)."
+    description: "Full scripted battle: lure the Five Greats into a cluster around the player, clear them with self-origin AoE (Boundless Seas / Thousand-Force Cleave / Seventeen Melancholy Forms), and reach WON within 8-12 rounds with the player at 15%-40% HP (54-144 of 360)."
     timeline:
+      # --- Tutorial (7 steps) ---
       - { at: 3, actions: [ui_accept] }
       - { at: 5, actions: [ui_accept] }
       - { at: 7, actions: [ui_accept] }
@@ -303,33 +304,61 @@ scenarios:
       - { at: 11, actions: [ui_accept] }
       - { at: 13, actions: [ui_accept] }
       - { at: 15, actions: [ui_accept] }
-      - { at: 20, actions: [move_up] }
-      - { at: 35, actions: [move_up] }
-      - { at: 50, actions: [move_up] }
-      - { at: 65, actions: [skill_1] }
-      - { at: 80, actions: [basic_attack] }
-      - { at: 90, actions: [end_turn] }
-      - { at: 500, actions: [basic_attack] }
-      - { at: 515, actions: [end_turn] }
-      - { at: 900, actions: [basic_attack] }
-      - { at: 915, actions: [end_turn] }
-      - { at: 1300, actions: [basic_attack] }
-      - { at: 1315, actions: [end_turn] }
-      - { at: 1700, actions: [basic_attack] }
-      - { at: 1715, actions: [end_turn] }
-      - { at: 2100, actions: [basic_attack] }
-      - { at: 2115, actions: [end_turn] }
-      - { at: 2500, actions: [basic_attack] }
-      - { at: 2515, actions: [end_turn] }
-      - { at: 2900, actions: [basic_attack] }
-      - { at: 2915, actions: [end_turn] }
-      - { at: 3300, actions: [basic_attack] }
-      - { at: 3315, actions: [end_turn] }
-      - { at: 3700, actions: [basic_attack] }
-      - { at: 3715, actions: [end_turn] }
-      - { at: 4100, actions: [basic_attack] }
-      - { at: 4115, actions: [end_turn] }
-      - at: 4500
+      - at: 30
+        actions: []
+        assert:
+          Player.turns_taken: 0
+          Player.health: 360
+      # --- Round 1: approach the top-center cluster (Central Divine at (7,1)). ---
+      - { at: 40, actions: [move_up] }
+      - { at: 55, actions: [move_up] }
+      - { at: 70, actions: [move_up] }
+      - { at: 85, actions: [skill_1] }
+      - { at: 100, actions: [basic_attack] }
+      - { at: 115, actions: [end_turn] }
+      # --- Round 2 (player acts LAST under Tidal Melody's -20 init): Boundless
+      #     Seas (square r2 self, 70 -> 91, cd6) on the converged cluster. ---
+      - { at: 620, actions: [skill_4] }
+      - { at: 635, actions: [basic_attack] }
+      - { at: 650, actions: [end_turn] }
+      # --- Round 3 (player still last): Thousand-Force Cleave (cross2 self,
+      #     34 -> 44, cd3); if technique-sealed it falls back to a basic attack. ---
+      - { at: 970, actions: [skill_3] }
+      - { at: 985, actions: [basic_attack] }
+      - { at: 1000, actions: [end_turn] }
+      # --- Round 4 (debuff expired, player FIRST; palm arts unlocked and HP well
+      #     below 180): Seventeen Melancholy Forms (adjacent, 70 -> 91, cd8). ---
+      - { at: 1030, actions: [skill_8] }
+      - { at: 1045, actions: [basic_attack] }
+      - { at: 1060, actions: [end_turn] }
+      # --- Round 5 (player first): Heavy Edge single-target cleanup. ---
+      - { at: 1300, actions: [skill_1] }
+      - { at: 1315, actions: [basic_attack] }
+      - { at: 1330, actions: [end_turn] }
+      # --- Round 6 (player first): Thousand-Force Cleave ready again. ---
+      - { at: 1560, actions: [skill_3] }
+      - { at: 1575, actions: [basic_attack] }
+      - { at: 1590, actions: [end_turn] }
+      # --- Round 7 (player first): Wandering Valley jump closes on the last
+      #     ranged straggler (East Heretic parks at range 3). ---
+      - { at: 1820, actions: [skill_7] }
+      - { at: 1835, actions: [basic_attack] }
+      - { at: 1850, actions: [end_turn] }
+      # --- Round 8 (player first): Boundless Seas ready again (cd6 from R2). ---
+      - { at: 2080, actions: [skill_4] }
+      - { at: 2095, actions: [basic_attack] }
+      - { at: 2110, actions: [end_turn] }
+      # --- Round 9 (player first): Heart-Rending Strike cleanup. ---
+      - { at: 2340, actions: [skill_5] }
+      - { at: 2355, actions: [basic_attack] }
+      - { at: 2370, actions: [end_turn] }
+      # --- Round 10 (player first): Heavy Edge final cleanup. ---
+      - { at: 2600, actions: [skill_1] }
+      - { at: 2615, actions: [basic_attack] }
+      - { at: 2630, actions: [end_turn] }
+      # --- Final victory assert (sampled at the victory instant: WON at round
+      #     8-12 with player HP 54-144; turns_taken differential vs frame 30). ---
+      - at: 2999
         actions: []
         assert:
           GameManager.current_state: 'current_state == "WON"'
