@@ -133,6 +133,17 @@ var debug_await_total: int = 0
 var debug_await_timeouts: int = 0
 var debug_await_frames: int = 0
 
+## Round-frame diagnostic: the process frame at which _begin_round most
+## recently ran (set right after the re-entry guard). Lets downstream spec
+## tasks re-time key presses against measured round boundaries.
+var debug_round_frame: int = 0
+
+## 蛤蟆反震 reflect diagnostic: cumulative count of times the reflect
+## triggered on a melee attacker (incremented exactly once per trigger, just
+## before the untyped 16-damage apply). Lets the balance tasks verify the
+## reflect-side hit-count assumption directly from the surface.
+var debug_reflect_hits: int = 0
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -234,6 +245,7 @@ func is_player_turn() -> bool:
 func _begin_round() -> void:
 	if phase == "PLAYER_TURN" or phase == "ENEMY_TURN":
 		return  # A turn is already in progress — re-entry guard.
+	debug_round_frame = Engine.get_process_frames()
 	_set_phase("ROUND_END")
 
 	# Reset once-per-round passives.
@@ -608,6 +620,7 @@ func _trigger_counter_reflect(target: Node, source: Node, is_melee: bool) -> voi
 				apply_damage(source, 13, target, false, true)  # round(10*1.3)
 		"toad_reflect":
 			if is_melee:
+				debug_reflect_hits += 1  # 蛤蟆反震 triggered on a melee attacker
 				apply_damage(source, 16, target, false, true)  # round(12*1.3)
 
 
@@ -965,7 +978,7 @@ func _execute_basic_attack(unit: Node, target: Node) -> Tween:
 		base = int(unit.character_data.attack_damage)
 	var output: int = int(round(base * _internal_fhd(unit)))
 
-	apply_damage(target, output, unit, _is_melee(unit, target))
+	apply_damage(target, output, unit, _is_melee_attack(unit, null))
 
 	if "acted" in unit:
 		unit.acted = true
@@ -1063,7 +1076,7 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 		if h == null or not is_instance_valid(h):
 			continue
 		if damage > 0:
-			apply_damage(h, damage, unit, _is_melee(unit, h),
+			apply_damage(h, damage, unit, _is_melee_attack(unit, skill),
 				bool(skill.ignore_damage_reduction))
 		if skill.dot_damage > 0 and skill.dot_rounds > 0:
 			apply_dot(h, int(skill.dot_damage), int(skill.dot_rounds), fhd)
@@ -1389,7 +1402,7 @@ func get_fa_hui_du(gongfa) -> float:
 
 
 ## Defense-side damage reduction: 丐帮铁骨 -15% all damage; 神雕之力 -50%
-## melee (Chebyshev distance <= 1 at resolution).
+## melee (weapon-class classification via _is_melee_attack).
 func _damage_reduction(target: Node, is_melee: bool) -> float:
 	var dr: float = 0.0
 	match _passive_of(target):
@@ -1414,13 +1427,52 @@ func _consume_toad_charge(unit: Node) -> float:
 	return 1.0
 
 
-## Melee = Chebyshev distance <= 1 at resolution time.
-func _is_melee(a: Node, b: Node) -> bool:
-	if a == null or b == null:
+## Melee weapon classes (design/10_systems.md §2.2): 刀/剑/长兵/拳掌/轻功/横练
+## are melee; 指/暗器/奇门毒/乐器 are ranged. The classification is decided by
+## the external art's weapon class (外功门类) — NOT by shape, reach, or damage.
+const MELEE_SCHOOLS: Array[String] = [
+	"sword", "blade", "polearm", "palm", "qinggong", "hardening",
+]
+
+
+## True when the given GongfaData.school value is a melee weapon class.
+func _school_is_melee(school: String) -> bool:
+	return MELEE_SCHOOLS.has(school)
+
+
+## Melee/ranged classification — the single place weapon-class semantics live.
+## Drives BOTH the Shen Diao -50% melee DR (enemy -> player) and the West
+## Poison 蛤蟆反震 reflect (player -> West Poison). Pure function of state:
+## zero RNG, never reads grid_pos or distance.
+##   skill_or_basic == null       -> basic attack: classify by the unit's
+##                                    PRIMARY external art (external_arts[0],
+##                                    主修外功).
+##   skill_or_basic (SkillData)   -> classify by the declaring external art's
+##                                    weapon class (found via
+##                                    `skill in art.techniques`, the same
+##                                    lookup as _external_fhd_for_skill).
+## Missing/invalid data degrades conservatively to ranged (false); "internal"
+## arts never declare techniques, so they can never be a skill source.
+func _is_melee_attack(unit: Node, skill_or_basic) -> bool:
+	if unit == null or not is_instance_valid(unit):
 		return false
-	if not ("grid_pos" in a and "grid_pos" in b):
+	if not ("character_data" in unit) or unit.character_data == null:
 		return false
-	return _chebyshev(a.grid_pos, b.grid_pos) <= 1
+	var arts = unit.character_data.external_arts
+	if arts == null or arts.is_empty():
+		return false
+	if skill_or_basic == null:
+		# Basic attack: classify by the primary external art (主修外功).
+		if arts[0] != null:
+			return _school_is_melee(str(arts[0].school))
+		return false
+	# Skill: find the declaring external art; "internal" arts never declare
+	# techniques, so a not-found lookup conservatively returns ranged.
+	for art in arts:
+		if art != null and "techniques" in art and art.techniques != null:
+			if skill_or_basic in art.techniques:
+				return _school_is_melee(str(art.school))
+	return false
 
 
 func _distance_between(a: Node, b: Node) -> int:
