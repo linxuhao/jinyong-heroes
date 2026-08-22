@@ -1,10 +1,9 @@
 ## TutorialManager (autoload)
 ##
 ## Step-by-step tutorial overlay system with input gating. Manages 7 tutorial
-## steps that teach the player movement, basic attacks, skills, end turn, and
-## pause. Once the tutorial completes (or is skipped), calls
-## GameManager.start_battle(). Advances on ui_accept (Enter/Space) or
-## tutorial_next (Enter) for automated headless playtest.
+## steps that teach the player movement, basic attacks, skills, and pause.
+## Once the tutorial completes (or is skipped), calls GameManager.start_battle().
+## Responds to ui_accept (Enter/Space) for automated headless playtest.
 extends Node
 
 # ---------------------------------------------------------------------------
@@ -14,21 +13,11 @@ extends Node
 const STEP_WELCOME: int = 0
 const STEP_MOVEMENT: int = 1
 const STEP_BASIC_ATTACK: int = 2
-const STEP_SKILLS: int = 3
-const STEP_END_TURN: int = 4
+const STEP_SKILL_1: int = 3
+const STEP_SKILL_2: int = 4
 const STEP_PAUSE: int = 5
 const STEP_COMBAT_START: int = 6
 const STEP_COUNT: int = 7
-
-## Every action that can be gated. Skip and the all-enemies-dead fast-forward
-## unlock the full list (the player controller still enforces the round-4
-## two-phase palm-art unlock for skill_5..skill_8).
-const _ALL_ACTIONS: Array[String] = [
-	"move", "basic_attack",
-	"skill_1", "skill_2", "skill_3", "skill_4",
-	"skill_5", "skill_6", "skill_7", "skill_8",
-	"end_turn", "pause",
-]
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -91,40 +80,45 @@ const _STEP_TITLES: Dictionary = {
 	STEP_WELCOME: "Welcome to Huashan Sword Tournament",
 	STEP_MOVEMENT: "Movement",
 	STEP_BASIC_ATTACK: "Basic Attack",
-	STEP_SKILLS: "Skills",
-	STEP_END_TURN: "End Turn",
-	STEP_PAUSE: "Pause",
+	STEP_SKILL_1: "Skill: Sorrowful Palms (黯然销魂掌)",
+	STEP_SKILL_2: "Skill: Heavy Iron Sword (玄铁剑法)",
+	STEP_PAUSE: "Pause Combat",
 	STEP_COMBAT_START: "Battle Begin!",
 }
 
 ## Body strings (with BBCode) keyed by step id.
 const _STEP_BODIES: Dictionary = {
 	STEP_WELCOME: (
-		"You are Yang Guo. Defeat all Five Greats to become champion.\n\n"
-		+ "Press Next or Enter to continue."
+		"You are Yang Guo (杨过). Defeat all Five Greats to become champion!\n\n"
+		+ "Press [b]Next[/b] or [b]Enter/Space[/b] to continue."
 	),
 	STEP_MOVEMENT: (
-		"WASD/Arrows move one tile at a time. You have 4 move points per turn.\n\n"
-		+ "Try moving now!"
+		"Use [b]WASD[/b] or [b]Arrow keys[/b] to move Yang Guo one tile at a "
+		+ "time on the grid.\n\nTry moving now!"
 	),
 	STEP_BASIC_ATTACK: (
-		"Move adjacent to an enemy, then press J (or left-click) to basic attack."
+		"Move adjacent to an enemy, then press [b]J[/b] (or [b]left-click[/b] "
+		+ "them) to perform a basic attack.\n\nTry attacking an enemy!"
 	),
-	STEP_SKILLS: (
-		"Press 1-4 to select a Heavy Iron Sword technique, then J to fire it at "
-		+ "the nearest enemy in range. Skills 5-8 (Melancholy Palms) unlock in "
-		+ "round 4.\n\nEach button shows its skill rating (e.g. OVERDRIVE x1.3)."
+	STEP_SKILL_1: (
+		"Press [b]1[/b] to select Sorrowful Palms, then click an adjacent "
+		+ "enemy.\nHigh damage with knockback. 4s cooldown.\n\n"
+			+ "Press [b]J[/b] to fire the selected skill at the nearest enemy "
+			+ "in range (or click a target)."
 	),
-	STEP_END_TURN: (
-		"Press Space to end your turn. After you end your turn, the enemies act "
-		+ "in initiative order."
+	STEP_SKILL_2: (
+		"Press [b]2[/b] to select Heavy Iron Sword.\n"
+		+ "Line AoE attack hitting enemies in a 2-tile line. 3s cooldown.\n\n"
+			+ "Press [b]J[/b] to fire the selected skill at the nearest enemy "
+			+ "in range (or click a target)."
 	),
 	STEP_PAUSE: (
-		"Press Escape to pause/unpause."
+		"Press [b]Escape[/b] to pause/unpause combat at any time.\n\n"
+		+ "Use this to plan your next move!"
 	),
 	STEP_COMBAT_START: (
 		"The tutorial is complete. Defeat all Five Greats!\n\n"
-		+ "Press Next to begin."
+		+ "Press [b]Next[/b] to begin."
 	),
 }
 
@@ -178,7 +172,7 @@ func advance() -> void:
 	if GameManager.enemies_alive.is_empty() and current_step < STEP_COMBAT_START:
 		current_step = STEP_COMBAT_START
 		# Unlock all actions when fast-forwarding.
-		_allowed_actions = _ALL_ACTIONS.duplicate()
+		_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "pause"]
 		_show_current_step()
 		return
 
@@ -210,7 +204,7 @@ func skip() -> void:
 	tutorial_skipped.emit()
 
 	# Unlock all actions.
-	_allowed_actions = _ALL_ACTIONS.duplicate()
+	_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "pause"]
 
 	_finish_tutorial()
 
@@ -333,14 +327,14 @@ func _update_allowed_actions() -> void:
 			_allowed_actions = ["move"]
 		STEP_BASIC_ATTACK:
 			_allowed_actions = ["move", "basic_attack"]
-		STEP_SKILLS:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4"]
-		STEP_END_TURN:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn"]
+		STEP_SKILL_1:
+			_allowed_actions = ["move", "basic_attack", "skill_1"]
+		STEP_SKILL_2:
+			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2"]
 		STEP_PAUSE:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn", "pause"]
+			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "pause"]
 		STEP_COMBAT_START:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn", "pause"]
+			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "pause"]
 
 # ---------------------------------------------------------------------------
 # Internal — Finish
@@ -355,14 +349,14 @@ func _finish_tutorial() -> void:
 	GameManager.start_battle()
 
 # ---------------------------------------------------------------------------
-# Input handling — ui_accept / tutorial_next advance the tutorial
+# Input handling — ui_accept (Enter/Space) advances tutorial
 # ---------------------------------------------------------------------------
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_active:
 		return
 
-	if event.is_action_pressed("ui_accept") or event.is_action_pressed("tutorial_next"):
+	if event.is_action_pressed("ui_accept"):
 		# Consume the event to prevent propagation.
 		get_viewport().set_input_as_handled()
 		advance()
