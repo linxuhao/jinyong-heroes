@@ -306,19 +306,23 @@ func get_units_in_range(origin: Vector2i, range_val: int) -> Array[Node]:
 	return units
 
 
-## Returns units whose grid positions fall within the specified area-of-effect
-## pattern centred at origin.
+## Returns the raw tile-set covered by an area-of-effect shape centred at
+## origin (no unit lookup, no dedup). Out-of-bounds tiles are dropped.
 ##
-## shape   |  pattern
-## --------|-------------------------------------------
-## single  |  just the origin tile
-## line    |  `size` tiles in `direction` from origin
-## cross   |  origin + 4 cardinal neighbours
-## square  |  (size*2+1)^2 Chebyshev ball centred at origin
+## shape     |  pattern
+## ----------|------------------------------------------------
+## single    |  just the origin tile
+## line      |  `size` tiles in `direction` from origin
+## cross     |  origin + `size` tiles in each of the 4 cardinal
+##           |  directions (arm length = size): 1 + 4*size tiles
+## square    |  (size*2+1)^2 Chebyshev ball centred at origin
+## adjacent  |  the 8-tile Chebyshev ring at distance exactly 1
 ##
-## For "line", a non-zero direction must be provided.
-func get_units_in_aoe(origin: Vector2i, shape: String, size: int,
-		direction: Vector2i = Vector2i.ZERO) -> Array[Node]:
+## For "line", a non-zero direction must be provided; otherwise the
+## direction toward the nearest occupied tile is auto-detected (existing
+## behaviour). Unknown shapes fall back to "single".
+func get_tiles_in_aoe(origin: Vector2i, shape: String, size: int,
+		direction: Vector2i = Vector2i.ZERO) -> Array[Vector2i]:
 	
 	var target_tiles: Array[Vector2i] = []
 	
@@ -341,11 +345,13 @@ func get_units_in_aoe(origin: Vector2i, shape: String, size: int,
 					target_tiles.append(tile)
 		
 		"cross":
+			# Center + `size` tiles in each cardinal direction (arm length).
 			target_tiles.append(origin)
 			for dir in _DIRECTIONS:
-				var tile: Vector2i = origin + dir
-				if is_in_bounds(tile):
-					target_tiles.append(tile)
+				for i in range(1, size + 1):
+					var tile: Vector2i = origin + dir * i
+					if is_in_bounds(tile):
+						target_tiles.append(tile)
 		
 		"square":
 			for dx in range(-size, size + 1):
@@ -354,9 +360,50 @@ func get_units_in_aoe(origin: Vector2i, shape: String, size: int,
 					if is_in_bounds(tile):
 						target_tiles.append(tile)
 		
+		"adjacent":
+			# The 8-tile Chebyshev ring at distance exactly 1 (no center).
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					if dx == 0 and dy == 0:
+						continue
+					var tile: Vector2i = origin + Vector2i(dx, dy)
+					if is_in_bounds(tile):
+						target_tiles.append(tile)
+		
 		_:
 			# Unknown shape — treat as single.
 			target_tiles.append(origin)
+	
+	return target_tiles
+
+
+## Returns units whose grid positions fall within the specified area-of-effect
+## pattern centred at origin.
+##
+## shape     |  pattern
+## ----------|------------------------------------------------
+## single    |  just the origin tile
+## line      |  `size` tiles in `direction` from origin
+## cross     |  origin + `size` tiles in each of the 4 cardinal
+##           |  directions (arm length = size)
+## square    |  (size*2+1)^2 Chebyshev ball centred at origin
+## adjacent  |  the 8-tile Chebyshev ring at distance exactly 1
+##
+## For "line", a non-zero direction must be provided.
+## When `hostile_to` is non-null, only units whose team differs from
+## `hostile_to`'s team are returned: damage AoEs pass the caster so friendly
+## units are never caught, while heal skills pass a same-team unit to get only
+## allies. When `hostile_to` is null (or its team is unknown) no filtering is
+## applied — the existing 4-argument call sites behave exactly as before.
+func get_units_in_aoe(origin: Vector2i, shape: String, size: int,
+		direction: Vector2i = Vector2i.ZERO,
+		hostile_to: Node = null) -> Array[Node]:
+	
+	var target_tiles: Array[Vector2i] = get_tiles_in_aoe(origin, shape, size, direction)
+	
+	var filter_team: int = -1
+	if hostile_to != null:
+		filter_team = _team_of(hostile_to)
 	
 	# Collect units present on the target tiles.
 	var units: Array[Node] = []
@@ -364,6 +411,8 @@ func get_units_in_aoe(origin: Vector2i, shape: String, size: int,
 		if occupancy.has(tile):
 			var unit: Node = occupancy[tile] as Node
 			if unit != null and is_instance_valid(unit):
+				if filter_team >= 0 and _team_of(unit) == filter_team:
+					continue  # Same team — skip (not hostile).
 				units.append(unit)
 	
 	# Deduplicate (a unit occupies only one tile, but keep clean).
@@ -427,3 +476,19 @@ static func _deduplicate_nodes(arr: Array[Node]) -> Array[Node]:
 			seen[key] = true
 			result.append(n)
 	return result
+
+
+## Read a unit's team id for AoE team filtering. Prefers a direct `team`
+## property on the unit when present; otherwise falls back to the unit's
+## `character_data.team` (player.gd / enemy.gd expose the team through their
+## CharacterData resource). Returns -1 when the team cannot be determined —
+## callers treat -1 as "no filtering" (keep every unit).
+static func _team_of(unit: Node) -> int:
+	if unit == null:
+		return -1
+	if "team" in unit:
+		return int(unit.team)
+	var cd: Resource = unit.get("character_data") as Resource
+	if cd != null and "team" in cd:
+		return int(cd.team)
+	return -1
