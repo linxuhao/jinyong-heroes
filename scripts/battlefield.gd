@@ -31,17 +31,26 @@ const GRID_HEIGHT: int = 11
 
 @onready var _backdrop: Sprite2D = $SummitBackdrop
 @onready var _tilemap: TileMap = $Grid
+@onready var _grid_lines: Node2D = $GridLines
 @onready var _characters_container: Node2D = $Characters
 
 ## Observable for the playtest contract: true when the SummitBackdrop sprite
 ## spans exactly the board rect [0,960]x[0,704] after the runtime fit (W7).
 var board_aligned: bool = false
 
+## Observable for the playtest contract: true when the GridLines overlay node
+## exists and is visible (grid-cell lines drawn above backdrop/tiles).
+var grid_lines_visible: bool = false
+
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
+	# 0. Grid overlay observable: true iff the GridLines node exists and is
+	#    visible (playtest surface; set before any other wiring).
+	grid_lines_visible = _grid_lines != null and _grid_lines.visible
+
 	# 1. Load the generated terrain tile textures.
 	var textures: Dictionary = _create_tile_textures()
 
