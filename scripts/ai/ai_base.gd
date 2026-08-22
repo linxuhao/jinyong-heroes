@@ -3,31 +3,29 @@
 ## Abstract base for all enemy AI controllers. Provides helpers for distance
 ## calculation, pathfinding, movement, and skill-readiness checks.
 ##
-## Subclasses override evaluate() and get_retreat_threshold().
-## Instances are created with .new() in battlefield.gd and assigned to
-## enemy.ai_controller.
+## Subclasses override evaluate(). Instances are created with .new() in
+## battlefield.gd and assigned to enemy.ai_controller.
 extends RefCounted
 
 # ---------------------------------------------------------------------------
 # Virtual methods — override in subclasses
 # ---------------------------------------------------------------------------
 
-## Evaluate the situation and return an action dictionary.
-## Keys: {action: String, target: Node, params: Dictionary}
-## action can be "move", "basic_attack", "skill", or "" (no action).
-## target is the player Node for attacks/skills, or the enemy self for moves.
-## params contains action-specific data:
-##   - For "move": {to: Vector2i}
-##   - For "skill": {skill_index: int}
-## Returns {} (empty dict) for no action.
-func evaluate(_enemy: Node, _player: Node, _delta: float) -> Dictionary:
+## Evaluate the situation and return a decision dictionary. Called ONCE per
+## enemy turn by CombatManager. Pure function of the enemy's cooldowns /
+## health / grid_pos, the player's grid_pos / health, and allies' health —
+## zero RNG, zero delta, zero per-instance mutable state.
+##
+## Keys:
+##   move_path: Array[Vector2i]  # index 0 = current tile; engine walks 1..end
+##   action: String              # "basic_attack" | "skill" | "wait"
+##   target: Node                # attack/heal target; self for self-buffs
+##   skill_index: int            # set when action == "skill"
+##   params: Dictionary          # optional for skills
+##   fsm_state: String           # "APPROACH"|"ATTACK"|"SKILL"|"RETREAT"|"WAIT"
+## Returns {} for no action (wait in place).
+func evaluate(enemy: Node) -> Dictionary:
 	return {}
-
-
-## Return the health ratio threshold below which this AI will retreat.
-## 0.0 means never retreat. Override in subclasses.
-func get_retreat_threshold() -> float:
-	return 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -62,31 +60,70 @@ func _is_in_range(enemy: Node, player: Node, range_val: int) -> bool:
 	return _distance(enemy.grid_pos, player.grid_pos) <= range_val
 
 
-## Return a move action that moves the enemy one step toward the player
-## along the A* path. Returns {} if no valid step exists.
-func _move_toward(enemy: Node, player: Node) -> Dictionary:
+## Build a multi-step move path from the enemy toward the player, capped at
+## `max_tiles` steps after the start. Every included tile must pass
+## GridManager.is_walkable and not be occupied; the player's own tile is
+## never included (pathing ends before it). Returns [start, step1, ...], or
+## [] when no step exists.
+func _move_toward_budget(enemy: Node, player: Node, max_tiles: int) -> Array[Vector2i]:
+	if enemy == null or player == null:
+		return []
+	if not ("grid_pos" in enemy and "grid_pos" in player):
+		return []
+
 	var path: Array[Vector2i] = _get_path_to_player(enemy, player)
 	if path.size() < 2:
-		return {}
+		return []
 
-	var next_step: Vector2i = path[1]  # first step after current position
+	var result: Array[Vector2i] = [enemy.grid_pos]
+	var steps: int = 0
+	for i in range(1, path.size()):
+		if steps >= max_tiles:
+			break
+		var tile: Vector2i = path[i]
+		if tile == player.grid_pos:
+			break  # Never include the player's occupied tile.
+		if not GridManager.is_walkable(tile):
+			continue
+		if GridManager.is_occupied(tile):
+			continue
+		result.append(tile)
+		steps += 1
 
-	# Safety check: the tile must be in bounds and not occupied.
-	if not GridManager.is_in_bounds(next_step):
-		return {}
-	if GridManager.is_occupied(next_step):
-		return {}
-
-	return {
-		action = "move",
-		target = enemy,
-		params = { to = next_step }
-	}
+	if result.size() < 2:
+		return []
+	return result
 
 
-## Return a move action that moves the enemy one tile directly away from
-## the player (cardinal directions only). Tries the primary away direction;
-## if blocked, tries perpendicular directions. Returns {} if all blocked.
+## Walk the movement budget toward the player and stop at the FIRST tile whose
+## Chebyshev distance to the player is <= attack_range, attacking from there.
+## Returns an ATTACK decision (move_path + basic_attack) when such a tile
+## exists, else an APPROACH decision (move the whole budget, action "wait").
+## Never returns {}.
+func _approach_decision(enemy: Node, player: Node, attack_range: int) -> Dictionary:
+	if enemy == null or player == null:
+		return { move_path = [], action = "wait", fsm_state = "APPROACH" }
+	if not ("grid_pos" in enemy and "grid_pos" in player):
+		return { move_path = [], action = "wait", fsm_state = "APPROACH" }
+
+	var path: Array[Vector2i] = _move_toward_budget(enemy, player, int(enemy.move_range))
+	if path.is_empty():
+		return { move_path = [], action = "wait", fsm_state = "APPROACH" }
+
+	for i in range(1, path.size()):
+		if _distance(path[i], player.grid_pos) <= attack_range:
+			return {
+				move_path = path.slice(0, i + 1),
+				action = "basic_attack",
+				target = player,
+				fsm_state = "ATTACK",
+			}
+	return { move_path = path, action = "wait", fsm_state = "APPROACH" }
+
+
+## Return a one-tile RETREAT decision moving directly away from the player
+## (cardinal directions only). Tries the primary away direction; if blocked,
+## tries perpendicular directions. Returns {} if all blocked.
 func _move_away(enemy: Node, player: Node) -> Dictionary:
 	if enemy == null or player == null:
 		return {}
@@ -137,16 +174,16 @@ func _move_away(enemy: Node, player: Node) -> Dictionary:
 		var target_pos: Vector2i = enemy_pos + dir_vec
 		if GridManager.is_walkable(target_pos) and not GridManager.is_occupied(target_pos):
 			return {
-				action = "move",
-				target = enemy,
-				params = { to = target_pos }
+				move_path = [enemy_pos, target_pos],
+				action = "wait",
+				fsm_state = "RETREAT",
 			}
 
 	return {}
 
 
-## Check whether a skill at the given index is ready to use (cooldown elapsed
-## and index is valid).
+## Check whether a skill at the given index is ready to use (round-based int
+## cooldown elapsed and index is valid).
 func _is_skill_ready(enemy: Node, skill_index: int) -> bool:
 	if enemy == null:
 		return false
@@ -157,4 +194,9 @@ func _is_skill_ready(enemy: Node, skill_index: int) -> bool:
 	if skill_index >= enemy.skills.size():
 		return false
 
-	return enemy.skill_cooldowns[skill_index] <= 0.0
+	return int(enemy.skill_cooldowns[skill_index]) <= 0
+
+
+## True when the two grid positions share a row or column (line AoE gate).
+func _aligned_in_line(a: Vector2i, b: Vector2i) -> bool:
+	return a.x == b.x or a.y == b.y

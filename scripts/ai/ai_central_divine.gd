@@ -1,70 +1,54 @@
 ## AIControllerCentralDivine — 中神通王重阳 AI
 ##
-## Defensive counter-attacker. Waits for the player to approach (stays IDLE
-## if not attacked recently). If attacked within the last 3 seconds, actively
-## approaches to range 2. At range 1-2, uses Divine Burst (AoE) or basic
-## attack. Retreats at 30% HP.
+## Defensive counter-attacker. Maintains Qi Aegis, dispels hostile buffs
+## with Primal Unity, and unleashes Seven Stars / Quanzhen Sword up close.
 ##
-## Skill[0]: Divine Burst — area burst skill, effective at close range.
+## Skill index map (from battlefield.gd):
+##   0 quanzhen_sword · 1 seven_stars · 2 qi_aegis · 3 primal_unity
 extends "res://scripts/ai/ai_base.gd"
 
-## Timestamp (seconds via Time.get_ticks_msec/1000.0) when the enemy was
-## last attacked. Set externally by enemy.gd or via signal. Initialised
-## to a very old value so the AI starts passive.
-var _last_attacked_time: float = -999.0
 
-
-func get_retreat_threshold() -> float:
-	return 0.30
-
-
-func evaluate(enemy: Node, player: Node, delta: float) -> Dictionary:
-	# Guard: if busy, skip.
-	if CombatManager.is_unit_busy(enemy):
+func evaluate(enemy: Node) -> Dictionary:
+	if enemy == null:
 		return {}
-
-	if enemy == null or player == null:
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
 		return {}
 	if not ("grid_pos" in enemy and "grid_pos" in player):
 		return {}
-	if not ("health" in enemy and "max_health" in enemy):
-		return {}
 
-	var distance: int = _distance(enemy.grid_pos, player.grid_pos)
-	var health_ratio: float = float(enemy.health) / float(enemy.max_health)
-	var current_time: float = Time.get_ticks_msec() / 1000.0
+	var dist: int = _distance(enemy.grid_pos, player.grid_pos)
 
-	# Retreat if below threshold.
-	if health_ratio < get_retreat_threshold():
-		enemy.fsm_state = "RETREAT"
-		return _move_away(enemy, player)
-
-	# Close range: counter-attack.
-	if distance <= 2:
-		if _is_skill_ready(enemy, 0):
-			enemy.fsm_state = "SKILL"
-			return {
-				action = "skill",
-				target = player,
-				params = { skill_index = 0 }
-			}
-		else:
-			enemy.fsm_state = "ATTACK"
-			return {
-				action = "basic_attack",
-				target = player,
-				params = {}
-			}
-
-	# Out of range (>2): decide based on whether recently attacked.
-	if distance > 2:
-		if current_time - _last_attacked_time <= 3.0:
-			# Recently attacked — actively approach.
-			enemy.fsm_state = "APPROACH"
-			return _move_toward(enemy, player)
-		else:
-			# Not attacked recently — stay IDLE, wait for player.
-			enemy.fsm_state = "IDLE"
-			return {}
-
-	return {}
+	# 1) Qi Aegis (shield 50 x3) — ready and (wounded or player within 2).
+	if _is_skill_ready(enemy, 2) \
+			and (int(enemy.health) < int(enemy.max_health) or dist <= 2):
+		return {
+			move_path = [], action = "skill", target = enemy,
+			skill_index = 2, fsm_state = "SKILL",
+		}
+	# 2) Primal Unity (global dispel strike) — always when ready.
+	if _is_skill_ready(enemy, 3):
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 3, fsm_state = "SKILL",
+		}
+	# 3) Seven Stars (cross 2) — player within 2.
+	if _is_skill_ready(enemy, 1) and dist <= 2:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 1, fsm_state = "SKILL",
+		}
+	# 4) Quanzhen Sword (single) — adjacent.
+	if _is_skill_ready(enemy, 0) and dist <= 1:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 0, fsm_state = "SKILL",
+		}
+	# 5) In melee range — basic attack (26 @ 1).
+	if dist <= 1:
+		return {
+			move_path = [], action = "basic_attack", target = player,
+			fsm_state = "ATTACK",
+		}
+	# 6) Approach to melee.
+	return _approach_decision(enemy, player, 1)

@@ -1,73 +1,74 @@
 ## AIControllerNorthBeggar — 北丐洪七公 AI
 ##
-## High-damage melee brawler. Charges directly at the player and uses
-## Dragon Palm (降龙十八掌) — a 3-tile line AoE with massive damage and
-## long cooldown — at range 1-3. When below retreat threshold, toggles
-## between retreat and re-engage each evaluation.
+## High-damage melee brawler. Charges the player, unloads Dragon Palms in
+## priority order, and uses the Dog-Beating Staff at range 2.
 ##
-## Skill[0]: Dragon Palm — 3-tile line AoE, high damage, long cooldown.
+## Skill index map (from battlefield.gd):
+##   0 proud_dragon_regret · 1 flying_dragon · 2 dragon_in_the_field
+##   3 hidden_dragon · 4 dog_beating_trip · 5 dog_beating_poke
+##   6 dog_beating_seal
 extends "res://scripts/ai/ai_base.gd"
 
-## Toggles between RETREAT and APPROACH every other evaluation when
-## below retreat threshold.
-var _retreat_toggle: bool = false
 
-
-func get_retreat_threshold() -> float:
-	return 0.15
-
-
-func evaluate(enemy: Node, player: Node, delta: float) -> Dictionary:
-	# Guard: if busy, skip.
-	if CombatManager.is_unit_busy(enemy):
+func evaluate(enemy: Node) -> Dictionary:
+	if enemy == null:
 		return {}
-
-	if enemy == null or player == null:
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
 		return {}
 	if not ("grid_pos" in enemy and "grid_pos" in player):
 		return {}
-	if not ("health" in enemy and "max_health" in enemy):
-		return {}
 
-	var distance: int = _distance(enemy.grid_pos, player.grid_pos)
-	var health_ratio: float = float(enemy.health) / float(enemy.max_health)
+	var dist: int = _distance(enemy.grid_pos, player.grid_pos)
 
-	# Below retreat threshold: toggle between retreat and re-engage.
-	if health_ratio < get_retreat_threshold():
-		_retreat_toggle = not _retreat_toggle
-		if _retreat_toggle:
-			enemy.fsm_state = "RETREAT"
-			return _move_away(enemy, player)
-		else:
-			# Re-engage: move toward player even when low.
-			enemy.fsm_state = "APPROACH"
-			return _move_toward(enemy, player)
-
-	# Preferred range 1-3: use skill[0] (Dragon Palm) if ready.
-	if distance >= 1 and distance <= 3:
-		if _is_skill_ready(enemy, 0):
-			enemy.fsm_state = "SKILL"
-			return {
-				action = "skill",
-				target = player,
-				params = { skill_index = 0 }
-			}
-		# If adjacent, use basic attack.
-		elif distance == 1:
-			enemy.fsm_state = "ATTACK"
-			return {
-				action = "basic_attack",
-				target = player,
-				params = {}
-			}
-		else:
-			# Approach to get closer.
-			enemy.fsm_state = "APPROACH"
-			return _move_toward(enemy, player)
-
-	# Out of range: approach.
-	if distance > 3:
-		enemy.fsm_state = "APPROACH"
-		return _move_toward(enemy, player)
-
-	return {}
+	# 1) Hidden Dragon (square 2 AoE, KB 2) — player within 2.
+	if _is_skill_ready(enemy, 3) and dist <= 2:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 3, fsm_state = "SKILL",
+		}
+	# 2) Proud Dragon Regret (single, KB 2) — adjacent.
+	if _is_skill_ready(enemy, 0) and dist <= 1:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 0, fsm_state = "SKILL",
+		}
+	# 3) Dragon in the Field (line 3, KB 1) — cardinal line within 3.
+	if _is_skill_ready(enemy, 2) \
+			and _aligned_in_line(enemy.grid_pos, player.grid_pos) and dist <= 3:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 2, fsm_state = "SKILL",
+		}
+	# 4) Flying Dragon (jump 3 + 3x3 at landing) — player within 3 and a
+	#    valid landing tile exists.
+	if _is_skill_ready(enemy, 1) and dist <= 3 \
+			and _move_toward_budget(enemy, player, 3).size() > 1:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 1, fsm_state = "SKILL",
+		}
+	# 5-7) Dog-Beating Staff (range 2, highest damage first).
+	if _is_skill_ready(enemy, 6) and dist <= 2:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 6, fsm_state = "SKILL",
+		}
+	if _is_skill_ready(enemy, 5) and dist <= 2:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 5, fsm_state = "SKILL",
+		}
+	if _is_skill_ready(enemy, 4) and dist <= 2:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 4, fsm_state = "SKILL",
+		}
+	# 8) In melee range — basic attack (28 @ 1).
+	if dist <= 1:
+		return {
+			move_path = [], action = "basic_attack", target = player,
+			fsm_state = "ATTACK",
+		}
+	# 9) Approach to melee.
+	return _approach_decision(enemy, player, 1)

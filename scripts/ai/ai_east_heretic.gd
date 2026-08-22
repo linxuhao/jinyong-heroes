@@ -1,62 +1,57 @@
 ## AIControllerEastHeretic — 东邪黄药师 AI
 ##
-## Ranged poison specialist. Prefers to fight at range 2-3. Retreats if the
-## player closes to melee (range 1) or when HP drops below 25%.
+## Ranged controller. Keeps distance 2-3, debuffs the player's initiative
+## whenever possible, and retreats when the player closes to melee.
 ##
-## Skill[0]: Poison Cloud — AoE DoT at range 2-3.
+## Skill index map (from battlefield.gd):
+##   0 falling_petals · 1 jade_flute_acupoint · 2 peach_blossom_maze
+##   3 tidal_melody
 extends "res://scripts/ai/ai_base.gd"
 
 
-func get_retreat_threshold() -> float:
-	return 0.25
-
-
-func evaluate(enemy: Node, player: Node, delta: float) -> Dictionary:
-	# Guard: if busy, skip.
-	if CombatManager.is_unit_busy(enemy):
+func evaluate(enemy: Node) -> Dictionary:
+	if enemy == null:
 		return {}
-
-	if enemy == null or player == null:
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
 		return {}
 	if not ("grid_pos" in enemy and "grid_pos" in player):
 		return {}
-	if not ("health" in enemy and "max_health" in enemy):
-		return {}
 
-	var distance: int = _distance(enemy.grid_pos, player.grid_pos)
-	var health_ratio: float = float(enemy.health) / float(enemy.max_health)
+	var dist: int = _distance(enemy.grid_pos, player.grid_pos)
 
-	# Retreat if below threshold.
-	if health_ratio < get_retreat_threshold():
-		enemy.fsm_state = "RETREAT"
+	# 1) Tidal Melody (global init debuff) — always when ready.
+	if _is_skill_ready(enemy, 3):
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 3, fsm_state = "SKILL",
+		}
+	# 2) Falling Petals (3x3 centered on the target tile, range 3).
+	if _is_skill_ready(enemy, 0) and dist <= 3:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 0, fsm_state = "SKILL",
+		}
+	# 3) Jade Flute Acupoint (technique seal; the rule gates it at range 3).
+	if _is_skill_ready(enemy, 1) and dist <= 3:
+		return {
+			move_path = [], action = "skill", target = player,
+			skill_index = 1, fsm_state = "SKILL",
+		}
+	# 4) Peach Blossom Maze (hazard zone around self; player within 2).
+	if _is_skill_ready(enemy, 2) and dist <= 2:
+		return {
+			move_path = [], action = "skill", target = enemy,
+			skill_index = 2, fsm_state = "SKILL",
+		}
+	# 5) Player adjacent — retreat to keep distance 2-3.
+	if dist == 1:
 		return _move_away(enemy, player)
-
-	# If player is adjacent (melee range): retreat to preferred range.
-	if distance == 1:
-		enemy.fsm_state = "RETREAT"
-		return _move_away(enemy, player)
-
-	# Preferred range: 2-3 tiles. Use skill[0] (poison cloud) if ready,
-	# else basic attack.
-	if distance >= 2 and distance <= 3:
-		if _is_skill_ready(enemy, 0):
-			enemy.fsm_state = "SKILL"
-			return {
-				action = "skill",
-				target = player,
-				params = { skill_index = 0 }
-			}
-		else:
-			enemy.fsm_state = "ATTACK"
-			return {
-				action = "basic_attack",
-				target = player,
-				params = {}
-			}
-
-	# Player is too far: approach to preferred range.
-	if distance > 3:
-		enemy.fsm_state = "APPROACH"
-		return _move_toward(enemy, player)
-
-	return {}
+	# 6) In basic range (22 @ 3) — ranged basic attack.
+	if dist <= 3:
+		return {
+			move_path = [], action = "basic_attack", target = player,
+			fsm_state = "ATTACK",
+		}
+	# 7) Approach to preferred range 3.
+	return _approach_decision(enemy, player, 3)
