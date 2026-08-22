@@ -150,7 +150,7 @@ scenarios:
           Player.skill_cooldowns: "skill_cooldowns[0] == 0"
 
   - name: dot_resolves_at_victim_turn_start
-    description: "West Poison applies Spirit Serpent poison mid-round 4; the player's round-5 turn start ticks round(8*1.3)=10, masked to a net +6 by the Shen Diao regen (+16)."
+    description: "West Poison applies Spirit Serpent poison mid-round 4; the player's round-5 turn start ticks round(8*1.3)=10, masked to a net +16 by the Shen Diao regen (+26)."
     timeline:
       - { at: 3, actions: [ui_accept] }
       - { at: 5, actions: [ui_accept] }
@@ -310,12 +310,12 @@ scenarios:
           Player.turns_taken: 0
           Player.health: 500
       # --- Round 1: approach the top-center cluster (Central Divine at (7,1)). ---
-      - { at: 40, actions: [move_up] }
-      - { at: 55, actions: [move_up] }
-      - { at: 70, actions: [move_up] }
-      - { at: 85, actions: [skill_1] }
-      - { at: 100, actions: [basic_attack] }
-      - { at: 115, actions: [end_turn] }
+      - { at: 46, actions: [move_up] }
+      - { at: 61, actions: [move_up] }
+      - { at: 76, actions: [move_up] }
+      - { at: 91, actions: [skill_1] }
+      - { at: 106, actions: [basic_attack] }
+      - { at: 121, actions: [end_turn] }
       # --- Round 2 (player acts LAST under Tidal Melody's -20 init): Boundless
       #     Seas (square r2 self, 70 -> 91, cd6) on the converged cluster. ---
       - { at: 620, actions: [skill_4] }
@@ -327,12 +327,12 @@ scenarios:
       - { at: 985, actions: [basic_attack] }
       - { at: 1000, actions: [end_turn] }
       # --- Round 4 (debuff expired, player FIRST; palm arts unlocked and HP well
-      #     below 180 — the skill_8 HP gate needs health < 180, i.e. below 50%
-      #     of 360, which three rounds of enemy focus-fire guarantee by now):
+      #     below 250 — the skill_8 HP gate needs health < 250, i.e. below 50%
+      #     of 500, which three rounds of enemy focus-fire guarantee by now):
       #     Seventeen Melancholy Forms (adjacent, 70 -> 91, cd8). ---
-      - { at: 1030, actions: [skill_8] }
-      - { at: 1045, actions: [basic_attack] }
-      - { at: 1060, actions: [end_turn] }
+      - { at: 1045, actions: [skill_8] }
+      - { at: 1060, actions: [basic_attack] }
+      - { at: 1075, actions: [end_turn] }
       # --- Round 5 (player first): Heavy Edge single-target cleanup. ---
       - { at: 1300, actions: [skill_1] }
       - { at: 1315, actions: [basic_attack] }
