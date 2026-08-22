@@ -138,6 +138,8 @@ func get_player() -> Node:
 func _show_end_game_overlay(text: String) -> void:
 	if _overlay_layer != null:
 		# Overlay already exists — just update the text.
+		# Safe: get_node_or_null re-resolves the path each call and returns
+		# null for freed nodes — no freed-object cast can occur.
 		var existing_label: Label = _overlay_layer.get_node_or_null("Panel/Label")
 		if existing_label != null:
 			existing_label.text = text

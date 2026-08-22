@@ -233,6 +233,8 @@ func _sync_status_names() -> void:
 func _apply_character_visuals() -> void:
 	var sprite: Sprite2D = _sprite
 	if sprite == null:
+		# Safe: get_node_or_null re-resolves the path each call and returns
+		# null for freed nodes — never a freed-object cast.
 		sprite = get_node_or_null("Sprite") as Sprite2D
 	if sprite == null:
 		return

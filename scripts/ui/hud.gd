@@ -66,6 +66,8 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	# --- Energy label (display only; no technique costs this run) ---
 	var energy_label: Label = _energy_label
 	if energy_label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		energy_label = get_node_or_null("EnergyLabel") as Label
 		if energy_label != null:
 			_energy_label = energy_label
@@ -79,6 +81,7 @@ func _create_health_bar(character: Node, display_name: String) -> void:
 	if not is_instance_valid(_health_bar_scene):
 		return
 
+	# Safe: fresh instantiate() output — never a freed reference.
 	var bar: Control = _health_bar_scene.instantiate() as Control
 	if bar == null:
 		return
@@ -117,6 +120,7 @@ func _populate_skill_buttons(player: Node) -> void:
 		if skill == null:
 			continue
 
+		# Safe: fresh instantiate() output — never a freed reference.
 		var inst: Button = _skill_button_scene.instantiate() as Button
 		if inst == null:
 			continue
@@ -195,6 +199,8 @@ func _refresh_skill_button_states(player: Node) -> void:
 		gate_hp = int(round(float(player.max_health) * 0.5))
 
 	for i in range(buttons.size()):
+		# Safe: `buttons` is a fresh get_children() snapshot of live children —
+		# never a stored freed reference.
 		var btn: Button = buttons[i] as Button
 		if btn == null:
 			continue

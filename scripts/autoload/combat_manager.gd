@@ -1225,6 +1225,9 @@ func _handle_death(target: Node) -> void:
 ## Modulates Sprite2D children overbright for 0.1s, then restores the
 ## original modulate. Returns the tween so the caller can await it.
 func _damage_flash(target: Node) -> Tween:
+	# Safe: `target` is validated with is_instance_valid before any use, and
+	# the child lookups below use get_node_or_null, which re-resolves the path
+	# each call and returns null for freed nodes — never a freed-object cast.
 	if target == null or not is_instance_valid(target):
 		return null
 	if not target is Node2D:

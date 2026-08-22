@@ -39,6 +39,8 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	# members (update_health()/follow_character() rely on them).
 	var bar: ProgressBar = _bar
 	if bar == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		bar = get_node_or_null("Bar") as ProgressBar
 		if bar != null:
 			_bar = bar
@@ -48,6 +50,8 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 
 	var label: Label = _name_label
 	if label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		label = get_node_or_null("NameLabel") as Label
 		if label != null:
 			_name_label = label

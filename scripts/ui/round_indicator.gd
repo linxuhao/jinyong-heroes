@@ -39,6 +39,8 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 
 	var round_label: Label = _round_label
 	if round_label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		round_label = get_node_or_null("RoundLabel") as Label
 		if round_label != null:
 			_round_label = round_label
@@ -47,6 +49,8 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 
 	var active_label: Label = _active_label
 	if active_label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		active_label = get_node_or_null("ActiveLabel") as Label
 		if active_label != null:
 			_active_label = active_label
@@ -55,6 +59,8 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 
 	var order_label: Label = _order_label
 	if order_label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		order_label = get_node_or_null("OrderLabel") as Label
 		if order_label != null:
 			_order_label = order_label

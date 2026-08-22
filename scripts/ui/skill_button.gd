@@ -61,6 +61,8 @@ func setup(skill, hotkey: String, fa_hui_du: float) -> void:
 
 	var hotkey_label: Label = _hotkey_label
 	if hotkey_label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		hotkey_label = get_node_or_null("HotkeyLabel") as Label
 		if hotkey_label != null:
 			_hotkey_label = hotkey_label
@@ -77,6 +79,8 @@ func setup(skill, hotkey: String, fa_hui_du: float) -> void:
 
 	var fahui_label: Label = _fahui_label
 	if fahui_label == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		fahui_label = get_node_or_null("FahuiLabel") as Label
 		if fahui_label != null:
 			_fahui_label = fahui_label
@@ -100,6 +104,8 @@ func setup(skill, hotkey: String, fa_hui_du: float) -> void:
 func update_cooldown(remaining: int, total: int) -> void:
 	var overlay: ColorRect = _cooldown_overlay
 	if overlay == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
 		overlay = get_node_or_null("CooldownOverlay") as ColorRect
 		if overlay != null:
 			_cooldown_overlay = overlay

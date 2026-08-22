@@ -300,9 +300,14 @@ func get_units_in_range(origin: Vector2i, range_val: int) -> Array[Node]:
 	var units: Array[Node] = []
 	for grid_pos in occupancy.keys():
 		if _chebyshev_distance(origin, grid_pos) <= range_val:
-			var unit: Node = occupancy[grid_pos] as Node
-			if unit != null and is_instance_valid(unit):
-				units.append(unit)
+			# Check-then-cast: occupancy values are stored node refs that may
+			# be freed (queue_free is deferred). Validate the raw Variant
+			# BEFORE the typed assignment — `as Node` raises on a freed object.
+			var raw = occupancy[grid_pos]
+			if raw == null or not is_instance_valid(raw):
+				continue
+			var unit: Node = raw
+			units.append(unit)
 	return units
 
 
@@ -409,11 +414,15 @@ func get_units_in_aoe(origin: Vector2i, shape: String, size: int,
 	var units: Array[Node] = []
 	for tile in target_tiles:
 		if occupancy.has(tile):
-			var unit: Node = occupancy[tile] as Node
-			if unit != null and is_instance_valid(unit):
-				if filter_team >= 0 and _team_of(unit) == filter_team:
-					continue  # Same team — skip (not hostile).
-				units.append(unit)
+			# Check-then-cast: same freed-ref hazard as get_units_in_range —
+			# validate the raw Variant BEFORE the typed assignment.
+			var raw = occupancy[tile]
+			if raw == null or not is_instance_valid(raw):
+				continue
+			var unit: Node = raw
+			if filter_team >= 0 and _team_of(unit) == filter_team:
+				continue  # Same team — skip (not hostile).
+			units.append(unit)
 	
 	# Deduplicate (a unit occupies only one tile, but keep clean).
 	units = _deduplicate_nodes(units)

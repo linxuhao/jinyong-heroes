@@ -253,11 +253,15 @@ func set_overlay(node: CanvasLayer) -> void:
 	if panel == null:
 		return
 
+	# Safe: every child lookup below uses get_node_or_null, which re-resolves
+	# the path each call and returns null for freed nodes — never a
+	# freed-object cast.
 	_title_label = panel.get_node_or_null("Title") as Label
 	_body_label = panel.get_node_or_null("Body") as RichTextLabel
 
 	var buttons: HBoxContainer = panel.get_node_or_null("Buttons") as HBoxContainer
 	if buttons != null:
+		# Safe: get_node_or_null re-resolves; null for freed nodes.
 		_next_button = buttons.get_node_or_null("Next") as Button
 		_skip_button = buttons.get_node_or_null("SkipTutorial") as Button
 
