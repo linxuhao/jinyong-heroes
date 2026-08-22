@@ -449,7 +449,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# Yang Guo (player)
 	var cd = CharacterData.new()
 	cd.character_name = "Yang Guo"
-	cd.max_health = 360
+	cd.max_health = 500
 	cd.move_range = 4
 	cd.attack_damage = 30
 	cd.attack_range = 1

@@ -463,7 +463,7 @@ func begin_turn(unit: Node) -> void:
 	var passive: String = _passive_of(unit)
 	match passive:
 		"shen_diao_power":
-			apply_heal(unit, 16)  # round(12 * 1.3)
+			apply_heal(unit, 26)  # round(20 * 1.3)
 		"one_yang_renewal":
 			apply_heal(unit, 13)  # round(10 * 1.3)
 
@@ -525,7 +525,7 @@ func _tick_hazard_zones(unit: Node) -> void:
 ## Apply damage to a target through the two-stage pipeline:
 ##   attack side (already computed by the caller): round(base x buffs x fhd)
 ##   defense side (here): round(output x (1 - DR_total))
-## DR tags: 丐帮铁骨 -15% all damage; 神雕之力 -20% melee (Chebyshev <= 1).
+## DR tags: 丐帮铁骨 -15% all damage; 神雕之力 -50% melee (Chebyshev <= 1).
 ## ignore_damage_reduction (一阳指) skips all DR tags.
 ## Order: DR -> shield absorb -> HP -> 先天罡气 fatal guard (before death) ->
 ## death handling -> 一阳续命 below-40% heal -> counter/reflect (owner alive).
@@ -1388,7 +1388,7 @@ func get_fa_hui_du(gongfa) -> float:
 	return DEFAULT_FA_HUI_DU
 
 
-## Defense-side damage reduction: 丐帮铁骨 -15% all damage; 神雕之力 -20%
+## Defense-side damage reduction: 丐帮铁骨 -15% all damage; 神雕之力 -50%
 ## melee (Chebyshev distance <= 1 at resolution).
 func _damage_reduction(target: Node, is_melee: bool) -> float:
 	var dr: float = 0.0
@@ -1397,7 +1397,7 @@ func _damage_reduction(target: Node, is_melee: bool) -> float:
 			dr += 0.15
 		"shen_diao_power":
 			if is_melee:
-				dr += 0.2
+				dr += 0.5  # −50% melee DR (flat; percentages never take the fhd multiplier)
 	return dr
 
 

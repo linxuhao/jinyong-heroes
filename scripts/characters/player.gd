@@ -168,7 +168,7 @@ func select_skill(index: int) -> void:
 ## Gate check for selecting (and executing) a skill at `index`. Silent no-op
 ## rules: out of bounds; palm arts (index >= 4) phase-locked until
 ## CombatManager.current_round >= 4; on cooldown (> 0 rounds); Seventeen Forms
-## HP gate (usable only BELOW 50% max HP — 180 of 360); technique seal
+## HP gate (usable only BELOW 50% max HP — 250 of 500); technique seal
 ## (no_techniques_next_turn); tutorial input allowance.
 func _skill_selectable(index: int) -> bool:
 	if index < 0 or index >= skills.size():
@@ -181,7 +181,7 @@ func _skill_selectable(index: int) -> bool:
 	if skill != null and skill.hp_gate_below_ratio > 0.0:
 		var gate_hp: int = int(round(float(max_health) * skill.hp_gate_below_ratio))
 		if health >= gate_hp:
-			return false  # "Below 50% HP": exactly 50% (180) is NOT usable.
+			return false  # "Below 50% HP": exactly 50% (250) is NOT usable.
 	if _has_restriction_status("no_techniques_next_turn"):
 		return false
 	if not TutorialManager.is_input_allowed("skill_%d" % (index + 1)):

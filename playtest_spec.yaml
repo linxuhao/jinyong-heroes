@@ -229,7 +229,7 @@ scenarios:
         actions: []
         assert:
           CombatManager.current_round: 1
-          Player.health: 360
+          Player.health: 500
           SkillButton1.disabled: false
           SkillButton2.disabled: false
           SkillButton3.disabled: false
@@ -294,7 +294,7 @@ scenarios:
           Central_Divine.health: "changed"
 
   - name: terminal_victory_8_12_rounds_hp_15_40
-    description: "Full scripted battle: lure the Five Greats into a cluster around the player, clear them with self-origin AoE (Boundless Seas / Thousand-Force Cleave / Seventeen Melancholy Forms), and reach WON within 8-12 rounds with the player at 15%-40% HP (54-144 of 360)."
+    description: "Full scripted battle: lure the Five Greats into a cluster around the player, clear them with self-origin AoE (Boundless Seas / Thousand-Force Cleave / Seventeen Melancholy Forms), and reach WON within 8-12 rounds with the player at 15%-40% HP (75-200 of 500)."
     timeline:
       # --- Tutorial (7 steps) ---
       - { at: 3, actions: [ui_accept] }
@@ -308,7 +308,7 @@ scenarios:
         actions: []
         assert:
           Player.turns_taken: 0
-          Player.health: 360
+          Player.health: 500
       # --- Round 1: approach the top-center cluster (Central Divine at (7,1)). ---
       - { at: 40, actions: [move_up] }
       - { at: 55, actions: [move_up] }
@@ -359,11 +359,11 @@ scenarios:
       - { at: 2615, actions: [basic_attack] }
       - { at: 2630, actions: [end_turn] }
       # --- Final victory assert (sampled at the victory instant: WON at round
-      #     8-12 with player HP 54-144; turns_taken differential vs frame 30). ---
+      #     8-12 with player HP 75-200; turns_taken differential vs frame 30). ---
       - at: 2999
         actions: []
         assert:
           GameManager.current_state: 'current_state == "WON"'
           CombatManager.current_round: 'current_round >= 8 and current_round <= 12'
-          Player.health: 'health >= 54 and health <= 144'
+          Player.health: 'health >= 75 and health <= 200'
           Player.turns_taken: "changed"
