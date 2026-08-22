@@ -527,6 +527,7 @@ All changes are file edits (git-reversible). The RTWP machinery is removed, not 
 4. `ui_accept` (Space/Enter) and `end_turn` (Space) coexist: `TutorialManager` consumes `ui_accept` only while `is_active`; the player's `end_turn` handler gates on `GameManager.get_state() == "BATTLE"` and its own turn.
 5. Balance target (8–12 rounds, 15–40% HP) is reachable by tuning AI behavior only; if it proves unreachable, this is reported to the user as a design conflict, not silently fixed by changing content numbers.
 6. Deterministic enemy registration/iteration order is East Heretic, West Poison, South Emperor, North Beggar, Central Divine (battlefield dictionary insertion order) — it is the initiative tie-break order and the heal-target tie-break order.
+7. With 普攻 and 强大特征 values now also multiplied by ×1.3, both sides' incoming damage rises ~30%, making the S9 8–12-round / 15–40% HP band harder to land in-band. The only legitimate tuning knob remains AI behavior — never `design/20_content.md` numbers.
 
 ---
 
