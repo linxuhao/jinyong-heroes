@@ -537,7 +537,7 @@ All changes are file edits (git-reversible). The RTWP machinery is removed, not 
 - **D3 — Cooldowns are ints, decremented at the unit's own turn start** (design 5.2). "Cooldown 1" = usable every other own-turn.
 - **D4 — Turn-start lifecycle order fixed:** cooldowns → DoT/status ticks → regen → act (design 5.2). Assertable via DoT timing in S5.
 - **D5 — Two-stage rounding** per design 4.3: attack side `round(base × buffs × 发挥度)` → defense side `round(output × (1 − DR))`. 发挥度 never touches cooldown/range/KB/duration.
-- **D6 — Melee = Chebyshev distance ≤ 1 at resolution.** Drives 神雕之力 (−20%) and 蛤蟆反震. Counter/reflect damage is untyped (no 发挥度, no DR).
+- **D6 — Melee = Chebyshev distance ≤ 1 at resolution.** Drives 神雕之力 (−20%) and 蛤蟆反震. Counter/reflect damage is untyped (skips DR tags) but eats the source's internal-art 发挥度 on the attack side.
 - **D7 — Fatal guard (先天罡气) intercepts `apply_damage` before death handling, including DoT ticks; 一阳续命 below-40% triggers only if the unit survives the hit.**
 - **D8 — AoE origins explicit (`self`/`target`/`landing`); cross arm length = size; `adjacent` = 8-tile ring; damage AoEs filter hostile units via a new `team` field.**
 - **D9 — Jump techniques displace without consuming the move budget; invalid landing → not consumed.**
