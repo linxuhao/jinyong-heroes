@@ -46,6 +46,7 @@ Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decide
 - **Round snapshot**: at round start, all living units are sorted by effective initiative (身法, minus 20 while a 碧海潮生 debuff is active) descending, ties broken by registration order (player first, then East → West → South → North → Central). Godot's `sort_custom` is unstable, so the engine uses a decorate-sort-undecorate insertion sort for determinism.
 - **Turn-start lifecycle** (exact order): cooldown decrement (int rounds) → DoT/status ticks → constant regen (神雕之力 +26, 一阳续命 +13) → the unit acts.
 - **Damage pipeline**: attack side `round(base × buffs × fa_hui_du)` → defense side `round(output × (1 − DR))`. 发挥度 (1.3 in the tutorial) applies to damage / heal / shield / DoT-tick values only — never cooldown, range, knockback, or duration.
+- **Melee vs ranged** (design/10_systems.md §2.2): decided by the declaring external art's **weapon class** (刀/剑/长兵/拳掌/轻功/横练 = melee; 指/暗器/奇门毒/乐器 = ranged) — never by shape, reach, or damage. Basic attacks classify by the character's primary external art (主修外功).
 - **Pause** is a boolean gate (no `Engine.time_scale`); the turn flow is event-driven and simply halts at unit boundaries while paused.
 
 ## 功法 (Gongfa) Data Structure
@@ -153,6 +154,7 @@ Observable nodes/variables include `CombatManager` (`current_round`, `phase`, `a
 
 - **Godot version**: targets 4.4 (the brief's pin); `project.godot` `config/features` records `4.7` — pre-existing and unrelated, and the project compiles/runs under the current toolchain.
 - **Stable initiative sort**: decorate-sort-undecorate with a registration-index tie-break (Godot's `sort_custom` is unstable, and 碧海潮生's −20 debuff can create ties mid-battle).
+- **Freed-object safety**: `queue_free()` is deferred, so any stored node reference (turn-order queue heads, occupancy-dict values, cached AI heal targets) is validated with `is_instance_valid()` **before** any `as` cast or typed assignment — the check-then-cast idiom is applied repo-wide (turn engine, grid queries, AI controllers, and UI scripts).
 - **Tween safety**: `_await_tween_safe()` caps every action tween at `TWEEN_TIMEOUT_SEC` (0.25 s) so a tween killed by `queue_free()` can never hang the turn loop; `CombatManager.debug_await_total / debug_await_timeouts / debug_await_frames / debug_round_frame` expose the round-frame budget for re-timing the playtest timeline.
 - **Deterministic AI**: zero RNG — pure priority lists over cooldown/range/HP facts; the terminal playtest scenario is reproducible by construction.
 - **Rounding**: GDScript `round()` rounds half away from zero; `45 * 1.3` is exactly 58.5 in double → canonical 59.
