@@ -32,6 +32,13 @@ func _alias_for(name: String) -> String:
 ## Array of instantiated HealthBar Controls, one per character.
 var _health_bars: Array[Control] = []
 
+## Geometric observables (playtest surface). Computed every `_process` frame
+## BEFORE the player null-check so they are readable pre-battle too. Both
+## widgets live on the same HUD canvas layer, so their get_global_rect()s
+## share one coordinate system (scale-1 viewport: HUD coords == pixels).
+var round_pause_overlap: bool = false
+var skill8_right_edge: float = 0.0
+
 ## Preloaded health_bar scene for instantiation.
 var _health_bar_scene: PackedScene = preload("res://scenes/ui/health_bar.tscn")
 
@@ -47,6 +54,38 @@ var _skill_button_scene: PackedScene = preload("res://scenes/ui/skill_button.tsc
 @onready var _pause_button: Button = $PauseButton
 @onready var _round_indicator: Control = $RoundIndicator
 @onready var _energy_label: Label = $EnergyLabel
+
+## Resolve a skill button by its deterministic name (SkillButton1..SkillButton8).
+## Safe by construction: get_node_or_null re-resolves the path each call and
+## returns null for freed/absent nodes — never a stored freed-object cast.
+## Do NOT cache buttons in a typed array (typed arrays validate on write).
+func _skill_button(n: String) -> Control:
+	return _skill_bar.get_node_or_null(n) as Control
+
+## Recompute the two HUD geometric observables every frame:
+##   - round_pause_overlap: RoundIndicator rect vs PauseButton rect (false
+##     when either widget is unresolvable, e.g. pre-setup);
+##   - skill8_right_edge: SkillButton8's right edge x (keeps last value / 0.0
+##     when the button does not exist yet).
+## Both rects come from get_global_rect() in the HUD's own coordinate space.
+func _update_geometry_observables() -> void:
+	var indicator: Control = _round_indicator
+	if indicator == null or not is_instance_valid(indicator):
+		indicator = get_node_or_null("RoundIndicator") as Control
+		if indicator != null:
+			_round_indicator = indicator
+	var pause: Button = _pause_button
+	if pause == null or not is_instance_valid(pause):
+		pause = get_node_or_null("PauseButton") as Button
+		if pause != null:
+			_pause_button = pause
+	if indicator != null and pause != null:
+		round_pause_overlap = indicator.get_global_rect().intersects(
+			pause.get_global_rect())
+
+	var button8: Control = _skill_button("SkillButton8")
+	if button8 != null:
+		skill8_right_edge = button8.get_global_rect().end.x
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -178,6 +217,10 @@ func _wire_cooldown_updates(player: Node) -> void:
 # ---------------------------------------------------------------------------
 
 func _process(_delta: float) -> void:
+	# Geometric observables first — readable every frame, including pre-battle
+	# frames where the player does not exist yet (before the null-check below).
+	_update_geometry_observables()
+
 	for bar in _health_bars:
 		if is_instance_valid(bar) and bar.has_method("follow_character"):
 			bar.follow_character()

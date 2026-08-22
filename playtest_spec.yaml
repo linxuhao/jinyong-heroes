@@ -28,7 +28,7 @@ surface:
   South_Emperor:  [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names]
   North_Beggar:   [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names]
   Central_Divine: [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names, sprite_top]
-  HUD: [visible, size]
+  HUD: [visible, size, skill8_right_edge, round_pause_overlap]
   RoundIndicator: [visible, current_round, active_actor, order_names]
   SkillBar: [visible, size, global_position]
   SkillButton1: [visible, text, fahui_text, disabled, hp_gated]

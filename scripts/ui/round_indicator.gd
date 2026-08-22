@@ -24,6 +24,41 @@ var order_names: Array[String] = []
 @onready var _active_label: Label = $ActiveLabel
 @onready var _order_label: Label = $OrderLabel
 
+## Compact initiative-order tokens for the OrderLabel (display only). The
+## `order_names` observable keeps the full canonical names — playtest asserts
+## depend on them. Unknown names pass through unchanged.
+const _ORDER_TOKENS := {
+	"Yang Guo": "YG",
+	"East Heretic": "EH",
+	"Central Divine": "CD",
+	"South Emperor": "SE",
+	"North Beggar": "NB",
+	"West Poison": "WP",
+}
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+## Map a canonical character name to its compact order token; unknown names
+## are returned unchanged (fallback names like "Player"/"Enemy" unaffected).
+func _token_for(name: String) -> String:
+	return _ORDER_TOKENS.get(name, name)
+
+## Build the ActiveLabel text from CombatManager.active_unit_name + the
+## player's moves_left/acted. Null-safe pre-battle fallback "Active: <actor>"
+## only. "✓" (U+2713) is mandated verbatim by the task card; "·" (U+00B7) is
+## Latin-1 and covered by the default font.
+func _active_text(actor: String) -> String:
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return "Active: %s" % actor
+	return "Active: %s · Move %d · %s" % [
+		actor,
+		int(player.moves_left),
+		("Act ✓" if not bool(player.acted) else "End"),
+	]
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -55,7 +90,7 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		if active_label != null:
 			_active_label = active_label
 	if active_label != null:
-		active_label.text = "Active: %s" % actor
+		active_label.text = _active_text(actor)
 
 	var order_label: Label = _order_label
 	if order_label == null:
@@ -65,4 +100,7 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		if order_label != null:
 			_order_label = order_label
 	if order_label != null:
-		order_label.text = "Order: %s" % ", ".join(order)
+		# Compact token format (no clip/ellipsis) so the order line fits its
+		# box and stays clear of the PauseButton. order_names keeps the full
+		# canonical names above — tokenization is display-only.
+		order_label.text = "Order: %s" % " > ".join(order.map(_token_for))

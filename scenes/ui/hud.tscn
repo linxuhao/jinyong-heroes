@@ -32,16 +32,16 @@ offset_bottom = -16.0
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -240.0
+offset_left = -180.0
 offset_top = 8.0
-offset_right = 240.0
+offset_right = 180.0
 offset_bottom = 72.0
 mouse_filter = 2
 script = ExtResource("3")
 
 [node name="RoundLabel" type="Label" parent="RoundIndicator"]
 layout_mode = 0
-offset_right = 480.0
+offset_right = 360.0
 offset_bottom = 20.0
 horizontal_alignment = 1
 text = "Round 0"
@@ -49,7 +49,7 @@ text = "Round 0"
 [node name="ActiveLabel" type="Label" parent="RoundIndicator"]
 layout_mode = 0
 offset_top = 22.0
-offset_right = 480.0
+offset_right = 360.0
 offset_bottom = 42.0
 horizontal_alignment = 1
 text = "Active: "
@@ -57,7 +57,7 @@ text = "Active: "
 [node name="OrderLabel" type="Label" parent="RoundIndicator"]
 layout_mode = 0
 offset_top = 44.0
-offset_right = 480.0
+offset_right = 360.0
 offset_bottom = 64.0
 horizontal_alignment = 1
 text = "Order: "
