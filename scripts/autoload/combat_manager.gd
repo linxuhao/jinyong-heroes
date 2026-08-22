@@ -291,10 +291,14 @@ func _next_turn() -> void:
 
 	# Pop dead heads (units killed earlier this round never act).
 	while not _turn_order_units.is_empty():
-		var head: Node = _turn_order_units[0] as Node
-		if head == null or not is_instance_valid(head):
+		# Check-then-cast: a raw Variant read never crashes on a freed object,
+		# but `as Node` raises "Trying to cast a freed object" at the cast
+		# itself. Validate BEFORE any typed assignment.
+		var raw_head = _turn_order_units[0]
+		if raw_head == null or not is_instance_valid(raw_head):
 			_turn_order_units.pop_front()
 			continue
+		var head: Node = raw_head  # typed assignment only after validation
 		if "health" in head and int(head.health) <= 0:
 			_turn_order_units.pop_front()
 			continue
@@ -304,7 +308,14 @@ func _next_turn() -> void:
 		_end_round()
 		return
 
-	var unit: Node = _turn_order_units.pop_front() as Node
+	# Check-then-cast: the popped head may be a freed object (queue_free() is
+	# deferred — a unit killed mid-round is still in the queue). Consume the
+	# invalid head and recurse so the next valid head takes the turn.
+	var raw_unit = _turn_order_units.pop_front()
+	if raw_unit == null or not is_instance_valid(raw_unit):
+		_next_turn()
+		return
+	var unit: Node = raw_unit  # typed assignment only after validation
 	_active_unit = unit
 	active_unit_name = _name_of(unit)
 
