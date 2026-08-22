@@ -15,6 +15,7 @@ extends Node2D
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
 const CharacterData = preload("res://scripts/data/character_data.gd")
+const GongfaData = preload("res://scripts/data/gongfa_data.gd")
 
 # ---------------------------------------------------------------------------
 # Constants (mirror GridManager for convenience)
@@ -192,137 +193,264 @@ func _fit_backdrop_to_board() -> void:
 # ---------------------------------------------------------------------------
 
 ## Create all SkillData resources. Returns a Dictionary keyed by skill ID.
+## All values match design/20_content.md EXACTLY: damage/heal/shield are base
+## values (before the fa hui du multiplier); cooldowns are in ROUNDS and tick
+## at each unit's own turn start.
 func _create_all_skill_data() -> Dictionary:
 	var skills: Dictionary = {}
 
-	var sd
+	# --- Yang Guo: Profound Iron Sword Art (hotkeys 1-4) ---
+	skills["heavy_edge"] = _skill("Heavy Edge",
+		"Single-target heavy strike with knockback. 1 round cooldown.",
+		45, 1, 1, "single", 0, "self", 1)
+	skills["grand_simplicity"] = _skill("Grand Simplicity",
+		"Line attack reaching 3 tiles. 2 round cooldown.",
+		38, 3, 2, "line", 3, "self", 0)
+	skills["thousand_force_cleave"] = _skill("Thousand-Force Cleave",
+		"Cross strike with 2-tile arms centered on self. 3 round cooldown.",
+		34, 2, 3, "cross", 2, "self", 0)
+	var boundless_seas = _skill("Boundless Seas",
+		"Finisher: shockwave around self with radius 2. 6 round cooldown.",
+		70, 2, 6, "square", 2, "self", 0)
+	boundless_seas.is_finisher = true
+	skills["boundless_seas"] = boundless_seas
 
-	# Sorrowful Palms (黯然销魂掌) — Yang Guo skill 1
-	sd = SkillData.new()
-	sd.skill_name = "Sorrowful Palms"
-	sd.description = "High melee damage with knockback. 4s cooldown."
-	sd.damage = 25
-	sd.range = 1
-	sd.cooldown = 4
-	sd.aoe_shape = "single"
-	sd.aoe_size = 0
-	sd.knockback = 1
-	sd.dot_damage = 0
-	sd.dot_rounds = 0
-	sd.heal_amount = 0
-	skills.sorrowful_palms = sd
+	# --- Yang Guo: Melancholy Palms (hotkeys 5-8) ---
+	skills["heart_rending_strike"] = _skill("Heart-Rending Strike",
+		"Single-target palm strike. 1 round cooldown.",
+		38, 1, 1, "single", 0, "self", 0)
+	var dragging_mire = _skill("Dragging Mire",
+		"Single-target palm strike that reduces the target's next move. 2 round cooldown.",
+		25, 1, 2, "single", 0, "self", 0)
+	dragging_mire.status_applied = "move_minus_next_turn"
+	skills["dragging_mire"] = dragging_mire
+	var wandering_valley = _skill("Wandering Valley",
+		"Jump up to 3 tiles and strike all units adjacent to the landing tile. 3 round cooldown.",
+		20, 3, 3, "adjacent", 0, "landing", 0)
+	wandering_valley.jump_tiles = 3
+	skills["wandering_valley"] = wandering_valley
+	var seventeen_forms = _skill("Seventeen Melancholy Forms",
+		"Finisher: strike all adjacent units with heavy knockback. Usable only below 50% HP. 8 round cooldown.",
+		70, 0, 8, "adjacent", 0, "self", 2)
+	seventeen_forms.hp_gate_below_ratio = 0.5
+	seventeen_forms.is_finisher = true
+	skills["seventeen_melancholy_forms"] = seventeen_forms
 
-	# Heavy Iron Sword (玄铁剑法) — Yang Guo skill 2
-	sd = SkillData.new()
-	sd.skill_name = "Heavy Iron Sword"
-	sd.description = "Line AoE, 2-tile reach. 3s cooldown."
-	sd.damage = 15
-	sd.range = 2
-	sd.cooldown = 3
-	sd.aoe_shape = "line"
-	sd.aoe_size = 2
-	sd.knockback = 0
-	sd.dot_damage = 0
-	sd.dot_rounds = 0
-	sd.heal_amount = 0
-	skills.heavy_iron_sword = sd
+	# --- East Heretic: Tidal Melody Tune ---
+	skills["falling_petals"] = _skill("Falling Petals",
+		"Ranged 3x3 area centered on the target tile. 2 round cooldown.",
+		14, 3, 2, "square", 1, "target", 0)
+	var jade_flute_acupoint = _skill("Jade Flute Acupoint",
+		"Seal the target's techniques on its next turn. 3 round cooldown.",
+		20, 1, 3, "single", 0, "self", 0)
+	jade_flute_acupoint.status_applied = "no_techniques_next_turn"
+	skills["jade_flute_acupoint"] = jade_flute_acupoint
+	var peach_blossom_maze = _skill("Peach Blossom Maze",
+		"Create a maze zone around self (radius 2) that slows anyone entering. 4 round cooldown.",
+		0, 2, 4, "square", 2, "self", 0)
+	peach_blossom_maze.status_applied = "hazard_zone"
+	skills["peach_blossom_maze"] = peach_blossom_maze
+	var tidal_melody = _skill("Tidal Melody",
+		"Global melody that lowers every target's initiative for 2 rounds. 6 round cooldown.",
+		18, 0, 6, "global", 0, "self", 0)
+	tidal_melody.status_applied = "init_minus_20"
+	skills["tidal_melody"] = tidal_melody
 
-	# Poison Cloud — East Heretic skill
-	sd = SkillData.new()
-	sd.skill_name = "Poison Cloud"
-	sd.description = "Ranged AoE poison, applies DoT. 5s cooldown."
-	sd.damage = 8
-	sd.range = 3
-	sd.cooldown = 5
-	sd.aoe_shape = "square"
-	sd.aoe_size = 1
-	sd.knockback = 0
-	sd.dot_damage = 4
-	sd.dot_rounds = 4
-	sd.heal_amount = 0
-	skills.poison_cloud = sd
+	# --- West Poison: Spirit Serpent Fist ---
+	var spirit_serpent = _skill("Spirit Serpent",
+		"Poisonous single-target strike. 2 round cooldown.",
+		24, 1, 2, "single", 0, "self", 0)
+	spirit_serpent.status_applied = "poison"
+	spirit_serpent.dot_damage = 8
+	spirit_serpent.dot_rounds = 2
+	skills["spirit_serpent"] = spirit_serpent
+	var toad_squat = _skill("Toad Squat",
+		"Buff self: next round's first technique deals 1.5x damage. 3 round cooldown.",
+		0, 0, 3, "single", 0, "self", 0)
+	toad_squat.status_applied = "toad_charge"
+	skills["toad_squat"] = toad_squat
+	var poison_sand_palm = _skill("Poison Sand Palm",
+		"Cross strike around self that also poisons. 3 round cooldown.",
+		18, 1, 3, "cross", 1, "self", 0)
+	poison_sand_palm.status_applied = "poison"
+	poison_sand_palm.dot_damage = 6
+	poison_sand_palm.dot_rounds = 2
+	skills["poison_sand_palm"] = poison_sand_palm
+	skills["toad_swarm"] = _skill("Toad Swarm",
+		"Line attack reaching 4 tiles with heavy knockback. 5 round cooldown.",
+		40, 4, 5, "line", 4, "self", 2)
 
-	# Venom Strike — West Poison skill
-	sd = SkillData.new()
-	sd.skill_name = "Venom Strike"
-	sd.description = "Melee poison strike with DoT. 3s cooldown."
-	sd.damage = 12
-	sd.range = 1
-	sd.cooldown = 3
-	sd.aoe_shape = "single"
-	sd.aoe_size = 0
-	sd.knockback = 0
-	sd.dot_damage = 5
-	sd.dot_rounds = 3
-	sd.heal_amount = 0
-	skills.venom_strike = sd
+	# --- South Emperor: Solar Finger Art ---
+	var solar_finger = _skill("Solar Finger",
+		"Ranged finger strike that ignores damage reduction. 2 round cooldown.",
+		30, 2, 2, "single", 0, "self", 0)
+	solar_finger.ignore_damage_reduction = true
+	skills["solar_finger"] = solar_finger
+	var acupoint_lock = _skill("Acupoint Lock",
+		"Seal the target's movement on its next turn. 3 round cooldown.",
+		12, 2, 3, "single", 0, "self", 0)
+	acupoint_lock.status_applied = "no_move_next_turn"
+	skills["acupoint_lock"] = acupoint_lock
+	var primal_breath = _skill("Primal Breath",
+		"Heal self or an ally. 4 round cooldown.",
+		0, 1, 4, "single", 0, "self", 0)
+	primal_breath.heal_amount = 35
+	primal_breath.target_friendly = true
+	skills["primal_breath"] = primal_breath
+	skills["six_pulse_volley"] = _skill("Six-Pulse Volley",
+		"Ranged line of six pulses reaching 3 tiles. 6 round cooldown.",
+		34, 3, 6, "line", 3, "self", 0)
 
-	# Healing Light — South Emperor skill
-	sd = SkillData.new()
-	sd.skill_name = "Healing Light"
-	sd.description = "Heals self. 15s cooldown."
-	sd.damage = 0
-	sd.range = 0
-	sd.cooldown = 15
-	sd.aoe_shape = "single"
-	sd.aoe_size = 0
-	sd.knockback = 0
-	sd.dot_damage = 0
-	sd.dot_rounds = 0
-	sd.heal_amount = 30
-	skills.healing_light = sd
+	# --- North Beggar: Twenty-One Dragon Palms ---
+	skills["proud_dragon_regret"] = _skill("Proud Dragon Regret",
+		"Single-target palm strike with knockback. 2 round cooldown.",
+		36, 1, 2, "single", 0, "self", 2)
+	var flying_dragon = _skill("Flying Dragon",
+		"Jump up to 3 tiles and strike a 3x3 area at the landing tile. 3 round cooldown.",
+		22, 3, 3, "square", 1, "landing", 0)
+	flying_dragon.jump_tiles = 3
+	skills["flying_dragon"] = flying_dragon
+	skills["dragon_in_the_field"] = _skill("Dragon in the Field",
+		"Line attack reaching 3 tiles with knockback. 4 round cooldown.",
+		30, 3, 4, "line", 3, "self", 1)
+	skills["hidden_dragon"] = _skill("Hidden Dragon",
+		"Shockwave around self with radius 2 and knockback. 6 round cooldown.",
+		48, 2, 6, "square", 2, "self", 2)
 
-	# Dragon Palm (降龙十八掌) — North Beggar skill
-	sd = SkillData.new()
-	sd.skill_name = "Dragon Palm"
-	sd.description = "Powerful line AoE with knockback. 6s cooldown."
-	sd.damage = 30
-	sd.range = 3
-	sd.cooldown = 6
-	sd.aoe_shape = "line"
-	sd.aoe_size = 3
-	sd.knockback = 2
-	sd.dot_damage = 0
-	sd.dot_rounds = 0
-	sd.heal_amount = 0
-	skills.dragon_palm = sd
+	# --- North Beggar: Dog-Beating Staff ---
+	skills["dog_beating_trip"] = _skill("Dog-Beating Trip",
+		"Ranged staff trip. 2 round cooldown.",
+		18, 2, 2, "single", 0, "self", 0)
+	skills["dog_beating_poke"] = _skill("Dog-Beating Poke",
+		"Ranged staff poke. 2 round cooldown.",
+		20, 2, 2, "single", 0, "self", 0)
+	skills["dog_beating_seal"] = _skill("Dog-Beating Seal",
+		"Ranged staff seal. 2 round cooldown.",
+		22, 2, 2, "single", 0, "self", 0)
 
-	# Divine Burst — Central Divine skill
-	sd = SkillData.new()
-	sd.skill_name = "Divine Burst"
-	sd.description = "Cross-shaped AoE, moderate damage. 5s cooldown."
-	sd.damage = 20
-	sd.range = 2
-	sd.cooldown = 5
-	sd.aoe_shape = "cross"
-	sd.aoe_size = 2
-	sd.knockback = 0
-	sd.dot_damage = 0
-	sd.dot_rounds = 0
-	sd.heal_amount = 0
-	skills.divine_burst = sd
+	# --- Central Divine: Quanzhen Sword Art ---
+	skills["quanzhen_sword"] = _skill("Quanzhen Sword",
+		"Single-target sword strike. 1 round cooldown.",
+		32, 1, 1, "single", 0, "self", 0)
+	skills["seven_stars"] = _skill("Seven Stars",
+		"Cross strike with 2-tile arms centered on self. 3 round cooldown.",
+		26, 2, 3, "cross", 2, "self", 0)
+	var qi_aegis = _skill("Qi Aegis",
+		"Grant self a shield absorbing 50 damage for 3 rounds. 5 round cooldown.",
+		0, 0, 5, "single", 0, "self", 0)
+	qi_aegis.shield_amount = 50
+	qi_aegis.shield_rounds = 3
+	skills["qi_aegis"] = qi_aegis
+	var primal_unity = _skill("Primal Unity",
+		"Global strike that also dispels hostile buffs. 7 round cooldown.",
+		30, 0, 7, "global", 0, "self", 0)
+	primal_unity.status_applied = "dispel_hostile_buffs"
+	skills["primal_unity"] = primal_unity
 
 	return skills
+
+
+## Build a SkillData resource with explicit values (see _create_all_skill_data
+## for field conventions). Special fields (dot, shield, jump, status, gates)
+## are set by the caller after this returns.
+func _skill(name: String, desc: String, damage: int, range: int, cooldown: int,
+		shape: String, size: int, origin: String, knockback: int):
+	var skill = SkillData.new()
+	skill.skill_name = name
+	skill.description = desc
+	skill.damage = damage
+	skill.range = range
+	skill.cooldown = cooldown
+	skill.aoe_shape = shape
+	skill.aoe_size = size
+	skill.aoe_origin = origin
+	skill.knockback = knockback
+	return skill
 
 
 # ---------------------------------------------------------------------------
 # Character data factory
 # ---------------------------------------------------------------------------
 
-## Create all CharacterData resources. Returns a Dictionary keyed by name.
+## Create all GongfaData (internal/external arts) and CharacterData resources.
+## Returns a Dictionary keyed by character_name. Stats match
+## design/20_content.md EXACTLY (values given directly, no derived formulas);
+## every unit's fa_hui_du stays at the GongfaData default of 1.3.
 func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	var chars: Dictionary = {}
-	var cd
 	var s: Dictionary = all_skills
 
+	# ------------------------------------------------------------------
+	# Gongfa (one internal art + the listed external arts per unit)
+	# ------------------------------------------------------------------
+	var gongfa: Dictionary = {}
+
+	# Yang Guo
+	var nine_yin = _gongfa("Nine Yin Manual (Fragment)", "A", "internal", "internal", "yang", 180, "shen_diao_power")
+	gongfa["nine_yin_manual"] = nine_yin
+	var iron_sword = _gongfa("Profound Iron Sword Art", "A", "external", "sword", "hard", 0, "")
+	iron_sword.techniques = [s["heavy_edge"], s["grand_simplicity"], s["thousand_force_cleave"], s["boundless_seas"]]
+	gongfa["profound_iron_sword"] = iron_sword
+	var melancholy_palms = _gongfa("Melancholy Palms", "A", "external", "palm", "yin", 0, "")
+	melancholy_palms.techniques = [s["heart_rending_strike"], s["dragging_mire"], s["wandering_valley"], s["seventeen_melancholy_forms"]]
+	gongfa["melancholy_palms"] = melancholy_palms
+
+	# East Heretic
+	var tidal_art = _gongfa("Tidal Melody Art", "A", "internal", "internal", "yin", 0, "finger_dart")
+	gongfa["tidal_melody_art"] = tidal_art
+	var tidal_tune = _gongfa("Tidal Melody Tune", "A", "external", "music", "yin", 0, "")
+	tidal_tune.techniques = [s["falling_petals"], s["jade_flute_acupoint"], s["peach_blossom_maze"], s["tidal_melody"]]
+	gongfa["tidal_melody_tune"] = tidal_tune
+
+	# West Poison
+	var toad_art = _gongfa("Toad Art", "A", "internal", "internal", "hard", 0, "toad_reflect")
+	gongfa["toad_art"] = toad_art
+	var serpent_fist = _gongfa("Spirit Serpent Fist", "A", "external", "palm", "hard", 0, "")
+	serpent_fist.techniques = [s["spirit_serpent"], s["toad_squat"], s["poison_sand_palm"], s["toad_swarm"]]
+	gongfa["spirit_serpent_fist"] = serpent_fist
+
+	# South Emperor
+	var primal_art = _gongfa("Primal Art", "A", "internal", "internal", "soft", 0, "one_yang_renewal")
+	gongfa["primal_art"] = primal_art
+	var solar_art = _gongfa("Solar Finger Art", "A", "external", "finger", "yang", 0, "")
+	solar_art.techniques = [s["solar_finger"], s["acupoint_lock"], s["primal_breath"], s["six_pulse_volley"]]
+	gongfa["solar_finger_art"] = solar_art
+
+	# North Beggar
+	var chaos_art = _gongfa("Chaos Art", "A", "internal", "internal", "yang", 0, "beggar_iron_bone")
+	gongfa["chaos_art"] = chaos_art
+	var dragon_palms = _gongfa("Twenty-One Dragon Palms", "A", "external", "palm", "yang", 0, "")
+	dragon_palms.techniques = [s["proud_dragon_regret"], s["flying_dragon"], s["dragon_in_the_field"], s["hidden_dragon"]]
+	gongfa["twenty_one_dragon_palms"] = dragon_palms
+	var dog_staff = _gongfa("Dog-Beating Staff", "B", "external", "polearm", "yang", 0, "")
+	dog_staff.techniques = [s["dog_beating_trip"], s["dog_beating_poke"], s["dog_beating_seal"]]
+	gongfa["dog_beating_staff"] = dog_staff
+
+	# Central Divine
+	var primal_quanzhen = _gongfa("Primal Art (Quanzhen)", "A", "internal", "internal", "yang", 0, "innate_qi")
+	gongfa["primal_art_quanzhen"] = primal_quanzhen
+	var quanzhen_art = _gongfa("Quanzhen Sword Art", "A", "external", "sword", "yang", 0, "")
+	quanzhen_art.techniques = [s["quanzhen_sword"], s["seven_stars"], s["qi_aegis"], s["primal_unity"]]
+	gongfa["quanzhen_sword_art"] = quanzhen_art
+
+	# ------------------------------------------------------------------
+	# Characters — Yang Guo first, then the Five Greats (this is the
+	# initiative tie-break order, preserved by the registration below)
+	# ------------------------------------------------------------------
 	# Yang Guo (player)
-	cd = CharacterData.new()
+	var cd = CharacterData.new()
 	cd.character_name = "Yang Guo"
-	cd.max_health = 100
-	cd.move_range = 3
-	cd.attack_damage = 10
+	cd.max_health = 360
+	cd.move_range = 4
+	cd.attack_damage = 30
 	cd.attack_range = 1
-	cd.skills = [s.sorrowful_palms, s.heavy_iron_sword]
+	cd.initiative = 88
+	cd.energy = 180
+	cd.team = 0
+	cd.passive_id = "shen_diao_power"
+	cd.internal_arts = [nine_yin]
+	cd.external_arts = [iron_sword, melancholy_palms]
+	cd.skills = iron_sword.techniques + melancholy_palms.techniques
 	cd.ai_class = ""
 	cd.color = Color(0.2, 0.5, 1.0, 1.0)  # blue
 	chars["Yang Guo"] = cd
@@ -330,11 +458,17 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# East Heretic (东邪黄药师)
 	cd = CharacterData.new()
 	cd.character_name = "East Heretic"
-	cd.max_health = 80
-	cd.move_range = 3
-	cd.attack_damage = 8
-	cd.attack_range = 2
-	cd.skills = [s.poison_cloud]
+	cd.max_health = 95
+	cd.move_range = 4
+	cd.attack_damage = 22
+	cd.attack_range = 3
+	cd.initiative = 85
+	cd.energy = 0
+	cd.team = 1
+	cd.passive_id = "finger_dart"
+	cd.internal_arts = [tidal_art]
+	cd.external_arts = [tidal_tune]
+	cd.skills = tidal_tune.techniques
 	cd.ai_class = "AIControllerEastHeretic"
 	cd.color = Color(0.2, 0.8, 0.2, 1.0)  # green
 	chars["East Heretic"] = cd
@@ -342,11 +476,17 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# West Poison (西毒欧阳锋)
 	cd = CharacterData.new()
 	cd.character_name = "West Poison"
-	cd.max_health = 90
+	cd.max_health = 115
 	cd.move_range = 3
-	cd.attack_damage = 10
+	cd.attack_damage = 26
 	cd.attack_range = 1
-	cd.skills = [s.venom_strike]
+	cd.initiative = 70
+	cd.energy = 0
+	cd.team = 1
+	cd.passive_id = "toad_reflect"
+	cd.internal_arts = [toad_art]
+	cd.external_arts = [serpent_fist]
+	cd.skills = serpent_fist.techniques
 	cd.ai_class = "AIControllerWestPoison"
 	cd.color = Color(0.7, 0.2, 0.7, 1.0)  # purple
 	chars["West Poison"] = cd
@@ -354,11 +494,17 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# South Emperor (南帝段智兴)
 	cd = CharacterData.new()
 	cd.character_name = "South Emperor"
-	cd.max_health = 85
+	cd.max_health = 100
 	cd.move_range = 3
-	cd.attack_damage = 9
-	cd.attack_range = 1
-	cd.skills = [s.healing_light]
+	cd.attack_damage = 24
+	cd.attack_range = 2
+	cd.initiative = 76
+	cd.energy = 0
+	cd.team = 1
+	cd.passive_id = "one_yang_renewal"
+	cd.internal_arts = [primal_art]
+	cd.external_arts = [solar_art]
+	cd.skills = solar_art.techniques
 	cd.ai_class = "AIControllerSouthEmperor"
 	cd.color = Color(0.9, 0.8, 0.2, 1.0)  # gold
 	chars["South Emperor"] = cd
@@ -366,11 +512,17 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# North Beggar (北丐洪七公)
 	cd = CharacterData.new()
 	cd.character_name = "North Beggar"
-	cd.max_health = 95
+	cd.max_health = 120
 	cd.move_range = 3
-	cd.attack_damage = 12
+	cd.attack_damage = 28
 	cd.attack_range = 1
-	cd.skills = [s.dragon_palm]
+	cd.initiative = 74
+	cd.energy = 0
+	cd.team = 1
+	cd.passive_id = "beggar_iron_bone"
+	cd.internal_arts = [chaos_art]
+	cd.external_arts = [dragon_palms, dog_staff]
+	cd.skills = dragon_palms.techniques + dog_staff.techniques
 	cd.ai_class = "AIControllerNorthBeggar"
 	cd.color = Color(0.8, 0.4, 0.1, 1.0)  # orange
 	chars["North Beggar"] = cd
@@ -378,16 +530,37 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# Central Divine (中神通王重阳)
 	cd = CharacterData.new()
 	cd.character_name = "Central Divine"
-	cd.max_health = 100
-	cd.move_range = 2
-	cd.attack_damage = 10
+	cd.max_health = 130
+	cd.move_range = 3
+	cd.attack_damage = 26
 	cd.attack_range = 1
-	cd.skills = [s.divine_burst]
+	cd.initiative = 80
+	cd.energy = 0
+	cd.team = 1
+	cd.passive_id = "innate_qi"
+	cd.internal_arts = [primal_quanzhen]
+	cd.external_arts = [quanzhen_art]
+	cd.skills = quanzhen_art.techniques
 	cd.ai_class = "AIControllerCentralDivine"
 	cd.color = Color(0.9, 0.9, 0.9, 1.0)  # white
 	chars["Central Divine"] = cd
 
 	return chars
+
+
+## Build a GongfaData resource with explicit values. External arts get their
+## techniques array attached by the caller; internal arts carry the passive id.
+func _gongfa(gongfa_name: String, grade: String, kind: String, school: String,
+		attribute: String, energy: int, passive_id: String):
+	var gf = GongfaData.new()
+	gf.gongfa_name = gongfa_name
+	gf.grade = grade
+	gf.kind = kind
+	gf.school = school
+	gf.attribute = attribute
+	gf.energy_provided = energy
+	gf.passive_id = passive_id
+	return gf
 
 
 # ---------------------------------------------------------------------------
@@ -406,6 +579,18 @@ func _instantiate_player(data) -> Node:
 
 	# Call setup with the character data.
 	player.setup(data)
+
+	# Wire the new CharacterData fields (initiative/energy/team/passive_id)
+	# onto the node. Guarded with `in` checks: player.gd declares these vars in
+	# a sibling task, so the assignment is a no-op until they land.
+	if "initiative" in player:
+		player.initiative = data.initiative
+	if "energy" in player:
+		player.energy = data.energy
+	if "team" in player:
+		player.team = data.team
+	if "passive_id" in player:
+		player.passive_id = data.passive_id
 
 	# Register tile occupancy.
 	GridManager.reserve_tile(start_pos, player)
@@ -470,6 +655,18 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 
 		# Call setup with character data and AI controller.
 		enemy.setup(data, ai_controller)
+
+		# Wire the new CharacterData fields (initiative/energy/team/passive_id)
+		# onto the node. Guarded with `in` checks: enemy.gd declares these vars
+		# in a sibling task, so the assignment is a no-op until they land.
+		if "initiative" in enemy:
+			enemy.initiative = data.initiative
+		if "energy" in enemy:
+			enemy.energy = data.energy
+		if "team" in enemy:
+			enemy.team = data.team
+		if "passive_id" in enemy:
+			enemy.passive_id = data.passive_id
 
 		# Register tile occupancy.
 		GridManager.reserve_tile(grid_pos, enemy)
