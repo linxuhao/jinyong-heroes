@@ -1,3 +1,14 @@
+# Playtest contract — audited (step playtest_contract, A1-A19) against the
+# implemented code: every surface var, state string, trait index, deck count,
+# sect order, menu cell index, debug action and frame number verified matching
+# (scripts/autoload/*, scripts/segments/*, scripts/data/*, scripts/ui/*,
+# project.godot [input]). Zero drift found — the 12 protected battle scenarios
+# are byte-unchanged except the four Chinese display-text sites and the one
+# CJK-presence assertion; the 8 segment/spine scenarios are consistent with the
+# runtime. Harness contract (from repo usage): scene boots main.tscn; actions
+# are Input.action_press names present in project.godot [input]; assert values
+# are "changed" | YAML literal | single-quoted GDScript boolean expression;
+# frame cap 3000 (last assert <= 2999; spine <= 2900).
 scene: "res://scenes/main.tscn"
 
 actions:
