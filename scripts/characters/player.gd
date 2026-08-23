@@ -497,7 +497,7 @@ func _try_attack_target(enemy: Node) -> void:
 			action_hint.emit(reject_reason)
 			return
 		var skill = skills[skill_index]
-		if not _can_skill_hit(skill, enemy):
+		if not can_skill_hit(skill, enemy):
 			# No valid target for this skill's shape/range — surface the reason.
 			action_hint.emit("射程不够")
 			return
@@ -577,7 +577,7 @@ func _pick_nearest_enemy_for_skill(skill) -> Node:
 			continue
 		if not ("grid_pos" in enemy):
 			continue
-		if not _can_skill_hit(skill, enemy):
+		if not can_skill_hit(skill, enemy):
 			continue
 		var enemy_pos: Vector2i = enemy.grid_pos
 		var dist: int = max(abs(grid_pos.x - enemy_pos.x), abs(grid_pos.y - enemy_pos.y))
@@ -591,7 +591,7 @@ func _pick_nearest_enemy_for_skill(skill) -> Node:
 ## (Chebyshev-based shape/range hit test). The engine performs the actual AoE
 ## resolution and jump-landing validation at execution; this only decides
 ## whether a target is selectable.
-func _can_skill_hit(skill, enemy: Node) -> bool:
+func can_skill_hit(skill, enemy: Node) -> bool:
 	if enemy == null or not is_instance_valid(enemy):
 		return false
 	if not ("grid_pos" in enemy):
