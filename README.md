@@ -1,4 +1,4 @@
-# Huashan Sword Tournament (华山论剑) — 招式打得出去,门派选得对
+# 武林群侠大乱斗 — 招式打得出去,门派选得对
 
 A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. Yang Guo faces the Five Grandmasters on a summit grid in a keyboard-completable tutorial duel, and behind it sits the full six-segment line: **tutorial win → transition → character creation → sect selection → cultivation (36 months) → map → ending**.
 
