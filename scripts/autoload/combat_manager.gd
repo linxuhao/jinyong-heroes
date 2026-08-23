@@ -88,8 +88,8 @@ const PAUSE_DEBOUNCE_MS: int = 100
 ## case (round-frame budget arithmetic in the header above).
 const TWEEN_TIMEOUT_SEC: float = 0.25
 
-## Fallback fa_hui_du when no GongfaData resource is available (every tutorial
-## art returns 1.3 via the GongfaData stub).
+## Fallback fa_hui_du when no GongfaData resource is available (tutorial arts
+## keep their flat 1.3 via the staged-values short-circuit).
 const DEFAULT_FA_HUI_DU: float = 1.3
 
 # ---------------------------------------------------------------------------
@@ -1376,7 +1376,7 @@ func _internal_fhd(unit: Node) -> float:
 	if unit != null and "character_data" in unit and unit.character_data != null:
 		var arts = unit.character_data.internal_arts
 		if arts != null and arts.size() > 0 and arts[0] != null:
-			fhd = get_fa_hui_du(arts[0])
+			fhd = get_fa_hui_du(arts[0], unit.character_data)
 	return fhd
 
 
@@ -1389,15 +1389,17 @@ func _external_fhd_for_skill(unit: Node, skill) -> float:
 			for art in arts:
 				if art != null and "techniques" in art and art.techniques != null:
 					if skill in art.techniques:
-						return get_fa_hui_du(art)
+						return get_fa_hui_du(art, unit.character_data)
 	return fhd
 
 
-## Delegate to the GongfaData fa_hui_du stub (1.3 tutorial-wide). The real
-## prerequisite (甲乙丙丁 cascade) calculation is NOT implemented this run.
-func get_fa_hui_du(gongfa) -> float:
+## Delegate to the GongfaData fa_hui_du cascade. `unit` is the acting unit's
+## CharacterData (never the battle Node): it carries the staged_values /
+## internal_arts / external_arts / attribute fields the cascade reads. Falls
+## back to DEFAULT_FA_HUI_DU when the gongfa has no cascade method.
+func get_fa_hui_du(gongfa, unit) -> float:
 	if gongfa != null and gongfa.has_method("get_fa_hui_du"):
-		return float(gongfa.get_fa_hui_du(null))
+		return float(gongfa.get_fa_hui_du(unit))
 	return DEFAULT_FA_HUI_DU
 
 
