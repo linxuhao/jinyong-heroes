@@ -224,26 +224,38 @@ func _test_fast_forward(ok: bool) -> bool:
 
 
 # --- criterion 10: save -> advance -> load -> delete roundtrip -----------------
+#
+# Note on the snapshot: every month advance autosaves (step2 §6,
+# cultivation.gd::_after_action -> SaveManager.autosave), so the manual
+# save_slot(1) at month 3 is clobbered by the advance's autosave before the
+# load. load_slot restores the LATEST saved state — the roundtrip snapshots
+# AFTER the advance (the month-4 autosave), then mutates the live profile so
+# the reload must demonstrably come from disk, and finally verifies delete.
 
 func _test_save_load_delete_roundtrip(ok: bool) -> bool:
 	var node: Node = _setup("shaolin", [], 777, 1, 3)
 	ok = _expect(ok, _sm.save_slot(1), "save_slot(1) at year 1 month 3")
+	# Advance one real month past the save point (this autosaves month 4).
+	node._apply_card(node._monthly_cards[0])
+	node._apply_action({"kind": "work"})
+	node._after_action()
+	ok = _expect(ok, node.month == 4, "month advanced to 4 after one month")
+	# Snapshot AFTER the advance: the month-4 autosave is what load restores.
 	var snapshot: Dictionary = {
 		"year": _sm.profile.cultivation["year"],
 		"month": _sm.profile.cultivation["month"],
 		"bone": _sm.profile.get_attr("bone"),
 		"silver": _sm.profile.silver,
 	}
-	# Advance one real month past the save point.
-	node._apply_card(node._monthly_cards[0])
-	node._apply_action({"kind": "work"})
-	node._after_action()
-	ok = _expect(ok, node.month == 4, "month advanced to 4 after one month")
+	ok = _expect(ok, int(snapshot["month"]) == 4, "advance autosaved the month-4 state")
+	# Mutate the live profile so the reload must come from disk, not memory.
+	_sm.profile.set_attr("bone", _sm.profile.get_attr("bone") + 50)
+	_sm.profile.silver += 500
 	ok = _expect(ok, _sm.load_slot(1), "load_slot(1) succeeds")
 	ok = _expect(ok, int(_sm.profile.cultivation["year"]) == int(snapshot["year"]), "reloaded year == snapshot")
-	ok = _expect(ok, int(_sm.profile.cultivation["month"]) == int(snapshot["month"]), "reloaded month == snapshot")
-	ok = _expect(ok, _sm.profile.get_attr("bone") == int(snapshot["bone"]), "reloaded bone == snapshot")
-	ok = _expect(ok, _sm.profile.silver == int(snapshot["silver"]), "reloaded silver == snapshot")
+	ok = _expect(ok, int(_sm.profile.cultivation["month"]) == int(snapshot["month"]), "reloaded month == snapshot (latest autosave)")
+	ok = _expect(ok, _sm.profile.get_attr("bone") == int(snapshot["bone"]), "reloaded bone == snapshot, not the mutated memory")
+	ok = _expect(ok, _sm.profile.silver == int(snapshot["silver"]), "reloaded silver == snapshot, not the mutated memory")
 	ok = _expect(ok, _sm.delete_slot(1), "delete_slot(1) removes the save")
 	ok = _expect(ok, not FileAccess.file_exists("user://save_1.json"), "save_1.json gone after delete")
 	_teardown(node)
