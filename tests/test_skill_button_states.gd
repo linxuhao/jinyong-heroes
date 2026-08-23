@@ -109,6 +109,41 @@ static func run() -> bool:
 	ok = _expect(ok, btn2.state_tag_text == "", 'state_tag_text cleared on ready')
 	ok = _expect(ok, btn2.get_node("CooldownLabel").visible == false, "CooldownLabel hidden on ready")
 
+	# --- Acceptance 5 (strengthen_skill_button_state_change_rendering): the
+	# --- SelectedMarker gold top bar mirrors `selected` across EVERY state
+	# --- (ready/cooldown/phase_locked/hp_gated), and the gold border covers
+	# --- both normal + disabled overrides on each state, so an
+	# --- unselected->selected frame diff is unmistakable.
+	var btn3 = SkillButtonScene.instantiate()
+	var marker: ColorRect = btn3.get_node("SelectedMarker")
+	for s in state_names:
+		btn3.selected = false
+		btn3._apply_state(s)
+		ok = _expect(ok, marker.visible == false, "SelectedMarker hidden on %s when unselected" % s)
+		btn3.selected = true
+		btn3._apply_state(s)
+		ok = _expect(ok, marker.visible == true, "SelectedMarker shown on %s when selected" % s)
+		var sel_normal: StyleBox = btn3.get_theme_stylebox("normal")
+		var sel_disabled: StyleBox = btn3.get_theme_stylebox("disabled")
+		if sel_normal is StyleBoxFlat:
+			ok = _expect(ok, sel_normal.border_color.is_equal_approx(GOLD),
+					"normal override border gold on %s when selected" % s)
+		if sel_disabled is StyleBoxFlat:
+			ok = _expect(ok, sel_disabled.border_color.is_equal_approx(GOLD),
+					"disabled override border gold on %s when selected" % s)
+
+	# Cooldown number enlarged (>= 24) + bright gold over the dark top-fill so a
+	# ready->cooldown diff is unmistakable; contract observables unchanged.
+	var btn4 = SkillButtonScene.instantiate()
+	btn4.cooldown_remaining = 1
+	btn4._apply_state("cooldown")
+	var cd_label: Label = btn4.get_node("CooldownLabel")
+	ok = _expect(ok, cd_label.get_theme_font_size("font_size") >= 24, "CooldownLabel font size >= 24")
+	ok = _expect(ok, cd_label.get_theme_color("font_color").is_equal_approx(Color(1.0, 0.85, 0.25, 1.0)),
+			"CooldownLabel font_color bright gold")
+	ok = _expect(ok, cd_label.visible == true, "CooldownLabel visible on cooldown (contract)")
+	ok = _expect(ok, btn4.cooldown_label_text == "1", 'cooldown_label_text == "1" (contract)')
+
 	if ok:
 		print("PASS: test_skill_button_states")
 	else:

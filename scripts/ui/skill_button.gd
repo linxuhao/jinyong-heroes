@@ -80,6 +80,12 @@ var _state_styleboxes: Dictionary = {}
 @onready var _cooldown_label: Label = $CooldownLabel
 @onready var _state_tag: Label = $StateTag
 
+## Cached SelectedMarker (4px gold top bar) reference, resolved defensively via
+## get_node_or_null (same pattern as _cooldown_label) so tree-less / freed-node
+## instances never crash. Visible exactly when `selected`; `_apply_state` is the
+## only place that writes its visibility.
+var _selected_marker = null
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -319,6 +325,20 @@ func _apply_state(state: String) -> void:
 				_cooldown_label = cooldown_label
 		if cooldown_label != null:
 			cooldown_label.visible = false
+
+	# Selected marker: a 4px gold top bar layered over EVERY state (it is the
+	# last child in the scene tree, so it draws above the cooldown top-fill and
+	# is never dimmed by the 0.5-alpha overlay). The single write to its
+	# visibility; `selected` is owned by the HUD, never assigned here.
+	var selected_marker: ColorRect = _selected_marker
+	if selected_marker == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
+		selected_marker = get_node_or_null("SelectedMarker") as ColorRect
+		if selected_marker != null:
+			_selected_marker = selected_marker
+	if selected_marker != null:
+		selected_marker.visible = selected
 
 # ---------------------------------------------------------------------------
 # Signal handling
