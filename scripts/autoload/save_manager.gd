@@ -131,16 +131,30 @@ func save_slot(s: int) -> bool:
         last_error = "save_refused"
         return false
 
+    # Stale-file hygiene: a .tmp/.bak left by an interrupted prior save must
+    # never poison the next save (copy/rename onto an existing path is
+    # platform-dependent). Removing first makes steps 3/4 deterministic.
+    _remove_file(_tmp_path(s))
+    _remove_file(_bak_path(s))
+
     var real := _path(s)
     var tmp := _tmp_path(s)
     var bak := _bak_path(s)
 
-    # Step 1: write the tmp file (pretty-printed plain JSON).
+    # Step 1: write the tmp file (pretty-printed plain JSON). A save dict that
+    # JSON.stringify cannot serialize (e.g. a nested Dictionary with a
+    # non-String key) stringifies to "" — writing that would create an empty
+    # file that then fails Step-2 validation opaquely. Guard it into the
+    # documented io_error and leave no file behind.
+    var json_text := JSON.stringify(_build_save_dict(), "\t")
+    if json_text == "":
+        last_error = "io_error"
+        return false
     var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
     if f == null:
         last_error = "io_error"
         return false
-    f.store_string(JSON.stringify(_build_save_dict(), "\t"))
+    f.store_string(json_text)
     f.close()
 
     # Step 2: re-read and validate the tmp — never trust the write.

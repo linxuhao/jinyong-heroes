@@ -8,8 +8,8 @@
 ## CanvasLayer — because a Control parented under a plain Node2D sizes to 0x0
 ## (the parent's anchorable rect is empty) and renders nothing while its script
 ## still updates surface vars. Owns the swap lifecycle — deferred free of the
-## outgoing scene (await tree_exited) so no code path ever touches a node freed
-## in the same frame (SOTA edge case 1).
+## outgoing scene; the coroutine resumes on the next process frame instead of
+## awaiting a signal, so it can never hang and pending_swap always clears.
 ##
 ## Startup: autoload _ready runs BEFORE the main scene enters the tree, so the
 ## host is resolved after one deferred frame (mirror TutorialManager) and the
@@ -107,7 +107,8 @@ func reload_battle() -> void:
 
 
 ## The swap protocol: mark in-flight, toggle HUD visibility, drop every
-## per-battle reference, free the outgoing scene and AWAIT its tree_exited
+## per-battle reference, free the outgoing scene (deferred free preserved;
+## the coroutine resumes on the next process frame instead of awaiting a signal)
 ## (deferred add — the incoming scene never coexists with a freed one), then
 ## instantiate the preloaded incoming scene under the host. Battlefield is
 ## named "Battlefield" (playtest surface) and the tutorial wiring in
@@ -128,7 +129,7 @@ func _do_swap(scene_key: String) -> void:
 		if is_instance_valid(_current_node):
 			_current_node.queue_free()
 			if _current_node.is_inside_tree():
-				await _current_node.tree_exited
+				await get_tree().process_frame
 		_current_node = null
 	var packed: PackedScene = _preloaded.get(scene_key, null)
 	if packed == null:
