@@ -78,6 +78,7 @@ func _travel() -> void:
 		ended = true
 		if not SceneManager.pending_swap:
 			GameManager.enter_segment("ENDING")
+			return
 
 
 func _render() -> void:

@@ -743,7 +743,7 @@ scenarios:
           CultivationScreen.gongfa_count: 'gongfa_count == 1'
 
   - name: cultivation_month_cycle_and_deck_bookkeeping
-    description: "Month 1 stages a 3-category card draw; picking card 0 then 练功 on the first gongfa completes the month: calendar advances, each monthly deck loses exactly one card, and the autosave lands cleanly."
+    description: "Month 1 stages a 3-category card draw (decks 12/12/9 -> 11/11/8 at frame 130); picking card 0 then 练功 on the first gongfa completes the month, which immediately stages month 2's draw — so at frame 200 each monthly deck has lost exactly two cards (10/10/7), the calendar shows month 2, and the autosave landed cleanly."
     timeline:
       - { at: 3, actions: [ui_accept] }
       - { at: 5, actions: [ui_accept] }
@@ -766,6 +766,9 @@ scenarios:
           GameManager.current_state: 'current_state == "CULTIVATION"'
           CultivationScreen.phase: 'phase == "CARD_PICK"'
           CultivationScreen.drawn_card_categories: 'drawn_card_categories.size() == 3'
+          SaveManager.eco_left: 'eco_left == 11'
+          SaveManager.eq_left: 'eq_left == 11'
+          SaveManager.growth_left: 'growth_left == 8'
       - { at: 140, actions: [ui_accept] }
       - { at: 150, actions: [ui_accept] }
       - { at: 160, actions: [ui_accept] }
@@ -774,9 +777,9 @@ scenarios:
         assert:
           CultivationScreen.month: 'month == 2'
           CultivationScreen.phase: 'phase == "CARD_PICK"'
-          SaveManager.eco_left: 'eco_left == 11'
-          SaveManager.eq_left: 'eq_left == 11'
-          SaveManager.growth_left: 'growth_left == 8'
+          SaveManager.eco_left: 'eco_left == 10'
+          SaveManager.eq_left: 'eq_left == 10'
+          SaveManager.growth_left: 'growth_left == 7'
           SaveManager.has_save: 'has_save == true'
           SaveManager.last_error: 'last_error == ""'
 
