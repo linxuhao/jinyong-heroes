@@ -21,13 +21,9 @@ import json, sys, urllib.request, urllib.error
 
 proj, builder = sys.argv[1], sys.argv[2].rstrip("/")
 
-SCRIPTS = [
-    "res://tests/unit_test_runner.gd",
-    "res://tests/test_save_manager.gd",
-    "res://tests/test_game_manager_fsm.gd",
-    "res://tests/test_cultivation.gd",
-    "res://tests/test_encounter.gd",
-]
+# No list here on purpose. The sidecar discovers every `tests/*.gd` that
+# `extends SceneTree` — the exact property `-s` requires. A hard-coded list goes
+# stale silently: the project grows a sixth suite and nothing ever runs it.
 
 
 def post(path, payload, timeout):
@@ -63,7 +59,8 @@ try:
         die("play-test gate FAILED")
 
     print("\n=== Godot unit suite ===")
-    sc = post("/script", {"project_dir": proj, "scripts": SCRIPTS}, 900)
+    sc = post("/script", {"project_dir": proj, "timeout": 180}, 1800)
+    print("discovered: %s" % ", ".join(sc.get("discovered") or ["(none)"]))
     for r in sc.get("results") or []:
         print("  %-42s %s" % (r["script"], "ok" if r["passed"] else "FAILED"))
         if not r["passed"]:
