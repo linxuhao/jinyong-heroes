@@ -139,7 +139,7 @@ func end_battle(won: bool) -> void:
 		current_state = "LOST"
 		game_lost.emit()
 		state_changed.emit("LOST")
-		_show_end_game_overlay("败于华山论剑\n\n按回车重试")
+		_show_end_game_overlay("战败于华山论剑\n\n按回车重试")
 
 # ---------------------------------------------------------------------------
 # Public API — Battle context & WON/LOST routing (combat_cleanup)

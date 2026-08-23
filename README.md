@@ -111,6 +111,12 @@ Health-bar name labels use Chinese display names (design §2.1 — every rendere
 | North Beggar | 洪七公 |
 | Central Divine | 王重阳 |
 
+### Readability (fix_vision_gate_readability)
+
+- **Health-bar empty track**: the bar's track is a LIGHT gray (luminance > 0.30) painted 3 px outside the control rect via `StyleBoxFlat.expand_margin_all` (never content margins), so a full-HP bar still reads as filled + empty — no solid-block bars (`HealthBar.track_bg` observable).
+- **Selected skill-button border**: the selected button renders a **3 px gold border** layered over any of the four states (ready / cooldown / phase_locked / hp_gated), so the current selection stays visible in every frame.
+- **Chinese no-ellipsis end text**: the WON/LOST end-game overlay text is Chinese (`胜利` / `战败`) and never ellipsized — no `"..."` and no U+2026 `…` (`GameManager.end_overlay_text` observable).
+
 ## Project Structure
 
 ```

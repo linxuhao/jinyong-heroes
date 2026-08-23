@@ -35,7 +35,7 @@ actions:
 
 surface:
   CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log, last_turn_actor, debug_await_total, debug_await_timeouts, debug_await_frames, debug_round_frame, debug_reflect_hits]
-  GameManager: [current_state]
+  GameManager: [current_state, end_overlay_text]
   SaveManager: [seed, last_error, slot, has_save, eco_left, eq_left, growth_left, pow_left, trait_left, art_left]
   Player: [health, max_health, grid_pos, moves_left, moved, acted, turns_taken, selected_skill_index, skill_cooldowns, shield, status_names, energy, sprite_top]
   East_Heretic:   [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names, sprite_top]
@@ -55,7 +55,7 @@ surface:
   SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
   SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
   PauseButton: [visible, global_position]
-  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height]
+  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height, track_bg]
   Battlefield: [board_aligned, grid_lines_visible]
   SceneManager: [current_scene, pending_swap, last_error]
   TransitionScreen: [lines_shown, done]
@@ -436,7 +436,7 @@ scenarios:
         assert:
           Battlefield.grid_lines_visible: true
           HealthBar.bar_width: 'bar_width <= 64'
-          HealthBar.total_height: 'total_height <= 20'
+          HealthBar.total_height: 'total_height <= 26'
           HUD.skill8_right_edge: 'skill8_right_edge <= 960'
           HUD.round_pause_overlap: 'round_pause_overlap == false'
           SkillButton5.state_text: 'state_text == "phase_locked"'
@@ -444,6 +444,10 @@ scenarios:
           SkillButton1.state_text: 'state_text == "ready"'
           HealthBar.follow_delta: 'follow_delta <= 24'
           HealthBar.fill_color: 'fill_color.g > 0.5 and fill_color.g > fill_color.r'
+          # Additive (fix_vision_gate_readability): the empty track is a LIGHT
+          # gray (luminance > 0.30) — the bar reads as filled+empty at full HP
+          # (5_vision Q5), asserted via the track_bg observable.
+          HealthBar.track_bg: 'track_bg.get_luminance() > 0.30'
           HealthBar.name_text: 'name_text == "杨过"'
           # Active-actor line: during the player's round-1 turn (frame 30) the
           # ActiveLine shows "行动: 杨过 · 移动 4 · 行动 ✓" — contains
@@ -521,6 +525,9 @@ scenarios:
         actions: []
         assert:
           GameManager.current_state: 'current_state == "WON"'
+          # Additive (fix_vision_gate_readability): the WON overlay text is
+          # Chinese and never ellipsized ("..." / U+2026 forbidden repo-wide).
+          GameManager.end_overlay_text: 'end_overlay_text.contains("胜利") and not end_overlay_text.contains("...") and not end_overlay_text.contains("…")'
       - { at: 50, actions: [ui_accept] }
       - at: 70
         actions: []
@@ -611,6 +618,9 @@ scenarios:
         actions: []
         assert:
           GameManager.current_state: 'current_state == "LOST"'
+          # Additive (fix_vision_gate_readability): the LOST overlay text is
+          # Chinese and never ellipsized ("..." / U+2026 forbidden repo-wide).
+          GameManager.end_overlay_text: 'end_overlay_text.contains("战败") and not end_overlay_text.contains("...") and not end_overlay_text.contains("…")'
       - { at: 50, actions: [ui_accept] }
       - at: 80
         actions: []

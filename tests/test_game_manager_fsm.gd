@@ -9,10 +9,11 @@
 ## Mirrors tests/test_save_manager.gd: extends SceneTree, autoloads from
 ## project.godot ARE loaded in -s mode and are fetched from the root (deferred,
 ## so the tree is fully up). The FSM logic is node-free — the test drives
-## current_state / battle_return_state directly and never calls end_battle /
-## debug paths (they touch scene nodes / CombatManager). current_state and
-## battle_return_state are restored to TUTORIAL at the end so later checks are
-## not polluted.
+## current_state / battle_return_state directly and never calls the DEBUG paths
+## (they touch scene nodes / CombatManager). end_battle IS exercised for its
+## overlay-text path (pure node creation, headless-safe; see
+## _test_end_overlay_text). current_state and battle_return_state are restored
+## to TUTORIAL at the end so later checks are not polluted.
 extends SceneTree
 
 const GameManagerScript = preload("res://scripts/autoload/game_manager.gd")
@@ -83,6 +84,7 @@ func _test_all() -> bool:
 	ok = _test_request_continue_noop(ok)
 	ok = _test_request_retry_unchanged(ok)
 	ok = _test_restart_game(ok)
+	ok = _test_end_overlay_text(ok)
 	return ok
 
 
@@ -261,6 +263,39 @@ func _test_restart_game(ok: bool) -> bool:
 	ok = _expect(ok, _sm.art_left == CardDataScript.deck_size("artifact"), "art_left restored to initial deck size")
 	ok = _expect(ok, _sm.trait_left == TraitDataScript.positive_ids().size(),
 		"trait_left restored (dynamic: 8 positives for a fresh profile)")
+	return ok
+
+
+# --- criterion 6: end_overlay_text (Chinese, no ellipsis) -------------------------
+
+## WON/LOST overlay text must be Chinese (界面文字一律中文) and never contain
+## "..." or U+2026 "…" (repo-wide no-ellipsis rule for UI text) — acceptance 5
+## of fix_vision_gate_readability. end_battle's overlay path is pure node
+## creation (CanvasLayer + Panel + Label; no scene refs), so it is safe in
+## headless -s mode; clear_battle() tears each overlay down afterwards.
+func _test_end_overlay_text(ok: bool) -> bool:
+	# WON: end_battle(true) writes the 胜利 overlay text.
+	_reset_signals()
+	_gm.current_state = "BATTLE"
+	_gm.end_battle(true)
+	ok = _expect(ok, _gm.current_state == "WON", "end_battle(true) -> WON")
+	ok = _expect(ok, _gm.end_overlay_text.contains("胜利"), "WON end_overlay_text contains 胜利")
+	ok = _expect(ok, not _gm.end_overlay_text.contains("..."), 'WON end_overlay_text has no "..."')
+	ok = _expect(ok, not _gm.end_overlay_text.contains("…"), "WON end_overlay_text has no U+2026")
+	_gm.clear_battle()
+
+	# LOST: end_battle(false) writes the 战败 overlay text.
+	_reset_signals()
+	_gm.current_state = "BATTLE"
+	_gm.end_battle(false)
+	ok = _expect(ok, _gm.current_state == "LOST", "end_battle(false) -> LOST")
+	ok = _expect(ok, _gm.end_overlay_text.contains("战败"), "LOST end_overlay_text contains 战败")
+	ok = _expect(ok, not _gm.end_overlay_text.contains("..."), 'LOST end_overlay_text has no "..."')
+	ok = _expect(ok, not _gm.end_overlay_text.contains("…"), "LOST end_overlay_text has no U+2026")
+	_gm.clear_battle()
+
+	# Restore the FSM to a non-WON/LOST state for _run()'s teardown.
+	_gm.current_state = GameManagerScript.STATE_TUTORIAL
 	return ok
 
 
