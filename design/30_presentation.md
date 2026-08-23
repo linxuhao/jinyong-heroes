@@ -326,3 +326,72 @@ RoundIndicator.active_text: 'active_text.contains("行动") == true'
 
 这也意味着:**一个场景的失败条数,在这些断言修好之前不能当作游戏质量的度量。**
 
+## 那个 120 秒不退出的测试,死在哪
+
+`tests/test_game_manager_fsm.gd` 每次都跑满 120 秒被杀(rc=124),看起来像「慢」。
+不是慢,是**炸了之后没人收尸**。
+
+GDScript 的运行时硬错误**中止当前函数,但不中止 SceneTree**。这个测试的
+`quit(0 if ok else 1)` 写在 `_run()` 的末尾(第 59 行),`_run()` 在第 46 行炸掉,
+`quit()` 永远到不了,进程就一直转到超时。
+
+炸点:
+
+```
+SCRIPT ERROR: Invalid access to property or key 'state_changed' on a base object of type 'Node'.
+          at: _ready (res://scripts/autoload/scene_manager.gd:68)
+          at: _run  (res://tests/test_game_manager_fsm.gd:46)
+```
+
+`_gm` 是一个**光板 `Node`**,没有挂脚本。而它上面第 42 行的守卫是:
+
+```gdscript
+if _gm == null or _sm == null:
+    push_error("... autoloads not found (run with -s from the repo root)")
+    quit(1)
+```
+
+**守卫检查了不会失败的那件事(节点存在),漏掉了真正会失败的那件事(节点有没有脚本)。**
+测试自己的文档注释写着「`-s` 模式下 project.godot 的 autoload 确实会被加载」——
+节点这一半是对的,脚本那一半不对,而守卫是照着那句话写的。
+
+`scene_manager.gd:68` 在 `_ready` 里以完全相同的方式失败,所以这不是测试的毛病,
+是 `-s` 模式的性质。想在 SceneTree 测试里用 GameManager,只能自己
+`GameManagerScript.new()`(文件顶上已经 `preload` 了,一直没用上)。
+
+**两条结构性的教训:**
+
+1. **每个 `extends SceneTree` 入口都必须保证 `quit()` 被调到。** 把断言堆在一个长函数
+   末尾再 quit,等于把「退出」押在「一条都不炸」上。
+2. **守卫要挡真正的失败模式。** `!= null` 挡不住「类型不对」,而这里能出错的就是类型。
+
+## 存档的混淆函数,从来没算过它该算的东西
+
+同一次运行的 stderr 里刷了上百行:
+
+```
+ERROR: Cannot represent 0x9E3779B97F4A7C15 as a 64-bit signed integer, since the value is too large.
+   at: hex_to_int (core/string/ustring.cpp:2406)
+```
+
+出处是 `scripts/autoload/save_manager.gd:65-67`,splitmix64 的三个常数:
+
+```gdscript
+var v: int = x + 0x9E3779B97F4A7C15
+v = (v ^ (v >> 30)) * 0xBF58476D1CE4E5B9
+v = (v ^ (v >> 27)) * 0x94D049BB133111EB
+```
+
+这三个都 **> 2^63**,GDScript 的 int 是有符号 64 位,literal 表示不了,**每次调用都报错**。
+也就是说这个混淆函数一直在用错的常数算,**它的输出从来不是 splitmix64**。
+
+`save_load_roundtrip` 场景一直是 **9/13**。这大概率就是机制,而不是巧合。
+
+**写法**:超过 `0x7FFF...` 的常数在 GDScript 里要写成补码后的负数字面量,
+或者拆成高低 32 位。**别指望 literal 报了错还能给你一个能用的值。**
+
+**这条是怎么被看见的**:边车的 `/script` 路由在超时分支里写的是
+`rc, out, err = 124, "", "timed out"`——**把已经产出的全部输出扔了**,
+而超时恰恰是最需要看输出的时候。`subprocess.TimeoutExpired` 本身就带
+`.stdout` / `.stderr`。改成捞回来之后,答案在第一次运行里就全在那儿了。
+
