@@ -73,6 +73,12 @@ var team: int = 1
 ## Primary internal art's passive id (engine hooks: finger_dart, ...).
 var passive_id: String = ""
 
+## Trait ids carried into battle from the profile (playtest surface + trait
+## engine hooks: sha_po_lang / iron_shirt / swallow_lightness / ambidextrous).
+## Populated by battlefield.gd from character_data.traits (encounter battles;
+## empty in the tutorial). Identical declaration to player.gd.
+var traits: Array[String] = []
+
 ## 内力 energy pool (display only — no technique costs this run).
 var energy: int = 0
 

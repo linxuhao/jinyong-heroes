@@ -155,7 +155,7 @@ func setup(data) -> void:
 ## no selection change) indices that are out of bounds, phase-locked (palm
 ## arts before round 4), on cooldown, HP-gated (Seventeen Forms at >= 50% HP),
 ## technique-sealed (no_techniques_next_turn), or tutorial-blocked.
-## Called by HUD buttons (GameManager.get_player()) and hotkeys 1-8.
+## Called by HUD buttons (GameManager.get_player()) and hotkeys 1-12.
 func select_skill(index: int) -> void:
 	if not _skill_selectable(index):
 		return
@@ -284,7 +284,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_move(Vector2i(1, 0))
 		get_viewport().set_input_as_handled()
 
-	# --- Skill selection (hotkeys 1-8; two-phase unlock inside select_skill) ---
+	# --- Skill selection (hotkeys 1-12; two-phase unlock inside select_skill) ---
 	elif event.is_action_pressed("skill_1"):
 		select_skill(0)
 		get_viewport().set_input_as_handled()
@@ -308,6 +308,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("skill_8"):
 		select_skill(7)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("skill_9"):
+		select_skill(8)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("skill_10"):
+		select_skill(9)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("skill_11"):
+		select_skill(10)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("skill_12"):
+		select_skill(11)
 		get_viewport().set_input_as_handled()
 
 	# --- Keyboard basic attack / skill execution (J) ---

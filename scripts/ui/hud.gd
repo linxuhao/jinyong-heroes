@@ -1,6 +1,7 @@
 ## HUD — Main UI layer containing floating health bars, the round indicator,
-## the energy label, the 8 programmatic skill buttons (fa hui du labels +
-## round-based cooldown overlays), and the pause button. Lives on CanvasLayer
+## the energy label, the up-to-12 programmatic skill buttons (fa hui du labels +
+## round-based cooldown overlays; two rows × 6 when the player owns more than 8
+## skills, one row otherwise), and the pause button. Lives on CanvasLayer
 ## layer 10. Button `disabled` state is recomputed every frame from combat +
 ## player state (phase lock / cooldown / HP gate).
 extends Control
@@ -39,6 +40,9 @@ var _health_bars: Array[Control] = []
 ## share one coordinate system (scale-1 viewport: HUD coords == pixels).
 var round_pause_overlap: bool = false
 var skill8_right_edge: float = 0.0
+## Row-2 right edge x of the two-row skill bar layout (skills > 8); 0.0 in the
+## single-row (<= 8 skills) mode. Surface observable, updated every frame.
+var skill12_right_edge: float = 0.0
 
 ## Preloaded health_bar scene for instantiation.
 var _health_bar_scene: PackedScene = preload("res://scenes/ui/health_bar.tscn")
@@ -51,17 +55,20 @@ var _skill_button_scene: PackedScene = preload("res://scenes/ui/skill_button.tsc
 # ---------------------------------------------------------------------------
 
 @onready var _health_bar_container: Control = $HealthBarContainer
-@onready var _skill_bar: HBoxContainer = $SkillBar
+@onready var _skill_bar: VBoxContainer = $SkillBar
+@onready var _skill_row_1: HBoxContainer = $SkillBar/SkillRow1
+@onready var _skill_row_2: HBoxContainer = $SkillBar/SkillRow2
 @onready var _pause_button: Button = $PauseButton
 @onready var _round_indicator: Control = $RoundIndicator
 @onready var _energy_label: Label = $EnergyLabel
 
-## Resolve a skill button by its deterministic name (SkillButton1..SkillButton8).
-## Safe by construction: get_node_or_null re-resolves the path each call and
-## returns null for freed/absent nodes — never a stored freed-object cast.
-## Do NOT cache buttons in a typed array (typed arrays validate on write).
+## Resolve a skill button by its deterministic name (SkillButton1..SkillButton12).
+## Buttons live under SkillRow1/SkillRow2 in the two-row layout, so resolve
+## recursively (find_child searches the whole subtree). Safe by construction:
+## find_child returns null for freed/absent nodes — never a stored freed-object
+## cast. Do NOT cache buttons in a typed array (typed arrays validate on write).
 func _skill_button(n: String) -> Control:
-	return _skill_bar.get_node_or_null(n) as Control
+	return _skill_bar.find_child(n, true, false) as Control
 
 ## Recompute the two HUD geometric observables every frame:
 ##   - round_pause_overlap: RoundIndicator rect vs PauseButton rect (false
@@ -87,6 +94,10 @@ func _update_geometry_observables() -> void:
 	var button8: Control = _skill_button("SkillButton8")
 	if button8 != null:
 		skill8_right_edge = button8.get_global_rect().end.x
+
+	var button12: Control = _skill_button("SkillButton12")
+	if button12 != null and button12.visible:
+		skill12_right_edge = button12.get_global_rect().end.x
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -145,9 +156,14 @@ func clear_battle_refs() -> void:
 			bar.queue_free()
 	_health_bars.clear()
 	if _skill_bar != null and is_instance_valid(_skill_bar):
-		for child in _skill_bar.get_children():
-			_skill_bar.remove_child(child)
-			child.queue_free()
+		# Buttons live under SkillRow1/SkillRow2 — clear BOTH rows so no button
+		# survives a battle exit.
+		for row in [_skill_row_1, _skill_row_2]:
+			if row == null or not is_instance_valid(row):
+				continue
+			for child in row.get_children():
+				row.remove_child(child)
+				child.queue_free()
 
 
 ## Create a single health bar for a character and add it to the container.
@@ -174,35 +190,60 @@ func _create_health_bar(character: Node, display_name: String) -> void:
 	_health_bars.append(bar)
 
 
-## Populate skill buttons from the player's skills array (indices 0..7).
-## Instantiates exactly one SkillButton per skill with deterministic names
-## SkillButton1..SkillButton8 (named BEFORE add_child to avoid duplicate-name
-## errors). Hotkey = index + 1. Every tutorial art returns fa_hui_du 1.3, so
-## all buttons show "发挥 ×1.3".
+## Populate skill buttons from the player's skills array. Always instantiates
+## exactly 12 SkillButton nodes with deterministic names SkillButton1..12 (named
+## BEFORE add_child to avoid duplicate-name errors); buttons beyond the player's
+## skill count are created but hidden (never fewer than 12) so the playtest
+## surface can read SkillButton9..12.visible in every mode. Hidden children are
+## excluded from BoxContainer layout, so the 8-button tutorial geometry stays
+## byte-identical. Layout: skills.size() <= 8 → every node (visible buttons +
+## hidden placeholders) goes in SkillRow1 and SkillRow2 stays empty; > 8 → two
+## rows × 6 (SkillButton1..6 in SkillRow1, SkillButton7..12 in SkillRow2).
+## Hotkey = index + 1. fa_hui_du comes from the real cascade
+## (_external_fhd_for_skill; falls back to DEFAULT_FA_HUI_DU 1.3 when the skill
+## has no matching art, so every tutorial button still shows "发挥 ×1.3").
 func _populate_skill_buttons(player: Node) -> void:
 	var skills: Array = []
 	if "skills" in player:
 		skills = player.skills
+	var n: int = skills.size()
 
 	# Clear any existing button children first (idempotent re-population).
-	for child in _skill_bar.get_children():
-		_skill_bar.remove_child(child)
-		child.queue_free()
-
-	for i in range(skills.size()):
-		var skill = skills[i]
-		if skill == null:
+	for row in [_skill_row_1, _skill_row_2]:
+		if row == null or not is_instance_valid(row):
 			continue
+		for child in row.get_children():
+			row.remove_child(child)
+			child.queue_free()
 
+	# Single-row mode: ALL 12 nodes in SkillRow1 (hidden ones occupy no layout
+	# space). Two-row mode: split 1-6 → row1, 7-12 → row2.
+	var use_two_rows: bool = n > 8
+
+	for i in range(12):
 		# Safe: fresh instantiate() output — never a freed reference.
 		var inst: Button = _skill_button_scene.instantiate() as Button
 		if inst == null:
 			continue
 		inst.name = "SkillButton%d" % (i + 1)
-		_skill_bar.add_child(inst)
+
+		var row: HBoxContainer = _skill_row_2 if use_two_rows and i >= 6 else _skill_row_1
+		if row == null or not is_instance_valid(row):
+			continue
+		row.add_child(inst)
+
+		if i >= n:
+			# No skill for this slot — hidden placeholder (surface-stable).
+			inst.visible = false
+			continue
+
+		var skill = skills[i]
+		if skill == null:
+			inst.visible = false
+			continue
 
 		if inst.has_method("setup"):
-			inst.setup(skill, str(i + 1), CombatManager.DEFAULT_FA_HUI_DU)
+			inst.setup(skill, str(i + 1), CombatManager._external_fhd_for_skill(player, skill))
 
 		# Store the skill index.
 		inst.skill_index = i
@@ -259,22 +300,27 @@ func _process(_delta: float) -> void:
 
 
 ## Per-frame skill button refresh: compute each button's `disabled` from
-##   (a) two-phase phase lock — palm arts (indices 4..7) locked while
-##       CombatManager.current_round < 4;
+##   (a) two-phase phase lock — TUTORIAL ONLY (CombatManager.tutorial_battle):
+##       palm arts (indices 4..11) locked while CombatManager.current_round < 4;
+##       encounter battles never phase-lock;
 ##   (b) per-round cooldown remaining — player.skill_cooldowns[i] > 0;
-##   (c) Seventeen Forms HP gate — index 7 usable only BELOW 50% max health.
+##   (c) HP gate — DATA-DRIVEN from each skill's hp_gate_below_ratio (e.g.
+##       Seventeen Forms ratio 0.5: usable only BELOW 50% max health).
 ## Also keeps the round-based cooldown overlays in sync (remaining/total
-## rounds). Child order matches skill index order (HBox, insertion order).
+## rounds). Flat iteration order (row1 children then row2 children) matches
+## skill index order in both single-row and two-row layouts.
 func _refresh_skill_button_states(player: Node) -> void:
 	var buttons: Array[Node] = []
-	for child in _skill_bar.get_children():
-		if child is Button:
-			buttons.append(child)
+	for row in [_skill_row_1, _skill_row_2]:
+		if row == null or not is_instance_valid(row):
+			continue
+		for child in row.get_children():
+			if child is Button:
+				buttons.append(child)
 
 	var cooldowns: Array = player.skill_cooldowns if "skill_cooldowns" in player else []
-	var gate_hp: int = 0
-	if "max_health" in player:
-		gate_hp = int(round(float(player.max_health) * 0.5))
+	var has_max_health: bool = "max_health" in player
+	var max_health: int = int(player.max_health) if has_max_health else 0
 
 	for i in range(buttons.size()):
 		# Safe: `buttons` is a fresh get_children() snapshot of live children —
@@ -283,10 +329,24 @@ func _refresh_skill_button_states(player: Node) -> void:
 		if btn == null:
 			continue
 
-		var phase_locked: bool = i >= 4 and CombatManager.current_round < 4
+		# Hidden placeholder buttons (no skill behind them) are skipped — never
+		# selectable, never rendered.
+		if not btn.visible:
+			continue
+
+		var phase_locked: bool = CombatManager.tutorial_battle \
+			and i >= 4 and CombatManager.current_round < 4
 		var on_cooldown: bool = i < cooldowns.size() and int(cooldowns[i]) > 0
-		var hp_gated: bool = i == 7 and "health" in player \
-			and int(player.health) >= gate_hp
+
+		# HP gate data-driven from the skill's own hp_gate_below_ratio (0.0 =
+		# never gated). Tutorial button 8 (seventeen_melancholy_forms, ratio 0.5)
+		# keeps its historical behavior byte-identical.
+		var ratio: float = 0.0
+		if "_skill_data" in btn and btn._skill_data != null:
+			ratio = float(btn._skill_data.hp_gate_below_ratio)
+		var hp_gated: bool = ratio > 0.0 and "health" in player \
+			and has_max_health \
+			and int(player.health) >= int(round(float(max_health) * ratio))
 		# Expose the pure HP-gate predicate on the button (playtest surface),
 		# independent of phase lock / cooldown. hp_gated is computed here every
 		# frame; skill_button.gd declares the var but never writes it.
@@ -346,9 +406,15 @@ func _on_skill_selected(index: int) -> void:
 ## turn start); total is the skill's round-valued cooldown.
 func _on_player_cooldowns_updated(cooldowns: Array) -> void:
 	var skill_buttons: Array[Node] = []
-	for child in _skill_bar.get_children():
-		if child.has_method("update_cooldown"):
-			skill_buttons.append(child)
+	# Row-aware: buttons live under SkillRow1/SkillRow2; the row HBoxes themselves
+	# have no update_cooldown, so iterating BOTH rows' children is required for
+	# row-2 cooldown overlays to update.
+	for row in [_skill_row_1, _skill_row_2]:
+		if row == null or not is_instance_valid(row):
+			continue
+		for child in row.get_children():
+			if child.has_method("update_cooldown"):
+				skill_buttons.append(child)
 
 	for i in range(skill_buttons.size()):
 		if i < cooldowns.size():
