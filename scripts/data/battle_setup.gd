@@ -11,6 +11,8 @@ class_name BattleSetup
 ##   attack_range = 1 (主外功近战门派) / 2 (远程门派: 唐门/暗器).
 ## Techniques come from progression_gongfa_data.gd's generic grade stubs
 ## (丁1 / 丙2 / 乙3); GongfaData.mastered mirrors the profile's mastered flags.
+## Consumers: tests/test_battle_setup.gd this round, and future encounter-battle
+## entry code (GameManager.enter_battle is a stub — there is no live caller yet).
 
 const CharacterData = preload("res://scripts/data/character_data.gd")
 const ProgressionGongfaData = preload("res://scripts/data/progression_gongfa_data.gd")

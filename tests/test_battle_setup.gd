@@ -1,8 +1,11 @@
 ## Unit tests for the progression-side battle setup
 ## (scripts/data/battle_setup.gd): the §7 stat-derivation formulas and the
 ## CharacterData build (staged_values == false, mastered propagation, generic
-## grade techniques). Mirrors tests/test_gongfa_cascade.gd's skeleton:
-## top-level static func run() -> bool; push_error on failure; print
+## grade techniques). Covers the subtask card's 8 acceptance criteria with
+## exact expected values (derive 100/24/4/40/30, move 2@10/3@20, range
+## melee-1 / tangmen-2, build not-staged/team-0/50, mastered propagation,
+## techniques [1,2,3], skills 1+2). Mirrors tests/test_gongfa_cascade.gd's
+## skeleton: top-level static func run() -> bool; push_error on failure; print
 ## PASS/FAIL at the end; never relies on assert() (stripped in release).
 ##
 ## NOTE on typing: CharacterData is NOT class_name-registered and the preload
