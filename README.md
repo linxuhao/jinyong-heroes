@@ -4,6 +4,8 @@ A **Godot 4** tactical wuxia RPG — five Grandmasters face Yang Guo on a summit
 
 This build replaces the previous real-time-with-pause combat with a **strictly sequential turn engine**: every surviving unit acts exactly once per round in initiative order (highest 身法 first), each turn is a movement budget plus one action (basic attack / technique / wait), cooldowns and DoT tick by round at the unit's own turn start, and enemy AI decides exactly once per enemy turn (zero RNG).
 
+Beyond the duel, the game ships the full **six-segment line** (design/40_progression.md): **tutorial win → transition → character creation → sect selection → cultivation (36 months) → map → ending**. The battlefield is one routable scene, not the whole game: `scenes/main.tscn` is a persistent shell (Camera + `SceneHost` + HUD/tutorial layers) and the `SceneManager` autoload hosts exactly one active segment scene under `SceneHost` at a time.
+
 ## Quick Start
 
 1. Open the project in **Godot 4.4+**.
@@ -28,6 +30,31 @@ This build replaces the previous real-time-with-pause combat with a **strictly s
 - **Two-phase unlock**: techniques `5`–`8` (Melancholy Palms) are locked until **round 4**; technique `8` (Seventeen Melancholy Forms) additionally requires HP **below 50%**.
 - Each unit acts once per round in initiative order: Yang Guo (88) → East Heretic (85) → Central Divine (80) → South Emperor (76) → North Beggar (74) → West Poison (70).
 - Defeat all five Grandmasters to win; let your health reach zero to lose.
+
+## The Six-Segment Line
+
+The whole game runs inside one persistent shell (`scenes/main.tscn`): a `SceneManager` autoload listens to `GameManager.state_changed` and swaps exactly one preloaded segment scene under the shell's `SceneHost` node (`GameManager.current_state` is the playtest-visible FSM state — `TUTORIAL → BATTLE → WON/LOST → TRANSITION → CHARACTER_CREATION → SECT_SELECTION → CULTIVATION → MAP → ENDING`).
+
+| Segment | Scene | What happens |
+|---|---|---|
+| 1. Tutorial | `battlefield` | Yang Guo vs the Five Greats (keyboard-completable tutorial; WON/LOST now route onward instead of terminating) |
+| 2. Transition | `transition` | Full-screen text pages → character creation |
+| 3. Creation | `creation` | 30-point attribute buy (tiered pricing, 10–20), trait/flaw toggles |
+| 4. Sect select | `sect_select` | Pick one of five sects → its internal + external gongfa |
+| 5. Cultivation | `cultivation` | 36 monthly cycles: card draws + 练功/修习/做工/游历 + year-end stay/switch |
+| 6. Map / ending | `map` → `ending` | Node-graph map (adjacency-checked moves) → tiered ending text |
+
+**Saves** live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` → validate → `.bak` rollback writes). The cultivation scene offers a 存盘/读档/删档 row; autosaves also run on month advance and map moves.
+
+### Debug actions (harness-only — no physical keys)
+
+Defined in `project.godot` `[input]` with **empty event lists** (never visible in normal UI, never bound to a key; the headless playtest triggers them via `Input.action_press`):
+
+| Action | Effect |
+|---|---|
+| `debug_win_tutorial` | Wipe every living enemy through the real damage/death pipeline → `WON` |
+| `debug_lose_tutorial` | Kill the player through the real damage/death pipeline → `LOST` |
+| `debug_fast_forward` | In cultivation, advance all remaining months synchronously through the normal month path (same RNG draws as manual play) |
 
 ## Chinese Font Theme
 
@@ -125,11 +152,11 @@ jinyong-play/
 
 ### Autoload singletons (`project.godot` `[autoload]`)
 
-`GameManager`, `GridManager`, `CombatManager`, `TutorialManager`, `AudioManager`.
+`GameManager` (six-segment FSM), `SaveManager` (PlayerProfile + seeded RNG + 3-slot JSON IO), `GridManager`, `CombatManager` (turn engine + `reset_battle()` / DEBUG hooks), `TutorialManager`, `AudioManager`, `ThemeManager` (ThemeDB font fallback), `SceneManager` (state-driven scene router; kept last in `[autoload]` because its teardown references the other managers by name).
 
 ### Input actions (`project.godot` `[input]`)
 
-`move_up`, `move_down`, `move_left`, `move_right`, `skill_1`..`skill_8` (digits 1–8), `basic_attack` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the built-in `ui_accept`.
+`move_up`, `move_down`, `move_left`, `move_right`, `skill_1`..`skill_8` (digits 1–8), `basic_attack` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the built-in `ui_accept` and the three harness-only DEBUG actions `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` (no physical bindings).
 
 ### `CombatManager` public API
 
