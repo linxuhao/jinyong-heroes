@@ -25,6 +25,11 @@ signal health_changed(new_health: int, max_health: int)
 ## skill is used). HUD skill buttons listen to this. Cooldowns are int ROUNDS.
 signal cooldowns_updated(cooldowns: Array)
 
+## Emitted whenever a skill selection / attack attempt is rejected, with the
+## specific Chinese reason (or "" to clear the hint line: selection success,
+## toggle-off, or a successful action). HUD ActionHintLabel listens to this.
+signal action_hint(text: String)
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -157,14 +162,20 @@ func setup(data) -> void:
 ## technique-sealed (no_techniques_next_turn), or tutorial-blocked.
 ## Called by HUD buttons (GameManager.get_player()) and hotkeys 1-12.
 func select_skill(index: int) -> void:
-	if not _skill_selectable(index):
+	var reject_reason: String = _skill_reject_reason(index)
+	if reject_reason != "":
+		# Rejected — surface the specific reason instead of a silent no-op.
+		action_hint.emit(reject_reason)
 		return
 
 	if index == selected_skill_index:
-		# Toggle off.
+		# Toggle off — clear the hint line.
 		selected_skill_index = -1
+		action_hint.emit("")
 	else:
 		selected_skill_index = index
+		# Guide the player to the confirm key / target click.
+		action_hint.emit("按 J 出招 / 点击目标")
 
 	# Play the select SFX (single hook shared by HUD buttons and hotkeys).
 	# Regression gate (fix_cascade_script_loads): AudioManager autoload parses,
@@ -177,23 +188,40 @@ func select_skill(index: int) -> void:
 ## CombatManager.current_round >= 4; on cooldown (> 0 rounds); Seventeen Forms
 ## HP gate (usable only BELOW 50% max HP — 250 of 500); technique seal
 ## (no_techniques_next_turn); tutorial input allowance.
-func _skill_selectable(index: int) -> bool:
+## Returns the FIRST failing rejection reason for selecting (and executing) a
+## skill at `index`, or "" when the skill is selectable. Mirrors the EXACT gate
+## order and conditions of the former _skill_selectable() body so the hint line
+## always names the real blocker: out of bounds; palm arts (index >= 4)
+## phase-locked until CombatManager.current_round >= 4; on cooldown (> 0
+## rounds, with the REMAINING rounds formatted at reject time); Seventeen Forms
+## HP gate (usable only BELOW 50% max HP — 250 of 500); technique seal
+## (no_techniques_next_turn); tutorial input allowance. The six Chinese
+## literals are grep-able acceptance points.
+func _skill_reject_reason(index: int) -> String:
 	if index < 0 or index >= skills.size():
-		return false
+		return "该招式不存在"
 	if CombatManager.tutorial_battle and index >= 4 and CombatManager.current_round < 4:
-		return false  # Two-phase unlock (tutorial-only): palm arts appear at round 4+.
+		return "教程尚未解锁"  # Two-phase unlock (tutorial-only): palm arts appear at round 4+.
 	if skill_cooldowns[index] > 0:
-		return false
+		return "冷却中 %d 回合" % skill_cooldowns[index]
 	var skill = skills[index]
 	if skill != null and skill.hp_gate_below_ratio > 0.0:
 		var gate_hp: int = int(round(float(max_health) * skill.hp_gate_below_ratio))
 		if health >= gate_hp:
-			return false  # "Below 50% HP": exactly 50% (250) is NOT usable.
+			return "须在半血以下"  # "Below 50% HP": exactly 50% (250) is NOT usable.
 	if _has_restriction_status("no_techniques_next_turn"):
-		return false
+		return "本回合无法用招"
 	if not TutorialManager.is_input_allowed("skill_%d" % (index + 1)):
-		return false
-	return true
+		return "教程尚未解锁"
+	return ""
+
+
+## Gate check for selecting (and executing) a skill at `index`. Thin wrapper
+## over _skill_reject_reason(): selectable iff no rejection reason applies.
+## Both existing call sites (select_skill / _try_attack_target) keep the exact
+## same gate order and conditions.
+func _skill_selectable(index: int) -> bool:
+	return _skill_reject_reason(index) == ""
 
 
 ## True while a "next turn" restriction status is active on the player.
@@ -453,33 +481,40 @@ func _handle_click_targeting() -> void:
 ## engine sets cooldown/acted only on successful execution).
 func _try_attack_target(enemy: Node) -> void:
 	if enemy == null or not is_instance_valid(enemy):
-		return
+		return  # Precondition guard — not a user-facing rejection.
 
 	if selected_skill_index >= 0:
 		# Using a skill — re-validate all gates at execution time (HP gate
 		# re-check included; the engine re-checks again as belt-and-braces).
 		var skill_index: int = selected_skill_index
-		if not _skill_selectable(skill_index):
+		var reject_reason: String = _skill_reject_reason(skill_index)
+		if reject_reason != "":
+			action_hint.emit(reject_reason)
 			return
 		var skill = skills[skill_index]
 		if not _can_skill_hit(skill, enemy):
-			# No valid target for this skill's shape/range — silently ignore.
+			# No valid target for this skill's shape/range — surface the reason.
+			action_hint.emit("射程不够")
 			return
 
 		_execute_skill(skill_index, enemy)
 		selected_skill_index = -1  # Auto-deselect after use.
+		action_hint.emit("")  # Clear the hint line after a successful skill use.
 
 	else:
 		# Basic attack.
 		if not TutorialManager.is_input_allowed("basic_attack"):
+			action_hint.emit("教程尚未解锁")
 			return
 
 		# Must be adjacent (Chebyshev distance <= 1).
 		if not _is_adjacent(enemy.grid_pos):
-			# Out of range — silently ignore.
+			# Out of range — surface the reason.
+			action_hint.emit("射程不够")
 			return
 
 		_execute_basic_attack(enemy)
+		action_hint.emit("")  # Clear the hint line after a successful basic attack.
 
 
 ## Keyboard basic attack / skill execution: fire the selected skill (or a basic
@@ -496,6 +531,10 @@ func _try_keyboard_attack() -> void:
 		target = _pick_nearest_enemy_in_range(1)
 	if target != null:
 		_try_attack_target(target)
+	else:
+		# No enemy satisfies the skill's shape/range (or none is adjacent for a
+		# basic attack) — surface the reason instead of a silent dead branch.
+		action_hint.emit("射程不够")
 
 
 ## Find the nearest living enemy within the given Chebyshev range of the

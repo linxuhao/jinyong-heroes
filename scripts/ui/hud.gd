@@ -50,6 +50,10 @@ var _health_bar_scene: PackedScene = preload("res://scenes/ui/health_bar.tscn")
 ## Preloaded skill_button scene for instantiation.
 var _skill_button_scene: PackedScene = preload("res://scenes/ui/skill_button.tscn")
 
+## Player reference whose action_hint signal is wired to the hint label, for
+## teardown in clear_battle_refs(). Null when no battle is set up.
+var _action_hint_player: Node = null
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -61,6 +65,7 @@ var _skill_button_scene: PackedScene = preload("res://scenes/ui/skill_button.tsc
 @onready var _pause_button: Button = $PauseButton
 @onready var _round_indicator: Control = $RoundIndicator
 @onready var _energy_label: Label = $EnergyLabel
+@onready var _action_hint_label: Label = $ActionHintLabel
 
 ## Resolve a skill button by its deterministic name (SkillButton1..SkillButton12).
 ## Buttons live under SkillRow1/SkillRow2 in the two-row layout, so resolve
@@ -144,6 +149,10 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 		var qi: int = int(player.energy) if "energy" in player else 0
 		energy_label.text = "内力: %d" % qi
 
+	# Wire the player's action_hint signal to the hint line (idempotent:
+	# disconnects any stale connection first, so repeated setup() calls are safe).
+	_wire_action_hint(player)
+
 
 ## Battle-exit cleanup: drop every per-battle reference so a scene swap never
 ## touches freed nodes. Frees the floating health bars (they hold the
@@ -151,6 +160,15 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 ## is_instance_valid, but the bars must not linger into the next battle) and
 ## clears the skill buttons (re-populated from scratch on the next setup()).
 func clear_battle_refs() -> void:
+	# Clear the hint line and drop the action_hint connection so a scene swap
+	# never leaves the old battle's hint text (or a freed player ref) behind.
+	hide_hint()
+	if _action_hint_player != null and is_instance_valid(_action_hint_player):
+		if _action_hint_player.has_signal("action_hint") \
+				and _action_hint_player.action_hint.is_connected(_on_action_hint):
+			_action_hint_player.action_hint.disconnect(_on_action_hint)
+	_action_hint_player = null
+
 	for bar in _health_bars:
 		if is_instance_valid(bar):
 			bar.queue_free()
@@ -268,6 +286,46 @@ func _wire_cooldown_updates(player: Node) -> void:
 		if player.cooldowns_updated.is_connected(_on_player_cooldowns_updated):
 			player.cooldowns_updated.disconnect(_on_player_cooldowns_updated)
 		player.cooldowns_updated.connect(_on_player_cooldowns_updated)
+
+
+## Show (or clear) the action hint line. Empty text hides the label; any
+## non-empty text makes it visible. Surface observables: `visible` + `text`.
+func show_hint(text: String) -> void:
+	if _action_hint_label == null or not is_instance_valid(_action_hint_label):
+		return
+	if text == "":
+		_action_hint_label.visible = false
+		_action_hint_label.text = ""
+	else:
+		_action_hint_label.text = text
+		_action_hint_label.visible = true
+
+
+## Hide the action hint line and clear its text.
+func hide_hint() -> void:
+	if _action_hint_label == null or not is_instance_valid(_action_hint_label):
+		return
+	_action_hint_label.visible = false
+	_action_hint_label.text = ""
+
+
+## Signal handler for the player's action_hint signal — forwards to show_hint.
+func _on_action_hint(text: String) -> void:
+	show_hint(text)
+
+
+## Wire the player's action_hint signal to the hint line, mirroring the
+## _wire_cooldown_updates pattern: guard has_signal, disconnect any stale
+## connection, then connect. Stores the player ref for teardown.
+func _wire_action_hint(player: Node) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+
+	if player.has_signal("action_hint"):
+		if player.action_hint.is_connected(_on_action_hint):
+			player.action_hint.disconnect(_on_action_hint)
+		player.action_hint.connect(_on_action_hint)
+	_action_hint_player = player
 
 
 # ---------------------------------------------------------------------------
