@@ -1,282 +1,269 @@
-# 技术架构设计 — 养成真的有意义 (Real Fa-Hui-Du, Fillable Ladders)
-
-Project: 养成真的有意义 — 发挥度真算、阶梯真的填得起来
-Repo: Godot 4 (latest stable; `project.godot` declares `config/features=PackedStringArray("4.7")`), GDScript, single-player wuxia cultivation + turn-based tactics.
-All file paths in this document are relative to the repo root (write paths, no `project/` prefix).
+# Step 2 Design — Make the Encounter Battle Path Load-Bearing
 
 ## 1. Overview
 
-The SOTA report established the real state of the codebase (the fa-hui-du cascade is already implemented; the "stub returns 1.3" premise is stale). This round's actual work:
+**Round goal:** `cultivation_changes_combat` fully green (29/29), `CombatManager.empty_round_stalls == 0` in every scenario, `trait_combat_effects_and_twelve_slots` / `sect_switch_same_school_connects` / `save_load_roundtrip` and all 12 protected tutorial battle scenarios stay green.
 
-1. **Remove the `staged_values` bypass entirely** and make the tutorial's protected 1.3 values emerge from the real cascade via **real mastered filler arts** (the brief forbids the 特判 short-circuit; protected playtest values must stay byte-identical).
-2. **Complete the progression ladder with 甲级 (A) rows**: A-grade arts for the four external ladders (sword / palm / polearm / dart) and the five sects' internal ladder, real named techniques for the new A-grade rows (§4.3 — the existing 丁丙乙 generic stubs stay this round; only grade A carries hand-authored techniques), `PRACTICE_TO_MASTER["A"]`, and a legal in-game way to obtain an A art (the 神功 card, design/40_progression §3.6).
-3. **Decide the 修习 lookup table** (the open Architect decision in design/90_decisions.md) and implement it through the single seeded RNG.
-4. **Encounter battles**: a real CULTIVATION → BATTLE → WON → CULTIVATION path so cultivation changes combat *visibly* (the round's thesis).
-5. **Trait hooks**: 杀 / 破 / 狼 / 铁布衫 / 身轻如燕 / 左右互搏 get real engine effects (first trait implementations ever).
-6. **Save roundtrip observability** and **sect-switch observability** so the two new playtest scenarios can assert full equality / continuity.
-7. **Two new playtest scenarios** (`cultivation_changes_combat`, `sect_switch_same_school_connects`) + extended `save_load_roundtrip` + trait scenarios, with new additive DEBUG actions and surface vars — existing 20 scenarios and all protected asserts stay byte-identical.
+**SOTA verdict (accepted):** every piece of the encounter machinery already exists and is unit-tested (`BattleSetup.build_character`, `EncounterData.sparring_partner`, battlefield ENCOUNTER branch, `_instantiate_player`, `_instantiate_sparring_partner`, HUD/trait/turn-engine hooks, save roundtrip). The battle can never start because of **two missing wiring links**:
 
-**Non-goals this round:** the other seven traits (无师自通 / 骨骼清奇 / 过目不忘 / 旧伤 / 心魔 / 孤煞 / 筋骨迟钝 / 江湖阅历 / 福缘深厚 — hooks stay data-only; 孤煞's existing lone_bane implementation is untouched), the 轻功 ladder (explicitly out of scope), companions, map content, and the three 遗留 failing scenarios (dot_resolves_at_victim_turn_start 2/8, each_unit_acts_once 6/12, terminal_victory 4/6 — do not touch).
+1. `SceneManager.SCENE_MAP` has no `"BATTLE"` key → `GameManager.start_encounter()` emits `state_changed("BATTLE")` and the router answers `last_error = "state_unmapped"` — **the battlefield scene is never instantiated.**
+2. `start_encounter()` emits `battle_started` **synchronously before the async scene swap**, while `get_player() == null` and `enemies_alive` is empty. `CombatManager._on_battle_started()` runs `_begin_round()` on that empty roster, trips the loud guard (`empty_round_stalls += 1`, `push_error`, phase `ROUND_END`) — and because `battle_started` fires only once, **the battle stays stalled forever even after the units arrive.**
 
-## 2. Design-consistency notes and 设计变更 (design changes)
+This design fixes exactly those two links and re-baselines the playtest. Nothing downstream is rebuilt; the loud guard is **never weakened** — the fix is sequencing, not assertion-lowering.
 
-Per `design/README.md`, every conflict with the design archive is declared here; `5_design` will apply these to the archive after final verification passes.
+**No design-record change.** This is a pure wiring bugfix; no rule in `design/` changes, so there is no "设计变更" section and `99_changelog.md` gets no row.
 
-1. **设计变更 — ladder set (40_progression §3.7).** The archive says 首批填满阶梯的门类 = 剑、拳掌、轻功. The implemented data (ProgressionGongfaData.SECTS) already provides 拳掌/剑/长兵/暗器 lines — matching all five sect start arts (罗汉拳/太极剑/峨眉剑法/打狗棒法/满天花雨) — and the SOTA report declares 轻功 out of scope. **Change: the filled ladders are 剑 / 拳掌 / 长兵 / 暗器 (external) + 内功 (internal, 5 sect lines); 轻功 is not filled this round.**
-2. **Design decision recorded — 修习 lookup table (90_decisions "谁来定:架构").** Final table in §4.1. This closes the open question.
-3. **Design decision recorded — 破 semantics.** 破军 ("功法修习经验 +50%") applies to **gongfa practice experience** (练功 +1 and every `practice`-type card/event amount through `_add_practice`), NOT to attribute 修习 gains. Amounts are `round(amount × 1.5)` (half-away-from-zero): 1→2, 2→3, 4→6, 6→9. No extra RNG.
-4. **Design decision recorded — A-grade content rows** (§4.2–§4.3): the 4 external A arts + 5 internal A arts, their attributes, and technique rows. External A attributes are deliberately chosen **not to equal any feeding sect line's attribute** so a completed 3-year ladder lands exactly at 1.0 (design §3.3 "1.0 起步") and the climb toward 1.3 stays a real pursuit; internal A arts keep their sect line's attribute so a full internal line can reach 1.3 (internal is 自成一类, 家家都教 — the generous lane).
-5. **Design decision recorded — 神功 card effect** (40_progression §3.6): grants one **random unowned A art** from the 9-row A pool (4 external + 5 internal), one `SaveManager.rng` draw in operation order. A player whose ladder doesn't match gets a 0.6~0.7 artifact — exactly the design's "用不好的神兵".
-6. **Design decision recorded — tutorial 编排数值 implementation.** 20_content.md says tutorial units' prerequisites are "视为已满" (treated as complete). That is now *implemented*: each tutorial unit's CharacterData is populated with real mastered filler arts (B/C/D same-school + same-attribute) by a shared pure helper, and the `staged_values` marker is deleted from CharacterData / gongfa_data / README / tests. Numbers are unchanged (`round(v × 1.3)` everywhere, exactly as before).
-7. **Design decision recorded — encounter defeat routing.** For encounter battles (battle_return_state = a segment state), LOST routes back to the return state (no death penalty designed yet) instead of hardcoded TUTORIAL. Tutorial LOST behavior unchanged.
-8. **Design decision recorded — 12-slot skill bar layout** (40_progression §9 + §2.2 左右互搏): default stays 2 arts / 8 slots; with 左右互搏, up to 3 arts / 12 slots. Layout = **two rows of 6 buttons** (each button keeps the audited 104 px width; row 2 holds buttons 7–12). Hotkeys skill_9..skill_12 are added as input actions (keys 9 / 0 / minus / equal); 1–8 unchanged.
-9. **Note (no change needed):** 40_progression §9's "技能栏 8 格…不再上调" is the *default*; the trait modifies it. This is the design's own §2.2 rule, not a conflict.
+---
 
-## 3. Architecture diagram (text)
+## 2. Architecture
+
+### 2.1 Current chain (broken)
 
 ```
-                        ┌────────────────────────── CULTIVATION (cultivation.gd) ──────────────────────────┐
-                        │  month loop: YEAR_AUGMENT / CARD_PICK → _apply_card → ACTION_PICK → _after_action │
-  SaveManager.rng ──────┤    shen_gong card → ProgressionGongfaData.a_pool() → random unowned A art        │
-  (single stream)       │    cultivate → TraitEffects.practice_gain(wisdom, rng.randf())  [修习查表]        │
-                        │    practice  → _add_practice(round(amt × 1.5 if 杀破狼))          [破]            │
-                        │    DEBUG: debug_step_month / debug_grant_art / debug_enter_encounter             │
-                        └───────────────┬───────────────────────────────┬──────────────────────────────────┘
-                                        │ debug_enter_encounter         │ WON→CULTIVATION (request_continue)
-                                        ▼                               ▲
-                       GameManager.start_encounter(): CULTIVATION → BATTLE; battle_return_state="CULTIVATION"
-                                        │                               │
-                                        ▼                               │
-                 battlefield.gd _ready: mode = return_state=="CULTIVATION" ? ENCOUNTER : TUTORIAL
-                                        │
-        ┌───────────────────────────────┴──────────────────────────────────┐
-        │ ENCOUNTER mode:                                                  │
-        │   player  = BattleSetup.build_character(SaveManager.profile)     │
-        │             → CharacterData { stats via design §7 formulas,      │
-        │               arts mirrored (mastered flags), equip ≤2/≤3 arts,  │
-        │               traits copied }                                    │
-        │   enemy   = EncounterData.sparring_partner() (fixed CharacterData)│
-        │   TutorialManager never starts (is_input_allowed = not is_active)│
-        │ TUTORIAL mode (unchanged numbers):                                │
-        │   content factory builds 6 units, then TutorialFillers.fill(cd)   │
-        │   replaces the staged_values loop: real mastered B/C/D fillers +  │
-        │   mastered=true on every art ⇒ cascade computes 1.3 for every art │
-        └───────────────────────────────┬──────────────────────────────────┘
-                                        ▼
-                  CombatManager — turn engine + resolution pipeline
-     get_fa_hui_du(gongfa, unit_cd) → GongfaData.get_fa_hui_du (pure cascade, no staged branch)
-     apply_damage: attack output (base × fhd × 狼 mult → round) → defense (× (1−DR−狼DR) → round)
-                   → shield → HP → fatal guard (先天罡气 / 铁布衫) → 杀 lifesteal → counters
-                                        │
-                                        ▼
-                  HUD (hud.gd): buttons per equipped skills (8 or 12, two rows),
-                  fahui_text from cascade; states data-driven (tutorial flag, hp_gate from SkillData)
+cultivation (debug_enter_encounter)
+  -> GameManager.start_encounter()          state CULTIVATION -> BATTLE
+       battle_started.emit()   [roster EMPTY: player null, no enemies]
+         -> CombatManager._on_battle_started()
+              phase IDLE -> current_round = 1 -> _begin_round()
+              -> empty order -> empty_round_stalls += 1, push_error, phase ROUND_END  (STALLED FOREVER)
+       state_changed.emit("BATTLE")
+         -> SceneManager._on_state_changed: SCENE_MAP.get("BATTLE") == null
+              -> last_error = "state_unmapped", return                     (NO SCENE SWAP)
 ```
 
-## 4. Architect-decided numbers (authoritative for implementers)
+### 2.2 Fixed chain (this design)
 
-### 4.1 修习 lookup table (final; closes 90_decisions)
+```
+cultivation (debug_enter_encounter)
+  -> GameManager.start_encounter()          state CULTIVATION -> BATTLE
+       battle_started.emit()   [roster EMPTY]
+         -> CombatManager._on_battle_started()  ->  _begin_if_ready()
+              roster empty -> return                                      (silent skip, NO stall)
+       state_changed.emit("BATTLE")
+         -> SceneManager._on_state_changed: SCENE_MAP["BATTLE"] == "battlefield"
+              -> swap_to("battlefield")  ->  _do_swap (await tree_exited, ~1-2 frames)
+              -> battlefield.tscn enters tree
+       battlefield._ready()  [battle_return_state == "CULTIVATION"]
+         -> _setup_encounter_battle()
+              profile null? -> push_warning + return (no kick-off queued)
+              _instantiate_player()          -> GameManager.set_player()     (roster now live)
+              _instantiate_sparring_partner() -> GameManager.register_enemy()
+              _wire_hud.call_deferred(...)          [queued first]
+              CombatManager.begin_battle.call_deferred()  [queued second, LAST statement]
+       end-of-frame flush (Godot MessageQueue, FIFO):
+         1. HUD.setup() runs (buttons/health bars exist, signal listeners wired)
+         2. begin_battle() -> _begin_if_ready()
+              phase IDLE, player != null, >= 1 enemy  ->  current_round = 1 -> _begin_round()
+              round_started(1) / turn_started(player) reach a WIRED HUD
+              -> phase PLAYER_TURN, player turn loop awaits process_frame
+```
 
-One `SaveManager.rng.randf()` draw per 修习, mapped to +1/+2/+3 by 悟性 tier (cumulative thresholds). `roll = rng.randf()`; tier table:
+The tutorial path is untouched end-to-end: its units exist before `start_battle()` fires, so `_on_battle_started()` sees a non-empty roster and begins round 1 exactly as today; `SCENE_MAP["BATTLE"]` maps to the already-hosted `battlefield` (`swap_to` no-ops); and the tutorial `_ready` branch never calls `begin_battle()`.
 
-| 悟性 tier | +1 | +2 | +3 | expected |
-|---|---|---|---|---|
-| ≤ 15 | 60% | 30% | 10% | 1.50 |
-| 16–25 | 35% | 45% | 20% | 1.85 |
-| 26–35 | 20% | 50% | 30% | 2.10 |
-| ≥ 36 | 10% | 45% | 45% | 2.35 |
+### 2.3 Component diagram (text)
 
-Pure helper (unit-testable, no autoload deps): `TraitEffects.practice_gain(wisdom: int, roll: float) -> int`. The caller draws the roll from `SaveManager.rng` — exactly one rng op per 修习, same op count as the old `randi_range(1,3)`, so determinism discipline is preserved (existing tests assert gain ∈ 1..3 and same-seed equality — still true).
+```
+[GameManager autoload]-- battle_started -->[CombatManager._on_battle_started (guarded)]
+        | state_changed("BATTLE")                 |
+        v                                         | begin_battle() (public, guarded)
+[SceneManager autoload]-- swap_to("battlefield")->[Battlefield scene]
+        SCENE_MAP["BATTLE"]="battlefield"               |
+                                                        v
+                                          _setup_encounter_battle(): units -> HUD queue -> kick-off queue
+                                                        |
+                                                        +-> [HUD (HUDLayer)]  <- deferred FIFO, before round 1
+                                                        +-> [CombatManager]   <- begin_battle deferred, round 1 starts
+```
 
-### 4.2 Grade tables extended (ProgressionGongfaData)
+---
 
-- `GRADE_SUFFIX["A"] = "a"`, `GRADE_STEP["A"] = "圆满"` (display: `易筋经·圆满`).
-- `PRACTICE_TO_MASTER["A"] = 10` (continuing D4/C6/B8/+2).
-- `TECHNIQUE_COUNT["A"] = 4`; `TECHNIQUE_DAMAGE["A"] = 30` (continuing 18/22/26/+4) — per-technique overrides below.
+## 3. Component specifications
 
-### 4.3 A-grade art rows (new content; real names replace 一式/二式/三式)
+### C1 — `scripts/autoload/scene_manager.gd`: add the `BATTLE` map entry (one line)
 
-**External A arts — one per school; attribute never matches that school's feeding sect lines:**
+- **Change:** add `"BATTLE": "battlefield",` to `SCENE_MAP` (after `"TUTORIAL"`).
+- `SCENE_PATHS` **already** contains `"battlefield": "res://scenes/battlefield.tscn"` — no new preload, no new machinery.
+- **Invariants (must hold after the change):**
+  - Tutorial `start_battle()` emits `state_changed("BATTLE")` while `current_scene == "battlefield"` → `swap_to` returns immediately (no-op branch, line 90-91). Byte-identical behavior.
+  - `WON` / `LOST` stay unmapped deliberately: `last_error = "state_unmapped"` on WON/LOST is pre-existing tutorial behavior the playtest already tolerates. **Do not add WON/LOST keys.**
+  - The existing swap protocol (`pending_swap` guard, `_teardown_battle_refs()` → `CombatManager.reset_battle()` → `GridManager.clear_grid()` → `GameManager.clear_battle()` **before** `queue_free`, `await tree_exited`) is the freed-object-safety contract — **keep it exactly as is.**
 
-| art id (school) | name (attr) | technique | shape | dmg | rng | cd | notes |
-|---|---|---|---|---|---|---|---|
-| `a_sword` | 独孤九剑 (刚) | 总诀式 | single | 30 | 1 | 1 | |
-| | | 破剑式 | single | 28 | 1 | 2 | `ignore_damage_reduction = true` |
-| | | 破气式 | line self | 26 | 3 | 3 | |
-| | | 绝招·无招胜有招 | square r2 self | 55 | — | 5 | `is_finisher = true` |
-| `a_palm` | 降龙十八掌 (阳) | 亢龙有悔 | single | 30 | 1 | 1 | knockback 1 |
-| | | 飞龙在天 | line self | 28 | 3 | 2 | |
-| | | 见龙在田 | cross1 self | 26 | — | 3 | |
-| | | 绝招·潜龙勿用 | square r2 self | 55 | — | 5 | `is_finisher`, knockback 2 |
-| `a_polearm` | 杨家枪法 (刚) | 回马枪 | single | 30 | 1 | 1 | |
-| | | 梨花枪 | line self | 28 | 3 | 2 | |
-| | | 锁喉枪 | single | 26 | 1 | 3 | knockback 1 |
-| | | 绝招·枪出如龙 | square r2 self | 55 | — | 5 | `is_finisher` |
-| `a_dart` | 小李飞刀 (阴) | 例不虚发 | single | 30 | 3 | 1 | ranged (dart) |
-| | | 连环飞刀 | line target | 28 | 2 | 2 | |
-| | | 满天刀雨 | square r1 target | 26 | 3 | 3 | |
-| | | 绝招·一刀飞仙 | square r2 target | 55 | 3 | 5 | `is_finisher` |
+### C2 — `scripts/autoload/combat_manager.gd`: guarded kick-off seam
 
-Feeding line attributes: sword lines are 柔(武当)/阴(峨眉) → sword A = 刚 ✓ no clash; palm line 刚(少林) → palm A = 阳 ✓; polearm line 阳(丐帮) → polearm A = 刚 ✓; dart line 柔(唐门) → dart A = 阴 ✓.
+Replace the body of `_on_battle_started()` and add a public `begin_battle()`, both sharing one guarded helper:
 
-**Internal A arts — one per sect line, same attribute as the line; data-only (energy 0, passive "", stats {}) like all progression internal arts:**
+```gdscript
+## Begin the turn-based battle: round 1 snapshot and the first turn. Drives the
+## tutorial path (battle_started fires when its units already exist). The
+## encounter path emits battle_started BEFORE its scene swap, while the roster
+## is still empty — skipping here keeps the empty_round_stalls guard
+## unreachable; the new battlefield's _ready() calls begin_battle() instead.
+func _on_battle_started() -> void:
+	_begin_if_ready()
 
-| id | name (attr) |
-|---|---|
-| `shaolin_yijin_a` | 易筋经·圆满 (刚) |
-| `wudang_chunyang_a` | 纯阳无极功·圆满 (柔) |
-| `gaibang_huntian_a` | 混天功·圆满 (阳) |
-| `emei_jiuyang_a` | 峨眉九阳功·圆满 (阴) |
-| `tangmen_xinfa_a` | 唐门心法·圆满 (柔) |
 
-**A pool (神功 grant pool, 9 ids):** the 4 external A ids + the 5 internal A ids. `ProgressionGongfaData.a_pool() -> Array[String]`, `a_art_for_school(school)`, `a_art_for_sect(sect_id)`. `art_by_id` / `art_id` / `display_name_of` extended to grade A.
+## Public kick-off for battles whose units are registered by the battlefield
+## scene itself (encounter mode): IDLE -> round 1. No-op while a battle is
+## running, when the player is missing, or when no enemy is registered — a
+## stray scene load can never trip the empty-round stall guard. The tutorial
+## never calls this (start_battle() drives it via battle_started).
+func begin_battle() -> void:
+	_begin_if_ready()
 
-### 4.4 Trait effect formulas (percentages never take the fhd multiplier)
 
-Pure static math lives in `TraitEffects` (new file) so unit tests don't need a scene tree:
+## Shared guarded kick-off: phase IDLE + live player + >= 1 enemy, then round 1.
+func _begin_if_ready() -> void:
+	if phase != "IDLE":
+		return
+	if GameManager.get_player() == null or GameManager.get_enemies_alive().is_empty():
+		return
+	current_round = 1
+	_begin_round()
+```
 
-- **杀 (sha)**: when the owner deals damage, heal `round(actual_hp_loss × 0.20)`; cap per round `round(owner.max_health × 0.15)`; per-round heal budget keyed by owner instance id, reset at round start (mirrors `_finger_dart_used`). Lifesteal fires after the target's HP deduction and before death handling; target death doesn't cancel it. No heal on self-damage.
-- **破 (pojun)**: `round(practice_amount × 1.5)` on every `_add_practice` call and every practice-typed card/event effect (see §2.3).
-- **狼 (lang)**: attack side — output = `round(base × fhd × other_buffs × (1 + 0.08 × N))` where N = living enemies of the owner at resolve time; defense side — extra DR `0.05 × N` added inside `_damage_reduction` (stacks additively with 铁骨/神雕之力; still bypassed by `ignore_damage_reduction`).
-- **铁布衫 (iron_shirt)**: first lethal damage per battle → owner stays at 1 HP, negative statuses cleared, flag `_iron_shirt_used[instance_id]` set (mirror `_innate_qi_used`; separate dictionary; reset in `reset_battle`).
-- **身轻如燕 (swallow_lightness)**: when the player's single-tile move targets an enemy-occupied tile AND the tile beyond is walkable and free AND `moves_left >= 2`: consume 2 movement, slide through to the far tile (never landing on the enemy tile). GridManager occupancy updated only for the departure and landing tiles; the enemy's tile occupancy is untouched.
-- **左右互搏 (ambidextrous)**: equipment cap 3 external arts (12 slots) instead of 2 (8 slots). Layout two rows × 6 (§2.8).
+- **The guard (`empty_round_stalls` + `push_error` in `_begin_round()`) stays untouched.** The fix is sequencing, never assertion-weakening.
+- `_on_battle_started` keeps its existing `phase != "IDLE"` re-entry guard as the first check (tutorial battles that already started cannot be double-kicked; `start_encounter`'s second call is already a no-op at the GameManager level).
+- **Tutorial byte-identity:** the roster there is non-empty when `battle_started` fires, so the new skip never fires on the tutorial path (SOTA assumption, verified against `start_battle()` call sites — it is only reachable from TUTORIAL after the tutorial battlefield `_ready` built its units).
+- `begin_battle()` is safe to call from anywhere, synchronously or deferred, because all preconditions are re-checked inside — including after a `reset_battle()` + `clear_battle()` teardown where the deferred call lands on a freed battlefield (player null → no-op).
 
-## 5. Component list & interfaces
+### C3 — `scripts/battlefield.gd`: kick off round 1 in the ENCOUNTER branch
 
-### C1 — `scripts/data/progression_gongfa_data.gd` (MODIFIED, pure data)
-Grade table extensions (§4.2) + A-grade rows (§4.3). New static API (all return fresh Resources, null on unknown):
-- `a_pool() -> Array[String]`
-- `a_art_for_school(school: String) -> Resource`
-- `a_art_for_sect(sect_id: String) -> Resource`
-- `art_by_id(id)` / `art_id(...)` / `display_name_of(id)` extended to A.
-External A techniques are real SkillData rows with the table's shapes/damages (all shape/origin/knockback/ignore_dr/is_finisher fields exist in the audited SkillData); internal A arts are data-only. Internal A rows reuse the existing `_display_name` pattern (`base + "·" + GRADE_STEP["A"]`), so the table stores base names only — never pre-append ·圆满. Keep the existing "no class_name typing" rule (GongfaData/SkillData are preloaded constants).
+In `_setup_encounter_battle()`, after the HUD wiring line, append the kick-off as the **last statement**, and update the function's doc comment (it currently claims `start_encounter()` kicks the battle — that is the bug being fixed):
 
-### C2 — `scripts/data/trait_effects.gd` (NEW, pure static)
-`practice_gain(wisdom: int, roll: float) -> int` · `lang_attack_mult(living_enemies: int) -> float` · `lang_dr(living_enemies: int) -> float` · `sha_heal_amount(loss: int, max_hp: int, healed_this_round: int) -> int` · `pojun_practice(amount: int) -> int`. No autoload references; all float math via `round()` (half-away-from-zero).
+```gdscript
+	# Wire the HUD (deferred — HUD._ready() hasn't run yet, so its @onready vars
+	# are null), then kick off round 1 deferred AFTER the wiring: Godot's
+	# MessageQueue flushes call_deferred FIFO within the same frame, so
+	# HUD.setup() (buttons + signal listeners) runs BEFORE round_started /
+	# turn_started fire — the same ordering the tutorial path has (HUD wired,
+	# then battle starts). begin_battle() self-guards (phase IDLE + non-empty
+	# roster), so the profile-null early return and any stray scene load can
+	# never reach the empty-round stall guard.
+	_wire_hud.call_deferred(player_node, [enemy_node])
+	CombatManager.begin_battle.call_deferred()
+```
 
-### C3 — `scripts/data/tutorial_fillers.gd` (NEW, pure static)
-`fill(unit_cd) -> void`: for every art on the unit (internal+external), for every lower-grade same-school slot with no mastered art present, append a fresh filler GongfaData (grade/school/attribute cloned from the art, empty techniques, `mastered = true`); then set `mastered = true` on every art the unit already carries. Process grades **descending (A→D)** so appended fillers are prerequisite-closed (a B filler's C/D slots get their own fillers) — the fill must be a fixpoint: after it, every art on the unit including fillers computes 1.3 via the real cascade (unit-tested). Pure data → unit-testable; battlefield and tests share the same code path. This replaces the staged bypass: after `fill`, `get_fa_hui_du` computes 1.3 for every tutorial art (cascade complete + ≥3 same-attribute mastered arts per attribute group — each unit's fillers share its arts' attributes).
+- **Profile-null guard:** `_setup_encounter_battle()` early-returns with a `push_warning` when `SaveManager.profile == null` — the kick-off is queued after that return point, and even if it weren't, `begin_battle()`'s roster check absorbs it. (SOTA edge case: no stray scene load can trip the stall guard.)
+- **HUD-before-round-1:** both calls are deferred in FIFO order in the same frame flush. `call_deferred` on a freed object is dropped by the MessageQueue (unit-test teardown path), and `begin_battle` is on the never-freed autoload, so the pair is safe under scene teardown.
+- **Deterministic timing:** the round starts at the end of the frame in which the new battlefield entered the tree; `CombatManager.debug_round_frame` records that process-frame number — the re-baselining anchor for the playtest.
+- **Do not touch** the tutorial branch of `_ready()` (steps 5-10 + `CombatManager.tutorial_battle = true` last-statement contract).
+- Encounter mode stays tutorial-free: `tutorial_battle == false` re-asserted, no overlay, no `TutorialManager.start()`.
 
-### C4 — `scripts/data/character_data.gd` (MODIFIED)
-- **DELETE** `staged_values` (the forbidden 特判).
-- **ADD** `@export var traits: Array[String] = []` (battle-side trait carrier).
+### C4 — `playtest_spec.yaml`: surface + scenario re-baseline
 
-### C5 — `scripts/data/gongfa_data.gd` (MODIFIED)
-Remove the `unit.staged_values → return fa_hui_du` branch from `get_fa_hui_du`; the `unit == null` fallback stays. Doc comment updated (no more 编排数值 mention).
-
-### C6 — `scripts/data/battle_setup.gd` (MODIFIED)
-- Drop the `staged_values` assignment and its comment.
-- `build_character(profile)`: `cd.traits = profile.traits.duplicate()`; external arts sorted by grade rank (A first, via `GongfaData.GRADE_RANK`), **grade ties break by profile order (stable)** — with a 神功-granted A art and the debug-granted A art both grade A, profile order decides which equips first and therefore which art's technique is `skill_1`; equip the first **2** arts (no ambidextrous) or first **3** (ambidextrous); `skills` = concatenated techniques of equipped arts only; mastered flags mirrored from profile as today.
-
-### C7 — `scripts/data/encounter_data.gd` (NEW, pure data)
-`sparring_partner() -> Resource` — fixed CharacterData: `character_name "Sparring Partner"`, `display_name "陪练弟子"`, hp 60, attack 12, move 2, initiative 3, melee, start tile (7,4) (adjacent to the player's (7,5)), team 1, `ai_class "AIControllerSparring"` (new tiny AI or reuse a melee one — implementer picks an existing melee AI class; must not require tutorial content). Arts: one mastered D internal art (attribute `阳`) + one mastered D external art (same attribute, no techniques needed) + two mastered D filler arts of the same attribute → its basic-attack fhd is exactly `1.0 + 0.1×3 = 1.3` regardless of engine defaults (deterministic; PM computes cooked numbers from these inputs). `sparring_partner_tile() -> Vector2i`.
-
-### C8 — `scripts/battlefield.gd` (MODIFIED)
-- Tutorial mode: after building the six units, call `TutorialFillers.fill(cd)` for each; delete the `staged_values = true` loop. Set `CombatManager.tutorial_battle = true`. Wire `traits` onto player/enemy nodes (same guarded `in` pattern as initiative/energy).
-- Encounter mode (when `GameManager.get_battle_return_state() == "CULTIVATION"`): build player via `BattleSetup.build_character(SaveManager.profile)`; instantiate via the existing `_instantiate_player`-style flow; spawn `EncounterData.sparring_partner()` at its tile; **do not call `TutorialManager.start`**; `CombatManager.reset_battle()` and `GameManager.start_battle`-equivalent transition are driven by `GameManager.start_encounter()` (see C9). All AI/hazard/status wiring stays shared.
-
-### C9 — `scripts/autoload/game_manager.gd` (MODIFIED)
-- `start_encounter() -> void`: if `current_state == "CULTIVATION"`: set `battle_return_state = "CULTIVATION"`, `current_state = "BATTLE"`, emit `battle_started` + `state_changed("BATTLE")` (SceneManager already routes on this state). Audited: `start_battle()` is hard-gated to TUTORIAL, so `start_encounter()` is a new entry point that does NOT reuse it.
-- `request_retry()`: **change** the destination from its current hardcoded TUTORIAL (audited in the current file: `clear_battle(); current_state = "TUTORIAL"; retry_requested.emit()`) to `battle_return_state` when it is a segment state, else TUTORIAL — mirroring `request_continue`'s segment-state routing (which IS already implemented in the current file; `request_retry` is not). Tutorial LOST stays TUTORIAL because `battle_return_state == "TUTORIAL"` is not a segment state.
-- Encounter routing cleanup: when an encounter battle's WON/LOST routes back to a segment, the routing path must run `clear_battle()` (the tutorial's `request_retry` already does; `request_continue` does not) so a second `debug_enter_encounter` in one scenario rebuilds fresh refs — `set_player` is first-call-wins and a stale `_player` would swallow the second battle's player. The WON/LOST overlay texts stay tutorial-flavored (华山论剑) this round — not asserted by the new scenarios.
-- DEBUG actions (unbound, harness-only, in `_process`): `debug_enter_encounter` → `start_encounter()` (no-op outside CULTIVATION). (`debug_win_tutorial`/`debug_lose_tutorial` reuse the existing pipeline hooks — verified they work for any active battle.)
-
-### C10 — `scripts/segments/cultivation.gd` (MODIFIED)
-- `_apply_card`: implement `"shen_gong"` — `pool = ProgressionGongfaData.a_pool()` minus owned ids; if non-empty: `pick = pool[SaveManager.rng.randi_range(0, pool.size()-1)]`; `SaveManager.profile.add_gongfa(pick, "A")`. (`"tech_unlock"` and `""` remain pass.) Note: this adds one rng op when the card is drawn — test_cultivation's fast-forward test (seed 4242, asserts `gongfa_count == 6`) must be updated to tolerate a granted A art (recompute expected count from the profile).
-- `_apply_action` cultivate: `var roll = SaveManager.rng.randf(); var gain = TraitEffects.practice_gain(profile.get_attr("wisdom"), roll)`.
-- `_add_practice(amount)`: if `profile.has_trait("sha_po_lang")`: `amount = TraitEffects.pojun_practice(amount)`; mastery threshold unchanged (`PRACTICE_TO_MASTER`, now incl. A=10).
-- New DEBUG actions: `debug_step_month` → advance exactly one month through the same phase machine with fixed auto-choices (card 0; 练功 = **first unmastered EXTERNAL art, else first unmastered art, else 修习 根骨**; year-end stay), stopping after the month completes (re-usable N times; no-op outside CULTIVATION). **Why external-first:** audited `cultivation.gd` adds +1 practice per 练功 (`_add_practice(1)`) and the profile stores internal arts before external ones, so a naive "first unmastered" order masters the internal ladder first and the external 乙 art can never be mastered within 36 months — the encounter scenario's 0.7 → 1.0 climb would be unreachable. Audited: one year-end resolution consumes exactly one `debug_step_month` press (`_after_action` parks at YEAR_END; `_resolve_year_end` advances the year). `debug_grant_art` → grant the A art of `main_external_id`'s school (fallback: the sect's internal A) via `add_gongfa(id, "A")`.
-- New surface vars (additive, synced in `_sync_surface`): `gongfa_ids: Array[String]`, `gongfa_grades: Array[String]`, `gongfa_names: Array[String]` (grant order).
-
-### C11 — `scripts/autoload/combat_manager.gd` (MODIFIED)
-- `tutorial_battle: bool = false` (set by battlefield tutorial mode; reset in `reset_battle`).
-- `_traits_of(unit) -> Array[String]` (node.traits or character_data.traits; both may be absent → []).
-- 狼: attack-side mult applied where attack output is computed (after fhd, before the attack-side `round`); defense-side term inside `_damage_reduction` (`+ 0.05 × enemies_alive` when owner has sha_po_lang).
-- 杀: in `apply_damage` after HP deduction / fatal-guard resolution: if source alive and has sha_po_lang and source != target: `heal = TraitEffects.sha_heal_amount(actual_loss, source.max_health, _sha_round_healed[src_id])`; `apply_heal(source, heal)`; accumulate counter. Counter reset in `_begin_round` (with `_finger_dart_used`) and `reset_battle`.
-- 铁布衫: in the fatal-guard section: `is_lethal and traits.has("iron_shirt") and not _iron_shirt_used.get(id, false)` → hp 1, clear negative statuses, set flag (mirror innate_qi, separate dict, reset in `reset_battle`).
-- New surface: `debug_sha_heal_total: int`, `debug_iron_shirt_procs: int`, `debug_lang_attack_mult: float` (last applied 狼 attack mult; 1.0 default).
-- Do NOT touch the three 遗留 failing scenarios' logic.
-
-### C12 — `scripts/characters/player.gd` (MODIFIED)
-- 身轻如燕 slide-through in `_try_move` (§4.4) — requires `moves_left >= 2`; uses `GridManager.is_occupied(target)` + `GridManager.is_walkable(beyond)`; occupancy ops via `GridManager.move_unit(self, from, beyond)`.
-- Declare `var traits: Array[String] = []` on player.gd (and the same declaration on enemy.gd) — the playtest surface contract `Player.traits` and CombatManager's `_traits_of` both read it; battlefield wires the CharacterData traits onto the node.
-- Hotkey handling extended: skill_9..skill_12 select indices 8..11 (bounds-safe); the two-phase palm unlock gate in `_skill_selectable`/HUD stays tutorial-only.
-
-### C13 — `scripts/autoload/tutorial_manager.gd` (VERIFY-ONLY — audited already in place)
-`is_input_allowed(action)` already returns **true when `not is_active`** (`if not is_active: return true` — audited in the current file). Encounter battles never start the tutorial, so no change is needed; the implementer only re-verifies this gate when wiring encounter mode. Existing tutorial behavior unchanged (all 7 steps still gate as before).
-
-### C14 — `scripts/ui/hud.gd` + `scenes/ui/hud.tscn` (MODIFIED)
-- SkillBar becomes a VBoxContainer with row HBoxes: `N <= 8` → one row (geometry identical to today: buttons 1–8 in a row, `skill8_right_edge` unchanged); `N > 8` → two rows × 6 (buttons 1–6 top, 7–12 bottom; each button 104 px → `skill8_right_edge = 6×104 = 624 ≤ 960` stays green; `skill12_right_edge = 624` too).
-- `_populate_skill_buttons`: always instantiates up to **12** SkillButton nodes — buttons beyond `skills.size()` are created but hidden (never fewer than 12), so the surface reads `SkillButton9..12.visible` are stable in every mode; 8-mode geometry stays byte-identical (hidden children occupy no space in an HBox).
-- `_refresh_skill_button_states`: phase lock condition becomes `CombatManager.tutorial_battle and i >= 4 and CombatManager.current_round < 4`; hp_gate becomes data-driven from `btn._skill_data.hp_gate_below_ratio` (tutorial button 8 keeps identical behavior — verified `seventeen_melancholy_forms` carries `hp_gate_below_ratio = 0.5`).
-- New surface: `HUD: skill12_right_edge: float` — row 2's right edge x in the two-row layout; 0.0 in the single-row (≤8 skills) mode.
-
-### C15 — `scripts/autoload/save_manager.gd` (MODIFIED)
-Roundtrip observability (additive surface; save schema unchanged — profile already persists traits/gongfa/mastered, `SAVE_VERSION` stays 1):
-- `snapshot_profile_json: String`, `snapshot_rng_state: int`, `snapshot_decks_string: String` — captured from `_build_save_dict()` at every successful `save_slot`.
-- `loaded_profile_json: String`, `loaded_rng_state: int`, `loaded_decks_string: String` — captured from the parsed file dict at every successful `load_slot`.
-- `decks_string` format: `"cat1:a,b,c;cat2:x,y"` (DECK_CATEGORIES order, ids joined by ",").
-
-### C16 — `project.godot` (MODIFIED)
-`[input]` additions (all unbound/empty event lists except skill_9..12): `debug_step_month`, `debug_grant_art`, `debug_enter_encounter`, `skill_9` (key 9), `skill_10` (key 0), `skill_11` (key minus), `skill_12` (key equal).
-
-### C17 — tests (extend + new; run_tests.sh / unit_test_runner registration)
-- `tests/test_progression_gongfa_data.gd` (extend): A tables (suffix/step/practice/count/damage), 9 A ids resolve, 4 techniques per external A with exactly one `is_finisher`, finisher name prefix 绝招, external-A attribute ∉ feeding sect-line attributes, internal A attributes == sect line attributes.
-- `tests/test_gongfa_cascade.gd` (rewrite criterion 1): delete staged short-circuit tests; add: `TutorialFillers.fill` yields 1.3 for every art of a tutorial-shaped unit (use the same art shapes as battlefield's factory); A-art ladder progression 缺2→0.7 / 缺1→0.85 / 齐→1.0 / same-attr 3→1.3; `CharacterData` has no `staged_values` property.
-- `tests/test_battle_setup.gd` (extend): traits propagation; equip cap 2 vs 3 (ambidextrous) with grade-sorted order (A art always equipped); no `staged_values` references.
-- `tests/test_trait_effects.gd` (NEW, pure): 修习 table tiers/expected values, pojun rounding, lang mult/dr, sha cap.
-- `tests/test_cultivation.gd` (extend): shen_gong card grants exactly one unowned A id (seeded); debug_grant_art targets main school; debug_step_month advances exactly one month; 破 ×1.5 practice; cultivate determinism via the lookup table; fix `_test_fast_forward` expected gongfa_count for possible A grants.
-- `tests/test_encounter.gd` (NEW, SceneTree-driven like test_cultivation): `start_encounter` transition CULTIVATION→BATTLE; `request_retry` routes to CULTIVATION for encounter context; EncounterData.sparring_partner shape (stats, arts, fhd inputs).
-- `tests/test_save_manager.gd` (extend): snapshot/loaded vars equal across save→mutate→load.
-- `tests/test_trait_data.gd`: unchanged (hook ids stay data-only); add assertion that the 13 ids/names/costs are untouched.
-
-### C18 — `playtest_spec.yaml` (extended additively — see §7)
-Existing 20 scenarios byte-identical. Four new skeletons + surface/action additions.
-
-## 6. Rollback & migration safety (irreversible-operation discipline)
-
-1. **Save format: additive only.** `PlayerProfile.to_dict`/`from_dict` already persist `traits`, `gongfa[{id,grade,practice,mastered}]`, seed, `rng.state`, six decks. No schema keys change; `SAVE_VERSION` stays 1. Old saves load cleanly (from_dict is defensive); new saves are a superset. **No destructive migration exists, therefore no delete-then-verify step is permitted anywhere.**
-2. **SaveManager IO already implements backup → execute → validate → delete** (.tmp write → re-validate → .bak copy → rename → re-validate → drop backup). The new snapshot/loaded observables read the same dicts — they add verification, not new risk.
-3. **staged_values removal is code-only** (no user data). Rollback path: git revert of C3/C4/C5/C7; protected playtest asserts (`fahui_du_multiplies_damage`, `dot_resolves_at_victim_turn_start`, `terminal_victory`, geometry) are the acceptance gate — if any turns red, the filler tables (not the asserts) must be fixed.
-4. **Deck/RNG order:** the shen_gong effect adds one rng draw when the card resolves. Existing scenario/test asserts target counts/categories only (audited: test_cultivation explicitly never asserts exact card ids) — the only count-affecting assert is `_test_fast_forward`'s `gongfa_count == 6`, updated per §C17. The new draw joins the same `SaveManager.rng` operation-order stream (never global `randi()`).
-5. **Protected-content invariants** (re-checked in t_plan, never weakened): 8 buttons all `发挥 ×1.3`; `Central_Divine.health == 71`; `Player.health == 152/168`; `skill8_right_edge <= 960`; all no-ellipsis asserts.
-
-## 7. Playtest contract (scene / actions / surface + scenario skeletons)
-
-`scene: "res://scenes/main.tscn"` (unchanged). **Actions (additive):** `debug_step_month`, `debug_grant_art`, `debug_enter_encounter`, `skill_9`, `skill_10`, `skill_11`, `skill_12` — all must exist in project.godot `[input]`. **Surface (additive only):**
+#### Surface delta (the observable contract for implementers)
 
 ```yaml
-CultivationScreen: [..., gongfa_ids, gongfa_grades, gongfa_names]
-SaveManager: [..., snapshot_profile_json, snapshot_rng_state, snapshot_decks_string,
-              loaded_profile_json, loaded_rng_state, loaded_decks_string]
-CombatManager: [..., tutorial_battle, debug_sha_heal_total, debug_iron_shirt_procs, debug_lang_attack_mult]
-Player: [..., traits]
-HUD: [..., skill12_right_edge]
-SkillButton9..SkillButton12: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-Sparring_Partner: [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names]
+CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log,
+  last_turn_actor, debug_await_total, debug_await_timeouts, debug_await_frames,
+  debug_round_frame, debug_reflect_hits, tutorial_battle, debug_sha_heal_total,
+  debug_iron_shirt_procs, debug_lang_attack_mult, empty_round_stalls]
 ```
 
-**Scenario skeletons (PM fills assert thresholds; every scenario presses at least one action; frame cap 3000, last assert ≤ 2999):**
+(`empty_round_stalls` appended — the round goal asserts it is 0 everywhere; `debug_round_frame` is already whitelisted and becomes the re-baselining instrument.)
 
-1. `sect_switch_same_school_connects` — creation → 武当 → cultivation year 1: `debug_step_month` ×12 → YEAR_END → move_down (换门派) → ui_accept → SECT_SWITCH → move_down ×3 (峨眉) → ui_accept → assert at ~frame 700: `CultivationScreen.year == 2`, `sect_id == "emei"`, `gongfa_ids` contains `emei_emeijian_c` (剑法到了丙级 — the continuity the brief demands), `gongfa_grades` shows the new C row.
-2. `cultivation_changes_combat` — creation → 武当 → `debug_step_month` ×13 (12 month-steps + 1 year-end resolution → year 2 m1, phase YEAR_AUGMENT, yearly cards staged) → `debug_grant_art` (sword A 独孤九剑) → `debug_enter_encounter` → BATTLE: press `skill_1` (总诀式) → assert `Sparring_Partner.health == 39` (round(30 × 0.7) = 21; 60−21; A-sword prereqs: sword D mastered ✓ / C unmastered ✗ / B absent ✗ → 缺2 → 0.7) and `SkillButton1.fahui_text == "发挥 ×0.7"` → `debug_win_tutorial` → ui_accept (WON → CULTIVATION) → `debug_step_month` ×21 (12 month-steps of year 2 + 1 year-end + 8 month-steps of year 3; external-first practice masters extC at year 2 m6 and extB 8/8 at year 3 m8; battle enters at year 3 m9) → `debug_enter_encounter` → BATTLE: `skill_1` → assert `Sparring_Partner.health == 30` (30 × 1.0; sword D/C/B all mastered, same-attribute 刚 count 0 because 独孤九剑 itself is unmastered → exactly 1.0) and `fahui_text == "发挥 ×1.0"` → `debug_win_tutorial`. One scenario, two battles, damage 21 vs 30 — 发挥度真算, byte-auditable. Press counts derive from audited cultivation.gd (+1 practice per 练功, internal-before-external grant order, one press per year-end resolution); PM re-verifies off-by-one against the final `debug_step_month`.
-3. `save_load_roundtrip` (EXTEND the existing scenario — keep current asserts, add at the end): after the load, assert `SaveManager.loaded_profile_json == SaveManager.snapshot_profile_json`, `loaded_rng_state == snapshot_rng_state`, `loaded_decks_string == snapshot_decks_string`.
-4. `trait_combat_effects_and_twelve_slots` — creation: traits 杀破狼 + 铁布衫 + 身轻如燕 + 左右互搏 (indices 8, 4, 5, 0) → 唐门 → `debug_step_month` ×26 (2×12 month-steps + 2 year-end resolutions → year 3 m1, phase YEAR_AUGMENT, extB granted unmastered) → `debug_grant_art` (dart A 小李飞刀; owned external arts D+C+B+A = 10 techniques; ambidextrous equip cap 3 → A+B+C = 9 skills) → `debug_enter_encounter` → assert: `SkillButton9.visible == true`, `SkillButton10.visible == false` (the 3-art equip cap in action: 10 techniques learned, 9 equipped), `SkillButton9.global_position.y > SkillButton1.global_position.y` (second row), `HUD.skill8_right_edge <= 960`, `HUD.skill12_right_edge <= 960`, `Player.traits` contains `sha_po_lang`; press `move_up` at the occupied (7,4) tile → assert `Player.grid_pos == Vector2i(7,3)` and moves_left reduced by 2 (身轻如燕); press `skill_1` (例不虚发, 30 — provided the year-2 yearly draw granted no external A art; see PM note (a)) → assert `debug_lang_attack_mult == 1.08`, `Sparring_Partner.health == 32` (derivation: extB unmastered → fhd 0.85; attack side round(30 × 0.85 × 1.08) = round(27.54) = 28; 60−28), `debug_sha_heal_total == 6` (杀: round(28 × 0.20) = 6 ≤ cap round(max_hp × 0.15)); press `debug_lose_tutorial` → assert `Player.health == 1` (铁布衫; audited `debug_kill_player` routes through `apply_damage`'s fatal-guard section, so the trait guard fires) and `debug_iron_shirt_procs == 1` and state != LOST; `debug_win_tutorial`. Digits assume 根骨 10 (max_hp 50 → 杀 cap 8); PM re-derives from the final creation inputs.
+#### Scenario deltas (skeletons; exact thresholds are PM's, but the values below are derived and expected to land as written)
 
-**PM threshold note:** all damage examples in §7 assume the §4.3/§7 inputs and `round()` half-away-from-zero; PM re-derives each number from the audited code during task planning (the derivation rules above are authoritative, the example digits are the expected values to verify). Three RNG/deck-sensitive spots PM must pin with the scenario's seed before finalizing asserts: (a) the yearly draws staged at year 2 m1 / year 3 m1 during `debug_step_month` (a shen_gong card grants a random unowned A art — verify it does not pre-empt `skill_1`'s identity; a trait card could add a damage-affecting trait — the new scenarios pick their traits at creation so the owned ids are excluded from decks, but the remaining pool must still be checked per seed); (b) the equip tie-break among grade-A external arts is profile order (stable); (c) the `debug_step_month` press counts in scenarios 2/4 include one press per year-end resolution (audited `_after_action` → YEAR_END → `_resolve_year_end`).
+1. `round_one_snapshot_and_turn_order` — add to the frame-30 assert block: `CombatManager.empty_round_stalls: 0` (tutorial path proves the skip never misfires into a stall).
 
-## 8. Tech stack (per SOTA — nothing reinvented)
+2. `cultivation_changes_combat` — battle-1 assert block (frame 490) gains:
+   - `CombatManager.empty_round_stalls: 'empty_round_stalls == 0'`
+   - `CombatManager.current_round: 1`
+   - `CombatManager.phase: 'phase == "PLAYER_TURN"'`
+   - `CombatManager.active_unit_name: 'active_unit_name == "ProgressionHero"'`
+   Battle-2 assert block (frame 1040) gains the same four lines.
+   **Existing digit asserts stay unchanged** — verified against the input model: the `skill_1` hotkey only *selects* skill 0, and the `basic_attack` key (J) *executes the selected skill* at the nearest valid target then auto-deselects; it never additionally lands a basic attack while a skill is selected. So battle 1 is `round(30×0.7)=21 → 60−21 = 39` and battle 2 is `round(30×0.85)=26 → 60−26 = 34` — exactly the current asserts (21→39, 26→34). Player `acted` flips to true on the successful skill execution (`"changed"` still passes).
+   - **Frame re-baseline rule:** round 1 now starts at `debug_round_frame` ≈ the frame the battlefield `_ready` ran (≈ debug_enter_encounter + 2-3 frames: swap teardown `await tree_exited` + instantiation). The first post-entry press sits +15 frames or more after the entry press in both battles (505 vs 450; 1055 vs 1000) — margins are ≥ 12 frames, so **no timeline edits are expected**. If the harness ever shows a press swallowed (phase not yet `PLAYER_TURN`), shift the press by the measured `debug_round_frame` delta, never by assertion edits.
 
-Godot 4 (`project.godot` declares features 4.7) + GDScript; programmatic Resource data layer (no .tres content files); `RandomNumberGenerator` per-instance seed/state via `SaveManager.rng` (splitmix64-mixed, persisted); `round()` half-away-from-zero; stable insertion-sort initiative; `AStarGrid2D` paths (GridManager); JSON text saves with the existing 5-step atomic write; additive playtest surface contract; `gdscript_check` compile gate per implementation step (`.gd` stays out of linter_manifest per addon guidance).
+3. `trait_combat_effects_and_twelve_slots` — add `CombatManager.empty_round_stalls: 'empty_round_stalls == 0'` to the frame-845 assert block. Existing digit asserts stay: 身轻如燕 slide (7,5)→(7,3) with `moves_left == 0` (move budget 2, slide costs 2), dart `round(30×0.85×1.08)=28 → 60−28 = 32`, `debug_lang_attack_mult == 1.08`, 杀 heal `round(28×0.2)=6`, 铁布衫 `health == 1` + `debug_iron_shirt_procs == 1`, no LOST. All of these were authored against the live-turn model (select → execute) and now actually execute.
 
-## 9. Extensibility
+4. `sect_switch_same_school_connects`, `save_load_roundtrip`, all tutorial battle scenarios, `spine_to_ending`: **no edits.** They do not press encounter-combat inputs, and the tutorial path is byte-identical.
 
-- Trait hooks remain data (`TraitData.hooks`): the six implemented effects key off trait ids; the remaining hooks (`dual_main_internal`, `no_finishers`, `hp30_chaos`, …) plug into the same lookup points (`_traits_of`, skill-selectable gate, turn start) in later rounds.
-- EncounterData is a table: more enemies/encounters are rows, not new code paths; the battlefield mode switch keys off `battle_return_state`, so further battle kinds (map encounters) reuse the same seam.
-- The A pool / ladders are rows: adding 轻功 or more schools means new rows in ProgressionGongfaData only.
-- Save roundtrip observables are generic string snapshots — future schema bumps can assert equality through them before adding fields.
+#### Frame cap
+All scenarios remain inside the 3000-frame cap; the deferred kick-off adds 0 extra frames versus the swap frame (same-frame flush).
 
-## 10. Output files checklist
+---
 
-`step2_design.md` (this file) + `linter_manifest.json` (unchanged: `""`, `.json`, `.yaml`, `.md`, `.tscn`, `.tres` → `basic`; no `.gd` entry — handled by the gdscript_check gate).
+## 4. Data flow & timing contract
+
+| Step | Actor | Frame (relative) |
+|---|---|---|
+| `debug_enter_encounter` press | harness | F |
+| `start_encounter()`: state→BATTLE, `battle_started` (skipped: empty roster), `state_changed("BATTLE")` | GameManager | F |
+| `swap_to("battlefield")` → `_do_swap` teardown + `await tree_exited` | SceneManager | F..F+1 |
+| battlefield `add_child` → `_ready()` → ENCOUNTER branch → units registered → HUD queue → `begin_battle` queue | battlefield | F+1..F+2 |
+| deferred flush (FIFO): `HUD.setup()` then `begin_battle()` → `current_round = 1`, `phase = PLAYER_TURN`, `round_started(1)`, `turn_started(player)` | MessageQueue | end of that same frame |
+| player turn loop resumes; input presses land | CombatManager / Player | every later frame |
+
+**Interface contract:**
+
+- `CombatManager.begin_battle() -> void` — public, idempotent, guarded; callable sync or deferred; the only new cross-component seam.
+- `CombatManager._on_battle_started()` — now skips empty rosters; unchanged signature/signal wiring (`GameManager.battle_started`).
+- `SceneManager.SCENE_MAP` — `"BATTLE" -> "battlefield"`; router logic untouched.
+- `battlefield._setup_encounter_battle()` — queues HUD wiring then `begin_battle` (both deferred); no other caller changes.
+- Playtest surface: `empty_round_stalls` must exist on `CombatManager` (it already does as a public var — only the spec whitelist changes).
+- Node/signal names, `class_name`s, and method signatures in the existing surface (`Player`, `Sparring_Partner`, `SkillButton1..12`, `CultivationScreen`, …) remain **verbatim** — they are the harness contract.
+
+---
+
+## 5. Edge cases → design decisions (traceability to the SOTA report)
+
+| SOTA edge case | Where this design answers it |
+|---|---|
+| Round-start ordering (the killer race) | C2 + C3: round 1 begins only via the guarded seam after both units are registered; the pre-swap `battle_started` is skipped when the roster is empty. |
+| `SCENE_MAP` gap | C1: one-line map entry; `swap_to` no-ops when already hosted (tutorial); WON/LOST stay unmapped. |
+| Second encounter in one session | `request_continue`/`request_retry` already `clear_battle()` for segment routing (verified in `game_manager.gd`), so `set_player` first-call-wins cannot swallow a rebuilt player; teardown order unchanged. |
+| Profile-null guard | `_setup_encounter_battle` early-return + `begin_battle()`'s own roster guard — double protection. |
+| Deterministic frame timing | Deferred FIFO flush at the end of the battlefield's `_ready` frame; `debug_round_frame` is the measurement anchor; press margins ≥ 12 frames. |
+| RNG/deck sensitivity | No RNG touched; yearly draws still consume `SaveManager.rng` only; scenario seed unchanged. |
+| Damage digit determinism | No damage code touched; expected digits (21→39, 26→34, 28→32, heal 6, ×1.08) are derived, not tuned. |
+| HUD/tutorial flags in ENCOUNTER mode | `tutorial_battle == false` asserted; HUD wiring flushed **before** `begin_battle()` so buttons and listeners exist when round 1 starts. |
+| Vision gate Q3 on battle scenes | Expected to resolve as a side effect of a live round loop (real cooldown/state changes); no button-visual code special-cased. |
+| Non-goal battles untouched | `each_unit_acts_once_per_round_initiative_order`, `dot_resolves_at_victim_turn_start`, `terminal_victory_8_12_rounds` untouched — no tutorial content numbers or AI behavior change; no assertion edits there. |
+
+---
+
+## 6. Verification plan
+
+### 6.1 Unit level (`run_tests.sh`, unchanged script)
+- `godot --headless -s res://tests/test_encounter.gd` — must stay green. Analysis: test (a) asserts wiring only (no phase assert), so the deferred kick-off does not break it; the queued `begin_battle` fires after teardown's `reset_battle()` + `clear_battle()` and self-guards to a no-op. Test (b) `start_encounter` now proceeds through `_on_battle_started` with a non-empty roster (units spawned) — signal-order asserts unaffected.
+- **Additive test (recommended, small):** in `test_encounter.gd`, a `_test_encounter_battle_live` case — spawn the battlefield, `await get_tree().process_frame` once (deferred flush completes), then assert `CombatManager.phase == "PLAYER_TURN"`, `CombatManager.current_round == 1`, `CombatManager.empty_round_stalls == 0`, and `CombatManager.active_unit_name == "ProgressionHero"`. This is the unit-level regression pin for the exact bug this round fixes.
+- `test_game_manager_fsm.gd` — asserts signal order only (`battle_started` then `state:BATTLE`); unaffected by the CombatManager-side skip.
+- `test_battle_setup.gd`, `test_gongfa_cascade.gd`, `test_trait_effects.gd`, `test_save_manager.gd`, `test_cultivation.gd`, `test_skill_button_states.gd` — untouched, must stay green (no files they read change behavior).
+
+### 6.2 Integration level (`playtest_spec.yaml`)
+- `cultivation_changes_combat` fully green (29/29 including the new `empty_round_stalls == 0` + round-1 liveness asserts).
+- `trait_combat_effects_and_twelve_slots`, `sect_switch_same_school_connects`, `save_load_roundtrip`, `spine_to_ending` green.
+- The 12 protected tutorial battle scenarios byte-identical (the only additive is the optional `empty_round_stalls: 0` assert in `round_one_snapshot_and_turn_order`).
+
+### 6.3 Vision gate Q3
+Battle-scene screenshots should now show real state transitions across frames (cooldown/selection changes) once the encounter round loop is live; no visual-code changes are designed.
+
+### 6.4 Rollback
+No irreversible operations, no data migration, no asset rewrites. Rollback = revert `scene_manager.gd` / `combat_manager.gd` / `battlefield.gd` / `playtest_spec.yaml`. (The "backup → execute → verify → delete old" migration constraint does not apply: nothing is deleted or rewritten in place; all edits are additive to source files under git.)
+
+---
+
+## 7. Task decomposition (for PM)
+
+| Task | File(s) | Acceptance |
+|---|---|---|
+| T1: BATTLE map entry | `./scripts/autoload/scene_manager.gd` | `SCENE_MAP` contains `"BATTLE": "battlefield"`; tutorial swap no-op preserved; WON/LOST unmapped |
+| T2: guarded kick-off seam | `./scripts/autoload/combat_manager.gd` | `begin_battle()` + `_begin_if_ready()` as specced; `_on_battle_started` skips empty roster; stall guard untouched; `test_encounter` green |
+| T3: encounter kick-off | `./scripts/battlefield.gd` | deferred HUD-wiring + deferred `begin_battle()` queued in FIFO order, last statements of `_setup_encounter_battle()`; doc comment corrected; profile-null early return preserved |
+| T4: playtest re-baseline | `./playtest_spec.yaml` | surface gains `empty_round_stalls`; new liveness asserts in the two encounter scenarios + optional tutorial assert; all four encounter scenarios green, tutorial scenarios byte-identical |
+| T5: additive unit pin (optional but recommended) | `./tests/test_encounter.gd` | `_test_encounter_battle_live` proves phase/round/stall values after one deferred flush |
+
+Dependency order: T1/T2 are independent; T3 depends on T2; T4 depends on T1-T3; T5 after T2.
+
+---
+
+## 8. Tech stack & extension considerations
+
+- **Stack:** Godot 4.4 + GDScript only; no new dependencies, no addons, no assets (per SOTA). Linters: `.gd` is excluded from `linter_manifest.json` (handled by the host `gdscript_check` gate); `basic` covers `.json/.yaml/.md/.tscn/.tres`.
+- **Extensions left open (not built now):** more encounter battles are rows in `EncounterData`/`BattleSetup` — `begin_battle()` is content-agnostic; any future mode whose units are registered by its scene can reuse the same guarded seam, and any signal-driven mode keeps `battle_started`. No new abstraction layers are introduced — the two-line guard and one map entry are the entire new surface.
+- **Deliberately not done:** no WON/LOST scene keys, no `empty_round_stalls` guard changes, no tutorial content/AI changes, no visual special-casing.
+
+## 9. Playtest contract summary (for PM)
+
+`scene`: `res://scenes/main.tscn` (unchanged). `actions`: unchanged (all 25 actions already declared, incl. `debug_enter_encounter`, `skill_9..12`). `surface`: one-line delta to `CombatManager` (add `empty_round_stalls`). Scenarios: two additive assert blocks + one optional tutorial assert, with the frame re-baseline rule from §3/C4. Frame cap 3000 unchanged.
