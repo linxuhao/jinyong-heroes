@@ -26,6 +26,7 @@ GridManager="*res://scripts/autoload/grid_manager.gd"
 CombatManager="*res://scripts/autoload/combat_manager.gd"
 TutorialManager="*res://scripts/autoload/tutorial_manager.gd"
 AudioManager="*res://scripts/autoload/audio_manager.gd"
+ThemeManager="*res://scripts/autoload/theme_manager.gd"
 
 [display]
 
@@ -34,6 +35,10 @@ window/size/viewport_height=704
 window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
+
+[gui]
+
+theme/custom="res://assets/themes/global_theme.tres"
 
 [input]
 
