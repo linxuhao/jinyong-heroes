@@ -172,7 +172,7 @@ Runs a compile check (which triggers the Godot import pass) followed by a headle
 
 A passing run requires a clean compile and a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 
-> **Verification status: GREEN (shipped).** The full gate passes: zero freed-object runtime errors repo-wide, the terminal battle ends `current_state == "WON"` in rounds 8–12 with the player at 75–200 HP (15–40% of 500) sampled at the victory moment, all six protected behavior scenarios stay green, the DoT/terminal scenarios are re-pinned to the 500-HP model, and the `ui_geometry_readability` geometric assertions are green. To re-run the whole gate after any change:
+> **Verification status: RED — 5_vision gate not re-run (no vision_report.json found in workspace).** The external 5_vision readability gate was not re-run after the visual-fix tasks landed, and no `playtest_report.json` is present in the workspace to back the prior checks — so no shipped / all_goals_met / ready_for_deploy claim is made. The final gate record (`final/verify_report.json`) is unverified pending a fresh gate re-run staged by the pipeline. To re-run the whole gate after any change:
 
 ```bash
 ./run_tests.sh

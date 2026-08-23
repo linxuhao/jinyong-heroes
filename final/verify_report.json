@@ -1,0 +1,11 @@
+{
+  "all_goals_met": false,
+  "ready_for_deploy": false,
+  "issues": [
+    "5_vision gate not re-run: no vision_report.json found in workspace"
+  ],
+  "evidence": {
+    "vision_report": null,
+    "playtest_report": null
+  }
+}
