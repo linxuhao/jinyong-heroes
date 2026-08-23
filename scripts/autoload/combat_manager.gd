@@ -916,10 +916,17 @@ func _remove_status(target: Node, status_id: String) -> void:
 func _ensure_statuses(target: Node) -> void:
 	if target == null:
 		return
+	# A typed array cannot be constructed by calling it — `Array[Dictionary]()`
+	# is a parse error ("Cannot call on an expression"), and because this file is
+	# an autoload it took every script that references CombatManager down with
+	# it: one syntax error, twelve reported failures, zero rendered frames.
+	# Declare the type on a local and assign that instead.
 	if not ("statuses" in target):
-		target.set("statuses", Array[Dictionary]())
+		var fresh: Array[Dictionary] = []
+		target.set("statuses", fresh)
 	if target.statuses == null:
-		target.set("statuses", Array[Dictionary]())
+		var reset: Array[Dictionary] = []
+		target.set("statuses", reset)
 
 
 ## Keep the observable status_names array in sync with the statuses table.
