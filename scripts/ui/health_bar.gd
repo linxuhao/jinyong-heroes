@@ -93,6 +93,21 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		sb.border_width_right = 1
 		sb.border_width_bottom = 1
 		sb.border_color = Color(0.05, 0.05, 0.05)
+		# Draw the track 3px larger than the control rect on every side. At
+		# 100% HP the fill covers the whole rect, so without this the widget is
+		# a solid coloured block and reads as a platform, not a bar — the
+		# readability gate reported exactly that 11/11 ("solid green
+		# rectangles, not bars with empty portions") while the fill/track
+		# split underneath was already correct.
+		#
+		# expand_margin, not content_margin: content margins only move a
+		# StyleBox's CONTENT, they never shrink the box it draws, so insetting
+		# the fill that way renders identically and changes nothing. Growing
+		# the track is the one that actually paints.
+		#
+		# bar.size stays 64x12, so the `HealthBar.bar_width <= 64` geometric
+		# assert is untouched — this is drawing, not layout.
+		sb.set_expand_margin_all(3.0)
 		bar.add_theme_stylebox_override("background", sb)
 		# Dedicated fill stylebox: recolored by update_health() per HP band.
 		# No border widths on the fill (a border around only the filled
@@ -174,6 +189,16 @@ func follow_character() -> void:
 	# At the default scale-1 window it is numerically identical to the old
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
+	# Kept at −50 deliberately. Lifting it to −104 does put the widget above the
+	# feet, but at 110×30 it then covers the character's chest and collides with
+	# the top HUD band, and characters on the top row have no headroom left before
+	# the viewport clamp pins it. Measured 2026-08-23 by rendering both.
+	#
+	# The offset is not the real problem: a 110×30 widget carrying a 64×12 bar AND
+	# a name label is enormous against a 64px tile, so wherever it goes it either
+	# reads as a platform or hides the actor. The fix is to make it COMPACT (a
+	# thin bar, smaller label) — which belongs with the Chinese-font/global-Theme
+	# pass that re-lays out every label anyway.
 	screen_pos += Vector2(-60, -50)
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
