@@ -14,6 +14,7 @@
 
 const SkillButtonScene: PackedScene = preload("res://scenes/ui/skill_button.tscn")
 const SkillButtonScript: GDScript = preload("res://scripts/ui/skill_button.gd")
+const RoundIndicatorScript: GDScript = preload("res://scripts/ui/round_indicator.gd")
 
 const GOLD := Color(1.0, 0.84, 0.0, 1.0)
 
@@ -143,6 +144,61 @@ static func run() -> bool:
 			"CooldownLabel font_color bright gold")
 	ok = _expect(ok, cd_label.visible == true, "CooldownLabel visible on cooldown (contract)")
 	ok = _expect(ok, btn4.cooldown_label_text == "1", 'cooldown_label_text == "1" (contract)')
+
+	# --- Acceptance 6 (Q6 no-ellipsis): every Label in the button scene renders
+	# without "..." / U+2026 "…", and no Label clips (clip_text == false,
+	# text_overrun_behavior == 0 — the two properties the vision gate checks).
+	# The sweep runs on a REAL setup() + _apply_state("cooldown") instance so the
+	# button text, hotkey, fahui label, state tag and cooldown number are the
+	# strings that actually render.
+	var btn5 = SkillButtonScene.instantiate()
+	btn5.setup({"skill_name": "总诀式", "description": "独孤九剑·总诀式"}, "9", 1.3)
+	btn5.cooldown_remaining = 2
+	btn5._apply_state("cooldown")
+	var rendered: Array[String] = [str(btn5.text)]
+	for child in btn5.get_children():
+		if child is Label:
+			rendered.append(str(child.text))
+			ok = _expect(ok, child.clip_text == false,
+					"Q6: Label %s has clip_text == false" % child.name)
+			ok = _expect(ok, int(child.text_overrun_behavior) == 0,
+					"Q6: Label %s has text_overrun_behavior == 0" % child.name)
+	for t in rendered:
+		ok = _expect(ok, not t.contains("…") and not t.contains("..."),
+				"Q6: rendered text %s is free of ellipsis (…/...)" % t)
+
+	# --- Acceptance 7 (Q4 round indicator): the active line renders the move
+	# budget (digit + "·" pips) and the acted suffix (行动 ✓ / 结束), and the
+	# move_pips observable mirrors moves_left. _active_text reads the live
+	# GameManager autoload's player node — a minimal fake player carrying the two
+	# properties is injected directly (the first-call-wins guard is bypassed via
+	# set("_player", ...)) and restored to null afterwards.
+	var ri = RoundIndicatorScript.new()
+	var fake_player := Node.new()
+	fake_player.set("moves_left", 4)
+	fake_player.set("acted", false)
+	var gm: Node = null
+	var main_loop: MainLoop = Engine.get_main_loop()
+	if main_loop is SceneTree:
+		gm = (main_loop as SceneTree).root.get_node_or_null("GameManager")
+	ok = _expect(ok, gm != null, "Q4: GameManager autoload reachable in unit-test context")
+	if gm != null:
+		gm.set("_player", fake_player)
+		var t_active: String = ri._active_text("杨过")
+		gm.set("_player", null)
+		ok = _expect(ok, t_active.contains("移动"),
+				'Q4: active line contains "移动"')
+		ok = _expect(ok, t_active.ends_with("行动 ✓"),
+				'Q4: un-acted active line ends "行动 ✓" (U+2713)')
+		ok = _expect(ok, ri.move_pips == "·".repeat(4),
+				'Q4: move_pips == "·".repeat(moves_left)')
+		fake_player.set("acted", true)
+		gm.set("_player", fake_player)
+		var t_done: String = ri._active_text("杨过")
+		gm.set("_player", null)
+		ok = _expect(ok, t_done.ends_with("结束"),
+				'Q4: acted active line ends "结束"')
+	fake_player.free()
 
 	if ok:
 		print("PASS: test_skill_button_states")
