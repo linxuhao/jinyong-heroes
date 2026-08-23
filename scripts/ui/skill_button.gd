@@ -61,6 +61,17 @@ var state_tag_text: String = ""
 ## Written by _apply_state's cooldown branch: str(cooldown_remaining).
 var cooldown_label_text: String = ""
 
+## Observable: bg luminance (Color.get_luminance(), raw-component BT.709
+## convention) of the state currently applied to this button. Written EVERY
+## frame by _apply_state via the static state_luma_value() helper. Playtest
+## surface: asserts the "waiting" palette's window [0.1814, 0.2874] on
+## enemy-turn frames and the four documented values on player-turn frames.
+## Named `state_luma` (not the helper's name) because the playtest surface
+## contract requires SkillButtonN.state_luma to be a script var — and GDScript
+## forbids a member var and a method from sharing that name (see
+## state_luma_value's doc comment).
+var state_luma: float = 0.0
+
 ## Reference to the SkillData resource for this button.
 var _skill_data = null
 
@@ -195,6 +206,8 @@ func update_cooldown(remaining: int, total: int) -> void:
 ##   cooldown:     bg (0.08,0.08,0.10) border (0.32,0.32,0.36) w1 tag ""
 ##   phase_locked: bg (0.55,0.53,0.48) border (0.68,0.66,0.60) w2 tag "锁定"
 ##   hp_gated:     bg (0.58,0.10,0.10) border (0.85,0.28,0.28) w2 tag "气血"
+##   waiting:      bg (0.18,0.28,0.38) border (0.32,0.42,0.52) w1 tag ""
+##                 (bg luma 0.26596 — see the arm's comment)
 ## Unknown state -> ready palette.
 static func state_palette(state: String) -> Dictionary:
 	match state:
@@ -219,6 +232,23 @@ static func state_palette(state: String) -> Dictionary:
 				"border_width": 2,
 				"tag_text": "气血",
 			}
+		"waiting":
+			# Dimmed desaturated cool blue-gray — "it is not your turn".
+			# bg luma: 0.2126*0.18 + 0.7152*0.28 + 0.0722*0.38 = 0.26596
+			# (raw-component BT.709, the repo convention; verified with
+			# Color.get_luminance()). Inside the hard window
+			# [0.1814, 0.2874]: >= 0.10 below ready (0.3874) AND >= 0.10
+			# above cooldown (0.0814). Also being >= 0.10 from hp_gated
+			# (0.2020) is IMPOSSIBLE — the ready <-> hp_gated gap is only
+			# 0.1854 < 0.20 — so the remaining separation from hp_gated
+			# (dark red + 气血 tag) and cooldown (near-black + number) comes
+			# from hue + markers. No tag, thin border.
+			return {
+				"bg_color": Color(0.18, 0.28, 0.38),
+				"border_color": Color(0.32, 0.42, 0.52),
+				"border_width": 1,
+				"tag_text": "",
+			}
 		_:
 			return {
 				"bg_color": Color(0.30, 0.40, 0.52),
@@ -226,6 +256,29 @@ static func state_palette(state: String) -> Dictionary:
 				"border_width": 1,
 				"tag_text": "",
 			}
+
+
+## Static-name note: GDScript forbids a member variable and a method from
+## sharing a name (Parse Error: Function "state_luma" has the same name as a
+## previously declared variable), and the playtest surface contract requires
+## the observable VAR `state_luma` on every button. So this cached luma lookup
+## is named `state_luma_value`; _apply_state writes the observable through it.
+static var _luma_cache: Dictionary = {}
+
+## Cached per-state bg luminance — state_palette(state)["bg_color"].
+## get_luminance(), computed with the raw-component BT.709 formula
+## (L = 0.2126r + 0.7152g + 0.0722b) exactly as the documented contract values
+## were (ready 0.3874, cooldown 0.0814, phase_locked 0.5306, hp_gated 0.2020);
+## do NOT srgb_to_linear() first or the numbers diverge from the window.
+## Unknown state -> ready luma 0.3874 (state_palette's `_:` fallback). Pure and
+## fully static: caches one float per state string in a static-var Dictionary.
+static func state_luma_value(state: String) -> float:
+	if _luma_cache.has(state):
+		return _luma_cache[state]
+	var palette: Dictionary = state_palette(state)
+	var luma: float = palette["bg_color"].get_luminance()
+	_luma_cache[state] = luma
+	return luma
 
 
 ## Cached StyleBoxFlat for a state — allocated once per state, never per frame
@@ -244,9 +297,9 @@ func _stylebox_for(state: String) -> StyleBoxFlat:
 	return sb
 
 
-## Apply the four-state visual presentation for this button. The state data
-## (state_text / cooldown_remaining / selected) is derived and written EVERY
-## frame by the HUD; this function only turns that data into visuals. The four
+## Apply the visual presentation for the current state of this button. The state
+## data (state_text / cooldown_remaining / selected) is derived and written
+## EVERY frame by the HUD; this function only turns that data into visuals. The
 ## states are pairwise distinguishable (design/30_presentation.md item 2):
 ##   ready        -> neutral blue-gray fill, thin border, no tag, no number
 ##   cooldown     -> dark desaturated fill + remaining-rounds NUMBER over the
@@ -254,11 +307,21 @@ func _stylebox_for(state: String) -> StyleBoxFlat:
 ##                   driven by update_cooldown, untouched here)
 ##   phase_locked -> light gray fill + 2px border + 锁定 tag
 ##   hp_gated     -> dark red fill + 2px red border + 气血 tag
+##   waiting      -> dimmed desaturated cool blue-gray, thin border, no tag,
+##                   no cooldown number (accepted side effect: the big number
+##                   hides while the round-fill overlay stays — the whole bar
+##                   reads as dimmed/waiting during enemy turns)
 ## The golden selected border (已选中) is layered on top of any state and never
 ## changes state_text. `modulate` is NOT used (theme stylebox overrides
 ## restyle the button) and `disabled` is never touched (HUD-owned).
 func _apply_state(state: String) -> void:
 	var palette: Dictionary = state_palette(state)
+
+	# Per-frame observable: bg luminance of the currently applied state (playtest
+	# surface). Goes through the static state_luma_value() helper — GDScript
+	# forbids a member var and a method sharing the name `state_luma`, and the
+	# observable owns the contract name (see state_luma_value's doc comment).
+	state_luma = state_luma_value(state)
 
 	# Per-state StyleBoxFlat override applied to BOTH "normal" and "disabled":
 	# a disabled button (cooldown / phase_locked / hp_gated) renders the

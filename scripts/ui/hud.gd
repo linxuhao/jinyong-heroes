@@ -431,17 +431,19 @@ func _refresh_skill_button_states(player: Node) -> void:
 				state = "cooldown"
 			elif hp_gated:
 				state = "hp_gated"
-				# turn-to-whom visible (design/30_presentation.md #3 / vision Q3): while
-				# the battle is live but it is NOT the player's turn, every button
-				# renders the distinct "waiting" presentation so the skill bar
-				# visibly changes across player -> enemy -> player turn frames.
-				# Presentation-only override of the derived four-state: the
-				# derivation above stays byte-identical, `disabled` is untouched,
-				# and every existing state_text assert fires during PLAYER_TURN
-				# frames where this gate is false. Not tutorial-scoped — encounter
-				# battles show it too.
-				if CombatManager.phase != "IDLE" and not CombatManager.is_player_turn():
-					state = "waiting"
+			# turn-to-whom visible (design/30_presentation.md #3 / vision Q3): while
+			# the battle is live but it is NOT the player's turn, EVERY visible
+			# button renders the distinct "waiting" presentation so the skill bar
+			# visibly changes across player -> enemy -> player turn frames.
+			# Presentation-only override of the derived four-state: the derivation
+			# above stays byte-identical, `disabled` is untouched, and every
+			# existing state_text assert fires during PLAYER_TURN frames where
+			# this gate is false. NOT nested inside the hp_gated branch — it
+			# applies to every button AFTER the chain (the Q3 bug: ready buttons
+			# never entered that branch). Not tutorial-scoped — encounter battles
+			# show it too.
+			if CombatManager.phase != "IDLE" and not CombatManager.is_player_turn():
+				state = "waiting"
 			if "state_text" in btn:
 				btn.state_text = state
 			if "cooldown_remaining" in btn:
