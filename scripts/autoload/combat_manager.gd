@@ -316,10 +316,10 @@ func _battle_active() -> bool:
 func _clear_unit_battle_state(unit: Node) -> void:
 	if unit == null or not is_instance_valid(unit):
 		return
-	if "statuses" in unit:
-		unit.statuses = []
-	if "status_names" in unit:
-		unit.status_names = []
+	if "statuses" in unit and unit.statuses != null:
+		unit.statuses.clear()
+	if "status_names" in unit and unit.status_names != null:
+		unit.status_names.clear()
 	if "skill_cooldowns" in unit and unit.skill_cooldowns != null:
 		var cooldowns: Array = unit.skill_cooldowns
 		for i in range(cooldowns.size()):
@@ -917,9 +917,9 @@ func _ensure_statuses(target: Node) -> void:
 	if target == null:
 		return
 	if not ("statuses" in target):
-		target.set("statuses", [])
+		target.set("statuses", Array[Dictionary]())
 	if target.statuses == null:
-		target.set("statuses", [])
+		target.set("statuses", Array[Dictionary]())
 
 
 ## Keep the observable status_names array in sync with the statuses table.
