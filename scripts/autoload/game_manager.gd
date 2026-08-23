@@ -280,9 +280,13 @@ func get_enemies_alive() -> Array[Node]:
 # ---------------------------------------------------------------------------
 
 ## Store a reference to the player character. First-call-wins — subsequent
-## calls are silently ignored, preventing accidental overwrites.
+## calls are silently ignored while the stored reference is a LIVE node,
+## preventing accidental overwrites. A stale reference to a FREED node (not
+## is_instance_valid) is replaced unconditionally: a dead player from a previous
+## scene swap must never block the fresh player of the next battle (the
+## encounter path relies on this self-heal after its guarded pre-cleanup).
 func set_player(node: Node) -> void:
-	if _player != null:
+	if _player != null and is_instance_valid(_player):
 		return
 	_player = node
 
@@ -290,6 +294,23 @@ func set_player(node: Node) -> void:
 ## Returns the stored player reference, or null if not yet set.
 func get_player() -> Node:
 	return _player
+
+## Drop every stale (freed) per-battle reference held by this autoload so the
+## next battle never registers against a dead node. Clears _player only when it
+## is a freed node (a live player is never touched) and removes every
+## enemies_alive entry that is not is_instance_valid, preserving the order of
+## live entries. Reference-clearing only — NEVER frees any node (scene teardown
+## owns the free) and never touches _overlay_layer (clear_battle()'s job), so
+## live battle data is zero-impact and clear_battle()/register_enemy()/
+## unregister_enemy() semantics are unchanged.
+func release_stale_units() -> void:
+	if _player != null and not is_instance_valid(_player):
+		_player = null
+	var kept: Array[Node] = []
+	for enemy in enemies_alive:
+		if is_instance_valid(enemy):
+			kept.append(enemy)
+	enemies_alive = kept
 
 # ---------------------------------------------------------------------------
 # Private helpers — End-game overlay

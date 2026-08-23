@@ -632,6 +632,15 @@ func _setup_encounter_battle() -> void:
 	# leaked into this scene's teardown.
 	CombatManager.tutorial_battle = false
 
+	# Guarded stale-ref cleanup BEFORE registering the fresh units: a previous
+	# battle's freed nodes may still be registered here (set_player is
+	# first-call-wins — a stale _player would silently swallow this fresh one,
+	# and register_enemy does not dedupe freed nodes, so get_enemies_alive()
+	# could carry dead nodes into the turn engine). release_stale_units() clears
+	# only freed references — live data is untouched and nothing is freed here
+	# (scene teardown owns the free).
+	GameManager.release_stale_units()
+
 	# Player: derived from the cultivation profile through the shared
 	# battle-setup path (stats, arts mirrored with mastered flags, traits copied,
 	# equip cap 2 / 3).
@@ -642,15 +651,25 @@ func _setup_encounter_battle() -> void:
 	# positions dict / ai_map — the tutorial enemy layout is untouched).
 	var enemy_node: Node = _instantiate_sparring_partner()
 
-	# Wire the HUD (deferred — HUD._ready() hasn't run yet, so its @onready vars
-	# are null), then kick off round 1 deferred AFTER the wiring: Godot's
-	# MessageQueue flushes call_deferred FIFO within the same frame, so
-	# HUD.setup() (buttons + signal listeners) runs BEFORE round_started /
-	# turn_started fire — the same ordering the tutorial path has (HUD wired,
-	# then battle starts). begin_battle() self-guards (phase IDLE + non-empty
-	# roster), so the profile-null early return and any stray scene load can
-	# never reach the empty-round stall guard.
-	_wire_hud.call_deferred(player_node, [enemy_node])
+	# Wire the HUD SYNCHRONOUSLY: this function runs during battlefield _ready,
+	# long after main.tscn's HUD entered the tree, so HUDLayer/HUD are already
+	# addressable and their @onready vars are resolved — HUD.setup() creates
+	# SkillButton1..12 and the health bars BEFORE begin_battle's deferred flush
+	# below. The teardown's clear_battle_refs() already ran in _do_swap before
+	# this scene was instantiated, so no post-wire clear can race it. If the HUD
+	# is somehow unreachable yet, fall back to the deferred wire (today's
+	# behaviour) so the buttons still appear in the same frame.
+	var wired: bool = _wire_hud(player_node, [enemy_node])
+	if not wired:
+		_wire_hud.call_deferred(player_node, [enemy_node])
+
+	# Kick off round 1 deferred AFTER the wiring: Godot's MessageQueue flushes
+	# call_deferred FIFO within the same frame, so HUD.setup() (buttons + signal
+	# listeners) runs BEFORE round_started / turn_started fire — the same
+	# ordering the tutorial path has (HUD wired, then battle starts).
+	# begin_battle() self-guards (phase IDLE + non-empty roster), so the
+	# profile-null early return and any stray scene load can never reach the
+	# empty-round stall guard.
 	CombatManager.begin_battle.call_deferred()
 
 
@@ -835,7 +854,11 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 # ---------------------------------------------------------------------------
 
 ## Find the HUD CanvasLayer and call its setup method with player and enemies.
-func _wire_hud(player: Node, enemies: Array[Node]) -> void:
+## Returns true iff a HUD target was found and target.setup(player, enemies)
+## was actually called — the encounter path uses this to choose between the
+## synchronous wire and the deferred fallback. The tutorial call site ignores
+## the return value (call_deferred discards it), so its behaviour is unchanged.
+func _wire_hud(player: Node, enemies: Array[Node]) -> bool:
 	# The HUD is on its own CanvasLayer in the main scene. Since battlefield
 	# is instanced into main, we walk up to the parent (Main) which has
 	# HUDLayer as a direct child.
@@ -858,6 +881,8 @@ func _wire_hud(player: Node, enemies: Array[Node]) -> void:
 
 	if target != null and target.has_method("setup"):
 		target.setup(player, enemies)
+		return true
+	return false
 
 
 ## Recursively search for a CanvasLayer named "HUDLayer" in the scene tree.
