@@ -94,10 +94,11 @@ Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decide
 Every art exposes `get_fa_hui_du(unit)` — the **real 甲乙丙丁 prerequisite cascade** (design/10_systems.md §3–§4), interval 0.6~1.3:
 
 1. `unit == null` → the art's flat `fa_hui_du` field (pre-cascade default).
-2. `unit.staged_values` → the flat field, **never recomputed** — the tutorial battle marks all six units `staged_values = true`, so its protected 编排数值 1.3 stays byte-identical (no "fixing" of balanced tutorial numbers).
-3. Otherwise: `missing` = count of lower-grade prerequisite slots in the same school with no mastered art (甲 needs 乙丙丁, 乙 needs 丙丁, 丙 needs 丁, 丁 needs none); `base = [1.0, 0.85, 0.7, 0.6][missing]`; if `base < 1.0` return it (prerequisites incomplete → no attribute bonus); else return `1.0 + 0.1 × min(same-attribute mastered arts, 3)`.
+2. Otherwise: `missing` = count of lower-grade prerequisite slots in the same school with no mastered art (甲 needs 乙丙丁, 乙 needs 丙丁, 丙 needs 丁, 丁 needs none); `base = [1.0, 0.85, 0.7, 0.6][missing]`; if `base < 1.0` return it (prerequisites incomplete → no attribute bonus); else return `1.0 + 0.1 × min(same-attribute mastered arts, 3)`.
 
-`GongfaData` also carries a `mastered` flag, and `CharacterData` carries the `staged_values` marker. `scripts/data/battle_setup.gd` builds progression-side `CharacterData` from a `PlayerProfile` (staged_values=false) via the design §7 formulas: 气血 = 根骨×5, 内力值 = 内力×2, 移动力 = 2+floor(身法/20), 先攻 = 身法, 普攻 = 10+根骨, range 1 (melee school) / 2 (唐门/暗器).
+The pure cascade is the ONLY path — there is no 特判 bypass. The tutorial battle's protected 编排数值 1.3 comes out of this same cascade: `TutorialFillers.fill()` (scripts/data/tutorial_fillers.gd) populates each tutorial unit with real mastered filler arts (missing lower-grade same-school slots + same-attribute arts), so every art's prerequisites are genuinely complete and the cascade computes exactly 1.3 for all eight skill buttons.
+
+`GongfaData` also carries a `mastered` flag, and `CharacterData` carries the battle-side `traits` array. `scripts/data/battle_setup.gd` builds progression-side `CharacterData` from a `PlayerProfile` via the design §7 formulas: 气血 = 根骨×5, 内力值 = 内力×2, 移动力 = 2+floor(身法/20), 先攻 = 身法, 普攻 = 10+根骨, range 1 (melee school) / 2 (唐门/暗器); profile traits are copied onto the CharacterData and only the top 2 (or top 3 with 左右互搏) external arts by grade rank are equipped.
 
 ## HUD
 

@@ -229,7 +229,8 @@ static func _test_internal_cascade(ok: bool) -> bool:
 
 static func _test_defaults(ok: bool) -> bool:
 	var cd = CharacterData.new()
-	ok = _expect(ok, cd.staged_values == false, "CharacterData.staged_values default false")
+	ok = _expect(ok, cd.traits == [], "CharacterData.traits default empty")
+	ok = _expect(ok, not "staged_values" in cd, "CharacterData has no staged_values property")
 	var g = GongfaData.new()
 	ok = _expect(ok, g.mastered == false, "GongfaData.mastered default false")
 	return ok
@@ -271,11 +272,10 @@ static func _gongfa(grade: String, school: String, attribute: String,
 
 
 ## Build a CharacterData unit with the given internal/external arts arrays.
-static func _unit(internal: Array, external: Array, staged: bool = false) -> Resource:
+static func _unit(internal: Array, external: Array) -> Resource:
 	var cd = CharacterData.new()
 	cd.internal_arts = internal
 	cd.external_arts = external
-	cd.staged_values = staged
 	return cd
 
 

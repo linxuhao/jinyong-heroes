@@ -185,8 +185,6 @@ static func _test_tutorial_fillers(ok: bool) -> bool:
 		if str(art.kind) != "internal":
 			int_ok = false
 	ok = _expect(ok, int_ok, "all internal_arts are internal-kind")
-	# staged_values untouched.
-	ok = _expect(ok, unit.staged_values == false, "staged_values stays false")
 	# Fixpoint: a second fill appends nothing.
 	TutorialFillers.fill(unit)
 	var internal_after: int = unit.internal_arts.size()

@@ -43,6 +43,11 @@ static func run() -> bool:
 	ok = _test_consts(ok)
 	ok = _test_unknown(ok)
 	ok = _test_fresh_instances(ok)
+	ok = _test_a_tables(ok)
+	ok = _test_a_pool(ok)
+	ok = _test_external_a_rows(ok)
+	ok = _test_internal_a_rows(ok)
+	ok = _test_a_lookup(ok)
 	if ok:
 		print("PASS test_progression_gongfa_data")
 	else:
@@ -74,8 +79,10 @@ static func _test_ids(ok: bool) -> bool:
 	# art_by_id round-trips every generated id
 	for id in ids:
 		ok = _expect(ok, ProgressionGongfaData.art_by_id(id) != null, "art_by_id round-trip " + id)
-	# unknown grade / kind -> ""
-	ok = _expect(ok, ProgressionGongfaData.art_id("shaolin", "internal", "A") == "", "art_id grade A -> ''")
+	# A-grade ids generate for both kinds; the internal one resolves, the
+	# generated external one does not (see _test_a_pool).
+	ok = _expect(ok, ProgressionGongfaData.art_id("shaolin", "internal", "A") == "shaolin_yijin_a", "art_id internal A")
+	ok = _expect(ok, ProgressionGongfaData.art_id("shaolin", "external", "A") == "shaolin_luohan_a", "art_id external A (generated)")
 	ok = _expect(ok, ProgressionGongfaData.art_id("shaolin", "nope", "D") == "", "art_id bad kind -> ''")
 	return ok
 
@@ -130,7 +137,7 @@ static func _test_techniques(ok: bool) -> bool:
 
 
 static func _test_consts(ok: bool) -> bool:
-	ok = _expect(ok, ProgressionGongfaData.PRACTICE_TO_MASTER == {"D": 4, "C": 6, "B": 8}, "PRACTICE_TO_MASTER 丁4/丙6/乙8")
+	ok = _expect(ok, ProgressionGongfaData.PRACTICE_TO_MASTER == {"D": 4, "C": 6, "B": 8, "A": 10}, "PRACTICE_TO_MASTER 丁4/丙6/乙8/甲10")
 	ok = _expect(ok, ProgressionGongfaData.GRADE_BY_YEAR == ["D", "C", "B"], "GRADE_BY_YEAR")
 	ok = _expect(ok, ProgressionGongfaData.display_name_of("shaolin_yijin_d") == "易筋经·入门", "display_name_of 丁 internal")
 	ok = _expect(ok, ProgressionGongfaData.display_name_of("shaolin_luohan_c") == "罗汉拳·精进", "display_name_of 丙 external")
@@ -157,6 +164,104 @@ static func _test_fresh_instances(ok: bool) -> bool:
 	var e2 = ProgressionGongfaData.external_art("shaolin", "C")
 	var t2 = e2.techniques[0]
 	ok = _expect(ok, t2.damage == 22, "technique stubs fresh")
+	return ok
+
+
+## --- A-grade tables ----------------------------------------------------------
+
+static func _test_a_tables(ok: bool) -> bool:
+	ok = _expect(ok, ProgressionGongfaData.GRADE_SUFFIX["A"] == "a", "GRADE_SUFFIX A -> a")
+	ok = _expect(ok, ProgressionGongfaData.GRADE_STEP["A"] == "圆满", "GRADE_STEP A -> 圆满")
+	ok = _expect(ok, ProgressionGongfaData.PRACTICE_TO_MASTER["A"] == 10, "PRACTICE_TO_MASTER A == 10")
+	ok = _expect(ok, ProgressionGongfaData.TECHNIQUE_COUNT["A"] == 4, "TECHNIQUE_COUNT A == 4")
+	ok = _expect(ok, ProgressionGongfaData.TECHNIQUE_DAMAGE["A"] == 30, "TECHNIQUE_DAMAGE A == 30")
+	ok = _expect(ok, ProgressionGongfaData.GRADE_BY_YEAR == ["D", "C", "B"],
+		"year ladder still tops at 乙")
+	return ok
+
+
+## --- A pool: 9 ids, fixed order, all resolve ---------------------------------
+
+static func _test_a_pool(ok: bool) -> bool:
+	var pool: Array = ProgressionGongfaData.a_pool()
+	var expected: Array = [
+		"a_sword", "a_palm", "a_polearm", "a_dart",
+		"shaolin_yijin_a", "wudang_chunyang_a", "gaibang_huntian_a",
+		"emei_jiuyang_a", "tangmen_xinfa_a",
+	]
+	ok = _expect(ok, pool.size() == 9, "a_pool size 9")
+	ok = _expect(ok, pool == expected, "a_pool fixed order")
+	for id in pool:
+		ok = _expect(ok, ProgressionGongfaData.art_by_id(id) != null, "a_pool id resolves " + id)
+	ok = _expect(ok, ProgressionGongfaData.art_by_id("shaolin_luohan_a") == null,
+		"generated external A not resolvable")
+	ok = _expect(ok, ProgressionGongfaData.external_art("shaolin", "A") == null,
+		"external_art A -> null (guard)")
+	ok = _expect(ok, ProgressionGongfaData.internal_art("shaolin", "A") != null,
+		"internal_art A resolves")
+	return ok
+
+
+## --- external A rows: 4 techniques, one finisher, 绝招 prefix, attr guard -----
+
+static func _test_external_a_rows(ok: bool) -> bool:
+	# Feeding sect-line attributes per school (design §4.3): the external A
+	# attribute must NOT equal the lines that feed it (sword 柔/阴, palm 刚,
+	# polearm 阳, dart 柔).
+	var feeding := {"sword": ["柔", "阴"], "palm": ["刚"], "polearm": ["阳"], "dart": ["柔"]}
+	for row_id in ["a_sword", "a_palm", "a_polearm", "a_dart"]:
+		var art = ProgressionGongfaData.art_by_id(row_id)
+		ok = _expect(ok, art != null, "external A resolves " + row_id)
+		if art == null:
+			continue
+		var techs: Array = art.techniques
+		ok = _expect(ok, techs.size() == 4, "external A has 4 techniques " + row_id)
+		var finishers := 0
+		var prefix_ok := true
+		for t in techs:
+			if t.is_finisher:
+				finishers += 1
+				if not (t.skill_name as String).begins_with("绝招"):
+					prefix_ok = false
+		ok = _expect(ok, finishers == 1, "exactly one finisher " + row_id)
+		ok = _expect(ok, prefix_ok, "finisher name begins with 绝招 " + row_id)
+		var attr: String = art.attribute
+		ok = _expect(ok, not (feeding[art.school] as Array).has(attr),
+			"external A attr " + attr + " not in feeding line " + row_id)
+	return ok
+
+
+## --- internal A rows: attribute == sect line, name = base + ·圆满 ---------------
+
+static func _test_internal_a_rows(ok: bool) -> bool:
+	for sect_id in SECT_IDS:
+		var art = ProgressionGongfaData.internal_art(sect_id, "A")
+		ok = _expect(ok, art != null, "internal A non-null " + sect_id)
+		if art == null:
+			continue
+		ok = _expect(ok, art.attribute == INTERNAL_ATTR[sect_id],
+			"internal A attr == sect line " + sect_id)
+		ok = _expect(ok, art.gongfa_name == INTERNAL_BASE[sect_id] + "·圆满",
+			"internal A name base+·圆满 " + sect_id)
+		ok = _expect(ok, art.techniques.is_empty(), "internal A data-only " + sect_id)
+		ok = _expect(ok, art.energy_provided == 0, "internal A energy 0 " + sect_id)
+	return ok
+
+
+## --- a_art_for_school / a_art_for_sect / display_name_of -----------------------
+
+static func _test_a_lookup(ok: bool) -> bool:
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_school("sword").gongfa_name == "独孤九剑", "a_art_for_school sword")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_school("palm").gongfa_name == "降龙十八掌", "a_art_for_school palm")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_school("polearm").gongfa_name == "杨家枪法", "a_art_for_school polearm")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_school("dart").gongfa_name == "小李飞刀", "a_art_for_school dart")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_school("nope") == null, "a_art_for_school unknown -> null")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_school("internal") == null, "a_art_for_school internal -> null")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_sect("shaolin").gongfa_name == "易筋经·圆满", "a_art_for_sect shaolin")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_sect("tangmen").gongfa_name == "唐门心法·圆满", "a_art_for_sect tangmen")
+	ok = _expect(ok, ProgressionGongfaData.a_art_for_sect("nope") == null, "a_art_for_sect unknown -> null")
+	ok = _expect(ok, ProgressionGongfaData.display_name_of("a_sword") == "独孤九剑", "display_name_of external A")
+	ok = _expect(ok, ProgressionGongfaData.display_name_of("shaolin_yijin_a") == "易筋经·圆满", "display_name_of internal A")
 	return ok
 
 
