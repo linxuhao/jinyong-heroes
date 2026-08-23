@@ -33,6 +33,7 @@ var last_error: String = ""
 ## GameManager state -> scene key.
 const SCENE_MAP: Dictionary = {
 	"TUTORIAL": "battlefield",
+	"BATTLE": "battlefield",
 	"TRANSITION": "transition",
 	"CHARACTER_CREATION": "creation",
 	"SECT_SELECTION": "sect_select",
