@@ -33,10 +33,14 @@ ending, per `design/40_progression.md` (decided-but-unbuilt) and the Step-1 SOTA
    3000-frame cap, using unbound DEBUG input actions (SOTA edge case 2).
 
 **Hard constraints honored (from SOTA + prior-run knowledge):**
-- The 11 existing scenarios in `playtest_spec.yaml` are **untouched** and must stay green.
-  That pins the tutorial battle's observable values: `GameManager.current_state == "WON"` at
-  frame 2999 (terminal scenario), `fahui_text == "OVERDRIVE x1.3"`, `name_text == "Yang Guo"`,
-  skill buttons without `…`, `RoundIndicator.active_text` ending in `"Act ✓"`, `bar_width <= 64`.
+- The 11 existing scenarios in `playtest_spec.yaml` keep their names, timelines, key presses
+  and all eleven internal-name assertions (`CombatManager.active_unit_name`, `turn_order`,
+  `turn_log`, `last_turn_actor`) **byte-identical**, and must stay green. Exactly four
+  display-text assertion sites are edited in the same task as the §2.1 translation (never
+  separately), and one CJK-presence assertion is added (§9). Pinned observable values:
+  `GameManager.current_state == "WON"` at frame 2999 (terminal scenario),
+  `fahui_text == "发挥 ×1.3"`, `name_text == "杨过"`, skill buttons without `…`,
+  `RoundIndicator.active_text` ending in `"行动 ✓"`, `bar_width <= 64`.
 - Freed-object crash hardening: autoloads never hold long-lived direct references to per-scene
   nodes; every access is `is_instance_valid()`/`get_node_or_null()`; scene swaps defer
   `add_child` until the outgoing scene is freed (SOTA edge case 1).
@@ -60,16 +64,35 @@ listed in §12 so `5_design` can fold them into the archive after final verifica
 archive and the protected playtest conflict, the playtest wins for the tutorial battle only —
 documented in the two notes below.
 
-### 2.1 UI text language (explicit note for implementers)
-- **Segments 2–6 ship Chinese UI text** per `design/30_presentation.md` ("界面文字一律中文",
-  English abbreviations explicitly rejected). The global theme + Noto Sans SC make this
-  renderable; all new screens are laid out for CJK widths at font size 12.
-- **The tutorial battle keeps its existing English strings this run** (skill names, "Yang Guo",
-  "OVERDRIVE x1.3", overlay text). Reason: 11 protected playtest scenarios assert those exact
-  values, and retranslating the tutorial is out of this run's scope. This is a run-scope note,
-  **not** a design change; a future run may retranslate the tutorial together with its
-  playtest assertions.
-- All code identifiers, node names, signal names, comments, and this document are English.
+### 2.1 UI text language: identity vs display (binding note for implementers)
+`design/30_presentation.md` requires 界面文字一律中文 with no carve-out, and it already
+records the measured widths that make Chinese fit (重剑无锋 48 px vs `Heavy Edge` 64 px on a
+104 px button — Chinese is narrower than what it replaces). So **every rendered string ships
+in Chinese this run, tutorial battle included**: it is the first screen the player sees, and
+shipping it English while segments 2–6 are Chinese would invert the requirement exactly where
+it is most visible. The translation follows the identity/display seam this repo already uses
+(hud.gd's `_DISPLAY_ALIASES` comment: only the display layer is affected — character_name,
+node names, turn-order names stay canonical and unchanged):
+
+- **Identity stays English and is never touched.** Node names, `character_name`, skill ids,
+  signal names, state strings, file names, code identifiers and comments stay byte-identical.
+  The playtest's eleven internal-name assertions (`CombatManager.active_unit_name`,
+  `turn_order[...]`, `turn_log[...]`, `last_turn_actor`) read identities, never rendered
+  labels — they are **not** renamed; any task plan that edits them is wrong.
+- **Display becomes Chinese.** Only the rendered strings change, in the same task as their
+  assertion edits (never a separate task):
+
+  | Rendered site | Old value | New value |
+  |---|---|---|
+  | 8 skill button names (battlefield.gd `_skill()` display strings; skill ids untouched) | `Heavy Edge` … | 重剑无锋 / 大巧不工 / 力斩千钧 / 四海无量 / 心惊肉跳 / 拖泥带水 / 徘徊空谷 / 黯然销魂十七式 (design/20_content.md originals) |
+  | fahui tag on every skill button (skill_button.gd formatter + .tscn placeholder) | `OVERDRIVE x1.3` | `发挥 ×1.3` |
+  | 6 unit display names (new `CharacterData.display_name`, set in battlefield.gd beside `character_name`, which stays English) | `Yang Guo`, `East Heretic`, `West Poison`, `South Emperor`, `North Beggar`, `Central Divine` | 杨过 / 黄药师 / 欧阳锋 / 段智兴 / 洪七公 / 王重阳 |
+  | HealthBar name label (hud.gd `_DISPLAY_ALIASES` values → `display_name`) | `Yang Guo`, `E. Heretic`, … | 杨过 / 黄药师 / … |
+  | RoundIndicator labels (round_indicator.gd) | `Active: Yang Guo · Move 4 · Act ✓`, `Round N`, `Order: <aliases>` | `行动: 杨过 · 移动 4 · 行动 ✓/结束`, `回合 N`, `顺序: <Chinese display names>` |
+  | tutorial overlay text (tutorial_manager.gd steps + tutorial_overlay.tscn button labels) | current English step text, `Next ▶`, `Skip Tutorial` | Chinese, same meaning (implementer translates); `继续 ▶` / `跳过教程` |
+
+This is a run-scope correction, not a design change — `design/30_presentation.md` already
+required it, so nothing goes into `99_changelog.md` for it.
 
 ### 2.2 Architecture-decided numbers (new decisions, for `5_design`)
 | Topic | Decision (this design) |
@@ -174,7 +197,7 @@ New GameManager API:
 - `request_continue()` / `request_retry()` — called from `_unhandled_input` on WON/LOST
 - `restart_game()` — clears battle refs, resets SaveManager, reloads tutorial battle
 - `clear_battle()` — nulls `_player`, clears `enemies_alive`, frees the end overlay
-- `_show_end_game_overlay()` gains a hint line ("Press Enter to continue" / retry wording) —
+- `_show_end_game_overlay()` gains a hint line (按回车继续 / 按回车重试 — Chinese per §2.1) —
   no existing assert reads overlay text, so this is safe.
 
 ---
@@ -265,7 +288,9 @@ button math from the archive holds at size 12).
   at y=11, `NameLabel` 64×9 above it (font 10); keep the existing `expand_margin_all(3)` track
   (already implemented — do not regress to content_margin); offset so the widget floats above
   the sprite without covering it (`screen_pos + (-34, -28)`). Expose `total_height: float` on
-  the surface; keep `bar_width <= 64`, `name_text`, `fill_color`, `follow_delta` untouched.
+  the surface; keep `bar_width <= 64`, the `name_text` surface variable, `fill_color`,
+  `follow_delta` untouched (the tutorial's rendered `name_text` value becomes the unit's
+  Chinese display name 杨过, per §2.1).
 
 ### C6. Segment scenes (NEW — all keyboard-drivable, no mouse required)
 All segment roots are `Control` FULL_RECT named exactly as the surface key. Input via
@@ -397,7 +422,7 @@ crash. Saving is refused while `SceneManager.pending_swap` or outside stable sta
 
 ---
 
-## 8. Content tables (thin but real; Chinese UI text for segments 2–6)
+## 8. Content tables (thin but real; all UI text Chinese per §2.1)
 
 ### 8.5 Card pools (ids → effects; effects apply immediately)
 - **economy (12):** `eco_20`×4 +20银, `eco_50`×3 +50银, `eco_100`×2 +100银, `eco_trade_1..3`
@@ -441,8 +466,22 @@ the implementer from these titles; the tier id is the asserted value).
 
 ## 9. Playtest contract (`playtest_spec.yaml`)
 
-**Preserved verbatim:** all 11 existing scenarios and every existing `surface` line.
-**Additive changes only:**
+**Preserved:** all 11 existing scenario names, timelines, key presses, and every existing
+`surface` line. The eleven internal-name assertions (`CombatManager.active_unit_name`,
+`turn_order[...]`, `turn_log[...]`, `last_turn_actor`) stay **byte-identical**.
+**Assertion edits (exactly these, in the same task as the §2.1 string changes):**
+
+- The four display-text sites: `SkillButton1..8.fahui_text == "OVERDRIVE x1.3"` →
+  `"发挥 ×1.3"` (8 lines, one string); `RoundIndicator.active_actor == "Yang Guo"` →
+  `"杨过"`; `HealthBar.name_text == "Yang Guo"` → `"杨过"`; the ActiveLine substring check
+  → its Chinese equivalent (contains `"移动"`, ends with `"行动 ✓"`).
+- **One added CJK-presence assertion** (the contract currently lacks one; without it a
+  silent revert to English passes every check in the file): in a tutorial scenario after the
+  battlefield is live, assert a rendered label contains a CJK character — concrete form
+  `SkillButton1.fahui_text.contains("发挥") == true` (PM may use the equivalent
+  `contains("杨")` check on `HealthBar.name_text`; place it at a frame where the label exists).
+
+**Additive changes:**
 
 1. `actions:` add `debug_fast_forward`, `debug_win_tutorial`, `debug_lose_tutorial` —
    defined in `project.godot [input]` with **empty event lists** (SOTA edge case 12: no
@@ -510,15 +549,28 @@ the implementer from these titles; the tier id is the asserted value).
 - `scripts/autoload/game_manager.gd` — FSM extension, battle context, WON/LOST input, clear_battle
 - `scripts/autoload/combat_manager.gd` — `reset_battle()`, `debug_wipe_enemies()`, `debug_kill_player()`
 - `scripts/autoload/grid_manager.gd` — `clear_grid()`
-- `scripts/ui/hud.gd` — `clear_battle_refs()`, visibility toggling
+- `scripts/ui/hud.gd` — `clear_battle_refs()`, visibility toggling, `_DISPLAY_ALIASES`
+  values → Chinese display names (§2.1)
 - `scripts/ui/health_bar.gd` + `scenes/ui/health_bar.tscn` — compact 68×20 layout, `total_height`
 - `scripts/data/gongfa_data.gd` — `mastered` field + real cascade `get_fa_hui_du`
-- `scripts/data/character_data.gd` — `staged_values` flag (编排数值 marker)
-- `playtest_spec.yaml` — additive surface/actions/scenarios (§9; protected lines untouched)
+- `scripts/data/character_data.gd` — `staged_values` flag (编排数值 marker) + `display_name`
+  (rendered Chinese name; `character_name` stays English, §2.1)
+- `scripts/battlefield.gd` — 6 units' `display_name` values (Chinese) + 8 skill display
+  strings → Chinese (skill ids untouched, §2.1)
+- `scripts/ui/skill_button.gd` + `scenes/ui/skill_button.tscn` — fahui formatter/placeholder
+  → `发挥 ×1.3` (§2.1)
+- `scripts/ui/round_indicator.gd` — active-actor + `回合/行动/移动/顺序` labels → Chinese (§2.1)
+- `scripts/autoload/tutorial_manager.gd` + `scenes/ui/tutorial_overlay.tscn` — overlay text
+  and button labels → Chinese (§2.1)
+- `playtest_spec.yaml` — the four display-text assertion edits + one CJK-presence assertion
+  (§9), plus additive surface/actions/scenarios
 - `README.md` — new flow, controls, debug actions, save locations
 
-**NOT modified:** all AI scripts, `player.gd`/`enemy.gd` combat logic, tutorial content,
-the 11 protected scenarios, all existing asset files.
+**NOT modified:** all AI scripts, `player.gd`/`enemy.gd` combat logic, the tutorial's
+combat content and all internal names (only rendered tutorial text is translated, §2.1), all
+existing asset files. The 11 protected scenarios keep their timelines, key presses and
+internal-name assertions; only the four display-text sites and the one added CJK assertion
+(§9) change.
 
 **Assets:** no new art/audio this run (design/40_progression.md §0: no art/audio/animation
 polish; thin segments use themed built-in controls + the existing `summit.png` backdrop for
