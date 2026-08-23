@@ -35,14 +35,14 @@ surface:
   HUD: [visible, size, skill8_right_edge, round_pause_overlap]
   RoundIndicator: [visible, current_round, active_actor, order_names, active_text]
   SkillBar: [visible, size, global_position]
-  SkillButton1: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton2: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton3: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton4: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton5: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton6: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
-  SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
+  SkillButton1: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton2: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton3: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton4: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton5: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton6: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
   PauseButton: [visible, global_position]
   HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height]
   Battlefield: [board_aligned, grid_lines_visible]
@@ -452,3 +452,38 @@ scenarios:
         assert:
           HealthBar.follow_delta: 'follow_delta <= 24'
           HealthBar.global_position: "changed"
+
+  - name: skill_button_visual_states
+    description: "The four skill-button states render pairwise-distinct visuals: at frame 30 buttons 5-8 show the Chinese phase-locked tag 锁定 while button 1 is ready (no tag); after Heavy Edge's cast (frame 65) button 1 shows the cooldown round number 1 and a visible overlay; at the player's next turn start (frame 500) it is ready again — no tag, no number, no overlay. Frame numbers mirror skill_button_turn_overlay."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [move_up] }
+      - at: 30
+        actions: []
+        assert:
+          SkillButton5.state_tag_text: 'state_tag_text == "锁定"'
+          SkillButton1.state_tag_text: 'state_tag_text == ""'
+      - { at: 35, actions: [move_up] }
+      - { at: 50, actions: [move_up] }
+      - { at: 65, actions: [skill_1] }
+      - { at: 80, actions: [basic_attack] }
+      - at: 120
+        actions: []
+        assert:
+          SkillButton1.state_text: 'state_text == "cooldown"'
+          SkillButton1.cooldown_label_text: 'cooldown_label_text == "1"'
+          SkillButton1.overlay_visible: 'overlay_visible == true'
+      - { at: 130, actions: [end_turn] }
+      - at: 500
+        actions: []
+        assert:
+          CombatManager.current_round: 2
+          SkillButton1.state_text: 'state_text == "ready"'
+          SkillButton1.cooldown_label_text: 'cooldown_label_text == ""'
+          SkillButton1.overlay_visible: 'overlay_visible == false'

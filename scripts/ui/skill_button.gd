@@ -7,6 +7,9 @@ extends Button
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
 
+## Gold border color applied to the selected button's stylebox(es).
+const SELECTED_BORDER_COLOR := Color(1.0, 0.84, 0.0, 1.0)
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -50,8 +53,22 @@ var overlay_visible: bool = false
 ## frame by the HUD; drives the golden selected border (已选中 state).
 var selected: bool = false
 
+## Observable: rendered StateTag text ("" | "锁定" | "气血"). Written by
+## _apply_state; never assigned elsewhere.
+var state_tag_text: String = ""
+
+## Observable: rendered CooldownLabel text ("" when not on cooldown).
+## Written by _apply_state's cooldown branch: str(cooldown_remaining).
+var cooldown_label_text: String = ""
+
 ## Reference to the SkillData resource for this button.
 var _skill_data = null
+
+## Cached per-state StyleBoxFlat instances (one per state), keyed by state
+## string. _apply_state runs EVERY frame for 8 buttons, so the boxes are
+## allocated once per state and only border_color mutates in place (selected
+## flips) — never StyleBoxFlat.new() per frame per button.
+var _state_styleboxes: Dictionary = {}
 
 # ---------------------------------------------------------------------------
 # Node references
@@ -166,60 +183,138 @@ func update_cooldown(remaining: int, total: int) -> void:
 		overlay.anchor_bottom = 1.0
 
 
+## Pure per-state palette for the four skill-button states (testable without
+## a scene). Returns a Dictionary:
+##   { "bg_color": Color, "border_color": Color, "border_width": int,
+##     "tag_text": String }
+## Contract values (design/30_presentation.md item 2 — pairwise distinct):
+##   ready:        bg (0.20,0.24,0.30) border (0.35,0.40,0.48) w1 tag ""
+##   cooldown:     bg (0.16,0.16,0.20) border (0.42,0.42,0.46) w1 tag ""
+##   phase_locked: bg (0.32,0.32,0.34) border (0.55,0.55,0.58) w2 tag "锁定"
+##   hp_gated:     bg (0.40,0.12,0.12) border (0.75,0.25,0.25) w2 tag "气血"
+## Unknown state -> ready palette.
+static func state_palette(state: String) -> Dictionary:
+	match state:
+		"cooldown":
+			return {
+				"bg_color": Color(0.16, 0.16, 0.20),
+				"border_color": Color(0.42, 0.42, 0.46),
+				"border_width": 1,
+				"tag_text": "",
+			}
+		"phase_locked":
+			return {
+				"bg_color": Color(0.32, 0.32, 0.34),
+				"border_color": Color(0.55, 0.55, 0.58),
+				"border_width": 2,
+				"tag_text": "锁定",
+			}
+		"hp_gated":
+			return {
+				"bg_color": Color(0.40, 0.12, 0.12),
+				"border_color": Color(0.75, 0.25, 0.25),
+				"border_width": 2,
+				"tag_text": "气血",
+			}
+		_:
+			return {
+				"bg_color": Color(0.20, 0.24, 0.30),
+				"border_color": Color(0.35, 0.40, 0.48),
+				"border_width": 1,
+				"tag_text": "",
+			}
+
+
+## Cached StyleBoxFlat for a state — allocated once per state, never per frame
+## per button. border_color is mutated in place when `selected` flips; nothing
+## else changes after creation.
+func _stylebox_for(state: String) -> StyleBoxFlat:
+	if _state_styleboxes.has(state):
+		return _state_styleboxes[state]
+	var palette: Dictionary = state_palette(state)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = palette["bg_color"]
+	sb.border_color = palette["border_color"]
+	sb.set_border_width_all(int(palette["border_width"]))
+	sb.set_corner_radius_all(3)
+	_state_styleboxes[state] = sb
+	return sb
+
+
 ## Apply the four-state visual presentation for this button. The state data
 ## (state_text / cooldown_remaining / selected) is derived and written EVERY
 ## frame by the HUD; this function only turns that data into visuals. The four
 ## states are pairwise distinguishable (design/30_presentation.md item 2):
-##   ready        -> default style, full modulate, no tag, no number
-##   cooldown     -> slight desaturation + remaining-rounds NUMBER over the
+##   ready        -> neutral blue-gray fill, thin border, no tag, no number
+##   cooldown     -> dark desaturated fill + remaining-rounds NUMBER over the
 ##                   existing dark top-fill overlay (the overlay itself is
 ##                   driven by update_cooldown, untouched here)
-##   phase_locked -> gray tint + "LOCKED" tag
-##   hp_gated     -> red tint + "HP" tag
+##   phase_locked -> light gray fill + 2px border + 锁定 tag
+##   hp_gated     -> dark red fill + 2px red border + 气血 tag
 ## The golden selected border (已选中) is layered on top of any state and never
-## changes state_text.
+## changes state_text. `modulate` is NOT used (theme stylebox overrides
+## restyle the button) and `disabled` is never touched (HUD-owned).
 func _apply_state(state: String) -> void:
-	# Ready: default appearance, full modulate.
-	if state == "ready":
-		modulate = Color(1, 1, 1, 1)
-		if _cooldown_label != null:
-			_cooldown_label.visible = false
-		if _state_tag != null:
-			_state_tag.text = ""
-	# Cooldown: slight desaturation + remaining-rounds number over the overlay.
-	elif state == "cooldown":
-		modulate = Color(0.78, 0.78, 0.82, 1.0)
-		if _cooldown_label != null:
-			_cooldown_label.visible = true
-			_cooldown_label.text = str(cooldown_remaining)
-		if _state_tag != null:
-			_state_tag.text = ""
-	# Phase lock (palm arts locked before round 4): gray tint + LOCKED tag.
-	elif state == "phase_locked":
-		modulate = Color(0.55, 0.55, 0.6)
-		if _state_tag != null:
-			_state_tag.text = "LOCKED"
-		if _cooldown_label != null:
-			_cooldown_label.visible = false
-	# HP gate (Seventeen Forms above 50% max health): red tint + HP tag.
-	elif state == "hp_gated":
-		modulate = Color(0.85, 0.4, 0.4)
-		if _state_tag != null:
-			_state_tag.text = "HP"
-		if _cooldown_label != null:
-			_cooldown_label.visible = false
+	var palette: Dictionary = state_palette(state)
 
-	# Selected overlay: bright golden border via a "normal" StyleBoxFlat
-	# override, layered on top of the four states (a selected button is never
-	# disabled, so "normal" is the rendered stylebox).
-	if selected:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.22, 0.22, 0.26, 1.0)
-		sb.border_color = Color(1.0, 0.84, 0.0, 1.0)
-		sb.set_border_width_all(2)
-		add_theme_stylebox_override("normal", sb)
+	# Per-state StyleBoxFlat override applied to BOTH "normal" and "disabled":
+	# a disabled button (cooldown / phase_locked / hp_gated) renders the
+	# "disabled" stylebox, so the state styling must shadow both, or the flat
+	# default-theme gray wins. The cached box is shared; only border_color
+	# mutates (gold when selected, palette border otherwise).
+	var sb: StyleBoxFlat = _stylebox_for(state)
+	sb.border_color = SELECTED_BORDER_COLOR if selected else palette["border_color"]
+	add_theme_stylebox_override("normal", sb)
+	add_theme_stylebox_override("disabled", sb)
+
+	# Light text on every state's dark background — including the disabled
+	# font color, which a locked/cooling button would otherwise render in the
+	# theme's low-contrast gray.
+	var text_color := Color(0.92, 0.92, 0.92, 1.0)
+	add_theme_color_override("font_color", text_color)
+	add_theme_color_override("font_disabled_color", text_color)
+	add_theme_color_override("font_hover_color", text_color)
+	add_theme_color_override("font_pressed_color", text_color)
+	add_theme_color_override("font_focus_color", text_color)
+
+	# Chinese state tag (界面文字一律中文): 锁定 / 气血, "" for ready/cooldown.
+	state_tag_text = palette["tag_text"]
+	var state_tag: Label = _state_tag
+	if state_tag == null:
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
+		state_tag = get_node_or_null("StateTag") as Label
+		if state_tag != null:
+			_state_tag = state_tag
+	if state_tag != null:
+		state_tag.text = state_tag_text
+
+	# Cooldown: big remaining-rounds number over the overlay. Ready and the
+	# locked states hide the number (the HUD's phase_locked > cooldown
+	# priority means a locked button never needs the number visible).
+	if state == "cooldown":
+		cooldown_label_text = str(cooldown_remaining)
+		var cooldown_label: Label = _cooldown_label
+		if cooldown_label == null:
+			# Safe: get_node_or_null re-resolves the path each call; null for
+			# freed nodes — never a freed-object cast.
+			cooldown_label = get_node_or_null("CooldownLabel") as Label
+			if cooldown_label != null:
+				_cooldown_label = cooldown_label
+		if cooldown_label != null:
+			cooldown_label.visible = true
+			cooldown_label.text = cooldown_label_text
 	else:
-		remove_theme_stylebox_override("normal")
+		cooldown_label_text = ""
+		var cooldown_label: Label = _cooldown_label
+		if cooldown_label == null:
+			# Safe: get_node_or_null re-resolves the path each call; null for
+			# freed nodes — never a freed-object cast.
+			cooldown_label = get_node_or_null("CooldownLabel") as Label
+			if cooldown_label != null:
+				_cooldown_label = cooldown_label
+		if cooldown_label != null:
+			cooldown_label.visible = false
 
 # ---------------------------------------------------------------------------
 # Signal handling
