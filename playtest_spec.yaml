@@ -109,7 +109,7 @@ scenarios:
         actions: []
         assert:
           CombatManager.active_unit_name: 'active_unit_name == "Yang Guo"'
-          RoundIndicator.active_text: 'active_text.contains("行动")'
+          RoundIndicator.active_text: 'active_text.contains("行动") == true'
           Player.acted: 'acted == false'
 
   - name: enemy_acts_only_after_player_ends_turn
@@ -265,7 +265,7 @@ scenarios:
           CombatManager.current_round: 4
           CombatManager.phase: 'phase == "ENEMY_TURN"'
           CombatManager.active_unit_name: 'active_unit_name == "West Poison"'
-          Player.status_names: 'status_names.has("poison")'
+          Player.status_names: 'status_names.has("poison") == true'
           Player.health: 'health == 152'
       - at: 2000
         actions: []
@@ -1094,8 +1094,8 @@ scenarios:
         assert:
           CultivationScreen.year: 2
           CultivationScreen.sect_id: 'sect_id == "emei"'
-          CultivationScreen.gongfa_ids: 'gongfa_ids.has("emei_emeijian_c")'
-          CultivationScreen.gongfa_grades: 'gongfa_grades.has("C")'
+          CultivationScreen.gongfa_ids: 'gongfa_ids.has("emei_emeijian_c") == true'
+          CultivationScreen.gongfa_grades: 'gongfa_grades.has("C") == true'
           CultivationScreen.gongfa_count: "changed"
 
   - name: cultivation_changes_combat
@@ -1316,7 +1316,7 @@ scenarios:
           SkillButton9.global_position: 'global_position.y > SkillButton1.global_position.y'
           HUD.skill8_right_edge: 'skill8_right_edge <= 960'
           HUD.skill12_right_edge: 'skill12_right_edge <= 960'
-          Player.traits: 'traits.has("sha_po_lang")'
+          Player.traits: 'traits.has("sha_po_lang") == true'
           CombatManager.debug_lang_attack_mult: 'debug_lang_attack_mult == 1.0'
           Sparring_Partner.health: 60
           Player.grid_pos: 'grid_pos == Vector2i(7,5)'
