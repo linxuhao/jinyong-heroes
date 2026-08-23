@@ -167,7 +167,7 @@ func _render() -> void:
 				var def = _traits[i]
 				var marker: String = "▶" if i == trait_index else " "
 				var owned: String = "已选" if trait_ids.has(def.id) else ("+" + str(def.cost) if def.cost > 0 else str(def.cost))
-				text += "%s %s  %s  %s\n" % [marker, def.display_name, owned, def.hooks[0] if not def.hooks.is_empty() else ""]
+				text += "%s %s  %s  %s\n" % [marker, def.display_name, owned, ("先天" if def.cost > 0 else "缺陷")]
 			text += "\n上下选择，回车切换，右键确认"
 		"CONFIRM":
 			text = "【确认】剩余点数 %d（可保留余点）\n\n" % points_left
