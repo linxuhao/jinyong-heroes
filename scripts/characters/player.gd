@@ -1,9 +1,10 @@
 ## Player — Yang Guo character controller (turn-based)
 ##
 ## Turn-based controller: per-turn budgets (moves_left / moved / acted),
-## round-valued int cooldowns, skill selection via hotkeys 1-8 (two-phase
-## unlock: palm arts 5-8 need round >= 4; Seventeen Forms additionally needs
-## HP below 50%), J to execute the selected skill at the nearest valid target
+## round-valued int cooldowns, skill selection via hotkeys 1-12 (two-phase
+## unlock is tutorial-only: palm arts 5-8 need round >= 4; Seventeen Forms
+## additionally needs HP below 50%), J to execute the selected skill at the
+## nearest valid target
 ## (else an adjacent basic attack), Space to end the turn, Escape to pause,
 ## and left-click enemy targeting. Actions go through
 ## CombatManager.execute_action() — the RTWP action queue is removed.
@@ -82,6 +83,12 @@ var team: int = 0
 
 ## Primary internal art's passive id (engine hooks: shen_diao_power, ...).
 var passive_id: String = ""
+
+## Trait ids carried into battle from the profile (playtest surface + trait
+## engine hooks: sha_po_lang / iron_shirt / swallow_lightness / ambidextrous).
+## Populated by battlefield.gd from character_data.traits (encounter battles;
+## empty in the tutorial).
+var traits: Array[String] = []
 
 ## True while a movement tween is playing. Blocks new input during animation.
 var is_moving: bool = false
@@ -173,8 +180,8 @@ func select_skill(index: int) -> void:
 func _skill_selectable(index: int) -> bool:
 	if index < 0 or index >= skills.size():
 		return false
-	if index >= 4 and CombatManager.current_round < 4:
-		return false  # Two-phase unlock: palm arts (5-8) appear at round 4+.
+	if CombatManager.tutorial_battle and index >= 4 and CombatManager.current_round < 4:
+		return false  # Two-phase unlock (tutorial-only): palm arts appear at round 4+.
 	if skill_cooldowns[index] > 0:
 		return false
 	var skill = skills[index]
@@ -347,6 +354,24 @@ func _try_move(direction: Vector2i) -> void:
 	# Validate walkability (in-bounds and not a border wall tile).
 	if not GridManager.is_walkable(target):
 		return
+
+	# 身轻如燕 (swallow_lightness): an occupied target tile can be SLID THROUGH
+	# when the trait is owned and the movement budget allows — consume 2 movement
+	# and land on the walkable, unoccupied tile beyond (never on the enemy tile).
+	# GridManager occupancy is updated only for the departure and landing tiles;
+	# the enemy tile's occupancy is untouched.
+	if GridManager.is_occupied(target) and traits.has("swallow_lightness") \
+			and moves_left >= 2:
+		var beyond: Vector2i = target + direction
+		if GridManager.is_walkable(beyond) and not GridManager.is_occupied(beyond):
+			moves_left -= 2
+			moved = true
+			is_moving = true
+			GridManager.move_unit(self, grid_pos, beyond)
+			grid_pos = beyond
+			var slide_tween: Tween = create_tween()
+			slide_tween.tween_callback(_on_move_completed).set_delay(MOVE_DURATION)
+			return
 
 	# Validate occupancy.
 	if GridManager.is_occupied(target):
