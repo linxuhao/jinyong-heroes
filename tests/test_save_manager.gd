@@ -53,6 +53,7 @@ func _test_all() -> bool:
 	ok = _test_trait_deck_excludes_owned(ok)
 	ok = _test_save_guard_and_atomic(ok)
 	ok = _test_roundtrip_continuity(ok)
+	ok = _test_snapshot_roundtrip_observability(ok)
 	ok = _test_bad_file_fallback(ok)
 	ok = _test_missing_file_no_wipe(ok)
 	ok = _test_delete_idempotent(ok)
@@ -209,7 +210,33 @@ func _test_roundtrip_continuity(ok: bool) -> bool:
 	return ok
 
 
-# --- criterion 9: corrupt file -> fallback, never crash -------------------------
+# --- criterion 8b: save/load snapshot observability -----------------------------
+
+func _test_snapshot_roundtrip_observability(ok: bool) -> bool:
+	var prev_state: String = _gm.current_state
+	_gm.current_state = "CULTIVATION"
+	_sm.new_profile({"bone": 13}, ["lone_bane"])
+	_sm.draw_cards(true)
+	ok = _expect(ok, _sm.save_slot(1), "save for snapshot observability")
+	ok = _expect(ok, _sm.snapshot_rng_state != 0, "snapshot_rng_state captured on save")
+	ok = _expect(ok, _sm.snapshot_profile_json == JSON.stringify(_sm.profile.to_dict()),
+		"snapshot_profile_json == profile.to_dict() at the save point")
+	ok = _expect(ok, _sm.snapshot_decks_string != "", "snapshot_decks_string captured on save")
+	# Mutation after the save point must NOT survive the reload (real save->load
+	# path, not a dict copy).
+	_sm.profile.set_attr("bone", 99)
+	_sm.draw_cards(true)
+	ok = _expect(ok, _sm.load_slot(1), "load_slot(1) succeeds")
+	ok = _expect(ok, _sm.loaded_profile_json == _sm.snapshot_profile_json,
+		"loaded_profile_json == snapshot_profile_json")
+	ok = _expect(ok, _sm.loaded_rng_state == _sm.snapshot_rng_state,
+		"loaded_rng_state == snapshot_rng_state")
+	ok = _expect(ok, _sm.loaded_decks_string == _sm.snapshot_decks_string,
+		"loaded_decks_string == snapshot_decks_string")
+	ok = _expect(ok, _sm.profile.get_attr("bone") == 13,
+		"profile restored to the save point (bone == 13)")
+	_gm.current_state = prev_state
+	return ok
 
 func _test_bad_file_fallback(ok: bool) -> bool:
 	var path := "user://save_2.json"

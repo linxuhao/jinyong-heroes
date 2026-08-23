@@ -40,6 +40,16 @@ var growth_left: int = 0
 var pow_left: int = 0
 var trait_left: int = 0
 var art_left: int = 0
+# Playtest roundtrip observability (step2_design C15): captured on every
+# SUCCESSFUL save_slot/load_slot so a harness can assert full save->load
+# equality. Failure paths leave all six untouched. Schema is unchanged —
+# these are surface reads of the same dicts, never persisted keys.
+var snapshot_profile_json: String = ""
+var snapshot_rng_state: int = 0
+var snapshot_decks_string: String = ""
+var loaded_profile_json: String = ""
+var loaded_rng_state: int = 0
+var loaded_decks_string: String = ""
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 
@@ -161,6 +171,14 @@ func save_slot(s: int) -> bool:
         return false
     _remove_file(bak)
 
+    # Surface snapshots from the exact dict that was written (steps 2/5 of the
+    # atomic write validated this state, so the end-of-function values are
+    # identical to the file contents). Success path only.
+    var saved := _build_save_dict()
+    snapshot_profile_json = JSON.stringify(saved["profile"])
+    snapshot_rng_state = saved["rng_state"] as int
+    snapshot_decks_string = _decks_string(saved["decks"] as Dictionary)
+
     slot = s
     has_save = true
     last_error = ""
@@ -192,6 +210,12 @@ func load_slot(s: int) -> bool:
     if not _apply_save_dict(parsed):
         _fallback_fresh_profile("bad_schema")
         return false
+    # Surface snapshots from the parsed file dict (success path only; the
+    # bad_json/bad_schema/bad_version fallbacks above leave them untouched).
+    var parsed_dict: Dictionary = parsed
+    loaded_profile_json = JSON.stringify(parsed_dict["profile"])
+    loaded_rng_state = parsed_dict["rng_state"] as int
+    loaded_decks_string = _decks_string(parsed_dict["decks"] as Dictionary)
     slot = s
     last_error = ""
     return true
@@ -363,6 +387,36 @@ func _decks_snapshot() -> Dictionary:
             "drawn": (pool["drawn"] as Array).duplicate(),
         }
     return out
+
+
+## Deterministic string form of a validated "decks" subtree for the playtest
+## surface: DECK_CATEGORIES order, per category "<cat>:<remaining joined by
+## ,>,<drawn joined by ,>", categories joined by ";". No Dictionary iteration
+## order is relied on. Godot 4 has no Array.join — String.join over a
+## PackedStringArray is used, with str() coercion so a hostile hand-edited save
+## can never crash the surface. Example:
+## {"economy":{"remaining":["a","b"],"drawn":["c"]},...} -> "economy:a,b,c;..."
+func _decks_string(decks_dict: Dictionary) -> String:
+    var parts: PackedStringArray = []
+    for cat in DECK_CATEGORIES:
+        var pool: Variant = decks_dict.get(cat, null)
+        var remaining_str := ""
+        var drawn_str := ""
+        if pool is Dictionary:
+            var p: Dictionary = pool
+            remaining_str = _join_ids(p.get("remaining", []))
+            drawn_str = _join_ids(p.get("drawn", []))
+        parts.append(cat + ":" + remaining_str + "," + drawn_str)
+    return ";".join(parts)
+
+
+## "a,b,c" for an Array of ids; "" for an empty or non-Array value.
+func _join_ids(v: Variant) -> String:
+    var out: PackedStringArray = []
+    if v is Array:
+        for item in v:
+            out.append(str(item))
+    return ",".join(out)
 
 
 ## Restore profile / rng / decks / segment from a validated save dict. Shared
