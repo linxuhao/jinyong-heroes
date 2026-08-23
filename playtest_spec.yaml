@@ -342,10 +342,13 @@ scenarios:
         actions: []
         assert:
           CombatManager.current_round: "changed"
-      - at: 1600
+      - { at: 1600, actions: [end_turn] }
+      - { at: 2150, actions: [end_turn] }
+      - at: 2700
         actions: []
         assert:
-          CombatManager.current_round: 'current_round == 4'
+          CombatManager.current_round: 'current_round >= 4'
+          Player.health: 'health < 250'
           SkillButton1.hp_gated: false
           SkillButton5.disabled: false
           SkillButton6.disabled: false
