@@ -215,7 +215,7 @@ scenarios:
           CombatManager.last_turn_actor: "changed"
 
   - name: fahui_du_multiplies_damage
-    description: "Heavy Edge 45 * 1.3 = round(58.5) = 59 damage, and all 8 buttons show OVERDRIVE x1.3."
+    description: "Heavy Edge 45 * 1.3 = round(58.5) = 59 damage, and all 8 buttons show 超常 ×1.3."
     timeline:
       - { at: 3, actions: [ui_accept] }
       - { at: 5, actions: [ui_accept] }
@@ -428,8 +428,8 @@ scenarios:
           HealthBar.fill_color: 'fill_color.g > 0.5 and fill_color.g > fill_color.r'
           HealthBar.name_text: 'name_text == "杨过"'
           # Active-actor line: during the player's round-1 turn (frame 30) the
-          # ActiveLine shows "Active: Yang Guo · Move 4 · Act ✓" — contains
-          # "Move" and ends with the mandated "Act ✓" (U+2713).
+          # ActiveLine shows "行动: 杨过 · 移动 4 · 行动 ✓" — contains
+          # "移动" and ends with the mandated "行动 ✓" (U+2713).
           RoundIndicator.active_text: 'active_text.contains("移动") and active_text.ends_with("行动 ✓")'
           # No-ellipsis sweep: none of the 8 skill buttons' text may contain
           # the ellipsis character U+2026 ("…").

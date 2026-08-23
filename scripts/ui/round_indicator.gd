@@ -54,7 +54,7 @@ func _token_for(name: String) -> String:
 	return _ORDER_TOKENS.get(name, name)
 
 ## Build the ActiveLabel text from CombatManager.active_unit_name + the
-## player's moves_left/acted. Null-safe pre-battle fallback "Active: <actor>"
+## player's moves_left/acted. Null-safe pre-battle fallback "行动: <actor>"
 ## only. "✓" (U+2713) is mandated verbatim by the task card; "·" (U+00B7) is
 ## Latin-1 and covered by the default font.
 func _active_text(actor: String) -> String:

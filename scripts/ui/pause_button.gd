@@ -11,9 +11,9 @@ func _ready() -> void:
 
 	# Sync initial text with CombatManager state.
 	if CombatManager.is_paused:
-		text = "▶ Unpause"
+		text = "▶ 继续"
 	else:
-		text = "⏸ Pause"
+		text = "⏸ 暂停"
 
 	# Connect to CombatManager signals for state changes.
 	if CombatManager.paused.is_connected(_on_paused):
@@ -36,9 +36,9 @@ func _on_toggle_pause() -> void:
 
 ## Update button text when paused.
 func _on_paused() -> void:
-	text = "▶ Unpause"
+	text = "▶ 继续"
 
 
 ## Update button text when unpaused.
 func _on_unpaused() -> void:
-	text = "⏸ Pause"
+	text = "⏸ 暂停"
