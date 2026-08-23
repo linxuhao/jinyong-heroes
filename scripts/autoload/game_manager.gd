@@ -31,12 +31,51 @@ signal continue_requested()
 ## fresh tutorial battle). SceneManager connects here to reload the battlefield.
 signal retry_requested()
 
+## Emitted by restart_game() after state_changed("TUTORIAL"). SceneManager
+## (sibling task) connects here to reload a fresh battlefield for the restarted
+## tutorial.
+signal restart_requested()
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
 
-## The current game state. One of "TUTORIAL", "BATTLE", "WON", "LOST".
-var current_state: String = "TUTORIAL"
+## State string constants. The playtest spec asserts these raw values verbatim
+## (GameManager.current_state == "WON" etc.) — never rename them.
+const STATE_TUTORIAL: String = "TUTORIAL"
+const STATE_BATTLE: String = "BATTLE"
+const STATE_WON: String = "WON"
+const STATE_LOST: String = "LOST"
+const STATE_TRANSITION: String = "TRANSITION"
+const STATE_CHARACTER_CREATION: String = "CHARACTER_CREATION"
+const STATE_SECT_SELECTION: String = "SECT_SELECTION"
+const STATE_CULTIVATION: String = "CULTIVATION"
+const STATE_MAP: String = "MAP"
+const STATE_ENDING: String = "ENDING"
+
+## enter_segment()'s validation domain: the six segment scenes only. The battle
+## states (TUTORIAL/BATTLE/WON/LOST) are reached through their own entry points
+## (start_battle / end_battle / request_retry / request_continue) and are
+## deliberately excluded.
+const SEGMENT_STATES: Array[String] = [
+	STATE_TRANSITION, STATE_CHARACTER_CREATION, STATE_SECT_SELECTION,
+	STATE_CULTIVATION, STATE_MAP, STATE_ENDING,
+]
+
+## Legal predecessor map for enter_segment() (design §4 table): each segment
+## state lists the single state it may be entered from. Values reference the
+## STATE_* constants so a rename cannot silently desync the table.
+const SEGMENT_PREDECESSORS: Dictionary = {
+	"TRANSITION": [STATE_WON],
+	"CHARACTER_CREATION": [STATE_TRANSITION],
+	"SECT_SELECTION": [STATE_CHARACTER_CREATION],
+	"CULTIVATION": [STATE_SECT_SELECTION],
+	"MAP": [STATE_CULTIVATION],
+	"ENDING": [STATE_MAP],
+}
+
+## The current game state — one of the STATE_* constants above.
+var current_state: String = STATE_TUTORIAL
 
 ## Array of living enemy nodes registered via register_enemy().
 var enemies_alive: Array[Node] = []
@@ -122,12 +161,16 @@ func clear_battle() -> void:
 
 
 ## WON overlay continue: route to the next segment and notify listeners.
-## No-op unless the game is in WON.
+## Destination is battle_return_state when it is a segment state (future
+## encounter battles route WON back to CULTIVATION); the tutorial battle keeps
+## battle_return_state == "TUTORIAL" (not a segment), which falls back to the
+## fixed next segment TRANSITION. No-op unless the game is in WON.
 func request_continue() -> void:
-	if current_state != "WON":
+	if current_state != STATE_WON:
 		return
-	current_state = "TRANSITION"
-	state_changed.emit("TRANSITION")
+	var target: String = battle_return_state if SEGMENT_STATES.has(battle_return_state) else STATE_TRANSITION
+	current_state = target
+	state_changed.emit(target)
 	continue_requested.emit()
 
 
@@ -141,6 +184,36 @@ func request_retry() -> void:
 	current_state = "TUTORIAL"
 	state_changed.emit("TUTORIAL")
 	retry_requested.emit()
+
+
+## Validated single-transition helper used by segment scenes (design §4 table).
+## Returns true and emits state_changed(state) only when `state` is a segment
+## state and current_state is its legal predecessor; any other target
+## (non-segment, self, or out-of-order) returns false with no effect.
+func enter_segment(state: String) -> bool:
+	if not SEGMENT_STATES.has(state):
+		return false
+	var allowed: Variant = SEGMENT_PREDECESSORS.get(state, null)
+	if not (allowed is Array) or not (allowed as Array).has(current_state):
+		return false
+	current_state = state
+	state_changed.emit(state)
+	return true
+
+
+## Restart from ENDING (or anywhere): drop every battle reference, reset
+## SaveManager to a fresh default profile, then route to a truly-fresh TUTORIAL.
+## new_profile() alone marks tutorial_done = true (creation is only reachable
+## after the tutorial), so a full restart clears that flag back to false.
+## Emits state_changed("TUTORIAL") BEFORE restart_requested() so SceneManager
+## routes the scene first, then reloads a fresh battlefield.
+func restart_game() -> void:
+	clear_battle()
+	SaveManager.new_profile({}, [])
+	SaveManager.profile.flags["tutorial_done"] = false
+	current_state = STATE_TUTORIAL
+	state_changed.emit(STATE_TUTORIAL)
+	restart_requested.emit()
 
 # ---------------------------------------------------------------------------
 # Public API — Enemy tracking
