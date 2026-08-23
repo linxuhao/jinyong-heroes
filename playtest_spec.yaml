@@ -1117,11 +1117,12 @@ scenarios:
       - { at: 120, actions: [ui_accept] }
       - { at: 130, actions: [move_right] }
       - { at: 140, actions: [ui_accept] }
-      - at: 160
-        actions: []
+      - { at: 160, actions: [move_down] }
       - { at: 170, actions: [ui_accept] }
       - at: 200
         actions: []
+        assert:
+          CultivationScreen.sect_id: 'sect_id == "wudang"'
       # 12 month-steps + 1 year-end resolution = 13 presses -> year 2 month 1.
       - { at: 215, actions: [debug_step_month] }
       - { at: 230, actions: [debug_step_month] }
