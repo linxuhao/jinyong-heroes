@@ -417,6 +417,7 @@ scenarios:
         assert:
           Battlefield.grid_lines_visible: true
           HealthBar.bar_width: 'bar_width <= 64'
+          HealthBar.total_height: 'total_height <= 20'
           HUD.skill8_right_edge: 'skill8_right_edge <= 960'
           HUD.round_pause_overlap: 'round_pause_overlap == false'
           SkillButton5.state_text: 'state_text == "phase_locked"'

@@ -110,7 +110,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		# the fill that way renders identically and changes nothing. Growing
 		# the track is the one that actually paints.
 		#
-		# bar.size stays 64x12, so the `HealthBar.bar_width <= 64` geometric
+		# bar.size stays 64x8, so the `HealthBar.bar_width <= 64` geometric
 		# assert is untouched — this is drawing, not layout.
 		sb.set_expand_margin_all(3.0)
 		bar.add_theme_stylebox_override("background", sb)
