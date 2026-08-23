@@ -17,6 +17,17 @@
 ## (card draws inside SaveManager.draw_cards, 修习 gain, 游历 event draw).
 extends Control
 
+const TraitEffects = preload("res://scripts/data/trait_effects.gd")
+
+## Debug-grant school -> external A art id (GongfaData carries no id field;
+## ids are row-derived, hence the const map; see _debug_grant_art).
+const _A_ID_BY_SCHOOL := {
+	"sword": "a_sword",
+	"palm": "a_palm",
+	"polearm": "a_polearm",
+	"dart": "a_dart",
+}
+
 ## Surface: cultivation year (1..3).
 var year: int = 1
 
@@ -45,6 +56,12 @@ var gongfa_count: int = 0
 
 ## Surface: count of mastered gongfa.
 var mastered_count: int = 0
+
+## Surface: the profile's gongfa rows in grant order (ids / grades / display
+## names) — the observability the sect-switch scenario asserts on.
+var gongfa_ids: Array[String] = []
+var gongfa_grades: Array[String] = []
+var gongfa_names: Array[String] = []
 
 ## Surface: the three categories of the current month's cards.
 var drawn_card_categories: Array = []
@@ -83,6 +100,10 @@ func _process(_delta: float) -> void:
 		if not fast_forward_used:
 			fast_forward_used = true
 			_fast_forward()
+	if Input.is_action_just_pressed("debug_step_month"):
+		_debug_step_month()
+	if Input.is_action_just_pressed("debug_grant_art"):
+		_debug_grant_art()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -249,7 +270,18 @@ func _apply_card(card: Dictionary) -> void:
 			elif tid != "" and TraitData.get_def(tid) != null:
 				# Yearly trait-deck card: the card id IS the trait id.
 				SaveManager.profile.add_trait(tid)
-		"tech_unlock", "shen_gong", "":
+		"shen_gong":
+				# 神功 (design/40_progression §3.6; step2_design §2.5): grant one
+				# random unowned 甲级 art from the 9-row A pool — one
+				# SaveManager.rng draw in operation order; never an owned id.
+				var pool: Array[String] = []
+				for id in ProgressionGongfaData.a_pool():
+					if not SaveManager.profile.has_gongfa(id):
+						pool.append(id)
+				if not pool.is_empty():
+					var pick: String = pool[SaveManager.rng.randi_range(0, pool.size() - 1)]
+					SaveManager.profile.add_gongfa(pick, "A")
+		"tech_unlock", "":
 			pass  # data hooks this round (step2_design §8.5)
 	_sync_surface()
 
@@ -260,7 +292,11 @@ func _apply_action(action: Dictionary) -> void:
 		"practice":
 			_add_practice(1)
 		"cultivate":
-			var gain: int = SaveManager.rng.randi_range(1, 3)
+			# 修习 lookup table (design §4.1): one rng draw mapped to +1/+2/+3
+			# by 悟性 tier — the same one-op count as the old randi_range(1, 3),
+			# so the seeded RNG stream's op order is unchanged.
+			var roll: float = SaveManager.rng.randf()
+			var gain: int = TraitEffects.practice_gain(SaveManager.profile.get_attr("wisdom"), roll)
 			SaveManager.profile.add_attr(action.get("target", "bone"), gain)
 		"work":
 			SaveManager.profile.silver += 10
@@ -344,6 +380,8 @@ func _grant_year_arts() -> void:
 ## Add practice to the first unmastered gongfa; masters it on reaching the
 ## grade's threshold (丁4/丙6/乙8). A mastered art is never re-offered.
 func _add_practice(amount: int) -> void:
+	if SaveManager.profile.has_trait("sha_po_lang"):
+		amount = TraitEffects.pojun_practice(amount)
 	var gid: String = _first_unmastered_id()
 	if gid == "":
 		return
@@ -498,6 +536,99 @@ func _fast_forward() -> void:
 
 
 # ---------------------------------------------------------------------------
+# DEBUG: one-month step + A-art grant (unbound actions; one press per month /
+# one grant per press; identical RNG draws to manual play)
+# ---------------------------------------------------------------------------
+
+## Advance EXACTLY ONE month through the phase machine with fixed auto-choices
+## (first card; 练功 on the first unmastered EXTERNAL art, else first unmastered
+## art, else 修习 根骨; year-end stay). A press at YEAR_END resolves the year.
+## Repeatable: every press advances one month / resolves one year-end; no-op
+## outside CULTIVATION. The guard loop walks the multi-phase month to its
+## action + _after_action, then stops.
+func _debug_step_month() -> void:
+	if GameManager.current_state != "CULTIVATION":
+		return
+	var guard: int = 0
+	while guard < 20:
+		guard += 1
+		match phase:
+			"YEAR_AUGMENT":
+				var yearly: Dictionary = _yearly_cards[0] if not _yearly_cards.is_empty() else {}
+				_apply_card(yearly)
+				_start_month_cards()
+			"CARD_PICK":
+				var card: Dictionary = _monthly_cards[0] if not _monthly_cards.is_empty() else {}
+				_apply_card(card)
+				phase = "ACTION_PICK"
+				_action_focus = 0
+			"ACTION_PICK":
+				phase = "GONGFA_PICK"
+				_gongfa_focus = 0
+			"GONGFA_PICK":
+				var gid: String = _debug_practice_target()
+				if gid == "":
+					phase = "ATTR_PICK"
+					_attr_focus = 0
+				else:
+					_apply_action({"kind": "practice", "target": gid})
+					_after_action()
+					break
+			"ATTR_PICK":
+				_apply_action({"kind": "cultivate", "target": "bone"})
+				_after_action()
+				break
+			"YEAR_END":
+				_resolve_year_end(0)
+				break
+			"SECT_SWITCH":
+				_resolve_sect_switch(0)
+				break
+			_:
+				break
+	_sync_surface()
+	_render()
+
+
+## 练功 target for _debug_step_month: the first UNMASTERED external art in
+## profile.gongfa grant order (external-first — the profile stores internal arts
+## before external ones, so a naive first-unmastered pick would master the
+## internal ladder first and the external 乙 art could never master in 36
+## months); falls back to the first unmastered art of any kind. Unresolvable
+## ids are skipped.
+func _debug_practice_target() -> String:
+	for entry in SaveManager.profile.gongfa:
+		if bool(entry.get("mastered", false)):
+			continue
+		var id: Variant = entry.get("id", "")
+		if not (id is String):
+			continue
+		var art = ProgressionGongfaData.art_by_id(id as String)
+		if art != null and str(art.kind) == "external":
+			return id as String
+	return _first_unmastered_id()
+
+
+## DEBUG: grant the A art of the profile's main external school (sword/palm/
+## polearm/dart -> a_sword/a_palm/a_polearm/a_dart); falls back to the sect's
+## internal A art. Idempotent (never grants an owned id); no-op outside
+## CULTIVATION or when no A art can be derived.
+func _debug_grant_art() -> void:
+	if GameManager.current_state != "CULTIVATION":
+		return
+	var main = ProgressionGongfaData.art_by_id(SaveManager.profile.main_external_id)
+	if main == null:
+		return
+	var id: String = _A_ID_BY_SCHOOL.get(str(main.school), "")
+	if id == "":
+		id = ProgressionGongfaData.art_id(str(SaveManager.profile.cultivation.get("sect_id", "")), "internal", "A")
+	if id == "" or SaveManager.profile.has_gongfa(id):
+		return
+	SaveManager.profile.add_gongfa(id, "A")
+	_sync_surface()
+
+
+# ---------------------------------------------------------------------------
 # Surface sync + rendering
 # ---------------------------------------------------------------------------
 
@@ -516,6 +647,14 @@ func _sync_surface() -> void:
 	for entry in SaveManager.profile.gongfa:
 		if bool(entry.get("mastered", false)):
 			mastered_count += 1
+	gongfa_ids = []
+	gongfa_grades = []
+	gongfa_names = []
+	for entry in SaveManager.profile.gongfa:
+		var id: String = str(entry.get("id", ""))
+		gongfa_ids.append(id)
+		gongfa_grades.append(str(entry.get("grade", "")))
+		gongfa_names.append(ProgressionGongfaData.display_name_of(id))
 
 
 func _categories_of(cards: Array) -> Array:
