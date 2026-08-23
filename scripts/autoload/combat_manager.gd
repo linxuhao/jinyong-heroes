@@ -213,9 +213,29 @@ func _ready() -> void:
 		GameManager.battle_started.connect(_on_battle_started)
 
 
-## Begin the turn-based battle: round 1 snapshot and the first turn.
+## Begin the turn-based battle: round 1 snapshot and the first turn. Drives the
+## tutorial path (battle_started fires when its units already exist). The
+## encounter path emits battle_started BEFORE its scene swap, while the roster
+## is still empty — skipping here keeps the empty_round_stalls guard
+## unreachable; the new battlefield's _ready() calls begin_battle() instead.
 func _on_battle_started() -> void:
+	_begin_if_ready()
+
+
+## Public kick-off for battles whose units are registered by the battlefield
+## scene itself (encounter mode): IDLE -> round 1. No-op while a battle is
+## running, when the player is missing, or when no enemy is registered — a
+## stray scene load can never trip the empty-round stall guard. The tutorial
+## never calls this (start_battle() drives it via battle_started).
+func begin_battle() -> void:
+	_begin_if_ready()
+
+
+## Shared guarded kick-off: phase IDLE + live player + >= 1 enemy, then round 1.
+func _begin_if_ready() -> void:
 	if phase != "IDLE":
+		return
+	if GameManager.get_player() == null or GameManager.get_enemies_alive().is_empty():
 		return
 	current_round = 1
 	_begin_round()
