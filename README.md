@@ -6,7 +6,7 @@ This round makes **cultivation actually drive combat** (养成真的有意义 �
 
 - **发挥度 is now really computed** by the 甲乙丙丁 prerequisite cascade (`gongfa_data.gd:get_fa_hui_du()`, design/10_systems.md §4): 缺3=0.6 / 缺2=0.7 / 缺1=0.85 / 齐备=1.0, then ×1.1/×1.2/×1.3 for same-attribute mastered arts. The tutorial battle's protected 1.3 is **computed**, never special-cased — `TutorialFillers.fill()` populates each tutorial unit with real mastered filler arts so the prereqs are genuinely complete.
 - **The progression ladder is completed to 甲级 (A)** — four external ladders (拳掌 palm / 剑 sword / 长兵 polearm / 暗器 dart) and the five sects' internal ladder each have 丁丙乙甲 rows with real named techniques; a 神功 card and a debug action grant A arts.
-- **A real encounter battle** (`CULTIVATION → BATTLE → WON → CULTIVATION`) proves the same character deals different damage before vs. after filling the ladder.
+- **A real encounter battle** (`CULTIVATION → BATTLE → WON → CULTIVATION`) proves the same character deals different damage before vs. after filling the ladder. This round makes that path **load-bearing**: `SceneManager.SCENE_MAP["BATTLE"]` now routes to `battlefield` (the previous gap left `state_unmapped`), and the battlefield itself kicks off round 1 through a guarded `CombatManager.begin_battle()` seam after both units are registered — so `empty_round_stalls` stays 0 everywhere.
 - **Six trait combat effects** are implemented: 杀破狼 (sha / pojun / lang), 铁布衫, 身轻如燕, 左右互搏.
 - **Save roundtrip and sect-switch observability** added so the playtest can assert full-field equality and same-school continuity.
 
@@ -141,6 +141,8 @@ External A attributes deliberately never equal their school's feeding sect lines
 
 `GameManager.start_encounter()` (a new entry point, distinct from `start_battle()` which is gated to TUTORIAL) sets `battle_return_state = "CULTIVATION"` and routes CULTIVATION → BATTLE. The battlefield detects encounter mode (`battle_return_state == "CULTIVATION"`), builds the player from `SaveManager.profile` via `BattleSetup.build_character`, spawns a deterministic sparring partner (`EncounterData.sparring_partner()` — 60 HP, 4 mastered D 阳 arts → fhd 1.3), and does **not** start the tutorial overlay. `request_retry()` / `request_continue()` route LOST/WON back to `battle_return_state` (with `clear_battle()` so a second encounter rebuilds fresh refs).
 
+**Round-1 kick-off sequencing** (the wiring fix): `start_encounter()` emits `battle_started` *before* the async scene swap, while the roster is still empty. `CombatManager._on_battle_started()` therefore delegates to the guarded `_begin_if_ready()` — phase `IDLE` + live player + ≥1 enemy — and silently skips the empty pre-swap signal instead of tripping `empty_round_stalls`. The new battlefield's `_ready()` (ENCOUNTER branch) then queues `_wire_hud.call_deferred(...)` followed by `CombatManager.begin_battle.call_deferred()` (FIFO, same frame flush), so the HUD is wired **before** `round_started`/`turn_started` fire. `begin_battle()` is public, idempotent, and safe to call sync or deferred (after a `reset_battle()` + `clear_battle()` teardown it self-guards to a no-op). The tutorial path is unchanged: its units exist before `start_battle()`, so the skip never fires there.
+
 ## Trait Effects (first implementations)
 
 Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in `CombatManager` / `player.gd` / `battlefield.gd`:
@@ -217,8 +219,9 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 | Member | Behaviour |
 |--------|-----------|
-| `current_round` / `phase` / `active_unit_name` / `turn_order` / `turn_log` / `last_turn_actor` | Observable turn-engine state |
+| `current_round` / `phase` / `active_unit_name` / `turn_order` / `turn_log` / `last_turn_actor` / `empty_round_stalls` | Observable turn-engine state (the last is a loud guard counter — must stay 0) |
 | `tutorial_battle` | Encounter/tutorial mode flag |
+| `begin_battle()` | Guarded round-1 kick-off (phase IDLE + live player + ≥1 enemy); idempotent, callable sync or deferred |
 | `debug_sha_heal_total` / `debug_iron_shirt_procs` / `debug_lang_attack_mult` | Trait diagnostic counters |
 | `is_player_turn()` | True while the player's turn is active |
 | `end_current_turn()` | End the active unit's turn |
