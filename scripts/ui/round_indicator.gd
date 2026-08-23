@@ -1,6 +1,8 @@
 ## RoundIndicator — Top-center HUD widget showing the current round, the
 ## active actor, and the initiative order snapshot for the current round.
-## All text is English + digits only. Refreshed every frame by hud.gd.
+## All rendered text is Chinese (design §2.1 display layer); identity names
+## (CombatManager.active_unit_name / turn_order) stay English. Refreshed
+## every frame by hud.gd.
 extends Control
 
 # ---------------------------------------------------------------------------
@@ -17,7 +19,7 @@ var active_actor: String = ""
 var order_names: Array[String] = []
 
 ## Full ActiveLine string for the current frame, e.g.
-## "Active: Yang Guo · Move 4 · Act ✓". Written by update_display every frame
+## "行动: 杨过 · 移动 4 · 行动 ✓". Written by update_display every frame
 ## (outside the label-null guard) so the playtest surface stays live even if
 ## the ActiveLabel node is missing. "✓" = U+2713; "·" = U+00B7.
 var active_text: String = ""
@@ -34,12 +36,12 @@ var active_text: String = ""
 ## `order_names` observable keeps the full canonical names — playtest asserts
 ## depend on them. Unknown names pass through unchanged.
 const _ORDER_TOKENS := {
-	"Yang Guo": "YG",
-	"East Heretic": "EH",
-	"Central Divine": "CD",
-	"South Emperor": "SE",
-	"North Beggar": "NB",
-	"West Poison": "WP",
+	"Yang Guo": "杨过",
+	"East Heretic": "黄药师",
+	"Central Divine": "王重阳",
+	"South Emperor": "段智兴",
+	"North Beggar": "洪七公",
+	"West Poison": "欧阳锋",
 }
 
 # ---------------------------------------------------------------------------
@@ -58,16 +60,16 @@ func _token_for(name: String) -> String:
 func _active_text(actor: String) -> String:
 	var player: Node = GameManager.get_player()
 	if player == null or not is_instance_valid(player):
-		return "Active: %s" % actor
+		return "行动: %s" % actor
 	# Defensive guards (task contract): a player node that lacks moves_left /
 	# acted (e.g. a non-player scene) falls back to "Move 0 / End" instead of
 	# throwing on property access. `in` on an Object tests property existence.
 	var moves_left: int = int(player.moves_left) if "moves_left" in player else 0
 	var acted: bool = bool(player.acted) if "acted" in player else true
-	return "Active: %s · Move %d · %s" % [
+	return "行动: %s · 移动 %d · %s" % [
 		actor,
 		moves_left,
-		("Act ✓" if not acted else "End"),
+		("行动 ✓" if not acted else "结束"),
 	]
 
 # ---------------------------------------------------------------------------
@@ -75,18 +77,21 @@ func _active_text(actor: String) -> String:
 # ---------------------------------------------------------------------------
 
 ## Refresh the indicator from the turn engine. Writes the observable state
-## and the three child labels ("Round %d", "Active: %s", "Order: %s").
+## and the three child labels ("回合 %d", "行动: %s", "顺序: %s").
 ## Defensively resolves child labels via get_node_or_null (health_bar.gd
 ## pattern) so the method is call-order independent.
 func update_display(round_num: int, actor: String, order: Array[String]) -> void:
 	current_round = round_num
-	active_actor = actor
+	# Display layer: both the active_actor observable and the actor slot in
+	# the active line map through _ORDER_TOKENS (fallback: identity) so the
+	# whole active line is CJK-consistent (行动: 杨过 · 移动 4 · 行动 ✓).
+	active_actor = _token_for(actor)
 	order_names = order.duplicate()
 
 	# Observable ActiveLine string — written unconditionally (outside the
 	# label-null guard below) so the surface stays live even if the ActiveLabel
 	# node is missing from the scene.
-	active_text = _active_text(actor)
+	active_text = _active_text(active_actor)
 
 	var round_label: Label = _round_label
 	if round_label == null:
@@ -96,7 +101,7 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		if round_label != null:
 			_round_label = round_label
 	if round_label != null:
-		round_label.text = "Round %d" % round_num
+		round_label.text = "回合 %d" % round_num
 
 	var active_label: Label = _active_label
 	if active_label == null:
@@ -119,4 +124,4 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		# Compact token format (no clip/ellipsis) so the order line fits its
 		# box and stays clear of the PauseButton. order_names keeps the full
 		# canonical names above — tokenization is display-only.
-		order_label.text = "Order: %s" % " > ".join(order.map(_token_for))
+		order_label.text = "顺序: %s" % " > ".join(order.map(_token_for))

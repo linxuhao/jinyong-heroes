@@ -88,43 +88,42 @@ var _dim_rect: ColorRect = null
 
 ## Title strings keyed by step id.
 const _STEP_TITLES: Dictionary = {
-	STEP_WELCOME: "Welcome to Huashan Sword Tournament",
-	STEP_MOVEMENT: "Movement",
-	STEP_BASIC_ATTACK: "Basic Attack",
-	STEP_SKILLS: "Skills",
-	STEP_END_TURN: "End Turn",
-	STEP_PAUSE: "Pause",
-	STEP_COMBAT_START: "Battle Begin!",
+	STEP_WELCOME: "华山论剑",
+	STEP_MOVEMENT: "移动",
+	STEP_BASIC_ATTACK: "普通攻击",
+	STEP_SKILLS: "招式",
+	STEP_END_TURN: "结束回合",
+	STEP_PAUSE: "暂停",
+	STEP_COMBAT_START: "战斗开始！",
 }
 
 ## Body strings (with BBCode) keyed by step id.
 const _STEP_BODIES: Dictionary = {
 	STEP_WELCOME: (
-		"You are Yang Guo. Defeat all Five Greats to become champion.\n\n"
-		+ "Press Next or Enter to continue."
+		"你是杨过。击败五大高手，夺得华山论剑的胜者！\n\n"
+		+ "按「继续」或回车继续。"
 	),
 	STEP_MOVEMENT: (
-		"WASD/Arrows move one tile at a time. You have 4 move points per turn.\n\n"
-		+ "Try moving now!"
+		"WASD/方向键每次移动一格。每回合有 4 点移动力。\n\n"
+		+ "现在就试试移动吧！"
 	),
 	STEP_BASIC_ATTACK: (
-		"Move adjacent to an enemy, then press J (or left-click) to basic attack."
+		"移动到敌人身边，按 J（或鼠标左键）进行普通攻击。"
 	),
 	STEP_SKILLS: (
-		"Press 1-4 to select a Heavy Iron Sword technique, then J to fire it at "
-		+ "the nearest enemy in range. Skills 5-8 (Melancholy Palms) unlock in "
-		+ "round 4.\n\nEach button shows its skill rating (e.g. OVERDRIVE x1.3)."
+		"按 1-4 选择重剑剑法招式，再按 J 对射程内最近的敌人施展。"
+		+ "招式 5-8（黯然销魂掌）将在第 4 回合解锁。\n\n"
+		+ "每个按钮都会显示它的发挥度（例如 超常 ×1.3）。"
 	),
 	STEP_END_TURN: (
-		"Press Space to end your turn. After you end your turn, the enemies act "
-		+ "in initiative order."
+		"按空格结束回合。结束回合后，敌人会按出手顺序依次行动。"
 	),
 	STEP_PAUSE: (
-		"Press Escape to pause/unpause."
+		"按 Esc 暂停/继续游戏。"
 	),
 	STEP_COMBAT_START: (
-		"The tutorial is complete. Defeat all Five Greats!\n\n"
-		+ "Press Next to begin."
+		"教学完成。击败五大高手！\n\n"
+		+ "按「继续」开始战斗。"
 	),
 }
 

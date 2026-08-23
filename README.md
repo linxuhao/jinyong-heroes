@@ -29,6 +29,15 @@ This build replaces the previous real-time-with-pause combat with a **strictly s
 - Each unit acts once per round in initiative order: Yang Guo (88) → East Heretic (85) → Central Divine (80) → South Emperor (76) → North Beggar (74) → West Poison (70).
 - Defeat all five Grandmasters to win; let your health reach zero to lose.
 
+## Chinese Font Theme
+
+The whole UI ships in Chinese under one **global font theme** (design §2.1 — 界面文字一律中文):
+
+- **`assets/themes/global_theme.tres`** — a committed `Theme` with `default_font` = the shipped Noto Sans SC FontFile (`res://assets/fonts/NotoSansSC-Regular.otf`, SIL OFL — see `assets/fonts/LICENSE_OFL.txt`), referenced by **res:// path** (no `.uid` binding to rot) and `default_font_size = 12`.
+- Wired via `ProjectSettings gui/theme/custom`; the `ThemeManager` autoload additionally installs the same font as `ThemeDB.fallback_font` at startup as the CI-safe fallback.
+- **No per-node font overrides anywhere** — every label/button inherits the theme; labels keep `text_overrun_behavior` = trim (never ellipsis).
+- Display layer only: `character_name`, node names, skill ids, state strings and turn-order names stay canonical English (byte-identical for the playtest contract).
+
 ## The Five Grandmasters (deterministic AI)
 
 Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decides **once per enemy turn** via a deterministic priority list over cooldown/range/HP facts — no timers, no RNG:
@@ -56,24 +65,24 @@ Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decide
 ## HUD
 
 - **Grid overlay** (`GridLines`, a `Node2D` child of `scenes/battlefield.tscn` drawn above the floor tiles / backdrop): 1 px semi-transparent cell-boundary lines across the 15×11 board plus a slightly stronger border ring, so the grid reads over the summit painting. Exposed as the `Battlefield.grid_lines_visible` observable.
-- **Skill bar** (8 buttons, `SkillButton1..8`): technique name, hotkey, a 发挥度 rating label (`ERRATIC` / `NORMAL` / `OVERDRIVE` + multiplier — all tutorial arts show `OVERDRIVE x1.3`), and a round-based cooldown overlay with a **remaining-rounds number** (`CooldownLabel`) plus a **state tag** (`LOCKED` / `HP`). Each button exposes `state_text` — one of `"ready"`, `"cooldown"`, `"phase_locked"`, `"hp_gated"` — and `cooldown_remaining`, and renders five pairwise-distinct visuals: ready (normal), cooldown (dark fill + number), phase-locked (gray tint + `LOCKED` tag), HP-gated (red tint + `HP` tag), and selected (golden border when `player.selected_skill_index == skill_index`). Button text is shortened to fit without truncation (`17 Forms` instead of `Seventeen Melancholy Forms`).
+- **Skill bar** (8 buttons, `SkillButton1..8`): technique name, hotkey, a 发挥度 rating label (失常 / 正常 / 超常 + multiplier — all tutorial arts show `超常 ×1.3`), and a round-based cooldown overlay with a **remaining-rounds number** (`CooldownLabel`) plus a **state tag** (`LOCKED` / `HP`). Each button exposes `state_text` — one of `"ready"`, `"cooldown"`, `"phase_locked"`, `"hp_gated"` — and `cooldown_remaining`, and renders five pairwise-distinct visuals: ready (normal), cooldown (dark fill + number), phase-locked (gray tint + `LOCKED` tag), HP-gated (red tint + `HP` tag), and selected (golden border when `player.selected_skill_index == skill_index`). Button text is shortened to fit without truncation (`17 Forms` instead of `Seventeen Melancholy Forms`).
 - **Health bars** (one per character, `HealthBar`): a **64 px wide** bar (one grid cell; `HealthBar.bar_width`) with the **name label above** the bar (never overlapping, font 10, no clipping/ellipsis), fill color green→yellow→red by HP fraction. Bars follow their character via the stretch-aware `get_final_transform()` projection with edge clamping; `HealthBar.follow_delta` reports the pre-clamp pixel distance from the character's projected screen position.
-- **Round indicator** (top-center): `Round N`, `Active: <name> · Move <m> · Act ✓/End`, and `Order: <short aliases>` in a compact no-ellipsis format inside its box. The indicator rect never overlaps `PauseButton` (guarded by the `HUD.round_pause_overlap` observable).
-- **Energy label**: `Qi: 180` (display only — no technique costs this run).
-- All new HUD text is English + digits only.
+- **Round indicator** (top-center): `回合 N`, `行动: <name> · 移动 <m> · 行动 ✓/结束`, and `顺序: <Chinese names>` in a compact no-ellipsis format inside its box. The indicator rect never overlaps `PauseButton` (guarded by the `HUD.round_pause_overlap` observable).
+- **Energy label**: `内力: 180` (display only — no technique costs this run).
+- All rendered UI text is Chinese (design §2.1); identity strings (`character_name`, node names, skill ids, turn-order names) stay canonical English.
 
 ### Health-bar display aliases
 
-Health-bar name labels use short English aliases (no ellipsis — design/30_presentation.md explicitly allows shorter names). Display-only: `character_data.character_name`, node names, turn-order names and `order_names` stay canonical and unchanged (playtest asserts on the canonical names stay green).
+Health-bar name labels use Chinese display names (design §2.1 — every rendered string ships in Chinese; the names are short enough to fit the 64 px label with no ellipsis). Display-only: `character_data.character_name`, node names, turn-order names and `order_names` stay canonical and unchanged (playtest asserts on the canonical names stay green).
 
-| Canonical name | Health-bar alias |
-|----------------|------------------|
-| Yang Guo | Yang Guo |
-| East Heretic | E. Heretic |
-| West Poison | W. Poison |
-| South Emperor | S. Emperor |
-| North Beggar | N. Beggar |
-| Central Divine | C. Divine |
+| Canonical name | Display name |
+|----------------|--------------|
+| Yang Guo | 杨过 |
+| East Heretic | 黄药师 |
+| West Poison | 欧阳锋 |
+| South Emperor | 段智兴 |
+| North Beggar | 洪七公 |
+| Central Divine | 王重阳 |
 
 ## Project Structure
 

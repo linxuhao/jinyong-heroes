@@ -40,7 +40,7 @@ surface:
   SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
   SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
   PauseButton: [visible, global_position]
-  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color]
+  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height]
   Battlefield: [board_aligned, grid_lines_visible]
 
 scenarios:
@@ -66,7 +66,7 @@ scenarios:
           East_Heretic.turns_taken: 0
           RoundIndicator.visible: true
           RoundIndicator.current_round: 1
-          RoundIndicator.active_actor: 'active_actor == "Yang Guo"'
+          RoundIndicator.active_actor: 'active_actor == "杨过"'
 
   - name: enemy_acts_only_after_player_ends_turn
     description: "Enemies stay idle while the player's turn is open; they act only after Space (end_turn)."
@@ -223,14 +223,18 @@ scenarios:
       - at: 30
         actions: []
         assert:
-          SkillButton1.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton2.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton3.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton4.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton5.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton6.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton7.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
-          SkillButton8.fahui_text: 'fahui_text == "OVERDRIVE x1.3"'
+          SkillButton1.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton2.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton3.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton4.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton5.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton6.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton7.fahui_text: 'fahui_text == "超常 ×1.3"'
+          SkillButton8.fahui_text: 'fahui_text == "超常 ×1.3"'
+          # CJK-presence: the Chinese display layer is live on the buttons
+          # (band text contains a CJK character) — guards a silent English
+          # revert while the identity assertions stay byte-identical.
+          SkillButton1.fahui_text: 'fahui_text.contains("常") == true'
       - { at: 40, actions: [move_up] }
       - { at: 55, actions: [move_up] }
       - { at: 70, actions: [move_up] }
@@ -417,11 +421,11 @@ scenarios:
           SkillButton1.state_text: 'state_text == "ready"'
           HealthBar.follow_delta: 'follow_delta <= 24'
           HealthBar.fill_color: 'fill_color.g > 0.5 and fill_color.g > fill_color.r'
-          HealthBar.name_text: 'name_text == "Yang Guo"'
+          HealthBar.name_text: 'name_text == "杨过"'
           # Active-actor line: during the player's round-1 turn (frame 30) the
           # ActiveLine shows "Active: Yang Guo · Move 4 · Act ✓" — contains
           # "Move" and ends with the mandated "Act ✓" (U+2713).
-          RoundIndicator.active_text: 'active_text.contains("Move") and active_text.ends_with("Act ✓")'
+          RoundIndicator.active_text: 'active_text.contains("移动") and active_text.ends_with("行动 ✓")'
           # No-ellipsis sweep: none of the 8 skill buttons' text may contain
           # the ellipsis character U+2026 ("…").
           SkillButton1.text: 'text.contains("…") == false'

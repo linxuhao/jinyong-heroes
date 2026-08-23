@@ -7,17 +7,18 @@ extends Control
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
 
-## Display aliases for health-bar name labels: short English names, no
-## ellipsis (design/30_presentation.md explicitly allows shorter names).
+## Display aliases for health-bar name labels: Chinese display names
+## (design §2.1 — every rendered string ships in Chinese; the names are short
+## enough to fit the 64 px label with no ellipsis).
 ## Only the health-bar display layer is affected — character_data.character_name,
 ## node names, turn-order names and order_names stay canonical and unchanged.
 const _DISPLAY_ALIASES := {
-	"Yang Guo": "Yang Guo",
-	"East Heretic": "E. Heretic",
-	"West Poison": "W. Poison",
-	"South Emperor": "S. Emperor",
-	"North Beggar": "N. Beggar",
-	"Central Divine": "C. Divine",
+	"Yang Guo": "杨过",
+	"East Heretic": "黄药师",
+	"West Poison": "欧阳锋",
+	"South Emperor": "段智兴",
+	"North Beggar": "洪七公",
+	"Central Divine": "王重阳",
 }
 
 ## Map a canonical character name to its short display alias; unknown names
@@ -130,7 +131,7 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 			_energy_label = energy_label
 	if energy_label != null:
 		var qi: int = int(player.energy) if "energy" in player else 0
-		energy_label.text = "Qi: %d" % qi
+		energy_label.text = "内力: %d" % qi
 
 
 ## Create a single health bar for a character and add it to the container.
@@ -161,7 +162,7 @@ func _create_health_bar(character: Node, display_name: String) -> void:
 ## Instantiates exactly one SkillButton per skill with deterministic names
 ## SkillButton1..SkillButton8 (named BEFORE add_child to avoid duplicate-name
 ## errors). Hotkey = index + 1. Every tutorial art returns fa_hui_du 1.3, so
-## all buttons show "OVERDRIVE x1.3".
+## all buttons show "超常 ×1.3".
 func _populate_skill_buttons(player: Node) -> void:
 	var skills: Array = []
 	if "skills" in player:
@@ -226,7 +227,7 @@ func _process(_delta: float) -> void:
 			bar.follow_character()
 
 	# Round indicator: always refresh from the engine (safe pre-battle — shows
-	# the initial "Round 0 / Active: / Order:" state).
+	# the initial "回合 0 / 行动: / 顺序:" state).
 	if is_instance_valid(_round_indicator):
 		_round_indicator.update_display(
 			CombatManager.current_round,
