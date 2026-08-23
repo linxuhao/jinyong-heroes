@@ -26,12 +26,13 @@ static func run() -> bool:
 	ok = _expect(ok, SkillButton.fa_hui_du_label(2.0) == "发挥 ×2.0",
 		"fa_hui_du_label(2.0) == 发挥 ×2.0")
 
-	# Every multiplier renders as "发挥 ×N.N" (one decimal) regardless of band —
-	# the band labels (失常/正常/超常) are gone (design §2.1 mandated format).
-	ok = _expect(ok, SkillButton.fa_hui_du_label(0.99) == "发挥 ×1.0",
-		"fa_hui_du_label(0.99) == 发挥 ×1.0")
-	ok = _expect(ok, SkillButton.fa_hui_du_label(1.21) == "发挥 ×1.2",
-		"fa_hui_du_label(1.21) == 发挥 ×1.2")
+	# Two-decimal cascade values render exactly (0.85 = 缺1 ladder,
+	# design/10_systems.md §4): the formatter uses %.2f then strips trailing
+	# zeros, so 0.99 -> "0.99" and 1.21 -> "1.21" (never rounded to 1 decimal).
+	ok = _expect(ok, SkillButton.fa_hui_du_label(0.99) == "发挥 ×0.99",
+		"fa_hui_du_label(0.99) == 发挥 ×0.99")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(1.21) == "发挥 ×1.21",
+		"fa_hui_du_label(1.21) == 发挥 ×1.21")
 
 	if ok:
 		print("PASS: test_theme_font")
