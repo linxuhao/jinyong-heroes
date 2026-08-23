@@ -12,8 +12,21 @@
 **一句统一风格句,只描述画风,绝不点名任何游戏对象**——把物件清单写进风格句,
 生图模型会把每样东西画进每一张图。每个资源的主体只写在它自己那一条 prompt 里。
 
-当前风格句(水墨武侠向):
-> ink-wash wuxia painting, muted earth tones, soft paper texture, side view, flat lighting
+当前风格句(水墨武侠向)——**以 `assets/seed_manifest.json` 的 `style_block` 为准**:
+> Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting
+
+> **为什么改这一句。** 档案原先写的是
+> `ink-wash wuxia painting, muted earth tones, soft paper texture, side view, flat lighting`,
+> 而**实际产出全部现有资产的**是上面那句(记在 `assets/seed_manifest.json`)。
+> 两句在三个轴上相反:**flat lighting ↔ dramatic lighting**、
+> soft paper texture ↔ clean bold outlines、muted earth tones ↔ 未提。
+>
+> 档案说一套、现实是另一套,而没人发现——因为没人把两边摆在一起比过。
+> 既然已经出图的是后者、看着也对,就以**已发生的事实**为准改档案,
+> 而不是照一句从没生效过的话去重画。新资产一律用这一句。
+>
+> **只有一句风格句。** 以后改风格,改 `seed_manifest.json` 的 `style_block`
+> **并同步这里**;两处不一致时,下一次重画就会和现有美术对不上。
 
 ## 字体(硬要求)
 
@@ -119,3 +132,19 @@ empty portions」。逐项渲染验证后的结论:
 闸门的原话是「**above** or attached to the characters, a bar with a filled
 portion and an empty portion」——三个条件缺一不可。
 
+## 已知美术欠账(核实过,尚未修)
+
+写在这里是因为它们**已经在游戏里了**,不是计划——下次重画资产时一并修,
+不要重新发现一遍。
+
+| 项 | 现状 | 该是什么 |
+|---|---|---|
+| **杨过的 prompt** | `a young swordsman in deep blue robes holding a heavy iron sword` | **缺"独臂"**。`20_content.md` §1 明写他是**独臂神雕侠**,而 prompt 从没提过,所以出来的立绘是双臂的 |
+| **洪七公的 prompt** | `a ragged beggar in faded red robes with a wine gourd` | **缺打狗棒**。丐帮的标志性兵器(见 §2.3 门派表:丐帮 → 打狗棒法),prompt 里只有酒葫芦 |
+| **背景图尺寸** | 768 × 588,运行时拉伸到 960 × 704 | **非等比拉伸**(横 1.25 × 纵 1.1973),画面会被拉扁。应按 **960 × 704 原生出图** |
+| **战败音效** | 没有。`game_lost` 只调了 `stop_music()` | 战败当前是**静音**的,该有一个下沉的收尾音 |
+| **背景乐循环点** | 未设 | 30 秒一圈重头播,接缝听得见 |
+| **招式音效** | 31 个招式共用一个 `hit.wav` | 至少按外功门类分几种 |
+
+**背景图还有一条硬约束:必须偏亮。** `grid_lines.gd` 画的是 35% 透明度的深色墨线,
+背景一深,格线就消失——而"格子可见"是可读性硬要求第一条。
