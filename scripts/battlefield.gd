@@ -612,10 +612,14 @@ func _gongfa(gongfa_name: String, grade: String, kind: String, school: String,
 ## Encounter mode entry (battle_return_state == "CULTIVATION"): build the player
 ## from the live cultivation profile via BattleSetup, spawn the sparring partner
 ## at its fixed tile, wire the HUD, and — critically — NEVER start the tutorial
-## (no overlay, no step gating). The battle itself is kicked off by
-## GameManager.start_encounter() (battle_started -> CombatManager
-## _on_battle_started -> _begin_round). All AI/hazard/status wiring stays shared
-## with the tutorial path.
+## (no overlay, no step gating). Round 1 is kicked off by THIS scene: the last
+## statement queues CombatManager.begin_battle() (deferred, AFTER the HUD wiring
+## in FIFO order), which starts the round only once both units are registered.
+## GameManager.start_encounter() emits battle_started BEFORE this scene exists
+## (while the roster is still empty), so its synchronous kick is skipped there;
+## begin_battle() self-guards (phase IDLE + non-empty roster) so the deferred
+## flush here is the single place the encounter round starts. All AI/hazard/
+## status wiring stays shared with the tutorial path.
 func _setup_encounter_battle() -> void:
 	# A CULTIVATION battle always has a profile; guard anyway so a stray scene
 	# load never hard-crashes.
@@ -639,8 +643,15 @@ func _setup_encounter_battle() -> void:
 	var enemy_node: Node = _instantiate_sparring_partner()
 
 	# Wire the HUD (deferred — HUD._ready() hasn't run yet, so its @onready vars
-	# are null).
+	# are null), then kick off round 1 deferred AFTER the wiring: Godot's
+	# MessageQueue flushes call_deferred FIFO within the same frame, so
+	# HUD.setup() (buttons + signal listeners) runs BEFORE round_started /
+	# turn_started fire — the same ordering the tutorial path has (HUD wired,
+	# then battle starts). begin_battle() self-guards (phase IDLE + non-empty
+	# roster), so the profile-null early return and any stray scene load can
+	# never reach the empty-round stall guard.
 	_wire_hud.call_deferred(player_node, [enemy_node])
+	CombatManager.begin_battle.call_deferred()
 
 
 ## Instantiate the sparring partner (EncounterData.sparring_partner) at its
