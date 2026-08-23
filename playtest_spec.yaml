@@ -162,7 +162,7 @@ scenarios:
         assert:
           CombatManager.active_unit_name: 'active_unit_name != "Yang Guo"'
           CombatManager.phase: 'phase == "ENEMY_TURN"'
-      - at: 700
+      - at: 1200  # justification: re-timed from 700 into the round-2 pre-first-enemy-turn window (round-2 start <= frame ~261 per the documented tween budget; the round-2 player turn awaits end_turn, so every frame from round-2 start onward has all five enemies' turns_taken == 1 and turn_log.size() == 6). playtest_report.json absent from this workspace — static-code diagnosis is branch (b) frame-window, not (a) accumulation: combat_manager.gd end_current_turn (lines 600-601) is the ONLY turns_taken increment path, shared by player and enemies, and current_round == 2 passing already proves all six round-1 turns ended; the per-battle reset _clear_unit_battle_state runs only at battle setup.
         actions: []
         assert:
           CombatManager.current_round: 2
@@ -259,7 +259,7 @@ scenarios:
       - { at: 400, actions: [end_turn] }
       - { at: 800, actions: [end_turn] }
       - { at: 1200, actions: [end_turn] }
-      - at: 1280
+      - at: 1430  # justification: re-timed from 1280 into the round-4 West-Poison-active window (round-4 enemy phase = frames 1201..<=~1450 per the documented tween budget; West Poison is the last of the five enemies, active after it applies poison in the tail of the phase, player health still 152 before the round-5 tick). playtest_report.json absent from this workspace — target picked from the documented budget bounds, pipeline re-run adjudicates.
         actions: []
         assert:
           CombatManager.current_round: 4
@@ -267,7 +267,7 @@ scenarios:
           CombatManager.active_unit_name: 'active_unit_name == "West Poison"'
           Player.status_names: 'status_names.has("poison") == true'
           Player.health: 'health == 152'
-      - at: 2000
+      - at: 2400  # justification: re-timed from 2000, still inside the round-5-started window (round-5 start <= frame ~1451 per budget; the poison tick round(8*1.3)=10 then Shen Diao regen +26 land synchronously at the round-5 player turn start, so health == 168 persists while the turn awaits end_turn). playtest_report.json absent — extra slack for a slower-than-budget cadence; assert pins byte-identical.
         actions: []
         assert:
           CombatManager.current_round: 5
