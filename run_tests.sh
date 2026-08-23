@@ -1,54 +1,82 @@
 #!/bin/bash
 # Godot test gate for subagent/fix_tests pipelines.
-# Runs compile check then a headless playtest to catch parse + runtime errors.
+# Compile check -> headless play-test -> GDScript unit suite.
+#
+# ⚠ DO NOT "fix" this back to calling a local `godot` binary.
+# There is NO godot binary in the container that runs this script. Godot lives
+# only in the `godot-builder` sidecar, reachable over HTTP at
+# $GODOT_BUILDER_URL (default http://godot-builder:8080). An earlier version
+# resolved GODOT_BIN through a four-step PATH ladder; every step failed, every
+# round, and the unit gate reported "godot binary not found" — a repair no
+# amount of shell can make, because the binary is not in this filesystem.
+# The sidecar mounts this workspace at the SAME absolute path, so the
+# project_dir sent below resolves identically on both sides.
 set -euo pipefail
 
-HARNESS="/app/docker/godot/godot_harness.py"
 PROJ_DIR="$(cd "$(dirname "$0")" && pwd)"
+BUILDER="${GODOT_BUILDER_URL:-http://godot-builder:8080}"
 
-# Resolve the godot binary ONCE, before any gate runs. The harness calls bare
-# `godot` internally and the unit-test step needs a real binary; a bare `godot`
-# is not on PATH in the test environment, so defaulting to it crashed with a
-# FileNotFoundError traceback instead of a test result. Resolution order:
-# GODOT_BIN env override -> absolute-path probe -> `command -v godot`.
-# Every probe is written inside an `if` condition so a failed lookup skips to
-# the next option instead of aborting the script under `set -e`.
-if [ -z "${GODOT_BIN:-}" ]; then
-	for p in /app/docker/godot/godot /usr/local/bin/godot /usr/bin/godot /opt/godot/godot; do
-		if [ -x "$p" ]; then
-			GODOT_BIN="$p"
-			break
-		fi
-	done
-fi
-if [ -z "${GODOT_BIN:-}" ]; then
-	if command -v godot >/dev/null 2>&1; then
-		GODOT_BIN="$(command -v godot)"
-	fi
-fi
-if [ -z "${GODOT_BIN:-}" ]; then
-	echo "godot binary not found; set GODOT_BIN=/path/to/godot" >&2
-	exit 1
-fi
-export GODOT_BIN
-# Prepend the binary's directory to PATH so the harness's internal bare
-# `godot` call also resolves (must happen before the first harness call).
-export PATH="$(dirname "$GODOT_BIN"):$PATH"
+python3 - "$PROJ_DIR" "$BUILDER" <<'PY'
+import json, sys, urllib.request, urllib.error
 
-echo "=== Godot compile check ==="
-python3 "$HARNESS" --compile "$PROJ_DIR"
-echo ""
+proj, builder = sys.argv[1], sys.argv[2].rstrip("/")
 
-echo "=== Godot playtest (5s) ==="
-python3 "$HARNESS" --playtest "$PROJ_DIR"
-echo ""
+SCRIPTS = [
+    "res://tests/unit_test_runner.gd",
+    "res://tests/test_save_manager.gd",
+    "res://tests/test_game_manager_fsm.gd",
+    "res://tests/test_cultivation.gd",
+    "res://tests/test_encounter.gd",
+]
 
-echo "=== Godot unit tests ==="
-"$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/unit_test_runner.gd
-"$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_save_manager.gd
-"$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_game_manager_fsm.gd
-"$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_cultivation.gd
-"$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_encounter.gd
-echo ""
 
-echo "All Godot checks passed."
+def post(path, payload, timeout):
+    req = urllib.request.Request(
+        builder + path, data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def die(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+
+try:
+    print("=== Godot compile check ===")
+    rep = post("/compile", {"project_dir": proj}, 600)
+    print(rep.get("summary", ""))
+    if not rep.get("passed", False):
+        for e in (rep.get("errors") or [])[:20]:
+            print("  %s:%s %s" % (e.get("file"), e.get("line"), e.get("msg")),
+                  file=sys.stderr)
+        die("compile gate FAILED")
+
+    print("\n=== Godot play-test ===")
+    pt = post("/playtest", {"project_dir": proj}, 900)
+    print(pt.get("summary", ""))
+    if not pt.get("passed", False):
+        for e in (pt.get("errors") or [])[:20]:
+            print("  %s" % (e if isinstance(e, str) else json.dumps(e)),
+                  file=sys.stderr)
+        die("play-test gate FAILED")
+
+    print("\n=== Godot unit suite ===")
+    sc = post("/script", {"project_dir": proj, "scripts": SCRIPTS}, 900)
+    for r in sc.get("results") or []:
+        print("  %-42s %s" % (r["script"], "ok" if r["passed"] else "FAILED"))
+        if not r["passed"]:
+            sys.stderr.write((r.get("stdout") or "")[-2000:])
+            sys.stderr.write((r.get("stderr") or "")[-2000:])
+    print(sc.get("summary", ""))
+    if not sc.get("passed", False):
+        die("unit suite FAILED")
+
+# An unreachable sidecar is an infra fault, not a code defect — but the code
+# then ships UNVERIFIED, so this must fail loudly rather than exit 0 quietly.
+except (urllib.error.URLError, OSError, TimeoutError) as e:
+    die("godot-builder unreachable at %s: %s — gate NOT run." % (builder, e))
+
+print("\nAll Godot checks passed.")
+PY

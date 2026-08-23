@@ -200,3 +200,33 @@ portion and an empty portion」——三个条件缺一不可。
 那正是本项目反复撞的墙(断言全绿、屏幕全空)。所以脊柱要留,
 只是它的职责收窄成**证明接得上**,细节交给底层那些短场景。
 
+
+
+## 闸门的接线:哪个闸门跑在哪里(不要「修」回去)
+
+三道 Godot 闸门**全部走 `godot-builder` 边车的 HTTP 接口**,
+跑管线的那个容器里**没有 godot 二进制**,将来也不会有。
+
+| 闸门 | 跑在 | 看什么 |
+|---|---|---|
+| 5_compile | 边车 `/compile` | 整仓 GDScript + `.tscn` 解析 |
+| (同一步) | 边车 `/playtest` | 真无头运行 + `playtest_spec.yaml` 断言 |
+| 5_vision | 视觉模型 | 5_compile 拍下的帧,可读性 |
+| 5_test | pytest | **Python** 测试。本仓没有 Python,故不适用 |
+
+**`run_tests.sh` 不要再改成解析本地 `godot` 路径。** 它曾经有一段四级
+`GODOT_BIN` 探测(env → 绝对路径 → `command -v` → 报错),四级全部落空,
+每一轮都报 `godot binary not found`,而 5_review 每一轮都据此拦下整个 run,
+PM 每一轮都派一个实现者去「修 PATH」——**去找一个根本不在这个文件系统里的
+二进制**。现在它 POST 给边车。
+
+**GDScript 单元套件从来没有跑过。** `tests/` 下 5 个 `extends SceneTree`
+的入口(`unit_test_runner` + `test_save_manager` / `test_game_manager_fsm` /
+`test_cultivation` / `test_encounter`)带着另外 12 个静态测试文件,
+一次都没有被执行过——因为它唯一的入口是 `tests/test_godot_suite.py`,
+而那条路上有**两堵墙**:pytest 的每测 60 秒上限,和 `run_tests` 工具
+外层 75 秒的总墙(它跑在调度器线程上,所以必须短)。编译一次就要两分钟,
+`test_godot_suite.py` **在结构上不可能通过**,它只会产出假红。
+
+所以那个包装被删了,套件的正确归宿是 5_compile(自己的 1200 秒预算,
+同一个边车)。在它接进去之前,**这一层是空的,不要把它当成绿灯**。
