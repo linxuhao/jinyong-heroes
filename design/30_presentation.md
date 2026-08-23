@@ -285,3 +285,44 @@ PM 每一轮都派一个实现者去「修 PATH」——**去找一个根本不�
 - 选中后在网格上高亮该招式的可及范围与其中的合法目标
 - 把 `basic_attack` 这个动作名改成表意的(它并不只是普攻)
 
+## 断言里必须有比较运算符,否则它什么都没测
+
+playtest 闸门**只在值里含有比较/逻辑运算符**(`==` `!=` `<` `>` `and` `or` …)
+时才把它当 GDScript 表达式求值。不含运算符的值被当成**标量字符串**,
+拿去和活节点的属性做相等比较。
+
+于是这样写:
+
+```yaml
+RoundIndicator.active_text: 'active_text.contains("行动")'
+```
+
+实际被求值成:
+
+```
+active_text == "active_text.contains("行动")"
+```
+
+——把标签文字拿去和「`active_text.contains("行动")`」这一串**字面量**比。
+**永远为假,而且不报错。**
+
+两种坏法,后一种更阴:
+
+| 属性类型 | 结果 |
+|---|---|
+| Array(如 `status_names` / `gongfa_ids` / `traits`) | 报 `Invalid operands to operator ==, Array and String`,至少看得见 |
+| String(如 `active_text`) | **静默恒假**,看起来就像功能坏了 |
+
+已发现 5 条这样写的断言,分布在 `round_one_snapshot_and_turn_order`、
+`dot_resolves_at_victim_turn_start`、`sect_switch_same_school_connects`、
+`trait_combat_effects_and_twelve_slots`。**其中 String 那条一直被当成
+「回合指示器坏了」的证据**,而回合指示器可能一直是好的。
+
+**写法:补一个 `== true`。**
+
+```yaml
+RoundIndicator.active_text: 'active_text.contains("行动") == true'
+```
+
+这也意味着:**一个场景的失败条数,在这些断言修好之前不能当作游戏质量的度量。**
+
