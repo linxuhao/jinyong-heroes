@@ -41,6 +41,11 @@ var state_text: String = ""
 ## the HUD; drives the CooldownLabel number shown over the cooldown overlay.
 var cooldown_remaining: int = 0
 
+## Observable: whether the CooldownOverlay is currently visible. Synced to
+## overlay.visible on every update_cooldown() call; readable by the playtest
+## surface as SkillButtonN.overlay_visible.
+var overlay_visible: bool = false
+
 ## Observable selection flag: true when the player's currently selected skill
 ## is this button (player.selected_skill_index == skill_index). Written every
 ## frame by the HUD; drives the golden selected border (已选中 state).
@@ -128,17 +133,26 @@ func update_cooldown(remaining: int, total: int) -> void:
 	if overlay == null:
 		return
 
-	var is_on_cooldown: bool = remaining > 0 and total > 0
-	overlay.visible = is_on_cooldown
+	# Visibility is decided by remaining > 0 alone: a cooling skill whose total
+	# is missing / zero must still show a full overlay (previously the
+	# `remaining > 0 and total > 0` condition hid it entirely).
+	var show: bool = remaining > 0
+	overlay.visible = show
+	overlay_visible = show
 
-	if is_on_cooldown:
-		# The overlay covers from the top, shrinking downward as the cooldown
-		# counts down. anchor_bottom moves from 1.0 (full height) upward.
-		var progress: float = float(remaining) / float(total)
-		overlay.anchor_top = 0.0
-		overlay.anchor_bottom = progress
-		overlay.offset_top = 0.0
-		overlay.offset_bottom = 0.0
+	# Fraction-of-rounds fill from the top (anchor_bottom moves from 1.0 down);
+	# fall back to a full overlay when the total is missing / zero so we never
+	# divide by zero (GDScript would otherwise produce inf).
+	var fraction: float = 1.0 if total <= 0 else float(remaining) / float(total)
+	overlay.anchor_top = 0.0
+	overlay.anchor_bottom = fraction
+	overlay.offset_top = 0.0
+	overlay.offset_bottom = 0.0
+
+	if not show:
+		# Cooldown ended: reset the anchors to the full rect so a later
+		# cooldown never starts from a stale partial fill.
+		overlay.anchor_bottom = 1.0
 
 
 ## Apply the four-state visual presentation for this button. The state data
