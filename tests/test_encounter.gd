@@ -50,7 +50,7 @@ func _run() -> void:
 	_sm.delete_slot(1)
 	_sm.delete_slot(2)
 	_sm.delete_slot(3)
-	var ok := _test_all()
+	var ok := await _test_all()
 	# Restore the autoloads to their canonical boot state for later checks.
 	CombatManager.reset_battle()
 	_gm.clear_battle()
@@ -66,6 +66,7 @@ func _run() -> void:
 func _test_all() -> bool:
 	var ok := true
 	ok = _test_encounter_field_ready(ok)
+	ok = await _test_encounter_battle_live(ok)
 	ok = _test_start_encounter_transition(ok)
 	ok = _test_request_retry_routes_to_cultivation(ok)
 	ok = _test_sparring_partner_shape(ok)
@@ -103,6 +104,37 @@ func _test_encounter_field_ready(ok: bool) -> bool:
 		"encounter: the registered enemy is the sparring partner")
 	ok = _expect(ok, player != null and "traits" in player and player.traits.has("sha_po_lang"),
 		"encounter: profile trait sha_po_lang wired onto the player node")
+	_teardown(node)
+	return ok
+
+
+# --- (live) encounter round-1 kick-off pin -----------------------------------
+
+## End-to-end regression pin for the exact bug this round fixes: the encounter
+## battle never started. The pre-swap battle_started signal fired while the
+## roster was still empty, and the deferred kick-off that the battlefield queues
+## at the END of _setup_encounter_battle() (HUD wiring, then
+## CombatManager.begin_battle.call_deferred()) is what actually brings round 1
+## up. One await process_frame lets Godot's MessageQueue flush that FIFO pair:
+## begin_battle() -> _begin_if_ready() -> current_round = 1 ->
+## _begin_round() -> _next_turn() sets phase = "PLAYER_TURN" and
+## active_unit_name = "ProgressionHero" synchronously, before the player-turn
+## loop suspends. Without the battlefield change the deferred flush never calls
+## begin_battle(), so the phase assert below cannot pass.
+func _test_encounter_battle_live(ok: bool) -> bool:
+	var node: Node = _spawn_encounter_battlefield()
+	# SceneTree's own signal: this script extends SceneTree (not Node), so
+	# get_tree() does not exist here — awaiting `process_frame` is the correct
+	# frame-wait idiom and lets the end-of-frame deferred flush run once.
+	await process_frame
+	ok = _expect(ok, CombatManager.phase == "PLAYER_TURN",
+		"live: phase == PLAYER_TURN after one deferred flush")
+	ok = _expect(ok, CombatManager.current_round == 1,
+		"live: current_round == 1")
+	ok = _expect(ok, CombatManager.empty_round_stalls == 0,
+		"live: empty_round_stalls == 0 (round 1 started with a live roster)")
+	ok = _expect(ok, CombatManager.active_unit_name == "ProgressionHero",
+		"live: active_unit_name == ProgressionHero (player wins round-1 initiative)")
 	_teardown(node)
 	return ok
 
