@@ -78,7 +78,7 @@ func end_battle(won: bool) -> void:
 		current_state = "LOST"
 		game_lost.emit()
 		state_changed.emit("LOST")
-		_show_end_game_overlay("Defeat…")
+		_show_end_game_overlay("Defeat")
 
 # ---------------------------------------------------------------------------
 # Public API — Enemy tracking

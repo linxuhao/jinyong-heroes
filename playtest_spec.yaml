@@ -29,7 +29,7 @@ surface:
   North_Beggar:   [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names]
   Central_Divine: [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names, sprite_top]
   HUD: [visible, size, skill8_right_edge, round_pause_overlap]
-  RoundIndicator: [visible, current_round, active_actor, order_names]
+  RoundIndicator: [visible, current_round, active_actor, order_names, active_text]
   SkillBar: [visible, size, global_position]
   SkillButton1: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
   SkillButton2: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible]
@@ -418,6 +418,20 @@ scenarios:
           HealthBar.follow_delta: 'follow_delta <= 24'
           HealthBar.fill_color: 'fill_color.g > 0.5 and fill_color.g > fill_color.r'
           HealthBar.name_text: 'name_text == "Yang Guo"'
+          # Active-actor line: during the player's round-1 turn (frame 30) the
+          # ActiveLine shows "Active: Yang Guo · Move 4 · Act ✓" — contains
+          # "Move" and ends with the mandated "Act ✓" (U+2713).
+          RoundIndicator.active_text: 'active_text.contains("Move") and active_text.ends_with("Act ✓")'
+          # No-ellipsis sweep: none of the 8 skill buttons' text may contain
+          # the ellipsis character U+2026 ("…").
+          SkillButton1.text: 'text.contains("…") == false'
+          SkillButton2.text: 'text.contains("…") == false'
+          SkillButton3.text: 'text.contains("…") == false'
+          SkillButton4.text: 'text.contains("…") == false'
+          SkillButton5.text: 'text.contains("…") == false'
+          SkillButton6.text: 'text.contains("…") == false'
+          SkillButton7.text: 'text.contains("…") == false'
+          SkillButton8.text: 'text.contains("…") == false'
       # --- Scripted move: the player walks 3 tiles up; the health bar must
       #     track the character (follow_delta stays small) and actually move
       #     (global_position differential). ---

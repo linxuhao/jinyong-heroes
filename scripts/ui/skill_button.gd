@@ -109,6 +109,11 @@ func setup(skill, hotkey: String, fa_hui_du: float) -> void:
 		fahui_label.text = fahui_text
 
 	if skill != null:
+		# Button text never clips in Godot (Button has no clip_text) — a
+		# too-long name paints over the neighbor instead. The short display-name
+		# set (<= ~12 chars, fixed in battlefield.gd _create_all_skill_data) is
+		# the guard; if a future name exceeds that, shorten the NAME — never an
+		# ellipsis (no-ellipsis sweep, design/30_presentation.md).
 		text = skill.skill_name
 		tooltip_text = skill.description
 	else:

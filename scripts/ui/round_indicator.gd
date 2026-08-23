@@ -16,6 +16,12 @@ var active_actor: String = ""
 ## Initiative order snapshot for the current round (names, first to act).
 var order_names: Array[String] = []
 
+## Full ActiveLine string for the current frame, e.g.
+## "Active: Yang Guo · Move 4 · Act ✓". Written by update_display every frame
+## (outside the label-null guard) so the playtest surface stays live even if
+## the ActiveLabel node is missing. "✓" = U+2713; "·" = U+00B7.
+var active_text: String = ""
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -53,10 +59,15 @@ func _active_text(actor: String) -> String:
 	var player: Node = GameManager.get_player()
 	if player == null or not is_instance_valid(player):
 		return "Active: %s" % actor
+	# Defensive guards (task contract): a player node that lacks moves_left /
+	# acted (e.g. a non-player scene) falls back to "Move 0 / End" instead of
+	# throwing on property access. `in` on an Object tests property existence.
+	var moves_left: int = int(player.moves_left) if "moves_left" in player else 0
+	var acted: bool = bool(player.acted) if "acted" in player else true
 	return "Active: %s · Move %d · %s" % [
 		actor,
-		int(player.moves_left),
-		("Act ✓" if not bool(player.acted) else "End"),
+		moves_left,
+		("Act ✓" if not acted else "End"),
 	]
 
 # ---------------------------------------------------------------------------
@@ -71,6 +82,11 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 	current_round = round_num
 	active_actor = actor
 	order_names = order.duplicate()
+
+	# Observable ActiveLine string — written unconditionally (outside the
+	# label-null guard below) so the surface stays live even if the ActiveLabel
+	# node is missing from the scene.
+	active_text = _active_text(actor)
 
 	var round_label: Label = _round_label
 	if round_label == null:
@@ -90,7 +106,7 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		if active_label != null:
 			_active_label = active_label
 	if active_label != null:
-		active_label.text = _active_text(actor)
+		active_label.text = active_text
 
 	var order_label: Label = _order_label
 	if order_label == null:
