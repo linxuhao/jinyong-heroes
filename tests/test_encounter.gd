@@ -173,7 +173,7 @@ func _test_sparring_partner_shape(ok: bool) -> bool:
 		ok = _expect(ok, str(art.attribute) == "yang", "sparring: art attribute yang")
 		ok = _expect(ok, bool(art.mastered), "sparring: art mastered")
 		ok = _expect(ok, art.techniques.is_empty(), "sparring: art has no techniques")
-		ok = _expect(ok, absf(GongfaData.get_fa_hui_du(art, cd) - 1.3) < 0.0001,
+		ok = _expect(ok, absf(art.get_fa_hui_du(cd) - 1.3) < 0.0001,
 			"sparring: art fhd == 1.3 via the real cascade")
 	ok = _expect(ok, EncounterData.sparring_partner_tile() == Vector2i(7, 4),
 		"sparring: partner tile (7,4)")
@@ -215,9 +215,12 @@ func _test_battle_setup_traits_and_equip(ok: bool) -> bool:
 
 ## Fresh encounter context: new profile (traits incl. sha_po_lang so the traits
 ## wire is observable), one wudang sword art (so BattleSetup has gongfa + a main
-## external school), state CULTIVATION, battle_return_state reset to TUTORIAL
-## (start_encounter must override it), then the battlefield scene instantiated
-## and added to the root so _ready() runs the encounter branch.
+## external school), state CULTIVATION and battle_return_state == CULTIVATION set
+## BEFORE the scene is instantiated — battlefield._ready() branches on
+## get_battle_return_state(), so it must already read "CULTIVATION" when the scene
+## enters the tree (start_encounter() would be too late: _ready runs during
+## add_child). Then the battlefield scene is added to the root so _ready() runs
+## the encounter branch.
 func _spawn_encounter_battlefield() -> Node:
 	_sm.new_profile({}, ["sha_po_lang"])
 	_sm.profile.cultivation["sect_id"] = "wudang"
@@ -226,7 +229,7 @@ func _spawn_encounter_battlefield() -> Node:
 	_gm.clear_battle()
 	CombatManager.reset_battle()
 	_gm.current_state = "CULTIVATION"
-	_gm.set_battle_return_state("TUTORIAL")
+	_gm.set_battle_return_state("CULTIVATION")
 	var inst: Node = BATTLEFIELD_SCENE.instantiate()
 	root.add_child(inst)
 	return inst
