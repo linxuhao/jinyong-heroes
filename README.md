@@ -6,6 +6,8 @@ This build replaces the previous real-time-with-pause combat with a **strictly s
 
 Beyond the duel, the game ships the full **six-segment line** (design/40_progression.md): **tutorial win → transition → character creation → sect selection → cultivation (36 months) → map → ending**. The battlefield is one routable scene, not the whole game: `scenes/main.tscn` is a persistent shell (Camera + `SceneHost` + HUD/tutorial layers) and the `SceneManager` autoload hosts exactly one active segment scene under `SceneHost` at a time.
 
+> **⚠️ Build status: NOT VERIFIED — do not ship.** The downstream hard gates do not confirm readiness: **5_vision failed 3/6 readability checks** (skill-button state change, turn/action state change, and text clipping / left-edge cutoff) and **5_test collected zero tests** (the 14 GDScript unit tests were not actually run). See the Verification Status note at the bottom. `final/verify_report.json` → `all_goals_met: false`, `ready_for_deploy: false`.
+
 ## Quick Start
 
 1. Open the project in **Godot 4.4+**.
@@ -238,7 +240,12 @@ The playtest contract (`playtest_spec.yaml`) carries **20 scenarios**: the ten b
 
 A passing run requires a clean compile and a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 
-> **Verification status: NOT YET VERIFIED (this step's evidence is produced by the downstream gates).** As the final-verification step, structural integration was confirmed by sampling (scene routing, FSM, save/profile/RNG/decks, theme, fa_hui_du cascade with staged tutorial values, all six segment scenes, the 20-scenario playtest contract, and the test harness). The runtime gates — **5_compile** (`compile_report.json`), **5_vision** (`vision_report.json`, the six readability checks), and **5_test** (`test_report.json`) — run *after* this step and had not produced their reports when this document was written. Until those gates run green, `final/verify_report.json` reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. (Note: a prior run's vision gate failed 3/6 readability checks; the current build adds the light-gray expand-margin health-bar track, the gold selected-skill border, and no-ellipsis end text to address exactly those three failures, but that fix has not yet been re-verified.) To run the full gate:
+> **Verification status: NOT VERIFIED — gates RED/INCONCLUSIVE (do not ship).** Structural integration was confirmed by sampling (scene routing, FSM, save/profile/RNG/decks, theme, fa_hui_du cascade with staged tutorial values, all six segment scenes, the 20-scenario playtest contract, and the test harness). The downstream runtime gates have since reported, and they do **not** confirm readiness:
+>
+> - **5_vision — FAILED** (`vision_report.json` passed:false): 3 of 6 readability hard checks red. Q3 (skill-button appearance changes over time) failed in 15/20 scenarios; Q4 (turn/action state changes visibly) failed in 10/20; Q6 (no truncated/clipped text) failed in 10/20 — concrete top/left-edge clipping on the battlefield (cooldowns, dot/turn overlays) **and** on segment screens (spine, transition, cultivation). Success criteria 4 (Chinese renders with no clipped text) and 5 (5_vision six checks green) are **not** met.
+> - **5_test — INCONCLUSIVE** (`test_report.json` no_tests_collected:true, returncode 5): the pytest wrapper collected zero tests, so the 14 GDScript unit tests under `tests/` were **not** actually executed or confirmed passing. Success criterion 3 (same seed → identical card sequence) is unverified. The real test evidence must come from the Godot suite (`run_tests.sh` → `tests/unit_test_runner.gd` + `tests/test_*.gd`), not a Python pytest collection.
+>
+> `final/verify_report.json` therefore reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. After the vision and test failures are fixed, re-run the full gate (compile + playtest + vision + test) and confirm every gate green before flipping the verdict. To run the full gate:
 
 ```bash
 ./run_tests.sh
