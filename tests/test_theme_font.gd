@@ -5,9 +5,9 @@
 ## script plus the assertion contract from task_plan.md acceptance criterion 2.
 ##
 ## The fahui formatter is a pure static function on SkillButton (extends
-## Button), so it is testable without instantiating any scene. Only
-## exactly-representable decimals are used (0.9 / 1.0 / 1.2 / 1.3 / 2.0) so the
-## `%.1f` formatting is unambiguous.
+## Button), so it is testable without instantiating any scene. Exactly
+## representable decimals are used throughout, so the %.2f-then-strip
+## formatting is unambiguous for every asserted value.
 
 const SkillButton = preload("res://scripts/ui/skill_button.gd")
 

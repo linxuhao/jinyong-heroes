@@ -101,19 +101,28 @@ var _selected_marker = null
 # Public API
 # ---------------------------------------------------------------------------
 
-## Fa hui du label for a multiplier (display only, pure function): every value
-## renders as "发挥 ×N.N" with the multiplier to one decimal place
-## (e.g. "发挥 ×1.3"). Static so unit tests can exercise it without
-## instantiating a scene.
+## Fa hui du label for a multiplier (display only, pure function): renders
+## "发挥 ×<fhd>" with minimal decimals and at least one decimal. The cascade
+## ladder's two-decimal value 0.85 (缺1, design/10_systems.md §4) renders as
+## "发挥 ×0.85", while one-decimal values (0.6/0.7/1.0/1.1/1.2/1.3) render
+## byte-identically to the old %.1f output. Algorithm: "%.2f" -> rstrip("0")
+## -> rstrip(".") -> append ".0" when no "." remains (so 1.0 stays "1.0").
+## Static so unit tests can exercise it without instantiating a scene.
 static func fa_hui_du_label(fhd: float) -> String:
-	return "发挥 ×%.1f" % fhd
+	var s := "%.2f" % fhd
+	s = s.rstrip("0")
+	s = s.rstrip(".")
+	if not s.contains("."):
+		s += ".0"
+	return "发挥 ×" + s
 
 ## Configure this button with a skill, a hotkey label, and the fa hui du
 ## multiplier of the external art that produced the skill.
 ## hotkey is a string like "1".."8". fa_hui_du drives the FahuiLabel text via
 ## the static fa_hui_du_label() helper:
 ##   any fhd -> "发挥 ×<fhd>"
-## The multiplier is formatted to one decimal place (Chinese + digits).
+## The multiplier is formatted with minimal decimals and at least one decimal
+## (Chinese + digits): 0.85 -> "发挥 ×0.85", 1.0 -> "发挥 ×1.0".
 ## Child labels are resolved defensively via get_node_or_null (health_bar.gd
 ## pattern) so setup() is call-order independent.
 func setup(skill, hotkey: String, fa_hui_du: float) -> void:
