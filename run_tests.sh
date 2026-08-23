@@ -19,6 +19,7 @@ echo "=== Godot unit tests ==="
 "$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/unit_test_runner.gd
 "$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_save_manager.gd
 "$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_game_manager_fsm.gd
+"$GODOT_BIN" --headless --path "$PROJ_DIR" -s res://tests/test_cultivation.gd
 echo ""
 
 echo "All Godot checks passed."

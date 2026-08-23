@@ -237,7 +237,17 @@ func _apply_card(card: Dictionary) -> void:
 			_add_practice(int(card.get("effect_value", 0)))
 		"trait":
 			var tid: String = card.get("id", "")
-			if tid != "":
+			if tid == "gr_trait_pool":
+				# Monthly growth card 机缘悟道 (step2_design §8.5): grant one
+				# random unowned positive trait — drawn from the not-yet-owned
+				# pool via the single RNG instance, in operation order. Never
+				# offer an id the profile already owns.
+				var pool: Array[String] = CardData.build_trait_deck(SaveManager.profile.traits)
+				if not pool.is_empty():
+					var pick: String = pool[SaveManager.rng.randi_range(0, pool.size() - 1)]
+					SaveManager.profile.add_trait(pick)
+			elif tid != "" and TraitData.get_def(tid) != null:
+				# Yearly trait-deck card: the card id IS the trait id.
 				SaveManager.profile.add_trait(tid)
 		"tech_unlock", "shen_gong", "":
 			pass  # data hooks this round (step2_design §8.5)
