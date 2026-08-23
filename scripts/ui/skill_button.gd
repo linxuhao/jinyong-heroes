@@ -187,47 +187,50 @@ func update_cooldown(remaining: int, total: int) -> void:
 ## a scene). Returns a Dictionary:
 ##   { "bg_color": Color, "border_color": Color, "border_width": int,
 ##     "tag_text": String }
-## Contract values (design/30_presentation.md item 2 — pairwise distinct):
-##   ready:        bg (0.20,0.24,0.30) border (0.35,0.40,0.48) w1 tag ""
-##   cooldown:     bg (0.16,0.16,0.20) border (0.42,0.42,0.46) w1 tag ""
-##   phase_locked: bg (0.32,0.32,0.34) border (0.55,0.55,0.58) w2 tag "锁定"
-##   hp_gated:     bg (0.40,0.12,0.12) border (0.75,0.25,0.25) w2 tag "气血"
+## Contract values (task_plan fix_vision_gate_readability — pairwise bg
+## luminance spread >= 0.10 via Color.get_luminance(), pre-computed: ready
+## 0.3874, cooldown 0.0814, phase_locked 0.5306, hp_gated 0.2020, so a vision
+## model can tell the states apart):
+##   ready:        bg (0.30,0.40,0.52) border (0.50,0.60,0.72) w1 tag ""
+##   cooldown:     bg (0.08,0.08,0.10) border (0.32,0.32,0.36) w1 tag ""
+##   phase_locked: bg (0.55,0.53,0.48) border (0.68,0.66,0.60) w2 tag "锁定"
+##   hp_gated:     bg (0.58,0.10,0.10) border (0.85,0.28,0.28) w2 tag "气血"
 ## Unknown state -> ready palette.
 static func state_palette(state: String) -> Dictionary:
 	match state:
 		"cooldown":
 			return {
-				"bg_color": Color(0.16, 0.16, 0.20),
-				"border_color": Color(0.42, 0.42, 0.46),
+				"bg_color": Color(0.08, 0.08, 0.10),
+				"border_color": Color(0.32, 0.32, 0.36),
 				"border_width": 1,
 				"tag_text": "",
 			}
 		"phase_locked":
 			return {
-				"bg_color": Color(0.32, 0.32, 0.34),
-				"border_color": Color(0.55, 0.55, 0.58),
+				"bg_color": Color(0.55, 0.53, 0.48),
+				"border_color": Color(0.68, 0.66, 0.60),
 				"border_width": 2,
 				"tag_text": "锁定",
 			}
 		"hp_gated":
 			return {
-				"bg_color": Color(0.40, 0.12, 0.12),
-				"border_color": Color(0.75, 0.25, 0.25),
+				"bg_color": Color(0.58, 0.10, 0.10),
+				"border_color": Color(0.85, 0.28, 0.28),
 				"border_width": 2,
 				"tag_text": "气血",
 			}
 		_:
 			return {
-				"bg_color": Color(0.20, 0.24, 0.30),
-				"border_color": Color(0.35, 0.40, 0.48),
+				"bg_color": Color(0.30, 0.40, 0.52),
+				"border_color": Color(0.50, 0.60, 0.72),
 				"border_width": 1,
 				"tag_text": "",
 			}
 
 
 ## Cached StyleBoxFlat for a state — allocated once per state, never per frame
-## per button. border_color is mutated in place when `selected` flips; nothing
-## else changes after creation.
+## per button. border_color AND border_width are mutated in place by
+## _apply_state when `selected` flips; nothing else changes after creation.
 func _stylebox_for(state: String) -> StyleBoxFlat:
 	if _state_styleboxes.has(state):
 		return _state_styleboxes[state]
@@ -260,10 +263,17 @@ func _apply_state(state: String) -> void:
 	# Per-state StyleBoxFlat override applied to BOTH "normal" and "disabled":
 	# a disabled button (cooldown / phase_locked / hp_gated) renders the
 	# "disabled" stylebox, so the state styling must shadow both, or the flat
-	# default-theme gray wins. The cached box is shared; only border_color
-	# mutates (gold when selected, palette border otherwise).
+	# default-theme gray wins. The cached box is shared across all 8 buttons
+	# per state; when selected the border WIDTH is raised to 3px AND recolored
+	# gold (the palette border is only 1-2px), otherwise width + color are
+	# restored from the palette — idempotent per-frame writes, no allocation.
 	var sb: StyleBoxFlat = _stylebox_for(state)
-	sb.border_color = SELECTED_BORDER_COLOR if selected else palette["border_color"]
+	if selected:
+		sb.set_border_width_all(3)
+		sb.border_color = SELECTED_BORDER_COLOR
+	else:
+		sb.set_border_width_all(int(palette["border_width"]))
+		sb.border_color = palette["border_color"]
 	add_theme_stylebox_override("normal", sb)
 	add_theme_stylebox_override("disabled", sb)
 

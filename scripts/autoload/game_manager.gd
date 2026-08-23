@@ -93,6 +93,13 @@ var _overlay_layer: CanvasLayer = null
 ## not terminal states.
 var battle_return_state: String = "TUTORIAL"
 
+## Observable: the end-game overlay's rendered text, written unconditionally
+## inside _show_end_game_overlay() whenever the overlay shows (WON -> text
+## containing 胜利, LOST -> text containing 战败). Never contains the ellipsis
+## character U+2026 "…" or "..." (repo-wide no-ellipsis rule for UI text) —
+## asserted by test_game_manager_fsm and the playtest surface.
+var end_overlay_text: String = ""
+
 # ---------------------------------------------------------------------------
 # Public API — State queries
 # ---------------------------------------------------------------------------
@@ -132,7 +139,7 @@ func end_battle(won: bool) -> void:
 		current_state = "LOST"
 		game_lost.emit()
 		state_changed.emit("LOST")
-		_show_end_game_overlay("败于华山论剑…\n\n按回车重试")
+		_show_end_game_overlay("败于华山论剑\n\n按回车重试")
 
 # ---------------------------------------------------------------------------
 # Public API — Battle context & WON/LOST routing (combat_cleanup)
@@ -271,6 +278,9 @@ func get_player() -> Node:
 ## Uses a CanvasLayer so it renders above all game content.
 ## Guarded against duplicate overlays.
 func _show_end_game_overlay(text: String) -> void:
+	# Observable: always record the rendered text (outside the overlay-null
+	# guard) so the playtest surface reads it in every show path.
+	end_overlay_text = text
 	if _overlay_layer != null:
 		# Overlay already exists — just update the text.
 		# Safe: get_node_or_null re-resolves the path each call and returns

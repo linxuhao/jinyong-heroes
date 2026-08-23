@@ -21,39 +21,49 @@ const GOLD := Color(1.0, 0.84, 0.0, 1.0)
 static func run() -> bool:
 	var ok := true
 
-	# --- Acceptance 1: palette contract, pairwise-distinct backgrounds, and
-	# --- Chinese tags (界面文字一律中文).
+	# --- Acceptance 1: palette contract, pairwise bg luminance spread >= 0.10,
+	# --- and Chinese tags (界面文字一律中文). The verbatim values come from
+	# --- task_plan fix_vision_gate_readability / research_notes (pre-computed
+	# --- Rec.709 luminance table) — deviating from them fails the Q3
+	# --- distinguishability objective (review-fix 1: cooldown bg was darkened
+	# --- to (0.08,0.08,0.10) so cooldown vs hp_gated spread clears 0.10).
 	var ready: Dictionary = SkillButtonScript.state_palette("ready")
 	var cooldown: Dictionary = SkillButtonScript.state_palette("cooldown")
 	var phase_locked: Dictionary = SkillButtonScript.state_palette("phase_locked")
 	var hp_gated: Dictionary = SkillButtonScript.state_palette("hp_gated")
 
-	ok = _expect(ok, ready["bg_color"].is_equal_approx(Color(0.20, 0.24, 0.30)), "ready bg_color")
-	ok = _expect(ok, ready["border_color"].is_equal_approx(Color(0.35, 0.40, 0.48)), "ready border_color")
+	ok = _expect(ok, ready["bg_color"].is_equal_approx(Color(0.30, 0.40, 0.52)), "ready bg_color")
+	ok = _expect(ok, ready["border_color"].is_equal_approx(Color(0.50, 0.60, 0.72)), "ready border_color")
 	ok = _expect(ok, int(ready["border_width"]) == 1, "ready border_width == 1")
 	ok = _expect(ok, ready["tag_text"] == "", 'ready tag_text == ""')
 
-	ok = _expect(ok, cooldown["bg_color"].is_equal_approx(Color(0.16, 0.16, 0.20)), "cooldown bg_color")
-	ok = _expect(ok, cooldown["border_color"].is_equal_approx(Color(0.42, 0.42, 0.46)), "cooldown border_color")
+	ok = _expect(ok, cooldown["bg_color"].is_equal_approx(Color(0.08, 0.08, 0.10)), "cooldown bg_color")
+	ok = _expect(ok, cooldown["border_color"].is_equal_approx(Color(0.32, 0.32, 0.36)), "cooldown border_color")
 	ok = _expect(ok, int(cooldown["border_width"]) == 1, "cooldown border_width == 1")
 	ok = _expect(ok, cooldown["tag_text"] == "", 'cooldown tag_text == ""')
 
-	ok = _expect(ok, phase_locked["bg_color"].is_equal_approx(Color(0.32, 0.32, 0.34)), "phase_locked bg_color")
-	ok = _expect(ok, phase_locked["border_color"].is_equal_approx(Color(0.55, 0.55, 0.58)), "phase_locked border_color")
+	ok = _expect(ok, phase_locked["bg_color"].is_equal_approx(Color(0.55, 0.53, 0.48)), "phase_locked bg_color")
+	ok = _expect(ok, phase_locked["border_color"].is_equal_approx(Color(0.68, 0.66, 0.60)), "phase_locked border_color")
 	ok = _expect(ok, int(phase_locked["border_width"]) == 2, "phase_locked border_width == 2")
 	ok = _expect(ok, phase_locked["tag_text"] == "锁定", 'phase_locked tag_text == "锁定"')
 
-	ok = _expect(ok, hp_gated["bg_color"].is_equal_approx(Color(0.40, 0.12, 0.12)), "hp_gated bg_color")
-	ok = _expect(ok, hp_gated["border_color"].is_equal_approx(Color(0.75, 0.25, 0.25)), "hp_gated border_color")
+	ok = _expect(ok, hp_gated["bg_color"].is_equal_approx(Color(0.58, 0.10, 0.10)), "hp_gated bg_color")
+	ok = _expect(ok, hp_gated["border_color"].is_equal_approx(Color(0.85, 0.28, 0.28)), "hp_gated border_color")
 	ok = _expect(ok, int(hp_gated["border_width"]) == 2, "hp_gated border_width == 2")
 	ok = _expect(ok, hp_gated["tag_text"] == "气血", 'hp_gated tag_text == "气血"')
 
-	# Pairwise-distinct backgrounds across the four states.
-	var bgs: Array = [ready["bg_color"], cooldown["bg_color"], phase_locked["bg_color"], hp_gated["bg_color"]]
-	for i in range(bgs.size()):
-		for j in range(i + 1, bgs.size()):
-			ok = _expect(ok, not bgs[i].is_equal_approx(bgs[j]),
-					"bg_color %d and %d pairwise distinct" % [i, j])
+	# Pairwise luminance spread across the four states (all 6 ordered pairs
+	# >= 0.10 — the Q3 visibility contract; computed live from the actual
+	# palette via Color.get_luminance()).
+	var state_names: Array = ["ready", "cooldown", "phase_locked", "hp_gated"]
+	var palettes: Array = [ready, cooldown, phase_locked, hp_gated]
+	for i in range(state_names.size()):
+		for j in range(i + 1, state_names.size()):
+			var lum_i: float = palettes[i]["bg_color"].get_luminance()
+			var lum_j: float = palettes[j]["bg_color"].get_luminance()
+			var spread: float = absf(lum_i - lum_j)
+			ok = _expect(ok, spread >= 0.10,
+					"%s vs %s bg luminance spread %.4f >= 0.10" % [state_names[i], state_names[j], spread])
 
 	# Unknown state falls back to the ready palette.
 	var unknown: Dictionary = SkillButtonScript.state_palette("bogus_state")
