@@ -15,23 +15,23 @@ const SkillButton = preload("res://scripts/ui/skill_button.gd")
 static func run() -> bool:
 	var ok := true
 
-	ok = _expect(ok, SkillButton.fa_hui_du_label(0.9) == "失常 ×0.9",
-		"fa_hui_du_label(0.9) == 失常 ×0.9")
-	ok = _expect(ok, SkillButton.fa_hui_du_label(1.0) == "正常 ×1.0",
-		"fa_hui_du_label(1.0) == 正常 ×1.0")
-	ok = _expect(ok, SkillButton.fa_hui_du_label(1.2) == "正常 ×1.2",
-		"fa_hui_du_label(1.2) == 正常 ×1.2")
-	ok = _expect(ok, SkillButton.fa_hui_du_label(1.3) == "超常 ×1.3",
-		"fa_hui_du_label(1.3) == 超常 ×1.3")
-	ok = _expect(ok, SkillButton.fa_hui_du_label(2.0) == "超常 ×2.0",
-		"fa_hui_du_label(2.0) == 超常 ×2.0")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(0.9) == "发挥 ×0.9",
+		"fa_hui_du_label(0.9) == 发挥 ×0.9")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(1.0) == "发挥 ×1.0",
+		"fa_hui_du_label(1.0) == 发挥 ×1.0")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(1.2) == "发挥 ×1.2",
+		"fa_hui_du_label(1.2) == 发挥 ×1.2")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(1.3) == "发挥 ×1.3",
+		"fa_hui_du_label(1.3) == 发挥 ×1.3")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(2.0) == "发挥 ×2.0",
+		"fa_hui_du_label(2.0) == 发挥 ×2.0")
 
-	# Band boundaries are exclusive the same way setup() applies them: < 1.0 is
-	# 失常, 1.0..1.2 is 正常, > 1.2 is 超常.
-	ok = _expect(ok, SkillButton.fa_hui_du_label(0.99) == "失常 ×1.0",
-		"fa_hui_du_label(0.99) == 失常 ×1.0")
-	ok = _expect(ok, SkillButton.fa_hui_du_label(1.21) == "超常 ×1.2",
-		"fa_hui_du_label(1.21) == 超常 ×1.2")
+	# Every multiplier renders as "发挥 ×N.N" (one decimal) regardless of band —
+	# the band labels (失常/正常/超常) are gone (design §2.1 mandated format).
+	ok = _expect(ok, SkillButton.fa_hui_du_label(0.99) == "发挥 ×1.0",
+		"fa_hui_du_label(0.99) == 发挥 ×1.0")
+	ok = _expect(ok, SkillButton.fa_hui_du_label(1.21) == "发挥 ×1.2",
+		"fa_hui_du_label(1.21) == 发挥 ×1.2")
 
 	if ok:
 		print("PASS: test_theme_font")

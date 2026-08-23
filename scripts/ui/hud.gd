@@ -178,7 +178,7 @@ func _create_health_bar(character: Node, display_name: String) -> void:
 ## Instantiates exactly one SkillButton per skill with deterministic names
 ## SkillButton1..SkillButton8 (named BEFORE add_child to avoid duplicate-name
 ## errors). Hotkey = index + 1. Every tutorial art returns fa_hui_du 1.3, so
-## all buttons show "超常 ×1.3".
+## all buttons show "发挥 ×1.3".
 func _populate_skill_buttons(player: Node) -> void:
 	var skills: Array = []
 	if "skills" in player:
