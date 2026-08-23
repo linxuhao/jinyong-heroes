@@ -34,6 +34,11 @@ var name_text: String = ""
 ## reads the live layout.
 var bar_width: float = 0.0
 
+## Total widget height in pixels (= size.y; 20.0 for the compact 68×20 layout).
+## Assigned in setup() (so the headless null-char test reads it without a char
+## node) AND re-assigned in follow_character() whenever the widget lays out.
+var total_height: float = 0.0
+
 ## Edge-clamp displacement: distance between the current root center and the
 ## desired (pre-clamp) root center. ~0 when unclamped (character mid-viewport),
 ## grows by the clamp offset when pinned to a viewport edge. Computed inside
@@ -139,6 +144,11 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	# so the observable is set in every setup() path.
 	name_text = char_name
 
+	# Record the widget height observable unconditionally (outside the node
+	# guards) so the headless null-char test reads size.y (20.0) even though
+	# follow_character() returns early when _char_node is null.
+	total_height = size.y
+
 	# Connect to the character's health_changed signal.
 	if char_node != null and is_instance_valid(char_node):
 		if char_node.has_signal("health_changed"):
@@ -189,17 +199,10 @@ func follow_character() -> void:
 	# At the default scale-1 window it is numerically identical to the old
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
-	# Kept at −50 deliberately. Lifting it to −104 does put the widget above the
-	# feet, but at 110×30 it then covers the character's chest and collides with
-	# the top HUD band, and characters on the top row have no headroom left before
-	# the viewport clamp pins it. Measured 2026-08-23 by rendering both.
-	#
-	# The offset is not the real problem: a 110×30 widget carrying a 64×12 bar AND
-	# a name label is enormous against a 64px tile, so wherever it goes it either
-	# reads as a platform or hides the actor. The fix is to make it COMPACT (a
-	# thin bar, smaller label) — which belongs with the Chinese-font/global-Theme
-	# pass that re-lays out every label anyway.
-	screen_pos += Vector2(-60, -50)
+	# Compact 68×20 widget: offset by half the widget width (34) so it stays
+	# horizontally centred above the character, and −28 to float it above the
+	# feet without covering the actor or colliding with the top HUD band.
+	screen_pos += Vector2(-34, -28)
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
 	# the bar is unclamped and free-following; grows only when a viewport edge
@@ -209,6 +212,9 @@ func follow_character() -> void:
 	# when the bar node is actually present).
 	if is_instance_valid(_bar):
 		bar_width = _bar.size.x
+	# Keep the height observable live while the widget actually runs its layout
+	# pass (re-assigned on every frame follow_character() executes).
+	total_height = size.y
 	# Clamp so the bar never clips off the viewport edges.
 	var vp: Vector2 = get_viewport_rect().size
 	global_position = Vector2(

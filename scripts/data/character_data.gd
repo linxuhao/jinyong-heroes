@@ -4,6 +4,9 @@ extends Resource
 ## Instantiated programmatically in battlefield.gd — not saved as .tres files.
 
 @export var character_name: String = ""
+## Rendered display name (Chinese, design §2.1). `character_name` stays the
+## canonical English identity — this field is the display layer only.
+@export var display_name: String = ""
 @export var max_health: int = 100
 @export var move_range: int = 1           # tiles per move action
 @export var attack_damage: int = 10
