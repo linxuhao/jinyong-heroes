@@ -134,6 +134,22 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 		energy_label.text = "内力: %d" % qi
 
 
+## Battle-exit cleanup: drop every per-battle reference so a scene swap never
+## touches freed nodes. Frees the floating health bars (they hold the
+## soon-to-be-freed character refs — follow_character() already guards with
+## is_instance_valid, but the bars must not linger into the next battle) and
+## clears the skill buttons (re-populated from scratch on the next setup()).
+func clear_battle_refs() -> void:
+	for bar in _health_bars:
+		if is_instance_valid(bar):
+			bar.queue_free()
+	_health_bars.clear()
+	if _skill_bar != null and is_instance_valid(_skill_bar):
+		for child in _skill_bar.get_children():
+			_skill_bar.remove_child(child)
+			child.queue_free()
+
+
 ## Create a single health bar for a character and add it to the container.
 func _create_health_bar(character: Node, display_name: String) -> void:
 	if not is_instance_valid(_health_bar_scene):

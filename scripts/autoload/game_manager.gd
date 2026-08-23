@@ -23,6 +23,14 @@ signal game_lost()
 ## Emitted on every state transition. Passes the new state name.
 signal state_changed(new_state: String)
 
+## Emitted when the player presses continue on the WON overlay (routes to the
+## next segment). SceneManager connects here to perform the actual scene swap.
+signal continue_requested()
+
+## Emitted when the player presses retry on the LOST overlay (routes back to a
+## fresh tutorial battle). SceneManager connects here to reload the battlefield.
+signal retry_requested()
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -38,6 +46,13 @@ var _player: Node = null
 
 ## Reference to the end-game overlay CanvasLayer (guards against duplicates).
 var _overlay_layer: CanvasLayer = null
+
+## Battle context: where end_battle()'s WON/LOST route once the overlay is
+## dismissed. "TUTORIAL" = the tutorial battle (WON -> TRANSITION, LOST ->
+## retry); future encounter battles set it to "CULTIVATION" via
+## set_battle_return_state(). This is the seam that makes WON/LOST transitions,
+## not terminal states.
+var battle_return_state: String = "TUTORIAL"
 
 # ---------------------------------------------------------------------------
 # Public API — State queries
@@ -73,12 +88,59 @@ func end_battle(won: bool) -> void:
 		current_state = "WON"
 		game_won.emit()
 		state_changed.emit("WON")
-		_show_end_game_overlay("Victory! 华山论剑 Champion!")
+		_show_end_game_overlay("胜利！华山论剑的胜者！\n\n按回车继续")
 	else:
 		current_state = "LOST"
 		game_lost.emit()
 		state_changed.emit("LOST")
-		_show_end_game_overlay("Defeat")
+		_show_end_game_overlay("败于华山论剑…\n\n按回车重试")
+
+# ---------------------------------------------------------------------------
+# Public API — Battle context & WON/LOST routing (combat_cleanup)
+# ---------------------------------------------------------------------------
+
+## Set where the current battle's WON/LOST should route once dismissed.
+func set_battle_return_state(s: String) -> void:
+	battle_return_state = s
+
+
+## The current battle's return-state context (see battle_return_state).
+func get_battle_return_state() -> String:
+	return battle_return_state
+
+
+## Drop every per-battle reference owned by this autoload so a scene swap never
+## touches freed nodes: clears the enemy registry, releases the player slot
+## (set_player is first-call-wins — a stale _player would silently swallow the
+## next battle's player), and frees the end-game overlay.
+func clear_battle() -> void:
+	enemies_alive.clear()
+	_player = null
+	if _overlay_layer != null:
+		_overlay_layer.queue_free()
+		_overlay_layer = null
+
+
+## WON overlay continue: route to the next segment and notify listeners.
+## No-op unless the game is in WON.
+func request_continue() -> void:
+	if current_state != "WON":
+		return
+	current_state = "TRANSITION"
+	state_changed.emit("TRANSITION")
+	continue_requested.emit()
+
+
+## LOST overlay retry: clear battle refs, route back to the tutorial, and
+## notify listeners (SceneManager reloads a fresh battlefield). No-op unless
+## the game is in LOST.
+func request_retry() -> void:
+	if current_state != "LOST":
+		return
+	clear_battle()
+	current_state = "TUTORIAL"
+	state_changed.emit("TUTORIAL")
+	retry_requested.emit()
 
 # ---------------------------------------------------------------------------
 # Public API — Enemy tracking
@@ -186,3 +248,33 @@ func _show_end_game_overlay(text: String) -> void:
 	label.add_theme_color_override("font_color", Color.GOLD)
 	label.add_theme_font_size_override("font_size", 28)
 	panel.add_child(label)
+
+# ---------------------------------------------------------------------------
+# Input — WON/LOST continue/retry + DEBUG hooks
+# ---------------------------------------------------------------------------
+
+## WON/LOST keyboard routing: ui_accept / tutorial_next dismiss the overlay.
+## Lives in _unhandled_input (NOT on the overlay) so headless playtest key
+## presses drive the routing: the overlay dim is a plain ColorRect with no
+## focusable controls, so keyboard events reach _unhandled_input untouched.
+func _unhandled_input(event: InputEvent) -> void:
+	if current_state == "WON":
+		if event.is_action_pressed("ui_accept") or event.is_action_pressed("tutorial_next"):
+			get_viewport().set_input_as_handled()
+			request_continue()
+	elif current_state == "LOST":
+		if event.is_action_pressed("ui_accept") or event.is_action_pressed("tutorial_next"):
+			get_viewport().set_input_as_handled()
+			request_retry()
+
+
+## Consume the unbound DEBUG actions (harness-only; empty event lists in
+## project.godot, triggerable via Input.action_press). Both route through the
+## real battle pipeline via CombatManager so WON/LOST behave exactly like
+## normal play (debug_win_tutorial -> wipe enemies -> end_battle(true);
+## debug_lose_tutorial -> kill player -> end_battle(false)).
+func _process(_delta: float) -> void:
+	if Input.is_action_just_pressed("debug_win_tutorial"):
+		CombatManager.debug_wipe_enemies()
+	if Input.is_action_just_pressed("debug_lose_tutorial"):
+		CombatManager.debug_kill_player()

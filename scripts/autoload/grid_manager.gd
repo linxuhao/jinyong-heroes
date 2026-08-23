@@ -185,6 +185,14 @@ func free_tile(grid_pos: Vector2i) -> void:
 	occupancy.erase(grid_pos)
 
 
+## Release every tile occupancy (the unit<->tile mapping) so a torn-down
+## battlefield's units stop occupying the grid before the next scene
+## instantiates. The grid geometry (AStar graph / tilemap ref) is kept intact —
+## battlefield.gd re-calls setup_grid() in its own _ready().
+func clear_grid() -> void:
+	occupancy.clear()
+
+
 ## Move a unit from one tile to another. Animates with a Tween.
 ## Returns true if the move was successfully initiated.
 ## The caller should check is_in_bounds and is_occupied on 'to' first,

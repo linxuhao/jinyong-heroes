@@ -230,6 +230,112 @@ func is_player_turn() -> bool:
 	return phase == "PLAYER_TURN"
 
 # ---------------------------------------------------------------------------
+# Public API — Battle reset + DEBUG hooks (combat_cleanup)
+# ---------------------------------------------------------------------------
+
+## Reset every per-battle engine state so the battlefield can be torn down and
+## re-entered cleanly (tutorial retry / restart / future encounter battles).
+## Does NOT free or touch scene-tree nodes — the caller (SceneManager) owns the
+## actual scene swap. Resets the round snapshot, phase, observables, hazard
+## zones, and each live unit's battle state (statuses / cooldowns / shield /
+## turn flags) so a re-entered battle starts from a clean slate.
+func reset_battle() -> void:
+	current_round = 0
+	phase = "IDLE"
+	active_unit_name = ""
+	turn_order = []
+	turn_log = []
+	last_turn_actor = ""
+	_turn_order_units = []
+	_active_unit = null
+	_player_turn_done = false
+	_finger_dart_used = {}
+	_innate_qi_used = {}
+	_one_yang_used = {}
+	hazard_zones = {}
+	for raw in GameManager.get_enemies_alive():
+		if raw == null or not is_instance_valid(raw):
+			continue
+		_clear_unit_battle_state(raw as Node)
+	var player: Node = GameManager.get_player()
+	if player != null and is_instance_valid(player):
+		_clear_unit_battle_state(player)
+
+
+## DEBUG hook (unbound harness action, consumed by GameManager._process):
+## defeat every living enemy THROUGH THE NORMAL damage/death pipeline
+## (apply_damage -> _handle_death -> unregister_enemy -> end_battle(true)) so
+## the WON path is identical to a real victory. The loop re-reads
+## enemies_alive after every hit: 先天罡气's fatal guard can survive the first
+## lethal blow at 1 HP, and the next pass finishes the survivor exactly like a
+## real kill. No-op when no battle is running.
+func debug_wipe_enemies() -> void:
+	if not _battle_active():
+		return
+	while not GameManager.get_enemies_alive().is_empty() \
+			and GameManager.get_state() not in ["WON", "LOST"]:
+		var raw = GameManager.get_enemies_alive()[0]
+		if raw == null or not is_instance_valid(raw):
+			GameManager.enemies_alive.erase(raw)
+			continue
+		var foe: Node = raw
+		if "health" in foe and int(foe.health) > 0:
+			# Lethal, DR-ignoring nuke at current HP through the real pipeline.
+			apply_damage(foe, int(foe.health), GameManager.get_player(), false, true)
+		else:
+			GameManager.unregister_enemy(foe)
+
+
+## DEBUG hook (unbound harness action): kill the player THROUGH THE NORMAL
+## damage/death pipeline (apply_damage -> _handle_death -> end_battle(false)).
+## No-op when no battle is running.
+func debug_kill_player() -> void:
+	if not _battle_active():
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	if "health" in player and int(player.health) > 0:
+		apply_damage(player, int(player.health), null, false, true)
+
+
+## True while a battle is actually running: the player exists, the engine is
+## past IDLE, and the battle is not already decided.
+func _battle_active() -> bool:
+	if GameManager.get_state() in ["WON", "LOST"]:
+		return false
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return false
+	return phase != "IDLE"
+
+
+## Reset one unit's per-battle state (statuses, cooldowns, shield, turn flags).
+## Check-then-cast: validate the node before any typed access (freed-object
+## safe); every property is guarded with an `in` existence test.
+func _clear_unit_battle_state(unit: Node) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	if "statuses" in unit:
+		unit.statuses = []
+	if "status_names" in unit:
+		unit.status_names = []
+	if "skill_cooldowns" in unit and unit.skill_cooldowns != null:
+		var cooldowns: Array = unit.skill_cooldowns
+		for i in range(cooldowns.size()):
+			cooldowns[i] = 0
+	if "shield" in unit:
+		unit.shield = 0
+	if "moved" in unit:
+		unit.moved = false
+	if "acted" in unit:
+		unit.acted = false
+	if "turns_taken" in unit:
+		unit.turns_taken = 0
+	if "selected_skill_index" in unit:
+		unit.selected_skill_index = -1
+
+# ---------------------------------------------------------------------------
 # Turn engine — round loop
 # ---------------------------------------------------------------------------
 
