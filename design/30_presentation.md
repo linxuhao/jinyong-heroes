@@ -230,3 +230,19 @@ PM 每一轮都派一个实现者去「修 PATH」——**去找一个根本不�
 
 所以那个包装被删了,套件的正确归宿是 5_compile(自己的 1200 秒预算,
 同一个边车)。在它接进去之前,**这一层是空的,不要把它当成绿灯**。
+
+### 第一次真的跑起来的结果(2026-08-23,手工经边车 `/script`)
+
+不是「大概能过、只差接线」。第一次执行就有 **5 处真失败**:
+
+| 入口 | 结果 |
+|---|---|
+| `unit_test_runner.gd` | rc=1,**8 过 4 挂**:`test_gongfa_cascade` / `test_health_bar` / `test_player_profile` / `test_skill_button_states` |
+| `test_game_manager_fsm.gd` | **rc=124,120 秒不退出** — 它根本不终止 |
+
+已知的一条具体断言:`test_skill_button_states: Q4: move_pips == "·".repeat(moves_left)`。
+
+这就是「一层从没跑过的闸门」的代价:它不是空着,是**攒了五处欠账**,
+而每一轮 5_review 都在读一句「godot binary not found」,以为问题出在 PATH。
+接线之前先修这五处,否则闸门一接上就是红的,而那一轮的主题会被它劫持。
+
