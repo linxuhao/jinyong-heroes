@@ -87,6 +87,11 @@ func _count_mastered_same_attribute(unit) -> int:
 
 
 ## Concatenated internal+external arts, null-tolerant (plain Arrays in practice).
+## When the unit carries `all_external_arts` (progression CharacterData built by
+## BattleSetup), the FULL known external list is appended too — identity-deduped
+## (same art instance already present via `external_arts`) so the cascade never
+## double-counts a mastered art in _count_mastered_same_attribute. Units without
+## the field (tutorial path) fall back to internal+external exactly.
 func _all_arts(unit) -> Array:
 	var arts: Array = []
 	if unit != null:
@@ -94,4 +99,8 @@ func _all_arts(unit) -> Array:
 			arts += unit.internal_arts
 		if unit.external_arts != null:
 			arts += unit.external_arts
+		if "all_external_arts" in unit and unit.all_external_arts != null:
+			for art in unit.all_external_arts:
+				if art != null and not arts.has(art):
+					arts.append(art)
 	return arts

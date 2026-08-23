@@ -1313,7 +1313,11 @@ scenarios:
           # A(4) + B(3) + C(2) = 9 equipped skills -> row 2 holds 7-9; 10-12 hidden.
           SkillButton9.visible: 'visible == true'
           SkillButton10.visible: 'visible == false'
-          SkillButton9.global_position: 'global_position.y > SkillButton1.global_position.y'
+          # Row 2 sits strictly below row 1: two self-referencing scalar asserts
+          # (row1 top ~648, row2 top ~700) — the harness expression evaluator
+          # does not resolve cross-node references in a single expression.
+          SkillButton1.global_position: 'global_position.y <= 680'
+          SkillButton9.global_position: 'global_position.y >= 690'
           HUD.skill8_right_edge: 'skill8_right_edge <= 960'
           HUD.skill12_right_edge: 'skill12_right_edge <= 960'
           Player.traits: 'traits.has("sha_po_lang") == true'

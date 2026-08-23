@@ -81,6 +81,13 @@ static func build_character(profile) -> Resource:
 		else:
 			all_external.append(art)
 
+	# Carry the FULL known external-arts list (same art instances, mastered flags
+	# already mirrored above) so GongfaData.get_fa_hui_du()'s prerequisite cascade
+	# sees every art the character knows — including lower grades dropped by the
+	# equip slice. `external_arts` below stays the grade-sorted EQUIPPED slice
+	# (primary-art melee classification and skill->art matching read only it).
+	cd.all_external_arts = all_external
+
 	# Equip the highest-grade external arts: stable grade-rank sort (A=甲 first,
 	# ties keep profile order — GDScript sort_custom is NOT stable, so use the
 	# private insertion sort), then keep the first 2 — or 3 with ambidextrous.
