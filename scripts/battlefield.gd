@@ -721,6 +721,11 @@ func _wire_hud(player: Node, enemies: Array[Node]) -> void:
 	if hud == null:
 		# Try alternative: search the entire scene tree from the parent.
 		hud = _find_hud_recursively(get_parent())
+	if hud == null:
+		# Persistent-shell layout: this battlefield lives under the shell's
+		# SceneHost (a SIBLING of HUDLayer), so a parent-scoped search cannot
+		# reach HUDLayer — fall back to a root-wide search.
+		hud = _find_hud_recursively(get_tree().root)
 
 	# setup() lives on the HUD node INSIDE the HUDLayer wrapper (the layer is a
 	# plain CanvasLayer with no script), so descend to it — otherwise the HUD is
@@ -758,6 +763,11 @@ func _wire_tutorial_overlay() -> void:
 	if tutorial_layer == null:
 		# Recurse to find it from the parent.
 		tutorial_layer = _find_tutorial_layer_recursively(get_parent())
+	if tutorial_layer == null:
+		# Persistent-shell layout: battlefield is hosted under SceneHost, so the
+		# parent-scoped search cannot reach the shell's TutorialLayer — fall back
+		# to a root-wide search.
+		tutorial_layer = _find_tutorial_layer_recursively(get_tree().root)
 
 	if tutorial_layer != null:
 		TutorialManager.set_overlay(tutorial_layer)

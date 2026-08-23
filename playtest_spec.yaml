@@ -46,6 +46,13 @@ surface:
   PauseButton: [visible, global_position]
   HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height]
   Battlefield: [board_aligned, grid_lines_visible]
+  SceneManager: [current_scene, pending_swap, last_error]
+  TransitionScreen: [lines_shown, done]
+  CreationScreen: [phase, points_left, attr_index, attrs, trait_ids, confirmed]
+  SectSelectScreen: [focus_index, selected_sect_id]
+  CultivationScreen: [year, month, sect_id, phase, silver, attr_bone, attr_inner, attr_agility, attr_wisdom, attr_fortune, gongfa_count, mastered_count, drawn_card_categories, event_id, fast_forward_used]
+  MapScreen: [current_node_id, focus_id, ended]
+  EndingScreen: [tier, done]
 
 scenarios:
   - name: round_one_snapshot_and_turn_order
@@ -487,3 +494,427 @@ scenarios:
           SkillButton1.state_text: 'state_text == "ready"'
           SkillButton1.cooldown_label_text: 'cooldown_label_text == ""'
           SkillButton1.overlay_visible: 'overlay_visible == false'
+
+  - name: spine_to_ending
+    description: "The full six-segment spine inside the frame cap: tutorial win -> transition -> creation -> sect select -> cultivation (DEBUG fast-forward through all 36 months) -> map (4 moves to 昆仑) -> tiered ending."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - at: 40
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "WON"'
+      - { at: 50, actions: [ui_accept] }
+      - at: 70
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "TRANSITION"'
+      - { at: 80, actions: [ui_accept] }
+      - { at: 90, actions: [ui_accept] }
+      - at: 110
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "CHARACTER_CREATION"'
+      # bone 10 -> 15 (5 right), ui_accept (-> TRAITS), move_right (-> CONFIRM), ui_accept (confirm)
+      - { at: 120, actions: [move_right] }
+      - { at: 130, actions: [move_right] }
+      - { at: 140, actions: [move_right] }
+      - { at: 150, actions: [move_right] }
+      - { at: 160, actions: [move_right] }
+      - { at: 170, actions: [ui_accept] }
+      - { at: 180, actions: [move_right] }
+      - { at: 190, actions: [ui_accept] }
+      - at: 210
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "SECT_SELECTION"'
+      - { at: 220, actions: [ui_accept] }
+      - at: 260
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "CULTIVATION"'
+          CultivationScreen.year: 1
+          CultivationScreen.month: 1
+          CultivationScreen.gongfa_count: 2
+      - { at: 280, actions: [debug_fast_forward] }
+      - at: 400
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "MAP"'
+      # 4x (move_right + ui_accept) along the mainline to 昆仑
+      - { at: 420, actions: [move_right] }
+      - { at: 430, actions: [ui_accept] }
+      - { at: 440, actions: [move_right] }
+      - { at: 450, actions: [ui_accept] }
+      - { at: 460, actions: [move_right] }
+      - { at: 470, actions: [ui_accept] }
+      - { at: 480, actions: [move_right] }
+      - { at: 490, actions: [ui_accept] }
+      - at: 520
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "ENDING"'
+          EndingScreen.tier: 'tier >= 1 and tier <= 3'
+
+  - name: tutorial_win_routes_to_transition
+    description: "After the WON overlay continue press, SceneManager swaps the battlefield out for the TransitionScreen with no pending swap left in flight."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - at: 40
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "WON"'
+      - { at: 50, actions: [ui_accept] }
+      - at: 80
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "TRANSITION"'
+          SceneManager.current_scene: 'current_scene == "transition"'
+          SceneManager.pending_swap: 'pending_swap == false'
+
+  - name: tutorial_loss_restarts_tutorial
+    description: "Losing the tutorial (DEBUG) routes back to a freshly re-instantiated battlefield with the player back at full HP — the teardown path must not crash on freed nodes."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_lose_tutorial] }
+      - at: 40
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "LOST"'
+      - { at: 50, actions: [ui_accept] }
+      - at: 80
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "TUTORIAL"'
+          SceneManager.current_scene: 'current_scene == "battlefield"'
+          Player.health: 'health == 500'
+
+  - name: creation_budget_clamp_and_traits
+    description: "Tiered attr pricing (bone 10->20 costs 15, inner 10->15 costs 5), the 20 cap, flaw refunds and positive-trait spends, toggling off, and confirm with leftover points allowed."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - { at: 40, actions: [ui_accept] }
+      - { at: 60, actions: [ui_accept] }
+      - { at: 70, actions: [ui_accept] }
+      # attrs: bone 10 -> 20 (10 right presses, 15 pts)
+      - { at: 90, actions: [move_right] }
+      - { at: 100, actions: [move_right] }
+      - { at: 110, actions: [move_right] }
+      - { at: 120, actions: [move_right] }
+      - { at: 130, actions: [move_right] }
+      - { at: 140, actions: [move_right] }
+      - { at: 150, actions: [move_right] }
+      - { at: 160, actions: [move_right] }
+      - { at: 170, actions: [move_right] }
+      - { at: 180, actions: [move_right] }
+      - { at: 190, actions: [move_down] }
+      # inner 10 -> 15 (5 right presses, 5 pts)
+      - { at: 200, actions: [move_right] }
+      - { at: 210, actions: [move_right] }
+      - { at: 220, actions: [move_right] }
+      - { at: 230, actions: [move_right] }
+      - { at: 240, actions: [move_right] }
+      - at: 260
+        actions: []
+        assert:
+          CreationScreen.points_left: 'points_left == 10'
+      # back to bone: still clamped at 20, no further spend
+      - { at: 270, actions: [move_up] }
+      - { at: 280, actions: [move_right] }
+      - at: 300
+        actions: []
+        assert:
+          CreationScreen.points_left: 'points_left == 10'
+          CreationScreen.attrs: 'attrs["bone"] == 20'
+      # traits: 旧伤 (index 9) refunds 8 -> 18
+      - { at: 310, actions: [ui_accept] }
+      - { at: 320, actions: [move_down] }
+      - { at: 330, actions: [move_down] }
+      - { at: 340, actions: [move_down] }
+      - { at: 350, actions: [move_down] }
+      - { at: 360, actions: [move_down] }
+      - { at: 370, actions: [move_down] }
+      - { at: 380, actions: [move_down] }
+      - { at: 390, actions: [move_down] }
+      - { at: 400, actions: [move_down] }
+      - { at: 410, actions: [ui_accept] }
+      - at: 430
+        actions: []
+        assert:
+          CreationScreen.points_left: 'points_left == 18'
+      # 左右互搏 (index 0) costs 10 -> 8; toggle off -> 18
+      - { at: 440, actions: [move_up] }
+      - { at: 450, actions: [move_up] }
+      - { at: 460, actions: [move_up] }
+      - { at: 470, actions: [move_up] }
+      - { at: 480, actions: [move_up] }
+      - { at: 490, actions: [move_up] }
+      - { at: 500, actions: [move_up] }
+      - { at: 510, actions: [move_up] }
+      - { at: 520, actions: [move_up] }
+      - { at: 530, actions: [ui_accept] }
+      - at: 550
+        actions: []
+        assert:
+          CreationScreen.points_left: 'points_left == 8'
+      - { at: 560, actions: [ui_accept] }
+      - at: 580
+        actions: []
+        assert:
+          CreationScreen.points_left: 'points_left == 18'
+      # confirm with leftover allowed
+      - { at: 590, actions: [move_right] }
+      - { at: 600, actions: [ui_accept] }
+      - at: 620
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "SECT_SELECTION"'
+
+  - name: lone_bane_sect_grants_external_only
+    description: "The 孤煞 flaw suppresses the sect's internal gongfa grant: entering 峨眉 with lone_bane yields exactly one gongfa (external only)."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - { at: 40, actions: [ui_accept] }
+      - { at: 60, actions: [ui_accept] }
+      - { at: 70, actions: [ui_accept] }
+      - { at: 80, actions: [ui_accept] }
+      # TRAITS: move_down x11 -> 孤煞 (index 11), toggle on
+      - { at: 90, actions: [move_down] }
+      - { at: 100, actions: [move_down] }
+      - { at: 110, actions: [move_down] }
+      - { at: 120, actions: [move_down] }
+      - { at: 130, actions: [move_down] }
+      - { at: 140, actions: [move_down] }
+      - { at: 150, actions: [move_down] }
+      - { at: 160, actions: [move_down] }
+      - { at: 170, actions: [move_down] }
+      - { at: 180, actions: [move_down] }
+      - { at: 190, actions: [move_down] }
+      - { at: 200, actions: [ui_accept] }
+      - { at: 210, actions: [move_right] }
+      - { at: 220, actions: [ui_accept] }
+      - at: 240
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "SECT_SELECTION"'
+      # 峨眉 is index 3
+      - { at: 250, actions: [move_down] }
+      - { at: 260, actions: [move_down] }
+      - { at: 270, actions: [move_down] }
+      - { at: 280, actions: [ui_accept] }
+      - at: 320
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "CULTIVATION"'
+          CultivationScreen.sect_id: 'sect_id == "emei"'
+          CultivationScreen.gongfa_count: 'gongfa_count == 1'
+
+  - name: cultivation_month_cycle_and_deck_bookkeeping
+    description: "Month 1 stages a 3-category card draw; picking card 0 then 练功 on the first gongfa completes the month: calendar advances, each monthly deck loses exactly one card, and the autosave lands cleanly."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - { at: 40, actions: [ui_accept] }
+      - { at: 60, actions: [ui_accept] }
+      - { at: 70, actions: [ui_accept] }
+      - { at: 80, actions: [ui_accept] }
+      - { at: 90, actions: [move_right] }
+      - { at: 100, actions: [ui_accept] }
+      - { at: 110, actions: [ui_accept] }
+      - at: 130
+        actions: []
+        assert:
+          GameManager.current_state: 'current_state == "CULTIVATION"'
+          CultivationScreen.phase: 'phase == "CARD_PICK"'
+          CultivationScreen.drawn_card_categories: 'drawn_card_categories.size() == 3'
+      - { at: 140, actions: [ui_accept] }
+      - { at: 150, actions: [ui_accept] }
+      - { at: 160, actions: [ui_accept] }
+      - at: 200
+        actions: []
+        assert:
+          CultivationScreen.month: 'month == 2'
+          CultivationScreen.phase: 'phase == "CARD_PICK"'
+          SaveManager.eco_left: 'eco_left == 11'
+          SaveManager.eq_left: 'eq_left == 11'
+          SaveManager.growth_left: 'growth_left == 8'
+          SaveManager.has_save: 'has_save == true'
+          SaveManager.last_error: 'last_error == ""'
+
+  - name: cultivation_year_end_stay
+    description: "Twelve manual months: 练功 the two 丁 arts to mastery (months 1-8), then 修习 根骨 (months 9-12); year-end 留下 rolls into year 2 and the year-2 丙 grant lands two more arts (gongfa_count 4, both 丁 mastered)."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - { at: 40, actions: [ui_accept] }
+      - { at: 60, actions: [ui_accept] }
+      - { at: 70, actions: [ui_accept] }
+      - { at: 80, actions: [ui_accept] }
+      - { at: 90, actions: [move_right] }
+      - { at: 100, actions: [ui_accept] }
+      - { at: 110, actions: [ui_accept] }
+      # month 1: card0, 练功, gongfa
+      - { at: 120, actions: [ui_accept] }
+      - { at: 135, actions: [ui_accept] }
+      - { at: 150, actions: [ui_accept] }
+      # month 2
+      - { at: 165, actions: [ui_accept] }
+      - { at: 180, actions: [ui_accept] }
+      - { at: 195, actions: [ui_accept] }
+      # month 3
+      - { at: 210, actions: [ui_accept] }
+      - { at: 225, actions: [ui_accept] }
+      - { at: 240, actions: [ui_accept] }
+      # month 4 (internal mastered)
+      - { at: 255, actions: [ui_accept] }
+      - { at: 270, actions: [ui_accept] }
+      - { at: 285, actions: [ui_accept] }
+      # month 5 (external 罗汉拳)
+      - { at: 300, actions: [ui_accept] }
+      - { at: 315, actions: [ui_accept] }
+      - { at: 330, actions: [ui_accept] }
+      # month 6
+      - { at: 345, actions: [ui_accept] }
+      - { at: 360, actions: [ui_accept] }
+      - { at: 375, actions: [ui_accept] }
+      # month 7
+      - { at: 390, actions: [ui_accept] }
+      - { at: 405, actions: [ui_accept] }
+      - { at: 420, actions: [ui_accept] }
+      # month 8 (external mastered)
+      - { at: 435, actions: [ui_accept] }
+      - { at: 450, actions: [ui_accept] }
+      - { at: 465, actions: [ui_accept] }
+      # months 9-12: 修习 根骨 (card0, move_down, ui_accept, ui_accept)
+      - { at: 480, actions: [ui_accept] }
+      - { at: 495, actions: [move_down] }
+      - { at: 510, actions: [ui_accept] }
+      - { at: 525, actions: [ui_accept] }
+      - { at: 540, actions: [ui_accept] }
+      - { at: 555, actions: [move_down] }
+      - { at: 570, actions: [ui_accept] }
+      - { at: 585, actions: [ui_accept] }
+      - { at: 600, actions: [ui_accept] }
+      - { at: 615, actions: [move_down] }
+      - { at: 630, actions: [ui_accept] }
+      - { at: 645, actions: [ui_accept] }
+      - { at: 660, actions: [ui_accept] }
+      - { at: 675, actions: [move_down] }
+      - { at: 690, actions: [ui_accept] }
+      - { at: 705, actions: [ui_accept] }
+      # year end: 留下
+      - { at: 720, actions: [ui_accept] }
+      - at: 760
+        actions: []
+        assert:
+          CultivationScreen.year: 'year == 2'
+          CultivationScreen.month: 'month == 1'
+          CultivationScreen.gongfa_count: 'gongfa_count == 4'
+          CultivationScreen.mastered_count: 'mastered_count == 2'
+
+  - name: save_load_roundtrip
+    description: "Manual save from the cultivation menu (slot 1) persists year/month; one more month then 读档 restores the exact snapshot (year 1 month 3, attrs untouched by the two 练功 months)."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [debug_win_tutorial] }
+      - { at: 40, actions: [ui_accept] }
+      - { at: 60, actions: [ui_accept] }
+      - { at: 70, actions: [ui_accept] }
+      - { at: 80, actions: [ui_accept] }
+      - { at: 90, actions: [move_right] }
+      - { at: 100, actions: [ui_accept] }
+      - { at: 110, actions: [ui_accept] }
+      # month 1
+      - { at: 120, actions: [ui_accept] }
+      - { at: 135, actions: [ui_accept] }
+      - { at: 150, actions: [ui_accept] }
+      # month 2
+      - { at: 165, actions: [ui_accept] }
+      - { at: 180, actions: [ui_accept] }
+      - { at: 195, actions: [ui_accept] }
+      # month 3: pick card 0 -> ACTION_PICK, then move_down x4 to 存盘
+      - { at: 210, actions: [ui_accept] }
+      - { at: 225, actions: [move_down] }
+      - { at: 240, actions: [move_down] }
+      - { at: 255, actions: [move_down] }
+      - { at: 270, actions: [move_down] }
+      - { at: 285, actions: [ui_accept] }
+      - at: 310
+        actions: []
+        assert:
+          SaveManager.has_save: 'has_save == true'
+          SaveManager.last_error: 'last_error == ""'
+      # complete month 3 (move back up to 练功, accept, accept) -> month 4
+      - { at: 320, actions: [move_up] }
+      - { at: 330, actions: [move_up] }
+      - { at: 340, actions: [move_up] }
+      - { at: 350, actions: [move_up] }
+      - { at: 360, actions: [ui_accept] }
+      - { at: 370, actions: [ui_accept] }
+      # month 4: pick card 0 -> ACTION_PICK, then move_down x5 to 读档
+      - { at: 385, actions: [ui_accept] }
+      - { at: 400, actions: [move_down] }
+      - { at: 410, actions: [move_down] }
+      - { at: 420, actions: [move_down] }
+      - { at: 430, actions: [move_down] }
+      - { at: 440, actions: [move_down] }
+      - { at: 450, actions: [ui_accept] }
+      - at: 490
+        actions: []
+        assert:
+          CultivationScreen.year: 'year == 1'
+          CultivationScreen.month: 'month == 3'
+          CultivationScreen.attr_bone: 'attr_bone == 10'
+          SaveManager.last_error: 'last_error == ""'
+

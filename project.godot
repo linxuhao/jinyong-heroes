@@ -28,6 +28,7 @@ CombatManager="*res://scripts/autoload/combat_manager.gd"
 TutorialManager="*res://scripts/autoload/tutorial_manager.gd"
 AudioManager="*res://scripts/autoload/audio_manager.gd"
 ThemeManager="*res://scripts/autoload/theme_manager.gd"
+SceneManager="*res://scripts/autoload/scene_manager.gd"
 
 [display]
 
