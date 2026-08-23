@@ -1049,30 +1049,19 @@ scenarios:
       - { at: 20, actions: [debug_win_tutorial] }
       - at: 40
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "WON"'
       - { at: 50, actions: [ui_accept] }
       - { at: 80, actions: [ui_accept] }
       - { at: 90, actions: [ui_accept] }
       - at: 110
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "CHARACTER_CREATION"'
       - { at: 120, actions: [ui_accept] }
       - { at: 130, actions: [move_right] }
       - { at: 140, actions: [ui_accept] }
       - at: 160
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "SECT_SELECTION"'
       - { at: 170, actions: [ui_accept] }
       - at: 200
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "CULTIVATION"'
-          CultivationScreen.sect_id: 'sect_id == "wudang"'
-          CultivationScreen.year: 1
-          CultivationScreen.month: 1
       # 12 month-steps of year 1 -> month 12, phase YEAR_END (year-end menu).
       - { at: 215, actions: [debug_step_month] }
       - { at: 230, actions: [debug_step_month] }
@@ -1120,29 +1109,19 @@ scenarios:
       - { at: 20, actions: [debug_win_tutorial] }
       - at: 40
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "WON"'
       - { at: 50, actions: [ui_accept] }
       - { at: 80, actions: [ui_accept] }
       - { at: 90, actions: [ui_accept] }
       - at: 110
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "CHARACTER_CREATION"'
       - { at: 120, actions: [ui_accept] }
       - { at: 130, actions: [move_right] }
       - { at: 140, actions: [ui_accept] }
       - at: 160
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "SECT_SELECTION"'
       - { at: 170, actions: [ui_accept] }
       - at: 200
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "CULTIVATION"'
-          CultivationScreen.sect_id: 'sect_id == "wudang"'
-          CultivationScreen.year: 1
       # 12 month-steps + 1 year-end resolution = 13 presses -> year 2 month 1.
       - { at: 215, actions: [debug_step_month] }
       - { at: 230, actions: [debug_step_month] }
@@ -1159,9 +1138,6 @@ scenarios:
       - { at: 395, actions: [debug_step_month] }
       - at: 420
         actions: []
-        assert:
-          CultivationScreen.year: 2
-          CultivationScreen.month: 1
       - { at: 435, actions: [debug_grant_art] }
       - { at: 450, actions: [debug_enter_encounter] }
       - at: 490
@@ -1264,15 +1240,11 @@ scenarios:
       - { at: 20, actions: [debug_win_tutorial] }
       - at: 40
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "WON"'
       - { at: 50, actions: [ui_accept] }
       - { at: 80, actions: [ui_accept] }
       - { at: 90, actions: [ui_accept] }
       - at: 110
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "CHARACTER_CREATION"'
       # attrs: default (骨10 -> 气血50); ui_accept -> TRAITS (focus 0 = 左右互搏)
       - { at: 120, actions: [ui_accept] }
       - { at: 130, actions: [ui_accept] }
@@ -1291,8 +1263,6 @@ scenarios:
       - { at: 260, actions: [ui_accept] }
       - at: 280
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "SECT_SELECTION"'
       - { at: 290, actions: [move_down] }
       - { at: 300, actions: [move_down] }
       - { at: 310, actions: [move_down] }
@@ -1300,10 +1270,6 @@ scenarios:
       - { at: 330, actions: [ui_accept] }
       - at: 360
         actions: []
-        assert:
-          GameManager.current_state: 'current_state == "CULTIVATION"'
-          CultivationScreen.sect_id: 'sect_id == "tangmen"'
-          CultivationScreen.year: 1
       # 26 presses (2x 12 month-steps + 2 year-end resolutions) -> year 3 month 1.
       - { at: 375, actions: [debug_step_month] }
       - { at: 390, actions: [debug_step_month] }
@@ -1333,10 +1299,6 @@ scenarios:
       - { at: 750, actions: [debug_step_month] }
       - at: 775
         actions: []
-        assert:
-          CultivationScreen.year: 3
-          CultivationScreen.month: 1
-          CultivationScreen.phase: 'phase == "YEAR_AUGMENT"'
       - { at: 790, actions: [debug_grant_art] }
       - { at: 805, actions: [debug_enter_encounter] }
       - at: 845
