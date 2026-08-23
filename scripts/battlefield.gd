@@ -16,6 +16,10 @@ extends Node2D
 const SkillData = preload("res://scripts/data/skill_data.gd")
 const CharacterData = preload("res://scripts/data/character_data.gd")
 const GongfaData = preload("res://scripts/data/gongfa_data.gd")
+const TutorialFillers = preload("res://scripts/data/tutorial_fillers.gd")
+const EncounterData = preload("res://scripts/data/encounter_data.gd")
+const BattleSetup = preload("res://scripts/data/battle_setup.gd")
+const AISparring = preload("res://scripts/ai/ai_sparring.gd")
 
 # ---------------------------------------------------------------------------
 # Constants (mirror GridManager for convenience)
@@ -65,6 +69,15 @@ func _ready() -> void:
 	#    before the first frame so board_aligned is set for the playtest gate.
 	_fit_backdrop_to_board()
 
+	# Encounter mode (design C8): a CULTIVATION-context battle (battle_return_state
+	# == "CULTIVATION", set by GameManager.start_encounter) has NO tutorial content.
+	# Branch BEFORE the tutorial path: build the BattleSetup hero + the sparring
+	# partner, never start the tutorial, and return — the tutorial character
+	# factory / overlay wiring never runs.
+	if GameManager.get_battle_return_state() == "CULTIVATION":
+		_setup_encounter_battle()
+		return
+
 	# 5. Create all skill data (referenced by character data).
 	var all_skills: Dictionary = _create_all_skill_data()
 
@@ -85,6 +98,12 @@ func _ready() -> void:
 	#    for the same reason — TutorialOverlay may not be ready yet).
 	_wire_tutorial_overlay.call_deferred()
 	TutorialManager.start.call_deferred()
+
+	# Tutorial mode flag — LAST statement of the tutorial branch: a
+	# CombatManager.reset_battle() that ran during this scene's swap (SceneManager
+	# teardown) defaults it to false, so the tutorial's two-phase palm unlock must
+	# re-assert it after the scene is fully wired.
+	CombatManager.tutorial_battle = true
 
 
 # ---------------------------------------------------------------------------
@@ -560,11 +579,13 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.color = Color(0.9, 0.9, 0.9, 1.0)  # white
 	chars["Central Divine"] = cd
 
-	# The tutorial battle is 编排数值 (staged values): mark all six CharacterData
-	# instances so the real 甲乙丙丁 fa_hui_du cascade never recomputes their
-	# flat 1.3 — the protected playtest damage/heal values stay byte-identical.
+	# Tutorial units' prerequisites are 视为已满 (design/20_content.md §1): fill
+	# each unit with real mastered B/C/D filler arts so the real 甲乙丙丁 cascade
+	# computes the flat 1.3 (round(v * 1.3)) for every art — the flat-1.3
+	# short-circuit bypass is gone. Protected playtest values stay byte-identical
+	# because the cascade output for these units is exactly 1.3.
 	for unit_cd in chars.values():
-		unit_cd.staged_values = true
+		TutorialFillers.fill(unit_cd)
 
 	return chars
 
@@ -582,6 +603,92 @@ func _gongfa(gongfa_name: String, grade: String, kind: String, school: String,
 	gf.energy_provided = energy
 	gf.passive_id = passive_id
 	return gf
+
+
+# ---------------------------------------------------------------------------
+# Encounter battle setup (design C8)
+# ---------------------------------------------------------------------------
+
+## Encounter mode entry (battle_return_state == "CULTIVATION"): build the player
+## from the live cultivation profile via BattleSetup, spawn the sparring partner
+## at its fixed tile, wire the HUD, and — critically — NEVER start the tutorial
+## (no overlay, no step gating). The battle itself is kicked off by
+## GameManager.start_encounter() (battle_started -> CombatManager
+## _on_battle_started -> _begin_round). All AI/hazard/status wiring stays shared
+## with the tutorial path.
+func _setup_encounter_battle() -> void:
+	# A CULTIVATION battle always has a profile; guard anyway so a stray scene
+	# load never hard-crashes.
+	if SaveManager.profile == null:
+		push_warning("Battlefield: encounter battle requested without a profile — aborting encounter setup")
+		return
+
+	# Encounter battles never phase-lock / gate input: reset_battle() already
+	# defaults this to false, but re-assert it in case a tutorial battle's flag
+	# leaked into this scene's teardown.
+	CombatManager.tutorial_battle = false
+
+	# Player: derived from the cultivation profile through the shared
+	# battle-setup path (stats, arts mirrored with mastered flags, traits copied,
+	# equip cap 2 / 3).
+	var player_cd = BattleSetup.build_character(SaveManager.profile)
+	var player_node: Node = _instantiate_player(player_cd)
+
+	# Sparring partner: one fixed enemy via its OWN helper (NOT the tutorial
+	# positions dict / ai_map — the tutorial enemy layout is untouched).
+	var enemy_node: Node = _instantiate_sparring_partner()
+
+	# Wire the HUD (deferred — HUD._ready() hasn't run yet, so its @onready vars
+	# are null).
+	_wire_hud.call_deferred(player_node, [enemy_node])
+
+
+## Instantiate the sparring partner (EncounterData.sparring_partner) at its
+## fixed tile, mirroring the tutorial enemy-instantiation flow: setup, guarded
+## field wires, tile reservation, surface-addressable node name BEFORE
+## add_child, then registration with GameManager. The AI is the trivial wait-AI
+## (ai_sparring.gd) — it never moves or attacks, so the player has a clean
+## damage dummy for the 发挥度 comparison.
+func _instantiate_sparring_partner() -> Node:
+	var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
+	var enemy: Node = enemy_scene.instantiate()
+
+	var data = EncounterData.sparring_partner()
+	var grid_pos: Vector2i = EncounterData.sparring_partner_tile()
+
+	enemy.grid_pos = grid_pos
+	enemy.position = GridManager.grid_to_world(grid_pos)
+
+	# Trivial wait-AI: evaluate() always returns {} so the partner stands still.
+	enemy.setup(data, AISparring.new())
+
+	# Wire the CharacterData fields onto the node. Guarded with `in` checks:
+	# enemy.gd declares these vars, so the assignment is a no-op until then.
+	if "initiative" in enemy:
+		enemy.initiative = data.initiative
+	if "energy" in enemy:
+		enemy.energy = data.energy
+	if "team" in enemy:
+		enemy.team = data.team
+	if "passive_id" in enemy:
+		enemy.passive_id = data.passive_id
+	if "traits" in enemy:
+		enemy.traits = data.traits
+
+	# Register tile occupancy.
+	GridManager.reserve_tile(grid_pos, enemy)
+
+	# Surface-addressable node name (playtest contract). Set before add_child so
+	# the node enters the tree already named.
+	enemy.name = "Sparring_Partner"
+
+	# Add to scene tree.
+	_characters_container.add_child(enemy)
+
+	# Register with GameManager.
+	GameManager.register_enemy(enemy)
+
+	return enemy
 
 
 # ---------------------------------------------------------------------------
@@ -612,6 +719,8 @@ func _instantiate_player(data) -> Node:
 		player.team = data.team
 	if "passive_id" in player:
 		player.passive_id = data.passive_id
+	if "traits" in player:
+		player.traits = data.traits
 
 	# Register tile occupancy.
 	GridManager.reserve_tile(start_pos, player)
@@ -688,6 +797,8 @@ func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 			enemy.team = data.team
 		if "passive_id" in enemy:
 			enemy.passive_id = data.passive_id
+		if "traits" in enemy:
+			enemy.traits = data.traits
 
 		# Register tile occupancy.
 		GridManager.reserve_tile(grid_pos, enemy)
