@@ -97,3 +97,25 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 
 > **回合制改造要点**:Space 从"暂停"改绑为"结束回合",暂停单独归 Escape。
 > 旧版 Space 同时绑了 `pause_game` 与 `ui_accept`,是已知缺陷。
+
+## 血条:必须做小(实测结论,不要再推一遍)
+
+2026-08-23,视觉闸门连续三轮判 **0/11**「solid green rectangles, not bars with
+empty portions」。逐项渲染验证后的结论:
+
+1. **满血时,只有填充色的血条就是一块纯色矩形。** 底槽必须**始终**看得见。
+   做法是给 background 的 StyleBox 加 `set_expand_margin_all(3.0)`,把底槽画得
+   比控件矩形大一圈。
+   ⚠️ **不要用 `set_content_margin_all` 去内缩填充** —— StyleBoxFlat 的
+   content margin 只移动**内容**,从不缩小它绘制的矩形。前两轮的修复方案就是
+   这一条,渲染出来逐像素无变化。
+2. **位置不是剩下的问题,尺寸才是。** 放脚下 → 读成**站台**;抬到头顶
+   (offset −104) → **盖住角色胸口**,还和顶部 HUD 撞,顶排角色更是没有
+   headroom 就被视口钳住。两个位置都渲染对比过。
+3. **真正的要求:把部件做小。** 现在是 110×30 的控件裹一条 64×12 的血条**外加
+   一行名字**,而一个格子才 64px——不管放哪儿都要么当站台要么挡人。
+   目标:细条(高 ≤ 8)、小字、整体高度 ≤ 20,放在角色**上方**且不遮挡精灵。
+
+闸门的原话是「**above** or attached to the characters, a bar with a filled
+portion and an empty portion」——三个条件缺一不可。
+
