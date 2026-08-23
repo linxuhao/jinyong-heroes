@@ -3,5 +3,6 @@
   ".json": "basic",
   ".yaml": "basic",
   ".md": "basic",
-  ".tscn": "basic"
+  ".tscn": "basic",
+  ".tres": "basic"
 }
