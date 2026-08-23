@@ -13,7 +13,14 @@ extends Control
 const _FILL_GREEN := Color(0.3, 0.9, 0.35)
 const _FILL_YELLOW := Color(0.95, 0.85, 0.2)
 const _FILL_RED := Color(0.9, 0.25, 0.2)
-const _TRACK_BG := Color(0.15, 0.15, 0.17)
+## Light gray track: the EMPTY portion of the bar, kept light so a vision model
+## can see the filled/empty split at any fill level (5_vision Q5 — dark tracks
+## made full bars read as solid blocks). The fill never blends into it: all
+## three fill bands differ from this track color.
+const _TRACK_BG := Color(0.62, 0.62, 0.65)
+## Dark 1px border around the track so the light track stays visible against
+## the light summit backdrop.
+const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
 
 # ---------------------------------------------------------------------------
 # State
@@ -34,10 +41,16 @@ var name_text: String = ""
 ## reads the live layout.
 var bar_width: float = 0.0
 
-## Total widget height in pixels (= size.y; 20.0 for the compact 68×20 layout).
+## Total widget height in pixels (= size.y; 26.0 for the compact 68×26 layout).
 ## Assigned in setup() (so the headless null-char test reads it without a char
 ## node) AND re-assigned in follow_character() whenever the widget lays out.
 var total_height: float = 0.0
+
+## The rendered track background color (the EMPTY portion of the bar) — the
+## bg_color of the "background" stylebox, written unconditionally in setup().
+## Exposed so the playtest surface can assert the track is light and visible
+## at full HP (e.g. 'track_bg.get_luminance() > 0.30').
+var track_bg: Color = _TRACK_BG
 
 ## Edge-clamp displacement: distance between the current root center and the
 ## desired (pre-clamp) root center. ~0 when unclamped (character mid-viewport),
@@ -88,16 +101,17 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		bar.max_value = max_hp
 		bar.value = max_hp
 		bar_width = bar.size.x
-		# Neutral dark track background (assigned once here, never recolored
-		# afterwards — the track stays constant). The 1px dark border keeps
-		# the bar visible against the backdrop at any fill level.
+		# Neutral track background (assigned once here, never recolored
+		# afterwards — the track stays constant): LIGHT gray so the empty
+		# portion is visible at any fill level (5_vision Q5), with a dark
+		# 1px border to separate it from the light backdrop.
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = _TRACK_BG
 		sb.border_width_left = 1
 		sb.border_width_top = 1
 		sb.border_width_right = 1
 		sb.border_width_bottom = 1
-		sb.border_color = Color(0.05, 0.05, 0.05)
+		sb.border_color = _TRACK_BORDER
 		# Draw the track 3px larger than the control rect on every side. At
 		# 100% HP the fill covers the whole rect, so without this the widget is
 		# a solid coloured block and reads as a platform, not a bar — the
@@ -110,7 +124,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		# the fill that way renders identically and changes nothing. Growing
 		# the track is the one that actually paints.
 		#
-		# bar.size stays 64x8, so the `HealthBar.bar_width <= 64` geometric
+		# bar.size stays 64x6, so the `HealthBar.bar_width <= 64` geometric
 		# assert is untouched — this is drawing, not layout.
 		sb.set_expand_margin_all(3.0)
 		bar.add_theme_stylebox_override("background", sb)
@@ -144,8 +158,12 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	# so the observable is set in every setup() path.
 	name_text = char_name
 
+	# Record the track color observable unconditionally (outside the bar-null
+	# guard) so the playtest surface reads it even when the bar node is absent.
+	track_bg = _TRACK_BG
+
 	# Record the widget height observable unconditionally (outside the node
-	# guards) so the headless null-char test reads size.y (20.0) even though
+	# guards) so the headless null-char test reads size.y (26.0) even though
 	# follow_character() returns early when _char_node is null.
 	total_height = size.y
 
@@ -199,10 +217,12 @@ func follow_character() -> void:
 	# At the default scale-1 window it is numerically identical to the old
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
-	# Compact 68×20 widget: offset by half the widget width (34) so it stays
-	# horizontally centred above the character, and −28 to float it above the
-	# feet without covering the actor or colliding with the top HUD band.
-	screen_pos += Vector2(-34, -28)
+	# Compact 68×26 widget: offset by half the widget width (34) so it stays
+	# horizontally centred above the character, and −34 to float it above the
+	# feet without covering the actor or colliding with the top HUD band (the
+	# vertical offset grew by the same 6 px the widget grew, so the bar's
+	# bottom edge stays 8 px above the character exactly as before).
+	screen_pos += Vector2(-34, -34)
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
 	# the bar is unclamped and free-following; grows only when a viewport edge
