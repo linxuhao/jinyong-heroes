@@ -2,9 +2,14 @@
 ##
 ## State-driven scene router under the persistent shell (scenes/main.tscn):
 ## listens to GameManager.state_changed and instantiates exactly one active
-## segment scene as a child of the shell's SceneHost node. Owns the swap
-## lifecycle — deferred free of the outgoing scene (await tree_exited) so no
-## code path ever touches a node freed in the same frame (SOTA edge case 1).
+## scene as a child of the shell's host nodes. The battlefield (a Node2D world)
+## hangs under SceneHost (Node2D); the six segment scenes (full-rect Controls)
+## hang under SegmentHost — a full-rect Control inside the SegmentLayer
+## CanvasLayer — because a Control parented under a plain Node2D sizes to 0x0
+## (the parent's anchorable rect is empty) and renders nothing while its script
+## still updates surface vars. Owns the swap lifecycle — deferred free of the
+## outgoing scene (await tree_exited) so no code path ever touches a node freed
+## in the same frame (SOTA edge case 1).
 ##
 ## Startup: autoload _ready runs BEFORE the main scene enters the tree, so the
 ## host is resolved after one deferred frame (mirror TutorialManager) and the
@@ -49,6 +54,7 @@ const SCENE_PATHS: Dictionary = {
 }
 
 var _host: Node = null
+var _segment_host: Control = null
 var _current_node: Node = null
 var _preloaded: Dictionary = {}
 
@@ -104,7 +110,10 @@ func reload_battle() -> void:
 ## (deferred add — the incoming scene never coexists with a freed one), then
 ## instantiate the preloaded incoming scene under the host. Battlefield is
 ## named "Battlefield" (playtest surface) and the tutorial wiring in
-## battlefield.gd resolves HUD/Tutorial layers via root fallback.
+## battlefield.gd resolves HUD/Tutorial layers via root fallback. The host is
+## chosen per scene kind: battlefield under _host (SceneHost, Node2D), every
+## segment scene under _segment_host (SegmentHost, full-rect Control inside the
+## SegmentLayer CanvasLayer) so the root Control sizes to the viewport.
 func _do_swap(scene_key: String) -> void:
 	if pending_swap:
 		return
@@ -125,16 +134,18 @@ func _do_swap(scene_key: String) -> void:
 		last_error = "scene_missing"
 		pending_swap = false
 		return
-	if _host == null:
+	var host: Node = _segment_host if not next_is_battle else _host
+	if host == null:
 		_find_host()
-	if _host == null:
+		host = _segment_host if not next_is_battle else _host
+	if host == null:
 		last_error = "host_missing"
 		pending_swap = false
 		return
 	var inst: Node = packed.instantiate()
 	if next_is_battle:
 		inst.name = "Battlefield"
-	_host.add_child(inst)
+	host.add_child(inst)
 	_current_node = inst
 	current_scene = scene_key
 	last_error = ""
@@ -155,12 +166,16 @@ func _teardown_battle_refs() -> void:
 	GameManager.clear_battle()
 
 
+## Resolve both hosts from the shell. last_error is set to "host_missing"
+## only when BOTH hosts are absent (a partially-built shell with one host
+## missing is reported per-swap by _do_swap).
 func _find_host() -> void:
 	var main_node: Node = get_node_or_null("/root/Main")
 	if main_node == null:
 		last_error = "host_missing"
 		return
 	_host = main_node.get_node_or_null("SceneHost")
-	if _host == null:
+	_segment_host = main_node.get_node_or_null("SegmentLayer/SegmentHost") as Control
+	if _host == null and _segment_host == null:
 		last_error = "host_missing"
 		return
