@@ -1,7 +1,7 @@
 # 技术架构设计 — 养成真的有意义 (Real Fa-Hui-Du, Fillable Ladders)
 
 Project: 养成真的有意义 — 发挥度真算、阶梯真的填得起来
-Repo: Godot 4.4, GDScript, single-player wuxia cultivation + turn-based tactics.
+Repo: Godot 4 (latest stable; `project.godot` declares `config/features=PackedStringArray("4.7")`), GDScript, single-player wuxia cultivation + turn-based tactics.
 All file paths in this document are relative to the repo root (write paths, no `project/` prefix).
 
 ## 1. Overview
@@ -178,7 +178,7 @@ Remove the `unit.staged_values → return fa_hui_du` branch from `get_fa_hui_du`
 
 ### C9 — `scripts/autoload/game_manager.gd` (MODIFIED)
 - `start_encounter() -> void`: if `current_state == "CULTIVATION"`: set `battle_return_state = "CULTIVATION"`, `current_state = "BATTLE"`, emit `battle_started` + `state_changed("BATTLE")` (SceneManager already routes on this state). Audited: `start_battle()` is hard-gated to TUTORIAL, so `start_encounter()` is a new entry point that does NOT reuse it.
-- `request_retry()`: destination = `battle_return_state` when it is a segment state, else TUTORIAL (mirrors `request_continue` — audited already implemented with exactly this segment-state routing).
+- `request_retry()`: **change** the destination from its current hardcoded TUTORIAL (audited in the current file: `clear_battle(); current_state = "TUTORIAL"; retry_requested.emit()`) to `battle_return_state` when it is a segment state, else TUTORIAL — mirroring `request_continue`'s segment-state routing (which IS already implemented in the current file; `request_retry` is not). Tutorial LOST stays TUTORIAL because `battle_return_state == "TUTORIAL"` is not a segment state.
 - Encounter routing cleanup: when an encounter battle's WON/LOST routes back to a segment, the routing path must run `clear_battle()` (the tutorial's `request_retry` already does; `request_continue` does not) so a second `debug_enter_encounter` in one scenario rebuilds fresh refs — `set_player` is first-call-wins and a stale `_player` would swallow the second battle's player. The WON/LOST overlay texts stay tutorial-flavored (华山论剑) this round — not asserted by the new scenarios.
 - DEBUG actions (unbound, harness-only, in `_process`): `debug_enter_encounter` → `start_encounter()` (no-op outside CULTIVATION). (`debug_win_tutorial`/`debug_lose_tutorial` reuse the existing pipeline hooks — verified they work for any active battle.)
 
@@ -268,7 +268,7 @@ Sparring_Partner: [health, max_health, grid_pos, turns_taken, acted, skill_coold
 
 ## 8. Tech stack (per SOTA — nothing reinvented)
 
-Godot 4.4 + GDScript; programmatic Resource data layer (no .tres content files); `RandomNumberGenerator` per-instance seed/state via `SaveManager.rng` (splitmix64-mixed, persisted); `round()` half-away-from-zero; stable insertion-sort initiative; `AStarGrid2D` paths (GridManager); JSON text saves with the existing 5-step atomic write; additive playtest surface contract; `gdscript_check` compile gate per implementation step (`.gd` stays out of linter_manifest per addon guidance).
+Godot 4 (`project.godot` declares features 4.7) + GDScript; programmatic Resource data layer (no .tres content files); `RandomNumberGenerator` per-instance seed/state via `SaveManager.rng` (splitmix64-mixed, persisted); `round()` half-away-from-zero; stable insertion-sort initiative; `AStarGrid2D` paths (GridManager); JSON text saves with the existing 5-step atomic write; additive playtest surface contract; `gdscript_check` compile gate per implementation step (`.gd` stays out of linter_manifest per addon guidance).
 
 ## 9. Extensibility
 
