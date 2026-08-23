@@ -554,6 +554,12 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.color = Color(0.9, 0.9, 0.9, 1.0)  # white
 	chars["Central Divine"] = cd
 
+	# The tutorial battle is 编排数值 (staged values): mark all six CharacterData
+	# instances so the real 甲乙丙丁 fa_hui_du cascade never recomputes their
+	# flat 1.3 — the protected playtest damage/heal values stay byte-identical.
+	for unit_cd in chars.values():
+		unit_cd.staged_values = true
+
 	return chars
 
 
