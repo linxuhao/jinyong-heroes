@@ -41,7 +41,7 @@ actions:
   - skill_12
 
 surface:
-  CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log, last_turn_actor, debug_await_total, debug_await_timeouts, debug_await_frames, debug_round_frame, debug_reflect_hits, tutorial_battle, debug_sha_heal_total, debug_iron_shirt_procs, debug_lang_attack_mult]
+  CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log, last_turn_actor, debug_await_total, debug_await_timeouts, debug_await_frames, debug_round_frame, debug_reflect_hits, tutorial_battle, debug_sha_heal_total, debug_iron_shirt_procs, debug_lang_attack_mult, empty_round_stalls]
   GameManager: [current_state, end_overlay_text]
   SaveManager: [seed, last_error, slot, has_save, eco_left, eq_left, growth_left, pow_left, trait_left, art_left, snapshot_profile_json, snapshot_rng_state, snapshot_decks_string, loaded_profile_json, loaded_rng_state, loaded_decks_string]
   Player: [health, max_health, grid_pos, moves_left, moved, acted, turns_taken, selected_skill_index, skill_cooldowns, shield, status_names, energy, sprite_top, traits]
@@ -94,6 +94,7 @@ scenarios:
         assert:
           GameManager.current_state: "changed"
           CombatManager.current_round: 1
+          CombatManager.empty_round_stalls: 0
           CombatManager.phase: 'phase == "PLAYER_TURN"'
           CombatManager.active_unit_name: 'active_unit_name == "Yang Guo"'
           CombatManager.turn_order: 'turn_order.size() == 6 and turn_order[0] == "Yang Guo" and turn_order[1] == "East Heretic" and turn_order[2] == "Central Divine" and turn_order[3] == "South Emperor" and turn_order[4] == "North Beggar" and turn_order[5] == "West Poison"'
@@ -1173,6 +1174,10 @@ scenarios:
           Player.grid_pos: 'grid_pos == Vector2i(7,5)'
           # Battle 1: sword D mastered / C unmastered / B absent -> 缺2 -> 0.7.
           SkillButton1.fahui_text: 'fahui_text == "发挥 ×0.7"'
+          CombatManager.empty_round_stalls: 'empty_round_stalls == 0'
+          CombatManager.current_round: 1
+          CombatManager.phase: 'phase == "PLAYER_TURN"'
+          CombatManager.active_unit_name: 'active_unit_name == "ProgressionHero"'
       - { at: 505, actions: [skill_1] }
       - { at: 520, actions: [basic_attack] }
       - at: 560
@@ -1229,6 +1234,10 @@ scenarios:
           CombatManager.tutorial_battle: 'tutorial_battle == false'
           Sparring_Partner.health: 60
           SkillButton1.fahui_text: 'fahui_text == "发挥 ×0.85"'
+          CombatManager.empty_round_stalls: 'empty_round_stalls == 0'
+          CombatManager.current_round: 1
+          CombatManager.phase: 'phase == "PLAYER_TURN"'
+          CombatManager.active_unit_name: 'active_unit_name == "ProgressionHero"'
       - { at: 1055, actions: [skill_1] }
       - { at: 1070, actions: [basic_attack] }
       - at: 1110
@@ -1335,6 +1344,7 @@ scenarios:
         assert:
           GameManager.current_state: 'current_state == "BATTLE"'
           CombatManager.tutorial_battle: 'tutorial_battle == false'
+          CombatManager.empty_round_stalls: 'empty_round_stalls == 0'
           # A(4) + B(3) + C(2) = 9 equipped skills -> row 2 holds 7-9; 10-12 hidden.
           SkillButton9.visible: 'visible == true'
           SkillButton10.visible: 'visible == false'
