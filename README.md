@@ -1,16 +1,16 @@
-# Huashan Sword Tournament (华山论剑) — 养成真的有意义
+# Huashan Sword Tournament (华山论剑) — 招式打得出去,门派选得对
 
 A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. Yang Guo faces the Five Grandmasters on a summit grid in a keyboard-completable tutorial duel, and behind it sits the full six-segment line: **tutorial win → transition → character creation → sect selection → cultivation (36 months) → map → ending**.
 
-This round makes **cultivation actually drive combat** (养成真的有意义 — 发挥度真算、阶梯真的填得起来):
+This round closes the playability gap a human tester hit (真人试玩): **the mechanism worked but the player didn't know how to fire** (`fahui_du_multiplies_damage` was 10/10 green because the script knows to move then `skill_1` then `basic_attack` — a human does not). It also finishes the two leftovers queued last round: the sect-select pick and the skill-bar turn states.
 
-- **发挥度 is now really computed** by the 甲乙丙丁 prerequisite cascade (`gongfa_data.gd:get_fa_hui_du()`, design/10_systems.md §4): 缺3=0.6 / 缺2=0.7 / 缺1=0.85 / 齐备=1.0, then ×1.1/×1.2/×1.3 for same-attribute mastered arts. The tutorial battle's protected 1.3 is **computed**, never special-cased — `TutorialFillers.fill()` populates each tutorial unit with real mastered filler arts so the prereqs are genuinely complete.
-- **The progression ladder is completed to 甲级 (A)** — four external ladders (拳掌 palm / 剑 sword / 长兵 polearm / 暗器 dart) and the five sects' internal ladder each have 丁丙乙甲 rows with real named techniques; a 神功 card and a debug action grant A arts.
-- **A real encounter battle** (`CULTIVATION → BATTLE → WON → CULTIVATION`) proves the same character deals different damage before vs. after filling the ladder. This round makes that path **load-bearing**: `SceneManager.SCENE_MAP["BATTLE"]` now routes to `battlefield` (the previous gap left `state_unmapped`), and the battlefield itself kicks off round 1 through a guarded `CombatManager.begin_battle()` seam after both units are registered — so `empty_round_stalls` stays 0 everywhere.
-- **Six trait combat effects** are implemented: 杀破狼 (sha / pojun / lang), 铁布衫, 身轻如燕, 左右互搏.
-- **Save roundtrip and sect-switch observability** added so the playtest can assert full-field equality and same-school continuity.
+- **A HUD hint line** (`ActionHintLabel`) now tells the player what to do next: after selecting a technique it reads `按 J 出招 / 点击目标`, and every previously-silent rejection now shows a specific Chinese reason — **射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在**.
+- **A range/target highlight** (`RangeHighlight`, a `Node2D` overlay) draws the selected skill's reachable tiles in translucent blue and valid enemy targets in red, driven by the player's own hit test so what you see is exactly what executes; it vanishes on deselect / toggle-off / use / battle exit.
+- **The confirm key got a real name**: the input action `basic_attack` → **`attack_confirm`** (J / keycode 74 unchanged). The *engine* action string `"basic_attack"` (AI decisions + `CombatManager.execute_action`) is a different thing and stays byte-identical.
+- **The skill bar now has a real "waiting" state**: on enemy-turn frames every visible button dims to a desaturated cool blue-gray (`state_palette("waiting")`, bg luma 0.26596) instead of silently falling through to the "ready" palette. The bug was that the override was nested inside the `elif hp_gated:` branch — dead code for every ready button.
+- **The sect pick is fixed**: `cultivation_changes_combat` now presses `move_down` at frame 160 so the check at frame 200 pins `CultivationScreen.sect_id == "wudang"` (武当, the sword sect the scenario's 剑法 damage pins actually describe). No frame numbers were renumbered.
 
-> **⚠️ Build status: FAILING GATES — do not ship.** Downstream gate results: **compile PASSED** (61 scripts parse OK, 0 errors), but **unit test FAILED** (`run_tests.sh` crashed with `FileNotFoundError: 'godot'` — the godot binary is not on PATH, so the GDScript suite never ran), **vision FAILED** (Q3 "skill button appearance changes over time" red in 7/14 battle scenarios — "All frames appear identical"), and the **playtest gate never ran** (`playtest_report.json` absent). `final/verify_report.json` → `all_goals_met: false`, `ready_for_deploy: false`. Fix the godot PATH, re-run all gates, and confirm test/vision/playtest green before flipping the verdict.
+> **⚠️ Verification status: structural integration confirmed by sampling; downstream gates NOT YET RE-RUN this round — do not claim shipped.** `final/verify_report.json` reports `all_goals_met: false` / `ready_for_deploy: false`. The four downstream gates (`5_compile`, `5_vision`, `5_test`, playtest) run *after* this step, so `compile_report.json` / `vision_report.json` / `test_report.json` / `playtest_report.json` do not yet exist at final-verification time. The code and playtest contract for this round are in place (see "This round" below and the 26-scenario contract), but the runtime evidence is produced by the gates that follow. Re-run `./run_tests.sh` and confirm every gate green before flipping the verdict.
 
 ## Quick Start
 
@@ -25,15 +25,15 @@ This round makes **cultivation actually drive combat** (养成真的有意义 �
 |--------|-------|
 | Move (one tile per press, 4-tile budget) | WASD / Arrow keys |
 | Select technique | **1–8** (9–12 with 左右互搏; or click the HUD skill buttons) |
-| Execute selected technique / basic attack | **J** (left-click an enemy to target the same way) |
+| Execute selected technique / basic attack | **J** (`attack_confirm`; left-click an enemy to target the same way) |
 | End turn | **Space** |
 | Advance tutorial | Enter / Space |
 | Pause / unpause | Escape |
 
 - Every turn = move up to your movement range **plus** one action, in any order. Space ends the turn at any point.
 - Press `J` with no skill selected to perform a basic attack on the **nearest adjacent** enemy.
-- Select a skill with `1`–`8` (or `9`–`12`), then press `J` to fire it at the nearest valid target.
-- **Two-phase unlock** (tutorial only): techniques `5`–`8` (Melancholy Palms) are locked until **round 4**; technique `8` (Seventeen Melancholy Forms) additionally requires HP **below 50%**.
+- Select a skill with `1`–`8` (or `9`–`12`), then press `J` to fire it at the nearest valid target. The hint line tells you the next step, and the grid highlight shows the reachable + target tiles.
+- **Two-phase unlock** (tutorial only): techniques `5`–`8` (Melancholy Palms) are locked until **round 4**; technique `8` (Seventeen Melancholy Forms) additionally requires HP **below 50%**. A rejected selection now says why instead of doing nothing.
 - Each unit acts once per round in initiative order: Yang Guo (88) → East Heretic (85) → Central Divine (80) → South Emperor (76) → North Beggar (74) → West Poison (70).
 - Defeat all five Grandmasters to win; let your health reach zero to lose.
 
@@ -159,7 +159,9 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 ## HUD
 
 - **Grid overlay** (`GridLines`): 1 px semi-transparent cell-boundary lines across the 15×11 board plus a border ring; exposed as `Battlefield.grid_lines_visible`.
-- **Skill bar**: up to **12** `SkillButton` nodes. Default = 2 arts / 8 slots (one row); with 左右互搏 = 3 arts / 12 slots (**two rows × 6**). Buttons beyond `skills.size()` are created but hidden, so `SkillButton9..12` surface reads are stable in every mode. Each button shows the technique name, hotkey, a `发挥 ×N.N` label (all tutorial arts show `发挥 ×1.3`), and a round-based cooldown overlay with a remaining-rounds number plus a state tag (`LOCKED` / `HP`). `state_text` is one of `"ready"` / `"cooldown"` / `"phase_locked"` / `"hp_gated"`. The two-phase unlock gate is `tutorial_battle`-scoped; the HP gate is data-driven from `SkillData.hp_gate_below_ratio`. `HUD.skill8_right_edge` / `HUD.skill12_right_edge` expose the right edges (≤ 960).
+- **Action hint line** (`ActionHintLabel`, new this round): a bottom-center label (hidden by default) that shows `按 J 出招 / 点击目标` after a technique is selected and a specific Chinese reason on every rejection — 射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在. The player emits a `action_hint` signal; the HUD forwards it to the label and clears it on deselect / success / battle exit (`clear_battle_refs()`).
+- **Range/target highlight** (`RangeHighlight`, new this round): a `Node2D` overlay between the grid lines and the characters. It polls `GameManager.get_player()` each frame, recomputes only when the selected skill / player tile / living-enemy count changes, and draws reachable tiles (translucent blue, alpha ≤ 0.28 so grid lines stay visible) plus valid enemy targets (translucent red). Reachability mirrors `player.can_skill_hit()` exactly; the target test *is* `can_skill_hit()`.
+- **Skill bar**: up to **12** `SkillButton` nodes. Default = 2 arts / 8 slots (one row); with 左右互搏 = 3 arts / 12 slots (**two rows × 6**). Buttons beyond `skills.size()` are created but hidden, so `SkillButton9..12` surface reads are stable in every mode. Each button shows the technique name, hotkey, a `发挥 ×N.N` label, and a round-based cooldown overlay with a remaining-rounds number plus a state tag (`LOCKED` / `HP`). `state_text` is one of `"ready"` / `"cooldown"` / `"phase_locked"` / `"hp_gated"` / **`"waiting"`** — the new fifth state renders on every visible button while the battle is live but it is not the player's turn. `SkillButtonN.state_luma` exposes the bg luminance (`Color.get_luminance()`; waiting bg luma 0.26596, ≥ 0.10 below ready 0.3874). The two-phase unlock gate is `tutorial_battle`-scoped; the HP gate is data-driven from `SkillData.hp_gate_below_ratio`. `HUD.skill8_right_edge` / `HUD.skill12_right_edge` expose the right edges (≤ 960).
 - **Health bars** (`HealthBar`): a **64 px** wide bar with the **name label above**, fill green→yellow→red by HP fraction, edge-clamped via `get_final_transform()`.
 - **Round indicator** (top-center): `回合 N`, `行动: <name> · 移动 <m> · 行动 ✓/结束`, `顺序: <Chinese names>`; never overlaps `PauseButton`.
 - **Energy label**: `内力: 180` (display only).
@@ -181,7 +183,7 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ```
 ├── project.godot                 # Engine config, autoload singletons, input map, display/stretch, theme
-├── playtest_spec.yaml            # Headless playtest contract (actions / surface / 23 scenarios)
+├── playtest_spec.yaml            # Headless playtest contract (actions / surface / 26 scenarios)
 ├── run_tests.sh                  # CLI gate: compile + headless playtest + unit tests
 ├── resources.md                  # Asset/tool reference notes
 ├── design/                       # Authoritative design archive (00..99)
@@ -201,8 +203,9 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 │   │          trait_effects, tutorial_fillers, encounter_data,
 │   │          progression_gongfa_data, card_data, event_data, map_data, battle_setup)
 │   ├── segments/ (transition, creation, sect_select, cultivation, map, ending)
-│   └── ui/ (hud, health_bar, skill_button, round_indicator, pause_button, tutorial_step)
-└── tests/                        # 16 test_*.gd + unit_test_runner.gd
+│   └── ui/ (hud, health_bar, skill_button, round_indicator, pause_button,
+│             tutorial_step, range_highlight)
+└── tests/                        # 16 test_*.gd + unit_test_runner.gd (unwired this round)
 ```
 
 ## Key Interfaces
@@ -213,7 +216,9 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ### Input actions (`project.godot` `[input]`)
 
-`move_up/down/left/right`, `skill_1`..`skill_8` (digits 1–8), `skill_9`..`skill_12` (keys 9 / 0 / minus / equal), `attack_confirm` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the six harness-only DEBUG actions `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` / `debug_step_month` / `debug_grant_art` / `debug_enter_encounter`.
+`move_up/down/left/right`, `skill_1`..`skill_8` (digits 1–8), `skill_9`..`skill_12` (keys 9 / 0 / minus / equal), `attack_confirm` (J — renamed from `basic_attack`; the *input* action only), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the six harness-only DEBUG actions `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` / `debug_step_month` / `debug_grant_art` / `debug_enter_encounter`.
+
+> **Naming caveat (important):** `basic_attack` exists as **two different strings**. The input action was renamed to `attack_confirm` (project.godot `[input]`, `player.gd` `ATTACK_ACTION` const + its two input sites, `tutorial_manager.gd` `_allowed_actions` lists, `playtest_spec.yaml`). The **engine action string** `"basic_attack"` — the AI decision dicts in `scripts/ai/*.gd` and the `CombatManager.execute_action(unit, "basic_attack", …)` resolution — is unchanged. Grep must show `basic_attack` only in the AI/combat resolution sites.
 
 ### `CombatManager` public API
 
@@ -242,13 +247,17 @@ Signals: `round_started`, `turn_started`, `turn_ended`, `phase_changed`, `action
 
 `get_state()`, `start_battle()` (tutorial-gated), `start_encounter()` (CULTIVATION → BATTLE), `end_battle(won)`, `register_enemy`, `unregister_enemy`, `get_enemies_alive()`, `set_player`, `get_player`, plus the six-segment surface: `set_battle_return_state` / `get_battle_return_state`, `enter_segment(state)`, `request_continue` / `request_retry`, `restart_game()`, `clear_battle()`, and the `end_overlay_text` observable.
 
+### `Player` surface (this round's additions)
+
+`signal action_hint(text)` (forwarded to the HUD hint label), `_skill_reject_reason(index) -> String` (single source of truth for the six rejection reasons, gate order byte-identical to the former `_skill_selectable()`), public `can_skill_hit(skill, enemy)` (authoritative hit test the highlight mirrors). `const ATTACK_ACTION: StringName = &"attack_confirm"` replaces the two hard-coded input-action strings.
+
 ### `SaveManager` / `SceneManager` surface
 
 `SaveManager` exposes `seed`, `last_error`, `slot`, `has_save`, the six deck counts `eco_left/eq_left/growth_left/pow_left/trait_left/art_left`, and the roundtrip observables `snapshot_profile_json` / `snapshot_rng_state` / `snapshot_decks_string` + `loaded_profile_json` / `loaded_rng_state` / `loaded_decks_string`. `SceneManager` exposes `current_scene`, `pending_swap`, `last_error`.
 
 ### Playtest surface contract (`playtest_spec.yaml`)
 
-Observable nodes/variables include `CombatManager` (turn engine + trait diagnostics), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`/`traits`, `SkillButton1..12` (`text`, `fahui_text`, `disabled`, `hp_gated`, `state_text`, `cooldown_remaining`), `RoundIndicator`, `EnergyLabel`, `HUD` (`visible`, `size`, `skill8_right_edge`, `skill12_right_edge`, `round_pause_overlap`), `HealthBar`, `Battlefield`, the six segment screens (`TransitionScreen`, `CreationScreen`, `SectSelectScreen`, `CultivationScreen` — incl. `gongfa_ids`/`gongfa_grades`/`gongfa_names` — `MapScreen`, `EndingScreen`), and the `SceneManager` / `SaveManager` autoloads.
+Observable nodes/variables include `CombatManager` (turn engine + trait diagnostics), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`/`traits`, `SkillButton1..12` (`text`, `fahui_text`, `disabled`, `hp_gated`, `state_text`, `cooldown_remaining`, `state_luma`), `ActionHintLabel` (`visible`, `text`), `RangeHighlight` (`visible`, `tile_count`, `target_count`), `RoundIndicator`, `EnergyLabel`, `HUD` (`visible`, `size`, `skill8_right_edge`, `skill12_right_edge`, `round_pause_overlap`), `HealthBar`, `Battlefield`, the six segment screens (`TransitionScreen`, `CreationScreen`, `SectSelectScreen`, `CultivationScreen` — incl. `gongfa_ids`/`gongfa_grades`/`gongfa_names` — `MapScreen`, `EndingScreen`), and the `SceneManager` / `SaveManager` autoloads.
 
 ## Technical Notes
 
@@ -260,6 +269,7 @@ Observable nodes/variables include `CombatManager` (turn engine + trait diagnost
 - **Seeded RNG**: one `RandomNumberGenerator` owned by `SaveManager`, seeded from `mix_seed(system_entropy)` (splitmix64 finalizer); all card draws / deck shuffles / 修习 rolls / shen_gong picks go through it in operation order. No stray `randi()` / `randomize()`.
 - **Rounding**: GDScript `round()` rounds half away from zero; `45 * 1.3` = 58.5 → 59. Percentages never take the fhd multiplier.
 - **Static AStar graph**: only the border ring is disabled once; occupancy re-checked at move time.
+- **Highlight layering**: `RangeHighlight` sits between `GridLines` and `Characters` in `battlefield.tscn`; translucent fills (alpha ≤ 0.28) keep grid lines readable, and health bars (CanvasLayer 10) always float on top.
 
 ## Testing
 
@@ -267,23 +277,21 @@ Observable nodes/variables include `CombatManager` (turn engine + trait diagnost
 ./run_tests.sh
 ```
 
-Runs a compile check (which triggers the Godot import pass), then a headless playtest against `playtest_spec.yaml`, then the Godot unit tests under `tests/` (via `tests/unit_test_runner.gd` + the SceneTree-style integration tests `test_save_manager.gd`, `test_game_manager_fsm.gd`, `test_cultivation.gd`, `test_encounter.gd`). Any failing unit test fails the whole gate. In total there are 16 `test_*.gd` files covering battle-setup formulas, card data, cultivation, encounter battles, event/map data, the gongfa cascade, health-bar geometry, player-profile round-trips, progression gongfa (incl. the A ladder/pool), save/load (incl. snapshot/loaded equality), skill-button states, theme font, trait data, and trait effects.
-
-The playtest contract (`playtest_spec.yaml`) carries **23 scenarios**: the ten battle behaviour scenarios (round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, two-phase unlock + HP gate, 先天罡气 fatal guard, terminal victory within 8–12 rounds with player HP 15%–40%, `ui_geometry_readability` + `skill_button_visual_states`), the ten segment/scene scenarios (`spine_to_ending`, `tutorial_win_routes_to_transition`, `tutorial_loss_restarts_tutorial`, `creation_budget_clamp_and_traits`, `lone_bane_sect_grants_external_only`, `cultivation_month_cycle_and_deck_bookkeeping`, `cultivation_year_end_stay`, `save_load_roundtrip`), plus the three new scenarios: `sect_switch_same_school_connects`, `cultivation_changes_combat`, and `trait_combat_effects_and_twelve_slots`.
+Runs a compile check (which triggers the Godot import pass), then a headless playtest against `playtest_spec.yaml`, then the Godot unit tests under `tests/`. The playtest contract carries **26 scenarios**: the ten battle behaviour scenarios (round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, two-phase unlock + HP gate, 先天罡气 fatal guard, terminal victory within 8–12 rounds with player HP 15%–40%, `ui_geometry_readability` + `skill_button_visual_states`), the segment/scene scenarios (`spine_to_ending`, `tutorial_win_routes_to_transition`, `tutorial_loss_restarts_tutorial`, `creation_budget_clamp_and_traits`, `lone_bane_sect_grants_external_only`, `cultivation_month_cycle_and_deck_bookkeeping`, `cultivation_year_end_stay`, `save_load_roundtrip`, `sect_switch_same_school_connects`, `cultivation_changes_combat`, `trait_combat_effects_and_twelve_slots`), and the three scenarios added this round (`skill_hint_and_range_highlight`, `skill_rejection_reason_texts`, `skill_bar_waiting_state`).
 
 A passing run requires a clean compile, a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 
-> **Verification status: FAILING GATES — do not ship.** Structural integration was confirmed by sampling (scene routing, FSM, save/profile/RNG/decks, theme, the real fa-hui-du cascade with `TutorialFillers`, the A-grade ladder + 神功 pool, the encounter-battle path, the six trait hooks, the 23-scenario playtest contract, and the test harness). The downstream runtime gates produced these results:
+> **Verification status: PENDING downstream gates — do not claim shipped.** Structural integration for this round was confirmed by sampling (hint line + six rejection reasons, the range/target highlight, the `attack_confirm` rename with the engine action string preserved, the `waiting` state palette + `state_luma`, the sect-select `move_down` fix + `sect_id == "wudang"` assert, and the 26-scenario playtest contract with its three new scenarios). The four downstream runtime gates (`5_compile`, `5_vision`, `5_test`, playtest) run **after** final verification, so their reports do not exist yet and their results are unconfirmed:
 >
-> - **5_compile** — ✅ **PASSED** (`compile_report.json`: 61 scripts parse OK, 0 errors; no GDScript parse issues).
-> - **5_test** — ❌ **FAILED** (`test_report.json`: passed=false, returncode=1). `run_tests.sh` crashed with `FileNotFoundError: 'godot'` — the godot binary is not on PATH, so the entire GDScript unit/integration suite never actually ran. No unit-test result exists to support a pass.
-> - **5_vision** — ❌ **FAILED** (`vision_report.json`: passed=false). Q3 "skill button appearance changes over time" (design/30_presentation.md readability hard requirement #2) failed in 7/14 battle scenarios ("All frames appear identical; no button changes"). The three new encounter scenarios were each classified "menu" (only 1 of 4 sampled frames showed a battlefield), so the encounter battle is not visibly progressing across the sampled frames.
-> - **playtest** — ⚠️ **NOT RUN** (`playtest_report.json` absent). The 23-scenario contract was never executed: `cultivation_changes_combat` 29/29 (21→39 / 26→34), `trait_combat_effects_and_twelve_slots` 29/29, `sect_switch_same_school_connects` 15/15, `save_load_roundtrip` 13/13, `cultivation_month_cycle_and_deck_bookkeeping` 17/17, `empty_round_stalls==0` in every scenario, and the six protected tutorial scenarios byte-identical are all unconfirmed.
->
-> `final/verify_report.json` therefore reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. Fix the godot PATH (or have `run_tests.sh` resolve the binary), re-run the full gate, and confirm every gate green before flipping the verdict:
+> - **5_compile** — ⏳ pending (`compile_report.json` not yet produced this round).
+> - **5_test** — ⏳ pending; expected "no Python source, not applicable" (the GDScript suite is explicitly unwired this round — non-goal), but no report exists yet to confirm.
+> - **5_vision** — ⏳ pending (`vision_report.json` not yet produced): Q3 waiting-state visual distinction, and battle-vs-menu classification of `cultivation_changes_combat` / `trait_combat_effects_and_twelve_slots`, are the round's hard visual acceptance.
+> - **playtest** — ⏳ pending (`playtest_report.json` not yet produced): the 26-scenario contract, six protected tutorial scenarios byte-identical, `cultivation_changes_combat` damage pins 21→26, `empty_round_stalls == 0`, 0 runtime errors, and `spine_to_ending` 32/32.
+
+`final/verify_report.json` therefore reports `all_goals_met: false` and `ready_for_deploy: false`. Re-run the full gate and confirm every gate green before flipping the verdict:
 
 ```bash
 ./run_tests.sh
 ```
 
-Re-run instructions: after any change, re-run and confirm: (a) `playtest_report.json` shows no `Trying to cast a freed object` errors, (b) the terminal scenario reports `WON` / round in `[8,12]` / HP in `[75,200]`, (c) the six protected tutorial behaviour scenarios stay green with byte-identical damage numbers and `发挥 ×1.3`, (d) `spine_to_ending` reaches `ENDING`, (e) `cultivation_changes_combat` shows two different damage numbers, (f) `save_load_roundtrip` snapshot/loaded equality is green, and (g) `ui_geometry_readability` + `skill_button_visual_states` are green.
+Re-run instructions: after any change, re-run and confirm: (a) `playtest_report.json` shows no `Trying to cast a freed object` errors, (b) the terminal scenario reports `WON` / round in `[8,12]` / HP in `[75,200]`, (c) the six protected tutorial behaviour scenarios stay green with byte-identical damage numbers and `发挥 ×1.3`, (d) `spine_to_ending` reaches `ENDING`, (e) `cultivation_changes_combat` shows `sect_id == "wudang"` and two different damage numbers (21 → 26), (f) `save_load_roundtrip` snapshot/loaded equality is green, (g) `skill_hint_and_range_highlight` / `skill_rejection_reason_texts` / `skill_bar_waiting_state` are green, and (h) `ui_geometry_readability` + `skill_button_visual_states` are green.
