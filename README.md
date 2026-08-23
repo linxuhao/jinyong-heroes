@@ -10,7 +10,7 @@ This round makes **cultivation actually drive combat** (养成真的有意义 �
 - **Six trait combat effects** are implemented: 杀破狼 (sha / pojun / lang), 铁布衫, 身轻如燕, 左右互搏.
 - **Save roundtrip and sect-switch observability** added so the playtest can assert full-field equality and same-school continuity.
 
-> **⚠️ Build status: NOT VERIFIED — do not ship.** At the time of final verification the downstream hard gates had **not yet produced their reports** (`compile_report.json`, `test_report.json`, `vision_report.json`, `playtest_report.json` are absent from the workspace — they run after this step). Structural integration was confirmed by sampling, but objective correctness (compile 0 errors, unit tests pass, the 23-scenario playtest green, the six protected tutorial scenarios byte-identical, vision Q3 green on real battle scenes) is **unconfirmed**. `final/verify_report.json` → `all_goals_met: false`, `ready_for_deploy: false`. Re-run the full gate and confirm every gate green before flipping the verdict.
+> **⚠️ Build status: FAILING GATES — do not ship.** Downstream gate results: **compile PASSED** (61 scripts parse OK, 0 errors), but **unit test FAILED** (`run_tests.sh` crashed with `FileNotFoundError: 'godot'` — the godot binary is not on PATH, so the GDScript suite never ran), **vision FAILED** (Q3 "skill button appearance changes over time" red in 7/14 battle scenarios — "All frames appear identical"), and the **playtest gate never ran** (`playtest_report.json` absent). `final/verify_report.json` → `all_goals_met: false`, `ready_for_deploy: false`. Fix the godot PATH, re-run all gates, and confirm test/vision/playtest green before flipping the verdict.
 
 ## Quick Start
 
@@ -273,14 +273,14 @@ The playtest contract (`playtest_spec.yaml`) carries **23 scenarios**: the ten b
 
 A passing run requires a clean compile, a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 
-> **Verification status: NOT VERIFIED — gates NOT YET RUN (do not ship).** Structural integration was confirmed by sampling (scene routing, FSM, save/profile/RNG/decks, theme, the real fa-hui-du cascade with `TutorialFillers`, the A-grade ladder + 神功 pool, the encounter-battle path, the six trait hooks, the 23-scenario playtest contract, and the test harness). The downstream runtime gates had **not produced their reports at verification time** — `compile_report.json`, `test_report.json`, `vision_report.json`, and `playtest_report.json` are absent from the workspace (they run after this step). Therefore the success criteria are unconfirmed:
+> **Verification status: FAILING GATES — do not ship.** Structural integration was confirmed by sampling (scene routing, FSM, save/profile/RNG/decks, theme, the real fa-hui-du cascade with `TutorialFillers`, the A-grade ladder + 神功 pool, the encounter-battle path, the six trait hooks, the 23-scenario playtest contract, and the test harness). The downstream runtime gates produced these results:
 >
-> - **5_compile** (runtime errors 0 / compile 0 errors) — `compile_report.json` absent.
-> - **5_test** (unit tests pass; same-seed → identical card sequence determinism) — `test_report.json` absent.
-> - **5_vision** (Q3 skill-button cross-frame change green on real battle scenes) — `vision_report.json` absent.
-> - **playtest** (23 scenarios green; six protected tutorial scenarios byte-identical; `cultivation_changes_combat` asserts two different damage numbers; `save_load_roundtrip` 10/10; trait thresholds) — `playtest_report.json` absent.
+> - **5_compile** — ✅ **PASSED** (`compile_report.json`: 61 scripts parse OK, 0 errors; no GDScript parse issues).
+> - **5_test** — ❌ **FAILED** (`test_report.json`: passed=false, returncode=1). `run_tests.sh` crashed with `FileNotFoundError: 'godot'` — the godot binary is not on PATH, so the entire GDScript unit/integration suite never actually ran. No unit-test result exists to support a pass.
+> - **5_vision** — ❌ **FAILED** (`vision_report.json`: passed=false). Q3 "skill button appearance changes over time" (design/30_presentation.md readability hard requirement #2) failed in 7/14 battle scenarios ("All frames appear identical; no button changes"). The three new encounter scenarios were each classified "menu" (only 1 of 4 sampled frames showed a battlefield), so the encounter battle is not visibly progressing across the sampled frames.
+> - **playtest** — ⚠️ **NOT RUN** (`playtest_report.json` absent). The 23-scenario contract was never executed: `cultivation_changes_combat` 29/29 (21→39 / 26→34), `trait_combat_effects_and_twelve_slots` 29/29, `sect_switch_same_school_connects` 15/15, `save_load_roundtrip` 13/13, `cultivation_month_cycle_and_deck_bookkeeping` 17/17, `empty_round_stalls==0` in every scenario, and the six protected tutorial scenarios byte-identical are all unconfirmed.
 >
-> `final/verify_report.json` therefore reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. Re-run the full gate and confirm every gate green before flipping the verdict:
+> `final/verify_report.json` therefore reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. Fix the godot PATH (or have `run_tests.sh` resolve the binary), re-run the full gate, and confirm every gate green before flipping the verdict:
 
 ```bash
 ./run_tests.sh
