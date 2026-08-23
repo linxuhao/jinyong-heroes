@@ -74,6 +74,14 @@ func _process(_delta: float) -> void:
 		_hide()
 		return
 
+	# Show the overlay: a valid battle with a selected skill exists. This is the
+	# only writer of visible = true; _hide() stays the only writer of
+	# visible = false (deselect / toggle-off / battle-exit). It must run BEFORE
+	# the diff early-return so frames where nothing changed also keep the node
+	# visible — otherwise a single _hide() during pre-battle frames leaves the
+	# highlight hidden forever even though tile_count/target_count are computed.
+	visible = true
+
 	var enemy_count: int = GameManager.get_enemies_alive().size()
 	if index == _last_index and player.grid_pos == _last_grid \
 			and enemy_count == _last_enemy_count:
