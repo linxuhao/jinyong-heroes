@@ -40,7 +40,7 @@ surface:
   SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
   SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining]
   PauseButton: [visible, global_position]
-  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta]
+  HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color]
   Battlefield: [board_aligned, grid_lines_visible]
 
 scenarios:
@@ -389,6 +389,8 @@ scenarios:
           SkillButton8.state_text: 'state_text == "phase_locked"'
           SkillButton1.state_text: 'state_text == "ready"'
           HealthBar.follow_delta: 'follow_delta <= 24'
+          HealthBar.fill_color: 'fill_color.g > 0.5 and fill_color.g > fill_color.r'
+          HealthBar.name_text: 'name_text == "Yang Guo"'
       # --- Scripted move: the player walks 3 tiles up; the health bar must
       #     track the character (follow_delta stays small) and actually move
       #     (global_position differential). ---

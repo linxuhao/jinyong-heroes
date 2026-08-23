@@ -111,6 +111,14 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 			_name_label = label
 	if label != null:
 		label.text = char_name
+		# Make the name readable over any backdrop: light text on a dark
+		# outline with a soft shadow. Font size stays 10 (tscn); the outline
+		# widens glyphs by ~outline_size px, which the short aliases still
+		# fit inside the 110 px label with clip_text disabled.
+		label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
+		label.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.05))
+		label.add_theme_constant_override("outline_size", 2)
+		label.add_theme_constant_override("shadow_outline_size", 1)
 
 	# Always record the name (unconditionally, outside the label-null guard)
 	# so the observable is set in every setup() path.
