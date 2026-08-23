@@ -58,12 +58,13 @@ surface:
   HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height, track_bg]
   Battlefield: [board_aligned, grid_lines_visible]
   SceneManager: [current_scene, pending_swap, last_error]
-  TransitionScreen: [lines_shown, done]
-  CreationScreen: [phase, points_left, attr_index, attrs, trait_ids, confirmed]
-  SectSelectScreen: [focus_index, selected_sect_id]
-  CultivationScreen: [year, month, sect_id, phase, silver, attr_bone, attr_inner, attr_agility, attr_wisdom, attr_fortune, gongfa_count, mastered_count, drawn_card_categories, event_id, fast_forward_used]
-  MapScreen: [current_node_id, focus_id, ended]
-  EndingScreen: [tier, done]
+  TransitionScreen: [lines_shown, done, visible, size]
+  CreationScreen: [phase, points_left, attr_index, attrs, trait_ids, confirmed, visible, size]
+  SectSelectScreen: [focus_index, selected_sect_id, visible, size]
+  CultivationScreen: [year, month, sect_id, phase, silver, attr_bone, attr_inner, attr_agility, attr_wisdom, attr_fortune, gongfa_count, mastered_count, drawn_card_categories, event_id, fast_forward_used, visible, size]
+  MapScreen: [current_node_id, focus_id, ended, visible, size]
+  EndingScreen: [tier, done, visible, size]
+  Backdrop: [visible, size]
 
 scenarios:
   - name: round_one_snapshot_and_turn_order
@@ -533,12 +534,20 @@ scenarios:
         actions: []
         assert:
           GameManager.current_state: 'current_state == "TRANSITION"'
+          TransitionScreen.visible: true
+          TransitionScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       - { at: 80, actions: [ui_accept] }
       - { at: 90, actions: [ui_accept] }
       - at: 110
         actions: []
         assert:
           GameManager.current_state: 'current_state == "CHARACTER_CREATION"'
+          CreationScreen.visible: true
+          CreationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       # bone 10 -> 15 (5 right), ui_accept (-> TRAITS), move_right (-> CONFIRM), ui_accept (confirm)
       - { at: 120, actions: [move_right] }
       - { at: 130, actions: [move_right] }
@@ -560,11 +569,19 @@ scenarios:
           CultivationScreen.year: 1
           CultivationScreen.month: 1
           CultivationScreen.gongfa_count: 2
+          CultivationScreen.visible: true
+          CultivationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       - { at: 280, actions: [debug_fast_forward] }
       - at: 400
         actions: []
         assert:
           GameManager.current_state: 'current_state == "MAP"'
+          MapScreen.visible: true
+          MapScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       # 4x (move_right + ui_accept) along the mainline to 昆仑
       - { at: 420, actions: [move_right] }
       - { at: 430, actions: [ui_accept] }
@@ -579,6 +596,10 @@ scenarios:
         assert:
           GameManager.current_state: 'current_state == "ENDING"'
           EndingScreen.tier: 'tier >= 1 and tier <= 3'
+          EndingScreen.visible: true
+          EndingScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
 
   - name: tutorial_win_routes_to_transition
     description: "After the WON overlay continue press, SceneManager swaps the battlefield out for the TransitionScreen with no pending swap left in flight."
@@ -602,6 +623,10 @@ scenarios:
           GameManager.current_state: 'current_state == "TRANSITION"'
           SceneManager.current_scene: 'current_scene == "transition"'
           SceneManager.pending_swap: 'pending_swap == false'
+          TransitionScreen.visible: true
+          TransitionScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
 
   - name: tutorial_loss_restarts_tutorial
     description: "Losing the tutorial (DEBUG) routes back to a freshly re-instantiated battlefield with the player back at full HP — the teardown path must not crash on freed nodes."
@@ -665,6 +690,10 @@ scenarios:
         actions: []
         assert:
           CreationScreen.points_left: 'points_left == 10'
+          CreationScreen.visible: true
+          CreationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       # back to bone: still clamped at 20, no further spend
       - { at: 270, actions: [move_up] }
       - { at: 280, actions: [move_right] }
@@ -762,6 +791,10 @@ scenarios:
           GameManager.current_state: 'current_state == "CULTIVATION"'
           CultivationScreen.sect_id: 'sect_id == "emei"'
           CultivationScreen.gongfa_count: 'gongfa_count == 1'
+          CultivationScreen.visible: true
+          CultivationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
 
   - name: cultivation_month_cycle_and_deck_bookkeeping
     description: "Month 1 stages a 3-category card draw (decks 12/12/9 -> 11/11/8 at frame 130); picking card 0 then 练功 on the first gongfa completes the month, which immediately stages month 2's draw — so at frame 200 each monthly deck has lost exactly two cards (10/10/7), the calendar shows month 2, and the autosave landed cleanly."
@@ -790,6 +823,10 @@ scenarios:
           SaveManager.eco_left: 'eco_left == 11'
           SaveManager.eq_left: 'eq_left == 11'
           SaveManager.growth_left: 'growth_left == 8'
+          CultivationScreen.visible: true
+          CultivationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       - { at: 140, actions: [ui_accept] }
       - { at: 150, actions: [ui_accept] }
       - { at: 160, actions: [ui_accept] }
@@ -880,6 +917,10 @@ scenarios:
           CultivationScreen.month: 'month == 1'
           CultivationScreen.gongfa_count: 'gongfa_count == 4'
           CultivationScreen.mastered_count: 'mastered_count == 2'
+          CultivationScreen.visible: true
+          CultivationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
 
   - name: save_load_roundtrip
     description: "Manual save from the cultivation menu (slot 1) persists year/month; one more month then 读档 restores the exact snapshot (year 1 month 3, attrs untouched by the two 练功 months)."
@@ -919,6 +960,10 @@ scenarios:
         assert:
           SaveManager.has_save: 'has_save == true'
           SaveManager.last_error: 'last_error == ""'
+          CultivationScreen.visible: true
+          CultivationScreen.size: 'size.x > 0 and size.y > 0'
+          Backdrop.visible: true
+          Backdrop.size: 'size.x > 0 and size.y > 0'
       # complete month 3 (move back up to 练功, accept, accept) -> month 4
       - { at: 320, actions: [move_up] }
       - { at: 330, actions: [move_up] }

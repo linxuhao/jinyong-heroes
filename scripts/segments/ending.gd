@@ -29,7 +29,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _render() -> void:
-	var body: RichTextLabel = get_node_or_null("BodyLabel") as RichTextLabel
+	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
 		return
 	var def: Dictionary = MapData.ending_def(tier)

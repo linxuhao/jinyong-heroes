@@ -86,7 +86,7 @@ func _travel() -> void:
 
 
 func _render() -> void:
-	var body: RichTextLabel = get_node_or_null("BodyLabel") as RichTextLabel
+	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
 		return
 	var text: String = "【江湖行路】\n\n"
