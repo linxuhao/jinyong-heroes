@@ -90,6 +90,12 @@ scenarios:
           RoundIndicator.visible: true
           RoundIndicator.current_round: 1
           RoundIndicator.active_actor: 'active_actor == "杨过"'
+      - at: 200
+        actions: []
+        assert:
+          CombatManager.active_unit_name: 'active_unit_name == "Yang Guo"'
+          RoundIndicator.active_text: 'active_text.contains("行动")'
+          Player.acted: 'acted == false'
 
   - name: enemy_acts_only_after_player_ends_turn
     description: "Enemies stay idle while the player's turn is open; they act only after Space (end_turn)."
@@ -114,6 +120,11 @@ scenarios:
           Player.acted: "changed"
           Central_Divine.health: "changed"
       - { at: 90, actions: [end_turn] }
+      - at: 100
+        actions: []
+        assert:
+          CombatManager.active_unit_name: 'active_unit_name != "Yang Guo"'
+          CombatManager.phase: 'phase == "ENEMY_TURN"'
       - at: 500
         actions: []
         assert:
@@ -131,6 +142,11 @@ scenarios:
       - { at: 13, actions: [ui_accept] }
       - { at: 15, actions: [ui_accept] }
       - { at: 20, actions: [end_turn] }
+      - at: 30
+        actions: []
+        assert:
+          CombatManager.active_unit_name: 'active_unit_name != "Yang Guo"'
+          CombatManager.phase: 'phase == "ENEMY_TURN"'
       - at: 700
         actions: []
         assert:
@@ -160,6 +176,11 @@ scenarios:
       - { at: 50, actions: [move_up] }
       - { at: 65, actions: [skill_1] }
       - { at: 80, actions: [basic_attack] }
+      - at: 95
+        actions: []
+        assert:
+          SkillButton1.state_text: 'state_text == "cooldown"'
+          SkillButton1.cooldown_remaining: 'cooldown_remaining == 1'
       - at: 120
         actions: []
         assert:
@@ -187,6 +208,11 @@ scenarios:
       - { at: 50, actions: [move_up] }
       - { at: 65, actions: [skill_1] }
       - { at: 80, actions: [basic_attack] }
+      - at: 95
+        actions: []
+        assert:
+          SkillButton1.overlay_visible: 'overlay_visible == true'
+          SkillButton1.cooldown_remaining: 'cooldown_remaining == 1'
       - at: 120
         actions: []
         assert:
@@ -468,6 +494,10 @@ scenarios:
       #     track the character (follow_delta stays small) and actually move
       #     (global_position differential). ---
       - { at: 40, actions: [move_up] }
+      - at: 50
+        actions: []
+        assert:
+          Player.grid_pos: "changed"
       - { at: 55, actions: [move_up] }
       - { at: 70, actions: [move_up] }
       - at: 85
