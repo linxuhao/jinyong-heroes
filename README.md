@@ -172,7 +172,13 @@ Runs a compile check (which triggers the Godot import pass) followed by a headle
 
 A passing run requires a clean compile and a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 
-> **Verification status: RED — 5_vision gate not re-run (no vision_report.json found in workspace).** The external 5_vision readability gate was not re-run after the visual-fix tasks landed, and no `playtest_report.json` is present in the workspace to back the prior checks — so no shipped / all_goals_met / ready_for_deploy claim is made. The final gate record (`final/verify_report.json`) is unverified pending a fresh gate re-run staged by the pipeline. To re-run the whole gate after any change:
+> **Verification status: RED — 5_vision readability gate FAILED (not shipped).** The external 5_vision gate was run and reported `passed: false` with **3 of 6 checks failing over 40 frames / 10 scenarios**:
+>
+> - **Q5 — Health bars recognisable**: 10/10 scenarios failed — bars render as solid blocks under characters with no visible filled + empty/background portion, so they do not read as HP bars (design/30_presentation.md readability hard-requirement #4).
+> - **Q6 — No truncated/clipped text**: 10/10 scenarios failed — character name labels are cut off at the bottom, skill text is obscured by the UI overlay, and the terminal frame ends with a `Defeat...` ellipsis (ellipsis is explicitly forbidden).
+> - **Q3 — Skill-button appearance changes over time**: 5/10 scenarios failed — all buttons appear identical across frames in `round_one_snapshot`, `enemy_acts_only`, `each_unit_acts_once`, `central_divine_innate_qi`, and `ui_geometry_readability`; the cooldown/state visuals do not visibly change across turns.
+>
+> Compile is clean (24 scripts, 0 errors) and the playtest behavior assertions pass (freed-object lane + terminal-balance lane healthy); the blocking work is confined to the visual/readability lane. Because hard success criterion 3 (the 5_vision gate) is red, `final/verify_report.json` reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. To re-run the whole gate after any change:
 
 ```bash
 ./run_tests.sh
