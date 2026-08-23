@@ -13,7 +13,7 @@ extends Node
 
 const STEP_WELCOME: int = 0
 const STEP_MOVEMENT: int = 1
-const STEP_BASIC_ATTACK: int = 2
+const STEP_ATTACK: int = 2
 const STEP_SKILLS: int = 3
 const STEP_END_TURN: int = 4
 const STEP_PAUSE: int = 5
@@ -24,7 +24,7 @@ const STEP_COUNT: int = 7
 ## unlock the full list (the player controller still enforces the round-4
 ## two-phase palm-art unlock for skill_5..skill_8).
 const _ALL_ACTIONS: Array[String] = [
-	"move", "basic_attack",
+	"move", "attack_confirm",
 	"skill_1", "skill_2", "skill_3", "skill_4",
 	"skill_5", "skill_6", "skill_7", "skill_8",
 	"end_turn", "pause",
@@ -90,7 +90,7 @@ var _dim_rect: ColorRect = null
 const _STEP_TITLES: Dictionary = {
 	STEP_WELCOME: "华山论剑",
 	STEP_MOVEMENT: "移动",
-	STEP_BASIC_ATTACK: "普通攻击",
+	STEP_ATTACK: "普通攻击",
 	STEP_SKILLS: "招式",
 	STEP_END_TURN: "结束回合",
 	STEP_PAUSE: "暂停",
@@ -107,7 +107,7 @@ const _STEP_BODIES: Dictionary = {
 		"WASD/方向键每次移动一格。每回合有 4 点移动力。\n\n"
 		+ "现在就试试移动吧！"
 	),
-	STEP_BASIC_ATTACK: (
+	STEP_ATTACK: (
 		"移动到敌人身边，按 J（或鼠标左键）进行普通攻击。"
 	),
 	STEP_SKILLS: (
@@ -334,16 +334,16 @@ func _update_allowed_actions() -> void:
 			pass
 		STEP_MOVEMENT:
 			_allowed_actions = ["move"]
-		STEP_BASIC_ATTACK:
-			_allowed_actions = ["move", "basic_attack"]
+		STEP_ATTACK:
+			_allowed_actions = ["move", "attack_confirm"]
 		STEP_SKILLS:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4"]
+			_allowed_actions = ["move", "attack_confirm", "skill_1", "skill_2", "skill_3", "skill_4"]
 		STEP_END_TURN:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn"]
+			_allowed_actions = ["move", "attack_confirm", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn"]
 		STEP_PAUSE:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn", "pause"]
+			_allowed_actions = ["move", "attack_confirm", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn", "pause"]
 		STEP_COMBAT_START:
-			_allowed_actions = ["move", "basic_attack", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn", "pause"]
+			_allowed_actions = ["move", "attack_confirm", "skill_1", "skill_2", "skill_3", "skill_4", "end_turn", "pause"]
 
 # ---------------------------------------------------------------------------
 # Internal — Finish

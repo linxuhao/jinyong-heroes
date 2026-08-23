@@ -213,7 +213,7 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ### Input actions (`project.godot` `[input]`)
 
-`move_up/down/left/right`, `skill_1`..`skill_8` (digits 1–8), `skill_9`..`skill_12` (keys 9 / 0 / minus / equal), `basic_attack` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the six harness-only DEBUG actions `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` / `debug_step_month` / `debug_grant_art` / `debug_enter_encounter`.
+`move_up/down/left/right`, `skill_1`..`skill_8` (digits 1–8), `skill_9`..`skill_12` (keys 9 / 0 / minus / equal), `attack_confirm` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the six harness-only DEBUG actions `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` / `debug_step_month` / `debug_grant_art` / `debug_enter_encounter`.
 
 ### `CombatManager` public API
 

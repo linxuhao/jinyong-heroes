@@ -14,6 +14,11 @@ extends Node2D
 const CharacterData = preload("res://scripts/data/character_data.gd")
 const SkillData = preload("res://scripts/data/skill_data.gd")
 
+## Input action for confirming / executing an attack (physical key J, keycode
+## 74). This is the INPUT action; the engine action string used by
+## CombatManager.execute_action is a separate namespace and stays unchanged.
+const ATTACK_ACTION: StringName = &"attack_confirm"
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -352,7 +357,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# --- Keyboard basic attack / skill execution (J) ---
 	# Fires the selected skill (or basic attack) at the nearest valid target.
-	elif event.is_action_pressed("basic_attack"):
+	elif event.is_action_pressed(ATTACK_ACTION):
 		_try_keyboard_attack()
 		get_viewport().set_input_as_handled()
 
@@ -503,7 +508,7 @@ func _try_attack_target(enemy: Node) -> void:
 
 	else:
 		# Basic attack.
-		if not TutorialManager.is_input_allowed("basic_attack"):
+		if not TutorialManager.is_input_allowed(ATTACK_ACTION):
 			action_hint.emit("教程尚未解锁")
 			return
 
