@@ -139,6 +139,11 @@ var debug_await_frames: int = 0
 ## tasks re-time key presses against measured round boundaries.
 var debug_round_frame: int = 0
 
+## Observable: how many times a round began with NO unit able to act. Must
+## stay 0 in a healthy battle; any non-zero value means the battle was
+## started with nothing registered and cannot advance.
+var empty_round_stalls: int = 0
+
 ## 蛤蟆反震 reflect diagnostic: cumulative count of times the reflect
 ## triggered on a melee attacker (incremented exactly once per trigger, just
 ## before the untyped 16-damage apply). Lets the balance tasks verify the
@@ -419,6 +424,25 @@ func _begin_round() -> void:
 	for entry in entries:
 		_turn_order_units.append(entry[2])
 		turn_order.append(_name_of(entry[2]))
+
+	if _turn_order_units.is_empty():
+		# Do NOT fall through to _next_turn() here. On an empty order it calls
+		# _end_round(), which increments the round and calls _begin_round()
+		# again, which lands right back here — three stack frames per round,
+		# forever, until "Stack overflow. Check for infinite recursion".
+		# Measured on run jinyong-cultivate, 2026-08-23: six such errors,
+		# reported at game_manager.gd:108 and combat_manager.gd:541 — neither
+		# of which is the recursion, only wherever the stack happened to run
+		# out. The cycle has no base case; this is it.
+		#
+		# A round with nobody in it is a broken battle, not a quiet edge case,
+		# so it is made LOUD rather than stalled silently: push_error surfaces
+		# in playtest_report.errors, and the counter lets a scenario assert on
+		# it directly.
+		empty_round_stalls += 1
+		push_error("Round %d began with no unit able to act — battle cannot advance." % current_round)
+		_set_phase("ROUND_END")
+		return
 
 	round_started.emit(current_round)
 	_next_turn()
