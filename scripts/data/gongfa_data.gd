@@ -6,8 +6,9 @@ extends Resource
 ## Internal arts produce stat bonuses / an energy pool / passives; external arts
 ## produce techniques. fa_hui_du (发挥度) is computed by the real 甲乙丙丁
 ## prerequisite cascade (design/10_systems.md §3–§4): 前置完成度 × 属性加成,
-## interval 0.6~1.3. The tutorial battle's arts are 编排数值 (staged) — see
-## CharacterData.staged_values — and keep their flat 1.3.
+## interval 0.6~1.3. The tutorial battle's protected 1.3 values come out of this
+## same cascade — TutorialFillers.fill() populates each tutorial unit with real
+## mastered filler arts so the prereqs are genuinely complete (no 特判 bypass).
 
 @export var gongfa_name: String = ""          # English display name
 @export var grade: String = ""                # "A"|"B"|"C"|"D" (甲乙丙丁)
@@ -23,8 +24,7 @@ extends Resource
 @export var fa_hui_du: float = 1.3            # multiplier applied to damage/heal/shield only
 
 ## Mastered flag — per-unit mastery state. Resource instances carry their own
-## mastery; the tutorial battle's arts are staged (CharacterData.staged_values)
-## and keep this false.
+## mastery; tutorial arts are marked mastered by TutorialFillers.fill().
 @export var mastered: bool = false
 
 ## Grade rank map: lower number = higher grade (A is 甲, D is 丁). Grade strings
@@ -42,9 +42,8 @@ const LOWER_SLOTS := {
 }
 
 ## Real 发挥度 (design/10_systems.md §4): 前置完成度 × 属性加成, interval
-## 0.6~1.3.
+## 0.6~1.3. The pure cascade is the ONLY path — there is no 特判 (staged) branch.
 ##   unit == null              -> fa_hui_du (field fallback, pre-cascade default)
-##   unit.staged_values        -> fa_hui_du (编排数值: tutorial 1.3, never recomputed)
 ##   missing = count of lower-grade prerequisite slots (same school) with no
 ##             mastered art of that grade in unit.internal_arts+external_arts
 ##   base    = [1.0, 0.85, 0.7, 0.6][clamp(missing, 0, 3)]
@@ -55,8 +54,6 @@ const LOWER_SLOTS := {
 ##   return 1.0 + 0.1 * same_attr     (1.0 / 1.1 / 1.2 / 1.3)
 func get_fa_hui_du(unit) -> float:
 	if unit == null:
-		return fa_hui_du
-	if unit.staged_values:
 		return fa_hui_du
 	var missing: int = 0
 	for req_grade in LOWER_SLOTS.get(grade, []):

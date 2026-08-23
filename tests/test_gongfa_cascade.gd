@@ -12,12 +12,14 @@
 
 const GongfaData = preload("res://scripts/data/gongfa_data.gd")
 const CharacterData = preload("res://scripts/data/character_data.gd")
+const TutorialFillers = preload("res://scripts/data/tutorial_fillers.gd")
 const CombatManagerScript = preload("res://scripts/autoload/combat_manager.gd")
 
 
 static func run() -> bool:
 	var ok := true
-	ok = _test_staged_short_circuit(ok)
+	ok = _test_fillers_yield_1_3(ok)
+	ok = _test_a_ladder(ok)
 	ok = _test_null_unit(ok)
 	ok = _test_d_empty(ok)
 	ok = _test_a_empty(ok)
@@ -37,20 +39,66 @@ static func run() -> bool:
 	return ok
 
 
-# --- criterion 1: staged_values short-circuits to the field -------------------
+# --- criterion 1: TutorialFillers.fill drives the real cascade to 1.3 ---------
 
-static func _test_staged_short_circuit(ok: bool) -> bool:
-	var art = _gongfa("A", "sword", "hard", "external", 1.3)
-	var unit = _unit([], [], true)
-	ok = _expect(ok, art.get_fa_hui_du(unit) == 1.3,
-		"staged unit returns field 1.3 (not cascade)")
-	art.fa_hui_du = 0.9
-	ok = _expect(ok, art.get_fa_hui_du(unit) == 0.9,
-		"staged unit returns the FIELD 0.9, never recomputed")
+## A tutorial-shaped unit (internal A 阳 + external A sword 刚 + external A
+## palm 阴 — the Yang Guo shape) after TutorialFillers.fill computes 1.3 for
+## EVERY art including the appended fillers. The fill is a fixpoint.
+static func _test_fillers_yield_1_3(ok: bool) -> bool:
+	var cd = CharacterData.new()
+	cd.internal_arts = [_gongfa("A", "internal", "yang", "internal", 1.3)]
+	cd.external_arts = [
+		_gongfa("A", "sword", "hard", "external", 1.3),
+		_gongfa("A", "palm", "yin", "external", 1.3),
+	]
+	var internal_before: int = cd.internal_arts.size()
+	var external_before: int = cd.external_arts.size()
+	TutorialFillers.fill(cd)
+	var arts: Array = cd.internal_arts + cd.external_arts
+	for art in arts:
+		var got: float = art.get_fa_hui_du(cd)
+		ok = _expect(ok, got == 1.3, "fillers: every art computes 1.3 (got " + str(got) + ")")
+	ok = _expect(ok, cd.internal_arts.size() == internal_before + 3, "3 internal fillers appended")
+	ok = _expect(ok, cd.external_arts.size() == external_before + 6, "6 external fillers appended")
+	# Fixpoint: a second fill appends nothing.
+	TutorialFillers.fill(cd)
+	ok = _expect(ok, cd.internal_arts.size() == internal_before + 3, "fixpoint: no internal appends on 2nd fill")
+	ok = _expect(ok, cd.external_arts.size() == external_before + 6, "fixpoint: no external appends on 2nd fill")
 	return ok
 
 
-# --- criterion 2: null unit falls back to the field ---------------------------
+# --- criterion 2: A-grade ladder values via the pure cascade ------------------
+
+static func _test_a_ladder(ok: bool) -> bool:
+	var art = _gongfa("A", "sword", "hard", "external", 1.3)
+	# 缺2: only mastered D present -> base 0.7
+	var d_m = _gongfa("D", "sword", "soft", "external", 1.3)
+	d_m.mastered = true
+	ok = _expect(ok, art.get_fa_hui_du(_unit([], [d_m])) == 0.7, "A with only D mastered -> 0.7 (缺2)")
+	# 缺1: C+D mastered, B absent -> 0.85
+	var c_m = _gongfa("C", "sword", "soft", "external", 1.3)
+	c_m.mastered = true
+	ok = _expect(ok, art.get_fa_hui_du(_unit([], [c_m, d_m])) == 0.85, "A with C+D mastered, no B -> 0.85 (缺1)")
+	# 齐: B+C+D mastered, all different attrs -> 1.0 (same_attr 0)
+	var b_m = _gongfa("B", "sword", "soft", "external", 1.3)
+	b_m.mastered = true
+	var c_yang = _gongfa("C", "sword", "yang", "external", 1.3)
+	c_yang.mastered = true
+	var d_yin = _gongfa("D", "sword", "yin", "external", 1.3)
+	d_yin.mastered = true
+	ok = _expect(ok, art.get_fa_hui_du(_unit([], [b_m, c_yang, d_yin])) == 1.0, "A with B+C+D mastered different attrs -> 1.0")
+	# same-attr 3: B+C+D mastered all 柔 -> 1.3
+	var b_soft = _gongfa("B", "sword", "soft", "external", 1.3)
+	b_soft.mastered = true
+	var c_soft = _gongfa("C", "sword", "soft", "external", 1.3)
+	c_soft.mastered = true
+	var d_soft = _gongfa("D", "sword", "soft", "external", 1.3)
+	d_soft.mastered = true
+	ok = _expect(ok, art.get_fa_hui_du(_unit([], [b_soft, c_soft, d_soft])) == 1.3, "A with B+C+D mastered all 柔 -> 1.3")
+	return ok
+
+
+# --- criterion 3: null unit falls back to the field ---------------------------
 
 static func _test_null_unit(ok: bool) -> bool:
 	var art = _gongfa("A", "sword", "hard", "external", 1.3)

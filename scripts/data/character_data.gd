@@ -21,7 +21,6 @@ extends Resource
 @export var passive_id: String = ""       # primary internal art's passive
 @export var team: int = 0                 # 0 = player, 1 = Five Greats
 
-## 编排数值 (staged values) marker: when true, the 甲乙丙丁 fa_hui_du cascade is
-## bypassed and every art keeps its flat `fa_hui_du` field. The tutorial battle
-## sets this on all six units so the protected 1.3 values stay byte-identical.
-@export var staged_values: bool = false
+## Battle-side trait carrier: profile trait ids copied onto the battle
+## CharacterData by BattleSetup.build_character (combat hooks key off these).
+@export var traits: Array[String] = []

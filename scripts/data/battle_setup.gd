@@ -15,6 +15,7 @@ class_name BattleSetup
 ## entry code (GameManager.enter_battle is a stub — there is no live caller yet).
 
 const CharacterData = preload("res://scripts/data/character_data.gd")
+const GongfaData = preload("res://scripts/data/gongfa_data.gd")
 const ProgressionGongfaData = preload("res://scripts/data/progression_gongfa_data.gd")
 
 ## Melee weapon classes (mirror of CombatManager.MELEE_SCHOOLS; kept local so
@@ -42,11 +43,13 @@ static func derive_stats(profile) -> Dictionary:
 
 
 ## Build a CharacterData for an encounter battle from a PlayerProfile.
-## staged_values=false (the real 甲乙丙丁 cascade applies); gongfa rows map to
-## fresh GongfaData resources with mastered mirrored from the profile; skills
-## are the external arts' generic grade techniques. Passive comes from the
-## primary internal art when the art declares one (progression internal arts
-## carry none this round, so it stays "").
+## Profile traits are copied onto the CharacterData (battle-side trait carrier);
+## gongfa rows map to fresh GongfaData resources with mastered mirrored from the
+## profile. External arts are sorted by grade rank (甲 first, ties kept in
+## profile order) and only the first 2 (or 3 with 左右互搏/ambidextrous) are
+## EQUIPPED — skills are the equipped external arts' techniques only. Passive
+## comes from the primary internal art when the art declares one (progression
+## internal arts carry none this round, so it stays "").
 static func build_character(profile) -> Resource:
 	var stats: Dictionary = derive_stats(profile)
 	var cd = CharacterData.new()
@@ -59,11 +62,10 @@ static func build_character(profile) -> Resource:
 	cd.attack_range = int(stats.attack_range)
 	cd.initiative = int(stats.initiative)
 	cd.team = 0
-	cd.staged_values = false
+	cd.traits = profile.traits.duplicate()
 
 	var internal_arts: Array = []
-	var external_arts: Array = []
-	var skills: Array = []
+	var all_external: Array = []
 	for entry in profile.gongfa:
 		var art_id: String = str(entry.get("id", ""))
 		if art_id == "":
@@ -77,12 +79,38 @@ static func build_character(profile) -> Resource:
 			if str(art.passive_id) != "":
 				cd.passive_id = str(art.passive_id)
 		else:
-			external_arts.append(art)
-			skills += art.techniques
-	cd.internal_arts = internal_arts
-	cd.external_arts = external_arts
+			all_external.append(art)
+
+	# Equip the highest-grade external arts: stable grade-rank sort (A=甲 first,
+	# ties keep profile order — GDScript sort_custom is NOT stable, so use the
+	# private insertion sort), then keep the first 2 — or 3 with ambidextrous.
+	var equipped: Array = _sort_by_grade_rank(all_external)
+	var cap: int = 3 if profile.has_trait("ambidextrous") else 2
+	cd.external_arts = equipped.slice(0, cap)
+	var skills: Array = []
+	for art in cd.external_arts:
+		skills += art.techniques
 	cd.skills = skills
+	cd.internal_arts = internal_arts
 	return cd
+
+
+## Stable ascending sort by GongfaData.GRADE_RANK (A=0 first); grade ties keep
+## the original (profile insertion) order. Insertion sort is stable — the
+## engine's sort_custom is not.
+static func _sort_by_grade_rank(arts: Array) -> Array:
+	var out: Array = []
+	for art in arts:
+		var rank: int = GongfaData.GRADE_RANK.get(str(art.grade), 99)
+		var inserted := false
+		for i in range(out.size()):
+			if rank < int(GongfaData.GRADE_RANK.get(str(out[i].grade), 99)):
+				out.insert(i, art)
+				inserted = true
+				break
+		if not inserted:
+			out.append(art)
+	return out
 
 
 ## Profile attr with a safe int coercion (fallback 10).
