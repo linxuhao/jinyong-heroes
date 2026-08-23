@@ -47,6 +47,7 @@ func _run() -> void:
 	_gm.continue_requested.connect(_on_continue)
 	_gm.retry_requested.connect(_on_retry)
 	_gm.restart_requested.connect(_on_restart)
+	_gm.battle_started.connect(_on_battle_started)
 	var ok := _test_all()
 	# Restore the autoload to its canonical boot state for later checks.
 	_gm.current_state = GameManagerScript.STATE_TUTORIAL
@@ -75,6 +76,10 @@ func _on_restart() -> void:
 	_events.append("restart")
 
 
+func _on_battle_started() -> void:
+	_events.append("battle_started")
+
+
 func _test_all() -> bool:
 	var ok := true
 	ok = _test_state_constants(ok)
@@ -85,6 +90,10 @@ func _test_all() -> bool:
 	ok = _test_request_retry_unchanged(ok)
 	ok = _test_restart_game(ok)
 	ok = _test_end_overlay_text(ok)
+	ok = _test_start_encounter(ok)
+	ok = _test_request_retry_encounter_routing(ok)
+	ok = _test_request_continue_clears_battle(ok)
+	ok = _test_debug_enter_encounter(ok)
 	return ok
 
 
@@ -296,6 +305,152 @@ func _test_end_overlay_text(ok: bool) -> bool:
 
 	# Restore the FSM to a non-WON/LOST state for _run()'s teardown.
 	_gm.current_state = GameManagerScript.STATE_TUTORIAL
+	return ok
+
+
+# --- start_encounter: CULTIVATION -> BATTLE with battle_return_state == CULTIVATION ---
+
+func _test_start_encounter(ok: bool) -> bool:
+	# CULTIVATION -> BATTLE: battle_return_state set to CULTIVATION, and the
+	# signals fire in the same order as start_battle (battle_started first).
+	_reset_signals()
+	_gm.clear_battle()
+	_gm.current_state = "CULTIVATION"
+	_gm.set_battle_return_state("TUTORIAL")
+	_gm.start_encounter()
+	ok = _expect(ok, _gm.current_state == "BATTLE", "start_encounter CULTIVATION -> BATTLE")
+	ok = _expect(ok, _gm.get_battle_return_state() == "CULTIVATION",
+		"start_encounter sets battle_return_state == CULTIVATION")
+	ok = _expect(ok, _state_log == ["BATTLE"], "state_changed(BATTLE) fired exactly once")
+	ok = _expect(ok, _events == ["battle_started", "state:BATTLE"],
+		"battle_started emitted before state_changed(BATTLE), once each")
+
+	# No-op from every other state: no state change, no signals.
+	for s in ["TUTORIAL", "BATTLE", "WON", "LOST", "MAP"]:
+		_reset_signals()
+		_gm.current_state = s
+		_gm.set_battle_return_state("TUTORIAL")
+		_gm.start_encounter()
+		ok = _expect(ok, _gm.current_state == s, "start_encounter no-op in " + s)
+		ok = _expect(ok, _gm.get_battle_return_state() == "TUTORIAL",
+			"battle_return_state untouched by start_encounter no-op in " + s)
+		ok = _expect(ok, _events.is_empty(), "no signals on start_encounter no-op in " + s)
+	return ok
+
+
+# --- request_retry: segment routing via battle_return_state --------------------
+
+func _test_request_retry_encounter_routing(ok: bool) -> bool:
+	# Encounter LOST (battle_return_state == CULTIVATION, a segment) routes back
+	# to CULTIVATION instead of the hardcoded TUTORIAL.
+	_reset_signals()
+	_gm.clear_battle()
+	_gm.current_state = "LOST"
+	_gm.set_battle_return_state("CULTIVATION")
+	_gm.request_retry()
+	ok = _expect(ok, _gm.current_state == "CULTIVATION", "retry from encounter LOST -> CULTIVATION")
+	ok = _expect(ok, _state_log == ["CULTIVATION"], "state_changed(CULTIVATION) fired once")
+	ok = _expect(ok, _events == ["state:CULTIVATION", "retry"],
+		"state_changed(CULTIVATION) before retry_requested, once each")
+
+	# Tutorial LOST (battle_return_state == TUTORIAL, NOT a segment) stays
+	# TUTORIAL — the byte-identical path the protected scenarios rely on.
+	_reset_signals()
+	_gm.current_state = "LOST"
+	_gm.set_battle_return_state("TUTORIAL")
+	_gm.request_retry()
+	ok = _expect(ok, _gm.current_state == "TUTORIAL", "retry from tutorial LOST -> TUTORIAL (unchanged)")
+	ok = _expect(ok, _events == ["state:TUTORIAL", "retry"], "tutorial retry event order unchanged")
+
+	# Non-segment fallback: an unknown return state still routes to TUTORIAL.
+	_reset_signals()
+	_gm.current_state = "LOST"
+	_gm.set_battle_return_state("BOGUS")
+	_gm.request_retry()
+	ok = _expect(ok, _gm.current_state == "TUTORIAL", "bogus battle_return_state falls back to TUTORIAL")
+	ok = _expect(ok, _events == ["state:TUTORIAL", "retry"], "fallback retry event order unchanged")
+	return ok
+
+
+# --- request_continue: guarded clear_battle on segment routing -----------------
+
+## request_continue now drops every per-battle ref (clear_battle) ONLY when the
+## WON routes to a segment state (encounter battles). The tutorial WON path
+## (battle_return_state == "TUTORIAL", not a segment) must preserve _player and
+## enemies byte-identically.
+func _test_request_continue_clears_battle(ok: bool) -> bool:
+	# Encounter WON -> CULTIVATION: battle refs are cleared.
+	_reset_signals()
+	var dummy_enemy: Node = Node.new()
+	dummy_enemy.name = "DummyEnemy"
+	var dummy_player: Node = Node.new()
+	dummy_player.name = "DummyPlayer"
+	_gm.clear_battle()
+	_gm.register_enemy(dummy_enemy)
+	_gm.set_player(dummy_player)
+	_gm.current_state = "WON"
+	_gm.set_battle_return_state("CULTIVATION")
+	_gm.request_continue()
+	ok = _expect(ok, _gm.current_state == "CULTIVATION", "continue from encounter WON -> CULTIVATION")
+	ok = _expect(ok, _gm.get_player() == null, "clear_battle dropped the player ref on segment routing")
+	ok = _expect(ok, _gm.get_enemies_alive().is_empty(), "clear_battle dropped enemies on segment routing")
+	dummy_enemy.free()
+	dummy_player.free()
+	_gm.clear_battle()
+
+	# Tutorial WON -> TRANSITION: battle refs are preserved (byte-identical guard).
+	_reset_signals()
+	dummy_enemy = Node.new()
+	dummy_enemy.name = "DummyEnemy2"
+	dummy_player = Node.new()
+	dummy_player.name = "DummyPlayer2"
+	_gm.clear_battle()
+	_gm.register_enemy(dummy_enemy)
+	_gm.set_player(dummy_player)
+	_gm.current_state = "WON"
+	_gm.set_battle_return_state("TUTORIAL")
+	_gm.request_continue()
+	ok = _expect(ok, _gm.current_state == "TRANSITION", "continue from tutorial WON -> TRANSITION")
+	ok = _expect(ok, _gm.get_player() == dummy_player,
+		"tutorial WON preserves the player ref (no clear_battle)")
+	ok = _expect(ok, _gm.get_enemies_alive().size() == 1,
+		"tutorial WON preserves enemies (no clear_battle)")
+	dummy_enemy.free()
+	dummy_player.free()
+	_gm.clear_battle()
+	return ok
+
+
+# --- debug_enter_encounter: unbound DEBUG action in _process ------------------
+
+## Input.is_action_just_pressed is frame-dependent: press -> _process -> release
+## must all happen in this one synchronous function (no await, no frame
+## boundary), per research_notes.md.
+func _test_debug_enter_encounter(ok: bool) -> bool:
+	# No-op outside CULTIVATION (TUTORIAL).
+	_reset_signals()
+	_gm.clear_battle()
+	_gm.current_state = "TUTORIAL"
+	_gm.set_battle_return_state("TUTORIAL")
+	Input.action_press("debug_enter_encounter")
+	_gm._process(0.0)
+	Input.action_release("debug_enter_encounter")
+	ok = _expect(ok, _gm.current_state == "TUTORIAL",
+		"debug_enter_encounter no-op outside CULTIVATION")
+	ok = _expect(ok, _events.is_empty(), "no signals on no-op debug_enter_encounter")
+
+	# CULTIVATION -> BATTLE via the same _process hook.
+	_reset_signals()
+	_gm.current_state = "CULTIVATION"
+	_gm.set_battle_return_state("TUTORIAL")
+	Input.action_press("debug_enter_encounter")
+	_gm._process(0.0)
+	Input.action_release("debug_enter_encounter")
+	ok = _expect(ok, _gm.current_state == "BATTLE", "debug_enter_encounter in CULTIVATION -> BATTLE")
+	ok = _expect(ok, _gm.get_battle_return_state() == "CULTIVATION",
+		"debug_enter_encounter sets battle_return_state == CULTIVATION")
+	ok = _expect(ok, _events == ["battle_started", "state:BATTLE"],
+		"debug_enter_encounter fires battle_started then state_changed(BATTLE)")
 	return ok
 
 

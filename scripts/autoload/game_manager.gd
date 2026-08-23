@@ -123,6 +123,20 @@ func start_battle() -> void:
 	state_changed.emit("BATTLE")
 
 
+## Enter an encounter battle from the cultivation segment: CULTIVATION -> BATTLE
+## with battle_return_state == "CULTIVATION" so WON/LOST route back to the
+## cultivation segment (see request_continue / request_retry). No-op outside
+## CULTIVATION. Deliberately does NOT reuse start_battle(), which stays
+## hard-gated to TUTORIAL.
+func start_encounter() -> void:
+	if current_state != STATE_CULTIVATION:
+		return
+	battle_return_state = STATE_CULTIVATION
+	current_state = STATE_BATTLE
+	battle_started.emit()
+	state_changed.emit(STATE_BATTLE)
+
+
 ## End the battle with a win or loss.
 ## Shows a centered overlay with victory or defeat text.
 ## No-op if the game is already in WON or LOST state.
@@ -171,25 +185,32 @@ func clear_battle() -> void:
 ## Destination is battle_return_state when it is a segment state (future
 ## encounter battles route WON back to CULTIVATION); the tutorial battle keeps
 ## battle_return_state == "TUTORIAL" (not a segment), which falls back to the
-## fixed next segment TRANSITION. No-op unless the game is in WON.
+## fixed next segment TRANSITION. Routing to a segment drops every per-battle
+## ref (clear_battle) so a second encounter in one session rebuilds fresh; the
+## tutorial WON path is not a segment and stays byte-identical (no
+## clear_battle). No-op unless the game is in WON.
 func request_continue() -> void:
 	if current_state != STATE_WON:
 		return
 	var target: String = battle_return_state if SEGMENT_STATES.has(battle_return_state) else STATE_TRANSITION
+	if SEGMENT_STATES.has(battle_return_state):
+		clear_battle()
 	current_state = target
 	state_changed.emit(target)
 	continue_requested.emit()
 
 
-## LOST overlay retry: clear battle refs, route back to the tutorial, and
-## notify listeners (SceneManager reloads a fresh battlefield). No-op unless
-## the game is in LOST.
+## LOST overlay retry: clear battle refs, then route to battle_return_state when
+## it is a segment state (encounter battles route LOST back to CULTIVATION),
+## else back to the tutorial. SceneManager reloads a fresh battlefield on
+## retry_requested. No-op unless the game is in LOST.
 func request_retry() -> void:
 	if current_state != "LOST":
 		return
 	clear_battle()
-	current_state = "TUTORIAL"
-	state_changed.emit("TUTORIAL")
+	var target: String = battle_return_state if SEGMENT_STATES.has(battle_return_state) else STATE_TUTORIAL
+	current_state = target
+	state_changed.emit(target)
 	retry_requested.emit()
 
 
@@ -361,3 +382,5 @@ func _process(_delta: float) -> void:
 		CombatManager.debug_wipe_enemies()
 	if Input.is_action_just_pressed("debug_lose_tutorial"):
 		CombatManager.debug_kill_player()
+	if Input.is_action_just_pressed("debug_enter_encounter"):
+		start_encounter()

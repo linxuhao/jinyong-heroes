@@ -43,6 +43,7 @@
 extends Node
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
+const TraitEffects = preload("res://scripts/data/trait_effects.gd")
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -144,6 +145,26 @@ var debug_round_frame: int = 0
 ## reflect-side hit-count assumption directly from the surface.
 var debug_reflect_hits: int = 0
 
+## Whether the active battle is the fixed tutorial. True = the tutorial's
+## skill-bar gates apply (two-phase palm unlock, phase lock); false = an
+## encounter/free battle with no tutorial restrictions. Set by battlefield.gd
+## when the tutorial content is built; reset to false in reset_battle().
+var tutorial_battle: bool = false
+
+## 杀 lifesteal diagnostic: cumulative HP healed by the sha_po_lang trait
+## (mirror debug_await_* — NEVER reset; the per-round budget resets are
+## internal to _sha_round_healed).
+var debug_sha_heal_total: int = 0
+
+## 铁布衫 diagnostic: cumulative fatal-guard procs by the iron_shirt trait
+## (NEVER reset; once-per-battle tracking is internal to _iron_shirt_used).
+var debug_iron_shirt_procs: int = 0
+
+## 狼 diagnostic: the last attack-side multiplier applied by the sha_po_lang
+## trait (1.0 when no trait). Reset to 1.0 on every attack-side computation
+## (basic attack / skill damage) and in reset_battle().
+var debug_lang_attack_mult: float = 1.0
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -168,6 +189,13 @@ var _innate_qi_used: Dictionary = {}
 
 ## 一阳续命 below-40% one-time heal flags, keyed by unit instance id.
 var _one_yang_used: Dictionary = {}
+
+## 杀 per-round lifesteal budget consumed, keyed by unit instance id, reset at
+## each round start (mirrors _finger_dart_used).
+var _sha_round_healed: Dictionary = {}
+
+## 铁布衫 fatal-guard-used flags, keyed by unit instance id (once per battle).
+var _iron_shirt_used: Dictionary = {}
 
 # ---------------------------------------------------------------------------
 # Wiring
@@ -252,6 +280,10 @@ func reset_battle() -> void:
 	_finger_dart_used = {}
 	_innate_qi_used = {}
 	_one_yang_used = {}
+	_sha_round_healed = {}
+	_iron_shirt_used = {}
+	tutorial_battle = false
+	debug_lang_attack_mult = 1.0
 	hazard_zones = {}
 	for raw in GameManager.get_enemies_alive():
 		if raw == null or not is_instance_valid(raw):
@@ -356,6 +388,7 @@ func _begin_round() -> void:
 
 	# Reset once-per-round passives.
 	_finger_dart_used = {}
+	_sha_round_healed = {}
 
 	# --- Build the round-order snapshot (decorate) ---
 	var units: Array = [GameManager.get_player()]
@@ -674,8 +707,12 @@ func apply_damage(target: Node, amount: int, source: Node = null,
 			_remove_status(target, "shield")
 
 	# --- HP ---
-	target.health = max(int(target.health) - actual, 0)
+	var hp_before: int = int(target.health)
+	target.health = max(hp_before - actual, 0)
 	var is_lethal: bool = int(target.health) <= 0
+	# The actual HP-reducing amount (before the fatal guards clamp to 1) — the
+	# 杀 lifesteal basis.
+	var loss: int = hp_before - int(target.health)
 
 	# --- 先天罡气 fatal guard BEFORE death handling (DoT ticks included) ---
 	if is_lethal and _passive_of(target) == "innate_qi" \
@@ -683,6 +720,17 @@ func apply_damage(target: Node, amount: int, source: Node = null,
 		target.health = 1
 		is_lethal = false
 		_innate_qi_used[target.get_instance_id()] = true
+		_clear_negative_statuses(target)
+
+	# --- 铁布衫 fatal guard (mirror 先天罡气; once per battle) ---
+	# Checked after 先天罡气: if the innate-qi guard already cleared the lethal
+	# hit, the iron-shirt guard must not also fire (first setter wins).
+	if is_lethal and _traits_of(target).has("iron_shirt") \
+			and not bool(_iron_shirt_used.get(target.get_instance_id(), false)):
+		target.health = 1
+		is_lethal = false
+		_iron_shirt_used[target.get_instance_id()] = true
+		debug_iron_shirt_procs += 1
 		_clear_negative_statuses(target)
 
 	damage_dealt.emit(target, amount, is_lethal)
@@ -697,6 +745,22 @@ func apply_damage(target: Node, amount: int, source: Node = null,
 		if ratio < 0.4:
 			_one_yang_used[target.get_instance_id()] = true
 			apply_heal(target, 78)  # round(60 * 1.3)
+
+	# --- 杀 lifesteal: heal round(20% of the actual loss), capped at 15% of the
+	# owner's max HP per round (per-round budget keyed by the source's instance
+	# id, reset at round start). Fires after HP deduction and the fatal guards
+	# but before death handling — a lethal blow still heals (target death never
+	# cancels it). No lifesteal on self-damage (source == target) or on
+	# guard-clamped losses (loss == 0).
+	if source != null and is_instance_valid(source) and source != target \
+			and loss > 0 and _traits_of(source).has("sha_po_lang"):
+		var src_id: int = source.get_instance_id()
+		var heal: int = TraitEffects.sha_heal_amount(loss,
+			int(source.max_health), int(_sha_round_healed.get(src_id, 0)))
+		if heal > 0:
+			apply_heal(source, heal)
+			_sha_round_healed[src_id] = int(_sha_round_healed.get(src_id, 0)) + heal
+			debug_sha_heal_total += heal
 
 	if is_lethal:
 		_handle_death(target)
@@ -1089,7 +1153,14 @@ func _execute_basic_attack(unit: Node, target: Node) -> Tween:
 	var base: int = 10  # default fallback
 	if "character_data" in unit and unit.character_data != null:
 		base = int(unit.character_data.attack_damage)
-	var output: int = int(round(base * _internal_fhd(unit)))
+	# 狼 attack side: ×(1 + 0.08 × living enemies) AFTER fhd, BEFORE the
+	# attack-side round(). Damage only — heals/shields/DoT never take it.
+	debug_lang_attack_mult = 1.0
+	var lang_mult: float = 1.0
+	if _traits_of(unit).has("sha_po_lang"):
+		lang_mult = TraitEffects.lang_attack_mult(_living_enemies_of(unit))
+		debug_lang_attack_mult = lang_mult
+	var output: int = int(round(base * _internal_fhd(unit) * lang_mult))
 
 	apply_damage(target, output, unit, _is_melee_attack(unit, null))
 
@@ -1142,9 +1213,16 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 
 	var fhd: float = _external_fhd_for_skill(unit, skill)
 	var buffs: float = _consume_toad_charge(unit)  # 蛤蟆蹲 x1.5 (damage only)
+	# 狼 attack side: ×(1 + 0.08 × living enemies) AFTER fhd/buffs, BEFORE the
+	# attack-side round(). Damage only — heals/shields/DoT ticks never take it.
+	debug_lang_attack_mult = 1.0
+	var lang_mult: float = 1.0
+	if _traits_of(unit).has("sha_po_lang"):
+		lang_mult = TraitEffects.lang_attack_mult(_living_enemies_of(unit))
+		debug_lang_attack_mult = lang_mult
 	var damage: int = 0
 	if skill.damage > 0:
-		damage = int(round(float(skill.damage) * buffs * fhd))
+		damage = int(round(float(skill.damage) * buffs * fhd * lang_mult))
 
 	# --- Resolve hit targets ---
 	var hit_units: Array[Node] = []
@@ -1431,6 +1509,42 @@ func _is_player(unit: Node) -> bool:
 	return unit.get_instance_id() == p.get_instance_id()
 
 
+## The unit's trait ids (combat hook lookups). Priority: the node's own
+## `traits` property when the node declares it, else the battle CharacterData's
+## `traits` (the current carrier — BattleSetup.build_character copies
+## profile.traits onto it), else []. Always returns a fresh Array[String].
+func _traits_of(unit: Node) -> Array[String]:
+	var result: Array[String] = []
+	if unit == null or not is_instance_valid(unit):
+		return result
+	if "traits" in unit:
+		var node_traits = unit.traits
+		if node_traits is Array:
+			for t in node_traits:
+				result.append(str(t))
+		return result
+	if "character_data" in unit and unit.character_data != null \
+			and "traits" in unit.character_data:
+		var cd_traits = unit.character_data.traits
+		if cd_traits is Array:
+			for t in cd_traits:
+				result.append(str(t))
+	return result
+
+
+## Number of living enemies of the given unit at resolve time (狼 scaling):
+## the player counts the registered living enemies; an enemy counts the living
+## hostile units (the player). Dead-but-not-yet-unregistered units are skipped.
+func _living_enemies_of(unit: Node) -> int:
+	var foes: Array[Node] = _hostile_units_of(unit)
+	var count: int = 0
+	for foe in foes:
+		if foe != null and is_instance_valid(foe) \
+				and (not ("health" in foe) or int(foe.health) > 0):
+			count += 1
+	return count
+
+
 func _initiative_of(unit: Node) -> int:
 	if unit == null:
 		return 0
@@ -1517,7 +1631,9 @@ func get_fa_hui_du(gongfa, unit) -> float:
 
 
 ## Defense-side damage reduction: 丐帮铁骨 -15% all damage; 神雕之力 -50%
-## melee (weapon-class classification via _is_melee_attack).
+## melee (weapon-class classification via _is_melee_attack); 狼 (sha_po_lang)
+## +5% DR per living enemy of the target (raw add — percentages never take
+## the fhd multiplier). ignore_damage_reduction skips the whole term.
 func _damage_reduction(target: Node, is_melee: bool) -> float:
 	var dr: float = 0.0
 	match _passive_of(target):
@@ -1526,6 +1642,9 @@ func _damage_reduction(target: Node, is_melee: bool) -> float:
 		"shen_diao_power":
 			if is_melee:
 				dr += 0.5  # −50% melee DR (flat; percentages never take the fhd multiplier)
+	# 狼 defense side.
+	if _traits_of(target).has("sha_po_lang"):
+		dr += TraitEffects.lang_dr(_living_enemies_of(target))
 	return dr
 
 
