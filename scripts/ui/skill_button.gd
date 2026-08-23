@@ -1,6 +1,6 @@
 ## SkillButton — A button representing a martial arts skill.
 ## Shows the technique name, a hotkey label, a fa hui du label
-## (失常 / 正常 / 超常 + multiplier), and a round-based cooldown
+## (发挥 ×N.N + multiplier), and a round-based cooldown
 ## overlay (gray fill from top). `disabled` is computed every frame by the
 ## HUD (phase lock / cooldown / HP gate) — never written here.
 extends Button
@@ -25,7 +25,7 @@ signal skill_selected(index: int)
 ## Set by HUD when instantiating/arranging skill buttons.
 var skill_index: int = -1
 
-## Observable fa hui du label text, e.g. "超常 ×1.3" (Chinese band + digits).
+## Observable fa hui du label text, e.g. "发挥 ×1.3" (Chinese prefix + digits).
 var fahui_text: String = ""
 
 ## Pure HP-gate predicate (Seventeen Forms only): true when this button is
@@ -84,24 +84,18 @@ var _state_styleboxes: Dictionary = {}
 # Public API
 # ---------------------------------------------------------------------------
 
-## Band label for a fa hui du multiplier (display only, pure function): values
-## < 1.0 render 失常, 1.0..1.2 render 正常, > 1.2 render 超常, each followed by
-## the multiplier to one decimal place (e.g. "超常 ×1.3"). Static so unit tests
-## can exercise it without instantiating a scene.
+## Fa hui du label for a multiplier (display only, pure function): every value
+## renders as "发挥 ×N.N" with the multiplier to one decimal place
+## (e.g. "发挥 ×1.3"). Static so unit tests can exercise it without
+## instantiating a scene.
 static func fa_hui_du_label(fhd: float) -> String:
-	if fhd < 1.0:
-		return "失常 ×%.1f" % fhd
-	elif fhd <= 1.2:
-		return "正常 ×%.1f" % fhd
-	return "超常 ×%.1f" % fhd
+	return "发挥 ×%.1f" % fhd
 
 ## Configure this button with a skill, a hotkey label, and the fa hui du
 ## multiplier of the external art that produced the skill.
 ## hotkey is a string like "1".."8". fa_hui_du drives the FahuiLabel text via
-## the static fa_hui_du_label() band helper:
-##   < 1.0    -> "失常 ×<fhd>"
-##   1.0..1.2 -> "正常 ×<fhd>"
-##   > 1.2    -> "超常 ×<fhd>"
+## the static fa_hui_du_label() helper:
+##   any fhd -> "发挥 ×<fhd>"
 ## The multiplier is formatted to one decimal place (Chinese + digits).
 ## Child labels are resolved defensively via get_node_or_null (health_bar.gd
 ## pattern) so setup() is call-order independent.
