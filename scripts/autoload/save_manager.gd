@@ -48,7 +48,9 @@ var segment: String = ""      # not surface; save writes GameManager.current_sta
 # ---------------------------------------------------------------------------
 
 ## splitmix64 finalizer (verbatim algorithm from research_notes). Mixes a raw
-## entropy seed once so similar raw seeds do not produce similar streams.
+## entropy seed once so similar raw seeds do not produce similar streams —
+## RandomNumberGenerator has no avalanche effect, so close raw seeds must not
+## yield close streams.
 static func mix_seed(x: int) -> int:
     var v: int = x + 0x9E3779B97F4A7C15
     v = (v ^ (v >> 30)) * 0xBF58476D1CE4E5B9

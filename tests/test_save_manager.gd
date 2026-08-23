@@ -31,6 +31,7 @@ func _run() -> void:
 		quit(1)
 		return
 	# Hermetic start: clear any save files left by an earlier interrupted run.
+	# (Criterion 11 then starts from a known-clean state.)
 	_sm.delete_slot(1)
 	_sm.delete_slot(2)
 	_sm.delete_slot(3)
