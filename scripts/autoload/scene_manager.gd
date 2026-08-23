@@ -115,9 +115,10 @@ func _do_swap(scene_key: String) -> void:
 		hud.visible = next_is_battle
 	if _current_node != null:
 		_teardown_battle_refs()
-		_current_node.queue_free()
-		if _current_node.is_inside_tree():
-			await _current_node.tree_exited
+		if is_instance_valid(_current_node):
+			_current_node.queue_free()
+			if _current_node.is_inside_tree():
+				await _current_node.tree_exited
 		_current_node = null
 	var packed: PackedScene = _preloaded.get(scene_key, null)
 	if packed == null:

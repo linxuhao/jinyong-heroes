@@ -19,7 +19,12 @@ var ended: bool = false
 
 
 func _ready() -> void:
+	# Save-integrity fallback: a hand-edited or legacy save may carry an empty /
+	# unknown map_node — never strand the player on a node with no neighbors.
 	current_node_id = SaveManager.profile.map_node
+	if current_node_id == "" or MapData.node_def(current_node_id).is_empty():
+		current_node_id = MapData.start_node()
+		SaveManager.profile.map_node = current_node_id
 	focus_id = current_node_id
 	_render()
 
