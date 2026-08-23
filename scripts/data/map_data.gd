@@ -28,6 +28,9 @@ const ADJACENCY: Dictionary = {
 
 ## Ending tiers, descending by min_total (step2_design §8.8).
 ## total = bone + inner + agility + wisdom + fortune.
+## INVARIANT: rows must stay sorted by min_total descending — ending_tier()
+## scans top-down and returns the first row the total reaches. The final row's
+## min_total is always 0, so any total yields at least tier 1.
 const ENDING_TIERS: Array = [
 	{"tier": 3, "min_total": 90, "title": "一代宗师",
 		"text": "武林为之震动。\n你的名号传遍江湖，各派掌门纷纷登门请教。\n此世武学之巅，自此有了你的名字。"},

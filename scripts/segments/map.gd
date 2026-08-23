@@ -48,13 +48,17 @@ func _cycle_focus(dir: int) -> void:
 	if nbrs.is_empty():
 		return
 	if focus_id == current_node_id:
-		# Focus sits on the current node: auto-select the mainline successor so
-		# move_right advances the story; fall back to the first neighbor.
+		# Focus sits on the current node: forward (+1) auto-selects the mainline
+		# successor so move_right advances the story (falling back to the first
+		# neighbor when the successor is not adjacent); backward (-1) wraps to
+		# the LAST neighbor. Both directions stay inside the adjacency list.
 		var mi: int = MAINLINE.find(current_node_id)
-		if mi >= 0 and mi < MAINLINE.size() - 1 and MapData.is_adjacent(current_node_id, MAINLINE[mi + 1]):
+		if dir > 0 and mi >= 0 and mi < MAINLINE.size() - 1 and MapData.is_adjacent(current_node_id, MAINLINE[mi + 1]):
 			focus_id = MAINLINE[mi + 1]
-		else:
+		elif dir > 0:
 			focus_id = nbrs[0]
+		else:
+			focus_id = nbrs[nbrs.size() - 1]
 		_render()
 		return
 	var idx: int = nbrs.find(focus_id)
