@@ -88,6 +88,14 @@ documented in the two notes below.
 | Tutorial-loss handling | `LOST` → keypress → reload tutorial battle from scratch (TUTORIAL state, tutorial active) |
 | Creation points | leftover points allowed (design says "spend 30", not "exactly 30"; SOTA assumption 2) |
 
+### 2.3 Ladder content scope (consistency note)
+`design/40_progression.md` §3.7 names 剑/拳掌/轻功 as the first ladders to fill. §3.1 of the
+same file forces the complementary set: a sect teaches *its own* external at the year's grade,
+so a walkable line needs the ladders of all five starters — 拳掌 (少林), 剑 (武当/峨眉),
+长兵 (丐帮), 暗器 (唐门). This run therefore fills exactly those four sect-external ladders;
+轻功 ladder content stays deferred (no sect starts with it; §12 keeps it as a plug-in row).
+`5_design` may reconcile §3.7's wording when folding this run's decisions into the archive.
+
 ---
 
 ## 3. Architecture diagram (text)
@@ -329,6 +337,11 @@ YEAR_END   → after months 12 and 24: 留下/换门派 (stay → next year same
             internal grant. Then autosave(slot 1).
 After month 36's action → GameManager.enter_segment("MAP"); autosave.
 ```
+**Save/load/delete menu row.** ACTION_PICK renders a persistent second row of three cells below
+the four action cells — 存盘 / 读档 / 删档 (slot 1; reachable with `move_down` past 游历;
+acting on one returns to ACTION_PICK; 删档 is the two-step confirm from §7). This is the only
+manual save surface in normal UI; autosave also runs from month advance and map moves.
+
 Month advances **after** the action resolves. `_apply_month(card_choice, action_choice)` is the
 single code path; **`debug_fast_forward`** (unbound input action consumed in `_process`) loops
 the remaining months synchronously through `_apply_month` with fixed auto-choices (first card;
@@ -457,18 +470,20 @@ the implementer from these titles; the tier id is the asserted value).
      `SceneManager.current_scene == "transition"` after the WON continue, `pending_swap == false`.
    - **`tutorial_loss_restarts_tutorial`**: `debug_lose_tutorial` → assert `LOST` → ui_accept →
      assert `TUTORIAL`, `SceneManager.current_scene == "battlefield"`,
-     `TutorialManager`-visible state (Player re-instantiated; no freed-object crash).
+     `Player.health == 500` (fresh re-instantiation — Player is in the existing surface;
+     no freed-object crash).
    - **`creation_budget_clamp_and_traits`**: buy 根骨 10→20 (15 pts), 内力 10→15 (+5),
      assert `points_left == 10`; attempt +根骨 → still 20; toggle 旧伤 (−8) → 18; toggle
      左右互搏 (−10) → 8; toggle off → 18; confirm with leftover allowed → `SECT_SELECTION`.
    - **`lone_bane_sect_grants_external_only`**: creation: toggle 孤煞, confirm; pick 峨眉 →
      `CultivationScreen.gongfa_count == 1`, `sect_id == "emei"` (internal suppressed).
    - **`cultivation_month_cycle_and_deck_bookkeeping`**: month 1: `phase == "CARD_PICK"`,
-     `drawn_card_categories` has 3 distinct entries; pick card 0 → action 练功 (2×ui_accept)
-     → practice +1, `month == 2`, three `*_left` counts each −1, `has_save == true`,
-     `last_error == ""`.
-   - **`cultivation_year_end_stay`**: 12 manual months (each: 2×ui_accept = card 0 +
-     练功 gongfa 0) → at year-end: stay → `year == 2`, `month == 1`,
+     `drawn_card_categories` has 3 distinct entries; pick card 0 (ui_accept) → action 练功
+     (ui_accept) → confirm first gongfa (ui_accept) → practice +1, `month == 2`, three
+     `*_left` counts each −1, `has_save == true`, `last_error == ""`.
+   - **`cultivation_year_end_stay`**: 12 manual months (each: 3×ui_accept = card 0 → 练功 →
+     confirm the first *unmastered* gongfa; once both 丁 arts are mastered, months 9–12 switch
+     the action to 修习 根骨) → at year-end: stay → `year == 2`, `month == 1`,
      `gongfa_count == 4` (丙 grants land).
    - **`save_load_roundtrip`**: 2 manual months → navigate focus to Save cell (move_down×N)
      → ui_accept → `has_save`, `last_error == ""`; 1 more month → navigate to Load cell →
