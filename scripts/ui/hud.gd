@@ -373,7 +373,7 @@ func _refresh_skill_button_states(player: Node) -> void:
 				state = "cooldown"
 			elif hp_gated:
 				state = "hp_gated"
-				# 轮到谁 visible (design/30_presentation.md #3 / vision Q3): while
+				# turn-to-whom visible (design/30_presentation.md #3 / vision Q3): while
 				# the battle is live but it is NOT the player's turn, every button
 				# renders the distinct "waiting" presentation so the skill bar
 				# visibly changes across player -> enemy -> player turn frames.
