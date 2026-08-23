@@ -3,6 +3,19 @@
 extends Control
 
 # ---------------------------------------------------------------------------
+# Fill / track color constants
+# ---------------------------------------------------------------------------
+# The fill is a dedicated StyleBoxFlat override recolored per HP band; the
+# track background stays constant (_TRACK_BG) so the bar reads as a bar at
+# any fill level. The whole-node modulate is never used: it would tint the
+# track, border, and fill together, hiding the fill-length change on damage.
+
+const _FILL_GREEN := Color(0.3, 0.9, 0.35)
+const _FILL_YELLOW := Color(0.95, 0.85, 0.2)
+const _FILL_RED := Color(0.9, 0.25, 0.2)
+const _TRACK_BG := Color(0.15, 0.15, 0.17)
+
+# ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
 
@@ -26,6 +39,17 @@ var bar_width: float = 0.0
 ## grows by the clamp offset when pinned to a viewport edge. Computed inside
 ## follow_character(), BEFORE the clamp lines.
 var follow_delta: float = 0.0
+
+## Current fill color — the bg_color of the dedicated fill stylebox, written
+## by update_health() per HP band. Exposed so the playtest surface can assert
+## the fill is bright green at full HP (e.g. 'fill_color.g > 0.5 and
+## fill_color.g > fill_color.r') — Color members are readable in the harness.
+var fill_color: Color = _FILL_GREEN
+
+## The dedicated "fill" stylebox of the bar. Created once in setup(); its
+## bg_color is the only thing update_health() recolors. Null until setup runs
+## (all write sites guard on it).
+var _fill_sb: StyleBoxFlat = null
 
 # ---------------------------------------------------------------------------
 # Node references
@@ -59,18 +83,24 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		bar.max_value = max_hp
 		bar.value = max_hp
 		bar_width = bar.size.x
-		# Dark-red background stylebox so the bar reads as a health bar even at
-		# low fill; the 1px dark border keeps it visible against the backdrop.
-		# Fill color stays driven by the existing green/yellow/red modulate
-		# logic in update_health() — no fill stylebox override.
+		# Neutral dark track background (assigned once here, never recolored
+		# afterwards — the track stays constant). The 1px dark border keeps
+		# the bar visible against the backdrop at any fill level.
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.35, 0.05, 0.05)
+		sb.bg_color = _TRACK_BG
 		sb.border_width_left = 1
 		sb.border_width_top = 1
 		sb.border_width_right = 1
 		sb.border_width_bottom = 1
 		sb.border_color = Color(0.05, 0.05, 0.05)
 		bar.add_theme_stylebox_override("background", sb)
+		# Dedicated fill stylebox: recolored by update_health() per HP band.
+		# No border widths on the fill (a border around only the filled
+		# region looks broken).
+		_fill_sb = StyleBoxFlat.new()
+		_fill_sb.bg_color = _FILL_GREEN
+		bar.add_theme_stylebox_override("fill", _fill_sb)
+		fill_color = _FILL_GREEN
 
 	var label: Label = _name_label
 	if label == null:
@@ -103,12 +133,18 @@ func update_health(current: int, max_hp: int) -> void:
 	var ratio: float = float(current) / float(max_hp) if max_hp > 0 else 0.0
 	_last_ratio = ratio
 
-	if ratio > 0.5:
-		_bar.modulate = Color(0.2, 0.8, 0.2)   # green
-	elif ratio > 0.25:
-		_bar.modulate = Color(0.8, 0.8, 0.2)   # yellow
-	else:
-		_bar.modulate = Color(0.8, 0.2, 0.2)   # red
+	# Recolor the dedicated fill stylebox per HP band. The track background is
+	# untouched (stays _TRACK_BG); never modulate the whole bar — that would
+	# tint the track and border too, hiding the fill-length change on damage.
+	if _fill_sb != null:
+		if ratio > 0.5:
+			_fill_sb.bg_color = _FILL_GREEN
+		elif ratio > 0.25:
+			_fill_sb.bg_color = _FILL_YELLOW
+		else:
+			_fill_sb.bg_color = _FILL_RED
+		fill_color = _fill_sb.bg_color
+		_bar.queue_redraw()
 
 
 ## Called every frame from HUD._process(). Follows the character's world
