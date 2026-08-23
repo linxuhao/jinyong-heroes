@@ -28,6 +28,8 @@ CombatManager="*res://scripts/autoload/combat_manager.gd"
 TutorialManager="*res://scripts/autoload/tutorial_manager.gd"
 AudioManager="*res://scripts/autoload/audio_manager.gd"
 ThemeManager="*res://scripts/autoload/theme_manager.gd"
+; SceneManager must stay the LAST autoload entry: its _teardown_battle_refs
+; references GameManager/CombatManager/GridManager by name (compile ordering).
 SceneManager="*res://scripts/autoload/scene_manager.gd"
 
 [display]

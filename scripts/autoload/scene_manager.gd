@@ -163,3 +163,4 @@ func _find_host() -> void:
 	_host = main_node.get_node_or_null("SceneHost")
 	if _host == null:
 		last_error = "host_missing"
+		return

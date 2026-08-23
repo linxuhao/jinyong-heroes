@@ -1,5 +1,8 @@
 [gd_scene load_steps=3 format=3]
 
+; Persistent shell (step2_design C1): SceneManager (autoload) hosts exactly one
+; active segment scene as a child of SceneHost. HUD/Tutorial layers persist.
+
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/ui/tutorial_overlay.tscn" id="2"]
 
