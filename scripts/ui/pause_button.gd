@@ -9,11 +9,13 @@ extends Button
 func _ready() -> void:
 	pressed.connect(_on_toggle_pause)
 
-	# Sync initial text with CombatManager state.
+	# Sync initial text with CombatManager state. Plain CJK labels only — the
+	# U+23F8 (pause) and U+25B6 (play) symbols are NOT covered by
+	# NotoSansSC-Regular.otf (tofu risk), and no assertion reads this text.
 	if CombatManager.is_paused:
-		text = "▶ 继续"
+		text = "继续"
 	else:
-		text = "⏸ 暂停"
+		text = "暂停"
 
 	# Connect to CombatManager signals for state changes.
 	if CombatManager.paused.is_connected(_on_paused):
@@ -36,9 +38,9 @@ func _on_toggle_pause() -> void:
 
 ## Update button text when paused.
 func _on_paused() -> void:
-	text = "▶ 继续"
+	text = "继续"
 
 
 ## Update button text when unpaused.
 func _on_unpaused() -> void:
-	text = "⏸ 暂停"
+	text = "暂停"
