@@ -33,18 +33,18 @@ Beyond the duel, the game ships the full **six-segment line** (design/40_progres
 
 ## The Six-Segment Line
 
-The whole game runs inside one persistent shell (`scenes/main.tscn`): a `SceneManager` autoload listens to `GameManager.state_changed` and swaps exactly one preloaded segment scene under the shell's `SceneHost` node (`GameManager.current_state` is the playtest-visible FSM state — `TUTORIAL → BATTLE → WON/LOST → TRANSITION → CHARACTER_CREATION → SECT_SELECTION → CULTIVATION → MAP → ENDING`).
+The whole game runs inside one persistent shell (`scenes/main.tscn`): a `SceneManager` autoload listens to `GameManager.state_changed` and swaps exactly one preloaded segment scene under the shell's `SceneHost` node (`GameManager.current_state` is the playtest-visible FSM state — `TUTORIAL → BATTLE → WON/LOST → TRANSITION → CHARACTER_CREATION → SECT_SELECTION → CULTIVATION → MAP → ENDING`). WON/LOST are transitions, not terminals: winning the tutorial routes onward to the transition; losing retries a fresh tutorial battle.
 
 | Segment | Scene | What happens |
 |---|---|---|
 | 1. Tutorial | `battlefield` | Yang Guo vs the Five Greats (keyboard-completable tutorial; WON/LOST now route onward instead of terminating) |
-| 2. Transition | `transition` | Full-screen text pages → character creation |
-| 3. Creation | `creation` | 30-point attribute buy (tiered pricing, 10–20), trait/flaw toggles |
-| 4. Sect select | `sect_select` | Pick one of five sects → its internal + external gongfa |
-| 5. Cultivation | `cultivation` | 36 monthly cycles: card draws + 练功/修习/做工/游历 + year-end stay/switch |
+| 2. Transition | `transition` | Full-screen Chinese text pages → character creation |
+| 3. Creation | `creation` | 30-point attribute buy (tiered pricing, 10–20) + trait/flaw toggles |
+| 4. Sect select | `sect_select` | Pick one of five sects → its 丁 internal + 丁 external gongfa |
+| 5. Cultivation | `cultivation` | 36 monthly cycles: card draws + 练功/修习/做工/游历 + year-end stay/switch + 存盘/读档/删档 |
 | 6. Map / ending | `map` → `ending` | Node-graph map (adjacency-checked moves) → tiered ending text |
 
-**Saves** live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` → validate → `.bak` rollback writes). The cultivation scene offers a 存盘/读档/删档 row; autosaves also run on month advance and map moves.
+**Saves** live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` → validate → `.bak` rollback writes). The cultivation scene offers a 存盘/读档/删档 row; autosaves also run on month advance and map moves. The save carries the RNG seed + `rng_state` + the per-category deck `remaining`/`drawn` lists, so a reloaded save replays the identical card sequence.
 
 ### Debug actions (harness-only — no physical keys)
 
@@ -63,7 +63,7 @@ The whole UI ships in Chinese under one **global font theme** (design §2.1 — 
 - **`assets/themes/global_theme.tres`** — a committed `Theme` with `default_font` = the shipped Noto Sans SC FontFile (`res://assets/fonts/NotoSansSC-Regular.otf`, SIL OFL — see `assets/fonts/LICENSE_OFL.txt`), referenced by **res:// path** (no `.uid` binding to rot) and `default_font_size = 12`.
 - Wired via `ProjectSettings gui/theme/custom`; the `ThemeManager` autoload additionally installs the same font as `ThemeDB.fallback_font` at startup as the CI-safe fallback.
 - **No per-node font overrides anywhere** — every label/button inherits the theme; labels keep `text_overrun_behavior` = trim (never ellipsis).
-- Display layer only: `character_name`, node names, skill ids, state strings and turn-order names stay canonical English (byte-identical for the playtest contract).
+- Display layer only: `character_name`, node names, skill ids, state strings and turn-order names stay canonical English (byte-identical for the playtest contract). Chinese replaces only the rendered strings (技能名 重剑无锋…黯然销魂十七式, 发挥 ×1.3, unit display names 杨过/黄药师/欧阳锋/段智兴/洪七公/王重阳, 回合/行动/顺序 labels, tutorial overlay text).
 
 ## The Five Grandmasters (deterministic AI)
 
@@ -81,19 +81,27 @@ Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decide
 
 - **Round snapshot**: at round start, all living units are sorted by effective initiative (身法, minus 20 while a 碧海潮生 debuff is active) descending, ties broken by registration order (player first, then East → West → South → North → Central). Godot's `sort_custom` is unstable, so the engine uses a decorate-sort-undecorate insertion sort for determinism.
 - **Turn-start lifecycle** (exact order): cooldown decrement (int rounds) → DoT/status ticks → constant regen (神雕之力 +26, 一阳续命 +13) → the unit acts.
-- **Damage pipeline**: attack side `round(base × buffs × fa_hui_du)` → defense side `round(output × (1 − DR))`. 发挥度 (1.3 in the tutorial) applies to damage / heal / shield / DoT-tick values only — never cooldown, range, knockback, or duration.
+- **Damage pipeline**: attack side `round(base × buffs × fa_hui_du)` → defense side `round(output × (1 − DR))`. 发挥度 applies to damage / heal / shield / DoT-tick values only — never cooldown, range, knockback, or duration.
 - **Melee vs ranged** (design/10_systems.md §2.2): decided by the declaring external art's **weapon class** (刀/剑/长兵/拳掌/轻功/横练 = melee; 指/暗器/奇门毒/乐器 = ranged) — never by shape, reach, or damage. Basic attacks classify by the character's primary external art (主修外功).
 - **Pause** is a boolean gate (no `Engine.time_scale`); the turn flow is event-driven and simply halts at unit boundaries while paused.
 
 ## 功法 (Gongfa) Data Structure
 
-`scripts/data/gongfa_data.gd` models internal/external martial arts. Internal arts produce the energy pool (内力 180 for Yang Guo) and a passive id; external arts produce technique lists. Every art exposes `get_fa_hui_du()` which returns **1.3** — an interface-only stub (the 甲乙丙丁 prerequisite cascade is deliberately not implemented this run).
+`scripts/data/gongfa_data.gd` models internal/external martial arts. Internal arts produce the energy pool (内力 180 for Yang Guo) and a passive id; external arts produce technique lists.
+
+Every art exposes `get_fa_hui_du(unit)` — the **real 甲乙丙丁 prerequisite cascade** (design/10_systems.md §3–§4), interval 0.6~1.3:
+
+1. `unit == null` → the art's flat `fa_hui_du` field (pre-cascade default).
+2. `unit.staged_values` → the flat field, **never recomputed** — the tutorial battle marks all six units `staged_values = true`, so its protected 编排数值 1.3 stays byte-identical (no "fixing" of balanced tutorial numbers).
+3. Otherwise: `missing` = count of lower-grade prerequisite slots in the same school with no mastered art (甲 needs 乙丙丁, 乙 needs 丙丁, 丙 needs 丁, 丁 needs none); `base = [1.0, 0.85, 0.7, 0.6][missing]`; if `base < 1.0` return it (prerequisites incomplete → no attribute bonus); else return `1.0 + 0.1 × min(same-attribute mastered arts, 3)`.
+
+`GongfaData` also carries a `mastered` flag, and `CharacterData` carries the `staged_values` marker. `scripts/data/battle_setup.gd` builds progression-side `CharacterData` from a `PlayerProfile` (staged_values=false) via the design §7 formulas: 气血 = 根骨×5, 内力值 = 内力×2, 移动力 = 2+floor(身法/20), 先攻 = 身法, 普攻 = 10+根骨, range 1 (melee school) / 2 (唐门/暗器).
 
 ## HUD
 
 - **Grid overlay** (`GridLines`, a `Node2D` child of `scenes/battlefield.tscn` drawn above the floor tiles / backdrop): 1 px semi-transparent cell-boundary lines across the 15×11 board plus a slightly stronger border ring, so the grid reads over the summit painting. Exposed as the `Battlefield.grid_lines_visible` observable.
-- **Skill bar** (8 buttons, `SkillButton1..8`): technique name, hotkey, a 发挥度 label in the mandated format (`发挥 ×N.N` — all tutorial arts show `发挥 ×1.3`), and a round-based cooldown overlay with a **remaining-rounds number** (`CooldownLabel`) plus a **state tag** (`LOCKED` / `HP`). Each button exposes `state_text` — one of `"ready"`, `"cooldown"`, `"phase_locked"`, `"hp_gated"` — and `cooldown_remaining`, and renders five pairwise-distinct visuals: ready (normal), cooldown (dark fill + number), phase-locked (gray tint + `LOCKED` tag), HP-gated (red tint + `HP` tag), and selected (golden border when `player.selected_skill_index == skill_index`). Button text is shortened to fit without truncation (`17 Forms` instead of `Seventeen Melancholy Forms`).
-- **Health bars** (one per character, `HealthBar`): a **64 px wide** bar (one grid cell; `HealthBar.bar_width`) with the **name label above** the bar (never overlapping, font 10, no clipping/ellipsis), fill color green→yellow→red by HP fraction. Bars follow their character via the stretch-aware `get_final_transform()` projection with edge clamping; `HealthBar.follow_delta` reports the pre-clamp pixel distance from the character's projected screen position.
+- **Skill bar** (8 buttons, `SkillButton1..8`): technique name, hotkey, a 发挥度 label in the mandated format (`发挥 ×N.N` — all tutorial arts show `发挥 ×1.3`), and a round-based cooldown overlay with a **remaining-rounds number** (`CooldownLabel`) plus a **state tag** (`LOCKED` / `HP`). Each button exposes `state_text` — one of `"ready"`, `"cooldown"`, `"phase_locked"`, `"hp_gated"` — and `cooldown_remaining`, and renders five pairwise-distinct visuals: ready (normal), cooldown (dark fill + number), phase-locked (gray tint + `LOCKED` tag), HP-gated (red tint + `HP` tag), and selected (golden border when `player.selected_skill_index == skill_index`). Button text is shortened to fit without truncation and without ellipsis.
+- **Health bars** (one per character, `HealthBar`): a **64 px wide** bar (one grid cell; `HealthBar.bar_width`) with the **name label above** the bar (never overlapping, font 10, no clipping/ellipsis), fill color green→yellow→red by HP fraction. Bars follow their character via the stretch-aware `get_final_transform()` projection with edge clamping; `HealthBar.follow_delta` reports the pre-clamp pixel distance from the character's projected screen position. `HealthBar.total_height` exposes the compact widget height (≤ 20).
 - **Round indicator** (top-center): `回合 N`, `行动: <name> · 移动 <m> · 行动 ✓/结束`, and `顺序: <Chinese names>` in a compact no-ellipsis format inside its box. The indicator rect never overlaps `PauseButton` (guarded by the `HUD.round_pause_overlap` observable).
 - **Energy label**: `内力: 180` (display only — no technique costs this run).
 - All rendered UI text is Chinese (design §2.1); identity strings (`character_name`, node names, skill ids, turn-order names) stay canonical English.
@@ -121,37 +129,45 @@ Health-bar name labels use Chinese display names (design §2.1 — every rendere
 
 ```
 jinyong-play/
-├── project.godot                 # Engine config, autoload singletons, input map, display/stretch
-├── playtest_spec.yaml            # Headless playtest contract (actions / surface / 10 scenarios)
-├── run_tests.sh                  # CLI test runner (compile + headless playtest)
+├── project.godot                 # Engine config, autoload singletons, input map, display/stretch, theme
+├── playtest_spec.yaml            # Headless playtest contract (actions / surface / 20 scenarios)
+├── run_tests.sh                  # CLI gate: compile + headless playtest + unit tests
 ├── resources.md                  # Asset/tool reference notes
+├── design/                       # Authoritative design archive (00..99)
 ├── assets/
 │   ├── characters/               # 6 generated character PNGs (true alpha)
 │   ├── terrain/                  # 64×64 floor + border tiles
 │   ├── backdrop/                 # summit backdrop (fitted to the board at runtime)
 │   ├── audio/                    # SFX + music bed WAVs
+│   ├── fonts/                    # Noto Sans SC (SIL OFL) + license
+│   ├── themes/global_theme.tres  # Global Chinese font theme (default_font, size 12)
 │   └── seed_manifest.json        # path → seed → frozen prompt (determinism)
 ├── scenes/
-│   ├── main.tscn                 # Entry point: HUD + tutorial overlay (CanvasLayers)
+│   ├── main.tscn                 # Persistent shell: Camera + SceneHost + HUD/Tutorial CanvasLayers
 │   ├── battlefield.tscn          # Grid, GridLines overlay, backdrop, character container
 │   ├── player.tscn               # Yang Guo
 │   ├── enemy.tscn                # Shared enemy scene (5 characters)
-│   └── ui/                       # HUD, health bar, skill button, tutorial overlay
-└── scripts/
-    ├── battlefield.gd            # Terrain/tilemap build, character + skill data, AI wiring, HUD/tutorial hookup
-    ├── grid_lines.gd             # Cell-boundary overlay drawn above tiles/backdrop (_draw)
-    ├── autoload/
-    │   ├── game_manager.gd       # State machine: TUTORIAL → BATTLE → WON | LOST
-    │   ├── grid_manager.gd       # Grid coords, occupancy, AStar2D, range/AoE (origin/size/team), sprite clamp
-    │   ├── combat_manager.gd     # Turn engine + damage/status/passive pipeline + death handling
-    │   ├── tutorial_manager.gd   # 7-step keyboard-completable tutorial + input gating
-    │   └── audio_manager.gd      # SFX + music playback
-    ├── characters/
-    │   ├── player.gd             # Turn budgets, 1-8 input, J, Space, gates, targeting, sprite clamp
-    │   └── enemy.gd              # Turn state, per-character visuals, sprite clamp
-    ├── ai/                       # ai_base + 5 per-Grandmaster deterministic controllers
-    ├── data/                     # character_data.gd, skill_data.gd, gongfa_data.gd
-    └── ui/                       # hud.gd, health_bar.gd, skill_button.gd, round_indicator.gd, etc.
+│   ├── ui/                       # HUD, health bar, skill button, tutorial overlay
+│   └── segments/                 # transition / creation / sect_select / cultivation / map / ending
+├── scripts/
+│   ├── battlefield.gd            # Terrain/tilemap build, character + skill data, AI wiring, HUD/tutorial hookup
+│   ├── grid_lines.gd             # Cell-boundary overlay drawn above tiles/backdrop (_draw)
+│   ├── autoload/
+│   │   ├── game_manager.gd       # Six-segment FSM: TUTORIAL → BATTLE → WON|LOST → TRANSITION → … → ENDING
+│   │   ├── scene_manager.gd      # State-driven scene router (hosts one segment scene under SceneHost)
+│   │   ├── save_manager.gd       # PlayerProfile + seeded RNG + decks + 3-slot atomic JSON IO
+│   │   ├── grid_manager.gd       # Grid coords, occupancy, AStar2D, range/AoE (origin/size/team), sprite clamp
+│   │   ├── combat_manager.gd     # Turn engine + damage/status/passive pipeline + death handling + reset_battle()
+│   │   ├── tutorial_manager.gd   # 7-step keyboard-completable tutorial + input gating
+│   │   ├── theme_manager.gd      # ThemeDB.fallback_font bootstrap (CI-safe font fallback)
+│   │   └── audio_manager.gd      # SFX + music playback
+│   ├── characters/               # player.gd, enemy.gd
+│   ├── ai/                       # ai_base + 5 per-Grandmaster deterministic controllers
+│   ├── data/                     # character_data, skill_data, gongfa_data, player_profile, trait_data,
+│   │                             # progression_gongfa_data, card_data, event_data, map_data, battle_setup
+│   ├── segments/                 # transition.gd, creation.gd, sect_select.gd, cultivation.gd, map.gd, ending.gd
+│   └── ui/                       # hud.gd, health_bar.gd, skill_button.gd, round_indicator.gd, etc.
+└── tests/                        # 14 test_*.gd + unit_test_runner.gd
 ```
 
 ## Key Interfaces
@@ -175,30 +191,36 @@ jinyong-play/
 | `execute_move_path(unit, path)` / `execute_action(unit, action, target, params)` | Execute movement / `"basic_attack"` / `"skill"` with tween-awaited animation |
 | `apply_damage(target, amount, source, is_melee, ignore_dr)` | Two-stage damage pipeline + fatal guard + counter/reflect |
 | `apply_heal` / `apply_shield` / `apply_dot` / `apply_status` | Heal / shield / DoT / status application |
-| `get_fa_hui_du(gongfa)` | Delegates to the `GongfaData` stub (1.3) |
+| `get_fa_hui_du(gongfa, unit)` | Delegates to the `GongfaData` 甲乙丙丁 cascade (staged units keep flat 1.3) |
+| `reset_battle()` / `debug_wipe_enemies()` / `debug_kill_player()` | Battle teardown + harness-only WON/LOST drivers through the real pipeline |
 | `pause()` / `unpause()` / `toggle_pause()` | Boolean pause gate (no `Engine.time_scale`) |
 
 Signals: `round_started`, `turn_started`, `turn_ended`, `phase_changed`, `action_executed`, `damage_dealt`, `paused`, `unpaused`.
 
 ### `GridManager` public API
 
-`is_in_bounds`, `is_walkable`, `is_occupied` / `reserve_tile` / `free_tile`, `find_path`, `get_move_range`, `get_units_in_range`, `get_tiles_in_aoe`, `get_units_in_aoe` (origin / shape / size / direction / team filter), `grid_to_world` / `world_to_grid`, `clamp_sprite_offset`.
+`is_in_bounds`, `is_walkable`, `is_occupied` / `reserve_tile` / `free_tile`, `find_path`, `get_move_range`, `get_units_in_range`, `get_tiles_in_aoe`, `get_units_in_aoe` (origin / shape / size / direction / team filter), `grid_to_world` / `world_to_grid`, `clamp_sprite_offset`, `clear_grid`.
 
 ### `GameManager` public API
 
-`get_state()`, `start_battle()`, `end_battle(won)`, `register_enemy`, `unregister_enemy` (auto-win on empty list), `get_enemies_alive()`, `set_player`, `get_player`.
+`get_state()`, `start_battle()`, `end_battle(won)`, `register_enemy`, `unregister_enemy` (auto-win on empty list), `get_enemies_alive()`, `set_player`, `get_player`, plus the six-segment surface: `set_battle_return_state` / `get_battle_return_state`, `enter_segment(state)` (validated predecessor transitions), `request_continue` / `request_retry`, `restart_game()`, `clear_battle()`, and the `end_overlay_text` observable.
+
+### `SaveManager` / `SceneManager` surface
+
+`SaveManager` exposes `seed`, `last_error`, `slot`, `has_save`, and the six deck counts `eco_left/eq_left/growth_left/pow_left/trait_left/art_left`; `SceneManager` exposes `current_scene`, `pending_swap`, `last_error`. Both are assertable from the playtest surface.
 
 ### Playtest surface contract (`playtest_spec.yaml`)
 
-Observable nodes/variables include `CombatManager` (`current_round`, `phase`, `active_unit_name`, `turn_order`, `turn_log`, `last_turn_actor`, plus the debug counters `debug_await_total`, `debug_await_timeouts`, `debug_await_frames`, `debug_round_frame`, `debug_reflect_hits`), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`, the 8 `SkillButton*` nodes (`text`, `fahui_text`, `disabled`, `hp_gated`, `state_text`, `cooldown_remaining`), `RoundIndicator`, `EnergyLabel`, `HUD` (`visible`, `size`, `skill8_right_edge`, `round_pause_overlap`), `HealthBar` (`visible`, `global_position`, `size`, `name_text`, `bar_width`, `follow_delta`), and `Battlefield` (`board_aligned`, `grid_lines_visible`). All geometric questions in the spec are answered by these GDScript-computed live-node observables — never raw `get_global_rect()` expressions in YAML.
+Observable nodes/variables include `CombatManager` (`current_round`, `phase`, `active_unit_name`, `turn_order`, `turn_log`, `last_turn_actor`, plus the debug counters `debug_await_total`, `debug_await_timeouts`, `debug_await_frames`, `debug_round_frame`, `debug_reflect_hits`), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`, the 8 `SkillButton*` nodes (`text`, `fahui_text`, `disabled`, `hp_gated`, `state_text`, `cooldown_remaining`), `RoundIndicator`, `EnergyLabel`, `HUD` (`visible`, `size`, `skill8_right_edge`, `round_pause_overlap`), `HealthBar` (`visible`, `global_position`, `size`, `name_text`, `bar_width`, `follow_delta`, `fill_color`, `total_height`, `track_bg`), `Battlefield` (`board_aligned`, `grid_lines_visible`), the six segment screens (`TransitionScreen`, `CreationScreen`, `SectSelectScreen`, `CultivationScreen`, `MapScreen`, `EndingScreen`), and the `SceneManager` / `SaveManager` autoloads. All geometric questions in the spec are answered by these GDScript-computed live-node observables — never raw `get_global_rect()` expressions in YAML.
 
 ## Technical Notes
 
 - **Godot version**: targets 4.4 (the brief's pin); `project.godot` `config/features` records `4.7` — pre-existing and unrelated, and the project compiles/runs under the current toolchain.
 - **Stable initiative sort**: decorate-sort-undecorate with a registration-index tie-break (Godot's `sort_custom` is unstable, and 碧海潮生's −20 debuff can create ties mid-battle).
-- **Freed-object safety**: `queue_free()` is deferred, so any stored node reference (turn-order queue heads, occupancy-dict values, cached AI heal targets) is validated with `is_instance_valid()` **before** any `as` cast or typed assignment — the check-then-cast idiom is applied repo-wide (turn engine, grid queries, AI controllers, and UI scripts).
+- **Freed-object safety**: `queue_free()` is deferred, so any stored node reference (turn-order queue heads, occupancy-dict values, cached AI heal targets) is validated with `is_instance_valid()` **before** any `as` cast or typed assignment — the check-then-cast idiom is applied repo-wide (turn engine, grid queries, AI controllers, and UI scripts). Scene swaps await the outgoing scene's `tree_exited` before instantiating the incoming one.
 - **Tween safety**: `_await_tween_safe()` caps every action tween at `TWEEN_TIMEOUT_SEC` (0.25 s) so a tween killed by `queue_free()` can never hang the turn loop; `CombatManager.debug_await_total / debug_await_timeouts / debug_await_frames / debug_round_frame` expose the round-frame budget for re-timing the playtest timeline.
 - **Deterministic AI**: zero RNG — pure priority lists over cooldown/range/HP facts; the terminal playtest scenario is reproducible by construction.
+- **Seeded RNG**: one `RandomNumberGenerator` instance owned by `SaveManager`, seeded from `mix_seed(system_entropy)` (splitmix64 finalizer — `RandomNumberGenerator` has no avalanche effect); all card draws / deck shuffles go through it in operation order. No stray `randi()` / `randomize()` in gameplay code.
 - **Rounding**: GDScript `round()` rounds half away from zero; `45 * 1.3` is exactly 58.5 in double → canonical 59.
 - **Static AStar graph**: only the border wall ring is disabled once; occupancy is re-checked at move time.
 - **Layout**: border ring is non-walkable; the skill bar sits over the bottom border row; the `GridLines` overlay draws cell boundaries above the backdrop/tiles; health bars (≤ 64 px wide, one cell) are clamped to the viewport with their name label above the bar.
@@ -210,20 +232,16 @@ Observable nodes/variables include `CombatManager` (`current_round`, `phase`, `a
 ./run_tests.sh
 ```
 
-Runs a compile check (which triggers the Godot import pass), then the Godot unit tests under `tests/`, then a headless playtest against `playtest_spec.yaml`. The unit-test step runs `tests/unit_test_runner.gd` (a SceneTree collector that preloads the ten `static func run() -> bool` data-logic test files and summarizes `UNIT TESTS: N passed, M failed`) plus the two SceneTree-style integration tests `tests/test_save_manager.gd` and `tests/test_game_manager_fsm.gd`, each driven by its own `-s` invocation; any failing unit test fails the whole gate. Ten scenarios cover: round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, the two-phase unlock + HP gate, 先天罡气 fatal guard, a terminal victory within 8–12 rounds with player HP between 15% and 40% (**75–200 of 500**), and the `ui_geometry_readability` scenario (grid overlay visible, health bar ≤ 64 px and tracking a scripted move, 8th skill button inside the viewport, round indicator vs pause button non-overlap, four skill-button states data-distinct).
+Runs a compile check (which triggers the Godot import pass), then the Godot unit tests under `tests/`, then a headless playtest against `playtest_spec.yaml`. The unit-test step runs `tests/unit_test_runner.gd` (a SceneTree collector that preloads the `static func run() -> bool` data-logic test files and summarizes `UNIT TESTS: N passed, M failed`) plus the SceneTree-style integration tests `tests/test_save_manager.gd`, `tests/test_game_manager_fsm.gd`, and `tests/test_cultivation.gd`, each driven by its own `-s` invocation; any failing unit test fails the whole gate. In total there are 14 `test_*.gd` files covering battle-setup formulas, card data, cultivation, event/map data, the gongfa cascade, health-bar geometry, player-profile round-trips, progression gongfa, save/load, skill-button states, theme font, and trait data.
+
+The playtest contract (`playtest_spec.yaml`) carries **20 scenarios**: the ten battle behaviour scenarios (round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, two-phase unlock + HP gate, 先天罡气 fatal guard, terminal victory within 8–12 rounds with player HP 15%–40%, and `ui_geometry_readability` + `skill_button_visual_states`), plus the ten segment/scene scenarios (`spine_to_ending`, `tutorial_win_routes_to_transition`, `tutorial_loss_restarts_tutorial`, `creation_budget_clamp_and_traits`, `lone_bane_sect_grants_external_only`, `cultivation_month_cycle_and_deck_bookkeeping`, `cultivation_year_end_stay`, and `save_load_roundtrip`).
 
 A passing run requires a clean compile and a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 
-> **Verification status: RED — 5_vision readability gate FAILED (not shipped).** The external 5_vision gate was run and reported `passed: false` with **3 of 6 checks failing over 40 frames / 10 scenarios**:
->
-> - **Q5 — Health bars recognisable**: 10/10 scenarios failed — bars render as solid blocks under characters with no visible filled + empty/background portion, so they do not read as HP bars (design/30_presentation.md readability hard-requirement #4).
-> - **Q6 — No truncated/clipped text**: 10/10 scenarios failed — character name labels are cut off at the bottom, skill text is obscured by the UI overlay, and the terminal frame ends with a `Defeat...` ellipsis (ellipsis is explicitly forbidden).
-> - **Q3 — Skill-button appearance changes over time**: 5/10 scenarios failed — all buttons appear identical across frames in `round_one_snapshot`, `enemy_acts_only`, `each_unit_acts_once`, `central_divine_innate_qi`, and `ui_geometry_readability`; the cooldown/state visuals do not visibly change across turns.
->
-> Compile is clean (24 scripts, 0 errors) and the playtest behavior assertions pass (freed-object lane + terminal-balance lane healthy); the blocking work is confined to the visual/readability lane. Because hard success criterion 3 (the 5_vision gate) is red, `final/verify_report.json` reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. To re-run the whole gate after any change:
+> **Verification status: NOT YET VERIFIED (this step's evidence is produced by the downstream gates).** As the final-verification step, structural integration was confirmed by sampling (scene routing, FSM, save/profile/RNG/decks, theme, fa_hui_du cascade with staged tutorial values, all six segment scenes, the 20-scenario playtest contract, and the test harness). The runtime gates — **5_compile** (`compile_report.json`), **5_vision** (`vision_report.json`, the six readability checks), and **5_test** (`test_report.json`) — run *after* this step and had not produced their reports when this document was written. Until those gates run green, `final/verify_report.json` reports `all_goals_met: false` and `ready_for_deploy: false` — no shipped claim is made. (Note: a prior run's vision gate failed 3/6 readability checks; the current build adds the light-gray expand-margin health-bar track, the gold selected-skill border, and no-ellipsis end text to address exactly those three failures, but that fix has not yet been re-verified.) To run the full gate:
 
 ```bash
 ./run_tests.sh
 ```
 
-Re-run instructions: `run_tests.sh` compiles/imports the project headlessly, runs the full playtest against `playtest_spec.yaml`, and writes `playtest_report.json` (pass/fail + per-scenario asserts + any runtime errors). Expect it to finish green; if a scenario fails, the report lists the exact assertion and frame. After tuning AI decision tables (`scripts/ai/*.gd`) or the scene button timeline (`playtest_spec.yaml`), re-run and confirm: (a) `playtest_report.json` shows no `Trying to cast a freed object` errors, (b) the terminal scenario reports `WON` / round in `[8,12]` / HP in `[75,200]`, (c) the six protected scenarios stay green, and (d) `ui_geometry_readability` is green.
+Re-run instructions: `run_tests.sh` compiles/imports the project headlessly, runs the full playtest against `playtest_spec.yaml`, and writes `playtest_report.json` (pass/fail + per-scenario asserts + any runtime errors). After any change, re-run and confirm: (a) `playtest_report.json` shows no `Trying to cast a freed object` errors, (b) the terminal scenario reports `WON` / round in `[8,12]` / HP in `[75,200]`, (c) the six protected tutorial behaviour scenarios stay green, (d) the `spine_to_ending` scenario reaches `ENDING`, and (e) `ui_geometry_readability` + `skill_button_visual_states` are green.
