@@ -25,6 +25,7 @@ actions:
 surface:
   CombatManager: [current_round, phase, active_unit_name, turn_order, turn_log, last_turn_actor, debug_await_total, debug_await_timeouts, debug_await_frames, debug_round_frame, debug_reflect_hits]
   GameManager: [current_state]
+  SaveManager: [seed, last_error, slot, has_save, eco_left, eq_left, growth_left, pow_left, trait_left, art_left]
   Player: [health, max_health, grid_pos, moves_left, moved, acted, turns_taken, selected_skill_index, skill_cooldowns, shield, status_names, energy, sprite_top]
   East_Heretic:   [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names, sprite_top]
   West_Poison:    [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names]
