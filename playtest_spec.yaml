@@ -53,22 +53,24 @@ surface:
   HUD: [visible, size, skill8_right_edge, skill12_right_edge, round_pause_overlap]
   RoundIndicator: [visible, current_round, active_actor, order_names, active_text]
   SkillBar: [visible, size, global_position]
-  SkillButton1: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton2: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton3: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton4: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton5: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton6: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton9: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton10: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton11: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
-  SkillButton12: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text]
+  ActionHintLabel: [visible, text]
+  SkillButton1: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton2: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton3: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton4: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton5: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton6: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton7: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton8: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton9: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton10: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton11: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
+  SkillButton12: [visible, text, fahui_text, disabled, hp_gated, state_text, cooldown_remaining, overlay_visible, state_tag_text, cooldown_label_text, state_luma]
   Sparring_Partner: [health, max_health, grid_pos, turns_taken, acted, skill_cooldowns, shield, status_names]
   PauseButton: [visible, global_position]
   HealthBar: [visible, global_position, size, name_text, bar_width, follow_delta, fill_color, total_height, track_bg]
   Battlefield: [board_aligned, grid_lines_visible]
+  RangeHighlight: [visible, tile_count, target_count]
   SceneManager: [current_scene, pending_swap, last_error]
   TransitionScreen: [lines_shown, done, visible, size]
   CreationScreen: [phase, points_left, attr_index, attrs, trait_ids, confirmed, visible, size]
@@ -1347,4 +1349,102 @@ scenarios:
           CombatManager.debug_iron_shirt_procs: 'debug_iron_shirt_procs == 1'
           GameManager.current_state: 'current_state != "LOST"'
       - { at: 1015, actions: [debug_win_tutorial] }
+
+  - name: skill_hint_and_range_highlight
+    description: "Selection UX: the hint line and range highlight are hidden before any selection; selecting Heavy Edge (skill_1, range 1, player at (7,5), all five enemies >= 4 tiles away) shows a non-empty hint and the reachable-tile highlight with zero in-range targets; the out-of-range attack_confirm at frame 35 leaves the hint showing the specific reason 射程不够; toggling skill_1 off at frame 55 hides both."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - at: 20
+        actions: []
+        assert:
+          ActionHintLabel.visible: 'visible == false'
+          RangeHighlight.visible: 'visible == false'
+      - { at: 25, actions: [skill_1] }
+      - at: 30
+        actions: []
+        assert:
+          Player.selected_skill_index: "changed"
+          ActionHintLabel.visible: 'visible == true'
+          ActionHintLabel.text: 'text != ""'
+          RangeHighlight.visible: 'visible == true'
+          RangeHighlight.tile_count: 'tile_count > 0'
+          RangeHighlight.target_count: 'target_count == 0'
+      - { at: 35, actions: [attack_confirm] }
+      - at: 50
+        actions: []
+        assert:
+          ActionHintLabel.text: 'text == "射程不够"'
+      - { at: 55, actions: [skill_1] }
+      - at: 60
+        actions: []
+        assert:
+          ActionHintLabel.visible: 'visible == false'
+          RangeHighlight.visible: 'visible == false'
+          RangeHighlight.tile_count: 'tile_count == 0'
+          RangeHighlight.target_count: 'target_count == 0'
+
+  - name: skill_rejection_reason_texts
+    description: "Rejection reasons are specific and non-empty: at round 1 skill_5 is phase-locked so selecting it shows 教程尚未解锁; after Heavy Edge's cooldown-1 cast lands on Central Divine (frame 80) re-selecting skill_1 at frame 90 shows 冷却中 1 回合. Central_Divine.health changed (130 -> 71) proves the cast landed."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [skill_5, move_up] }
+      - at: 30
+        actions: []
+        assert:
+          ActionHintLabel.text: 'text == "教程尚未解锁"'
+      - { at: 35, actions: [move_up] }
+      - { at: 50, actions: [move_up] }
+      - { at: 65, actions: [skill_1] }
+      - { at: 80, actions: [attack_confirm] }
+      - { at: 90, actions: [skill_1] }
+      - at: 95
+        actions: []
+        assert:
+          Central_Divine.health: "changed"
+          ActionHintLabel.text: 'text == "冷却中 1 回合"'
+
+  - name: skill_bar_waiting_state
+    description: "The waiting state is presentation-only and visually distinct: after end_turn at frame 130, enemy-turn frame 300 renders every button as waiting with a dimmed luma in [0.18, 0.2874] while phase is ENEMY_TURN and round is still 1; at the player's next turn start (frame 500, round 2) state_text is ready again — the override never leaks into player turns."
+    timeline:
+      - { at: 3, actions: [ui_accept] }
+      - { at: 5, actions: [ui_accept] }
+      - { at: 7, actions: [ui_accept] }
+      - { at: 9, actions: [ui_accept] }
+      - { at: 11, actions: [ui_accept] }
+      - { at: 13, actions: [ui_accept] }
+      - { at: 15, actions: [ui_accept] }
+      - { at: 20, actions: [move_up] }
+      - { at: 35, actions: [move_up] }
+      - { at: 50, actions: [move_up] }
+      - { at: 65, actions: [skill_1] }
+      - { at: 80, actions: [attack_confirm] }
+      - at: 120
+        actions: []
+        assert:
+          SkillButton1.state_text: 'state_text == "cooldown"'
+      - { at: 130, actions: [end_turn] }
+      - at: 300
+        actions: []
+        assert:
+          CombatManager.phase: 'phase == "ENEMY_TURN"'
+          CombatManager.current_round: 1
+          SkillButton1.state_text: 'state_text == "waiting"'
+          SkillButton1.state_luma: 'state_luma >= 0.18 and state_luma <= 0.2874'
+      - at: 500
+        actions: []
+        assert:
+          CombatManager.current_round: "changed"
+          SkillButton1.state_text: 'state_text == "ready"'
 
