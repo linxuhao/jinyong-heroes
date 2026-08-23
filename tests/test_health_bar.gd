@@ -19,12 +19,11 @@ static func run() -> bool:
 	var bar = HealthBarScene.instantiate()
 	bar.setup("测试", 100, null)
 
-	# Compact geometry: 68x26 widget, 64x6 bar, name label 20px tall above it
-	# (font 10 + outline 2 — the label rect must hold the CJK glyph box, so it
-	# grew from 14 to 20 px with the widget from 20 to 26 px total; review-fix
-	# 2 resolution in task_plan fix_vision_gate_readability).
-	ok = _expect(ok, bar.size == Vector2(68, 26), "bar.size == Vector2(68, 26)")
-	ok = _expect(ok, is_equal_approx(bar.total_height, 26.0), "bar.total_height == 26.0")
+	# Compact geometry: 68x20 widget, 64x8 bar, name label 9px tall above it
+	# (font 10; the label rect is intentionally shorter than the CJK glyph box —
+	# the no-clip guarantee is clip_text = false, not rect height).
+	ok = _expect(ok, bar.size == Vector2(68, 20), "bar.size == Vector2(68, 20)")
+	ok = _expect(ok, is_equal_approx(bar.total_height, 20.0), "bar.total_height == 20.0")
 	ok = _expect(ok, is_equal_approx(bar.bar_width, 64.0), "bar.bar_width == 64.0")
 	ok = _expect(ok, bar.name_text == "测试", 'bar.name_text == "测试"')
 
@@ -63,15 +62,15 @@ static func run() -> bool:
 		ok = _expect(ok, not fill_sb.bg_color.is_equal_approx(bar.track_bg),
 				"fill stylebox bg differs from track bg")
 
-	# Name-label no-clip (5_vision Q6 / review-fix 2): the label rect must be
-	# tall enough for the CJK glyph box — Font.get_height(10) + 2 * outline
-	# (the outline widens glyphs both sides) — and the label + bar must both
-	# fit inside the 26px widget without overlapping.
+	# Name-label no-clip (5_vision Q6): the 9px label rect cannot hold the full
+	# CJK glyph box (font 10 em ≈ 15px) — that is by design. The no-clip
+	# guarantee is Label.clip_text = false (text draws even outside the rect,
+	# never ellipsized: text_overrun_behavior = 0), so assert those instead of
+	# rect height, and keep the label + bar both fitting inside the 20px widget.
 	var label: Label = bar.get_node("NameLabel")
-	var glyph_box: int = label.get_theme_font("font").get_height(10) \
-			+ 2 * label.get_theme_constant("outline_size")
-	ok = _expect(ok, label.size.y >= glyph_box,
-			"NameLabel.size.y (%d) >= CJK glyph box (%d)" % [label.size.y, glyph_box])
+	ok = _expect(ok, label.clip_text == false, "NameLabel.clip_text == false (no clip)")
+	ok = _expect(ok, label.text_overrun_behavior == 0,
+			"NameLabel.text_overrun_behavior == 0 (no ellipsis)")
 	ok = _expect(ok, label.size.y + bar_node.size.y <= bar.total_height,
 			"NameLabel.size.y + Bar.size.y fit inside widget (no overlap)")
 

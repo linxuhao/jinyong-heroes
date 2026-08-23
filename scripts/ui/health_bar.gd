@@ -41,7 +41,7 @@ var name_text: String = ""
 ## reads the live layout.
 var bar_width: float = 0.0
 
-## Total widget height in pixels (= size.y; 26.0 for the compact 68×26 layout).
+## Total widget height in pixels (= size.y; 20.0 for the compact 68×20 layout).
 ## Assigned in setup() (so the headless null-char test reads it without a char
 ## node) AND re-assigned in follow_character() whenever the widget lays out.
 var total_height: float = 0.0
@@ -163,7 +163,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	track_bg = _TRACK_BG
 
 	# Record the widget height observable unconditionally (outside the node
-	# guards) so the headless null-char test reads size.y (26.0) even though
+	# guards) so the headless null-char test reads size.y (20.0) even though
 	# follow_character() returns early when _char_node is null.
 	total_height = size.y
 
@@ -217,12 +217,11 @@ func follow_character() -> void:
 	# At the default scale-1 window it is numerically identical to the old
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
-	# Compact 68×26 widget: offset by half the widget width (34) so it stays
-	# horizontally centred above the character, and −34 to float it above the
-	# feet without covering the actor or colliding with the top HUD band (the
-	# vertical offset grew by the same 6 px the widget grew, so the bar's
-	# bottom edge stays 8 px above the character exactly as before).
-	screen_pos += Vector2(-34, -34)
+	# Compact 68×20 widget: offset by half the widget width (34) so it stays
+	# horizontally centred above the character, and −28 to float it above the
+	# feet without covering the actor (widget bottom edge stays 8 px above the
+	# character: 28 − 20 = 8, the same hover height as before).
+	screen_pos += Vector2(-34, -28)
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
 	# the bar is unclamped and free-following; grows only when a viewport edge
