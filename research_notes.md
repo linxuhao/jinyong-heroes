@@ -277,3 +277,53 @@ scan runs only the committed scenario names). Zero compile/runtime/freed-object 
 `== -1` / `== "NEVER"` / TEMPORARY / diagnostic scaffolding, exactly 6 asserts, and the
 description states the fixture semantics.
 
+---
+
+# Research Notes — t4_goal4_waiting_contrast (implementation run log)
+
+Task: Goal 4 — make the skill-bar waiting state visually distinct (vision Q3 bad votes
+≤ 5/19, per-scenario counts authoritative). Changes: `state_palette("waiting")` bg
+(0.12,0.16,0.22) / border (0.30,0.36,0.44) / w1 / **tag `等待中`** (bg luma 0.155828,
+Δ≈0.23 vs ready 0.3874 — the old 0.12 dim was below the vision model's threshold; the
+tag is the primary cross-frame signal, D5); doc-comment updates in skill_button.gd;
+frame-210 re-pin of `playtest/skill_bar_waiting_state.yaml` (luma window [0.14, 0.17] +
+`state_tag_text == "等待中"` assert); README.md two 0.26596 → 0.1558 references + 等待中
+tag note. `tests/test_skill_button_states.gd` verified NOT to pin the waiting palette
+(reads only the four player-turn states; `state_names` excludes waiting) — not edited.
+The four player-turn palettes are untouched; `skill_button_visual_states.yaml` untouched.
+
+## C. Real-run procedure (t4b measurement — mandatory, acceptance evidence)
+
+Ran each scenario separately via `godot_playtest_scenario` (repo + staged overlay;
+~50 s each). Last real run output:
+
+- Per-scenario counts:
+  - `skill_bar_waiting_state` = **8/8** (was 7/7 — the frame-210 block gained the new
+    `state_tag_text` assert, so the total is 8 asserts: 1 at f120 + 5 at f210 + 2 at f500).
+  - `skill_button_visual_states` = **9/9** (four player-turn palettes untouched — green).
+  - `dot_resolves_at_victim_turn_start` = **6/6** (cross-turn-boundary battle scenario —
+    runs clean with the new palette, no crash / no compile error).
+- Frame-210 observed values (from the always-false probe `playtest/t4_probe_waiting.yaml`,
+  delete_file'd after pinning — forces `observed` into the report):
+  - `SkillButton1.state_luma` = **0.15582799911499** (≈ 0.155828 — inside the re-pinned
+    window [0.14, 0.17]; the real assert `state_luma >= 0.14 and state_luma <= 0.17`
+    passed in the delivery run).
+  - `SkillButton1.state_tag_text` = **"等待中"** (the real assert
+    `state_tag_text == "等待中"` passed).
+  - `SkillButton1.state_text` = **"waiting"** (byte-identical assert kept).
+- Failing asserts' observed values (probe-only, expected): `state_text == "never_matches"`
+  observed "waiting"; `state_luma < 0` observed 0.15582799911499;
+  `state_tag_text == "never_matches_tag"` observed "等待中". No failing asserts in the
+  committed scenarios.
+- Runtime/compile errors observed: **none / 0**. `empty_round_stalls` untouched.
+- Hard gate: passed for all three scenarios (`all_passed: true`, `hard_passed: true`).
+  Staged files applied to the runs: README.md, playtest/skill_bar_waiting_state.yaml,
+  scripts/ui/skill_button.gd.
+
+Pairwise-distinctness check (design/30_presentation.md item 2, all 5 states):
+ready 0.3874 no tag · cooldown 0.0814 + number · phase_locked 0.5306 + 锁定 ·
+hp_gated 0.2020 red + 气血 · waiting 0.1558 + 等待中. Waiting separates from
+cooldown/hp_gated by tag/text + hue, from ready by Δ0.23 luma + tag, from phase_locked
+by Δ0.37 luma + different text — no luma collision with the four player-turn states'
+pins in `skill_button_visual_states.yaml` (all 9/9 green in the same run).
+

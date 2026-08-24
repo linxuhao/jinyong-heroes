@@ -256,7 +256,7 @@ static func state_palette(state: String) -> Dictionary:
 				"bg_color": Color(0.12, 0.16, 0.22),
 				"border_color": Color(0.30, 0.36, 0.44),
 				"border_width": 1,
-				"tag_text": "",
+				"tag_text": "等待中",
 			}
 		_:
 			return {
