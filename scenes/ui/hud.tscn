@@ -112,6 +112,26 @@ offset_bottom = 44.0
 text = "暂停"
 script = ExtResource("2")
 
+[node name="EndTurnButton" type="Button" parent="."]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 52.0
+offset_right = -8.0
+offset_bottom = 88.0
+text = "结束回合"
+
+[node name="AttackButton" type="Button" parent="."]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 96.0
+offset_right = -8.0
+offset_bottom = 132.0
+text = "出招 (J)"
+
 [node name="SkillDescLabel" type="Label" parent="."]
 anchors_preset = 3
 anchor_left = 1.0

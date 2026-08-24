@@ -214,6 +214,9 @@ surface:
   - skill8_right_edge
   - skill12_right_edge
   - round_pause_overlap
+  - pressed_connected
+  - hud_button_overlap
+  - hud_desc_overlap
   RoundIndicator:
   - visible
   - current_round
@@ -383,6 +386,16 @@ surface:
   PauseButton:
   - visible
   - global_position
+  EndTurnButton:
+  - visible
+  - size
+  - mouse_filter
+  - disabled
+  AttackButton:
+  - visible
+  - size
+  - mouse_filter
+  - disabled
   HealthBar:
   - visible
   - global_position
@@ -575,3 +588,4 @@ scenario_order:
 - movement_range_highlight
 - creation_traits_back_next_buttons
 - creation_back_to_menu_walk
+- battle_end_turn_attack_buttons

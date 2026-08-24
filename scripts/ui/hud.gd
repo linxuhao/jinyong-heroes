@@ -50,6 +50,14 @@ var skill8_right_edge: float = 0.0
 ## single-row (<= 8 skills) mode. Surface observable, updated every frame.
 var skill12_right_edge: float = 0.0
 
+## Battle action buttons (defect 6): `pressed_connected` is the wiring-proof
+## snapshot taken AFTER the connects (creation.gd middle-chain pattern);
+## `hud_button_overlap` / `hud_desc_overlap` are per-frame geometry observables
+## asserted false whenever the HUD is visible.
+var pressed_connected: Dictionary = {}
+var hud_button_overlap: bool = false
+var hud_desc_overlap: bool = false
+
 ## Preloaded health_bar scene for instantiation.
 var _health_bar_scene: PackedScene = preload("res://scenes/ui/health_bar.tscn")
 
@@ -73,6 +81,8 @@ var _action_hint_player: Node = null
 @onready var _energy_label: Label = $EnergyLabel
 @onready var _action_hint_label: Label = $ActionHintLabel
 @onready var _skill_desc_label: Label = $SkillDescLabel
+@onready var _end_turn_button: Button = $EndTurnButton
+@onready var _attack_button: Button = $AttackButton
 
 ## Resolve a skill button by its deterministic name (SkillButton1..SkillButton12).
 ## Buttons live under SkillRow1/SkillRow2 in the two-row layout, so resolve
@@ -110,6 +120,63 @@ func _update_geometry_observables() -> void:
 	var button12: Control = _skill_button("SkillButton12")
 	if button12 != null and button12.visible:
 		skill12_right_edge = button12.get_global_rect().end.x
+
+	# Battle action buttons + skill description label geometry (defect 6):
+	#   hud_button_overlap — either new button's rect intersects any existing
+	#     HUD widget (PauseButton / RoundIndicator / SkillBar / ActionHintLabel);
+	#   hud_desc_overlap — SkillDescLabel's rect intersects any of those OR
+	#     either new button.
+	# Both must stay false while the HUD is visible (asserted by
+	# ui_geometry_readability and battle_end_turn_attack_buttons). All rects
+	# share the HUD layer-10 coordinate system (scale-1 viewport: HUD coords
+	# == pixels), so a single intersects() chain is exact.
+	var end_btn: Button = _end_turn_button
+	if end_btn == null or not is_instance_valid(end_btn):
+		end_btn = get_node_or_null("EndTurnButton") as Button
+		if end_btn != null:
+			_end_turn_button = end_btn
+	var atk_btn: Button = _attack_button
+	if atk_btn == null or not is_instance_valid(atk_btn):
+		atk_btn = get_node_or_null("AttackButton") as Button
+		if atk_btn != null:
+			_attack_button = atk_btn
+	var desc: Label = _skill_desc_label
+	if desc == null or not is_instance_valid(desc):
+		desc = get_node_or_null("SkillDescLabel") as Label
+		if desc != null:
+			_skill_desc_label = desc
+
+	hud_button_overlap = false
+	hud_desc_overlap = false
+	if end_btn == null or atk_btn == null:
+		return
+
+	var button_rects: Array[Rect2] = [
+		end_btn.get_global_rect(),
+		atk_btn.get_global_rect(),
+	]
+	var hud_widgets: Array[Rect2] = []
+	if indicator != null:
+		hud_widgets.append(indicator.get_global_rect())
+	if pause != null:
+		hud_widgets.append(pause.get_global_rect())
+	if is_instance_valid(_skill_bar):
+		hud_widgets.append(_skill_bar.get_global_rect())
+	if is_instance_valid(_action_hint_label):
+		hud_widgets.append(_action_hint_label.get_global_rect())
+
+	for r in button_rects:
+		for w in hud_widgets:
+			if r.intersects(w):
+				hud_button_overlap = true
+	if desc != null:
+		var d: Rect2 = desc.get_global_rect()
+		for w in hud_widgets:
+			if d.intersects(w):
+				hud_desc_overlap = true
+		for r in button_rects:
+			if d.intersects(r):
+				hud_desc_overlap = true
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -163,6 +230,10 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	# Skill description label: start every battle from the default guidance
 	# (nothing is selected yet).
 	_refresh_skill_desc_text()
+
+	# Battle action buttons: wire EndTurnButton / AttackButton to their
+	# handlers (idempotent disconnect-first) and snapshot the wiring proof.
+	_wire_battle_action_buttons()
 
 
 ## Battle-exit cleanup: drop every per-battle reference so a scene swap never
@@ -373,6 +444,72 @@ func _wire_action_hint(player: Node) -> void:
 	_action_hint_player = player
 
 
+## Wire the two battle action buttons (EndTurn / Attack) to their handlers.
+## Idempotent: disconnects any stale connection before connecting, so repeated
+## setup() calls are safe (mirrors _wire_action_hint). After the connects,
+## snapshot `pressed_connected` — the same middle-chain wiring proof creation.gd
+## uses; the snapshot MUST be taken after connect(), because
+## get_signal_connection_list("pressed") is empty before the signal is wired.
+func _wire_battle_action_buttons() -> void:
+	var end_btn: Button = _end_turn_button
+	if end_btn == null or not is_instance_valid(end_btn):
+		end_btn = get_node_or_null("EndTurnButton") as Button
+		if end_btn != null:
+			_end_turn_button = end_btn
+	if end_btn != null:
+		if end_btn.pressed.is_connected(_on_end_turn_pressed):
+			end_btn.pressed.disconnect(_on_end_turn_pressed)
+		end_btn.pressed.connect(_on_end_turn_pressed)
+
+	var atk_btn: Button = _attack_button
+	if atk_btn == null or not is_instance_valid(atk_btn):
+		atk_btn = get_node_or_null("AttackButton") as Button
+		if atk_btn != null:
+			_attack_button = atk_btn
+	if atk_btn != null:
+		if atk_btn.pressed.is_connected(_on_attack_pressed):
+			atk_btn.pressed.disconnect(_on_attack_pressed)
+		atk_btn.pressed.connect(_on_attack_pressed)
+
+	pressed_connected = {
+		"EndTurnButton": end_btn != null
+			and end_btn.get_signal_connection_list("pressed").size() > 0,
+		"AttackButton": atk_btn != null
+			and atk_btn.get_signal_connection_list("pressed").size() > 0,
+	}
+
+
+## Shared input gate for the two battle action buttons: input is allowed only
+## while it is the player's turn and the game is not paused.
+## CombatManager.end_current_turn() has NO internal turn gate, so this check is
+## the caller's responsibility — it mirrors the keyboard paths' own gating.
+func _battle_input_allowed() -> bool:
+	return CombatManager.is_player_turn() and not CombatManager.get_is_paused()
+
+
+## EndTurnButton handler: the same engine call the Space key makes. A silent
+## no-op when the gate is closed (enemy turn / paused), matching the keyboard
+## path exactly.
+func _on_end_turn_pressed() -> void:
+	if not _battle_input_allowed():
+		return
+	CombatManager.end_current_turn()
+
+
+## AttackButton handler: the same call the J key makes — fires the selected
+## skill, or a basic attack at the nearest adjacent enemy when none is
+## selected. Uses a LIVE GameManager.get_player() lookup (never a stored ref)
+## and guards the call before invoking the player method.
+func _on_attack_pressed() -> void:
+	if not _battle_input_allowed():
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	if player.has_method("_try_keyboard_attack"):
+		player._try_keyboard_attack()
+
+
 # ---------------------------------------------------------------------------
 # Process — update health bar positions
 # ---------------------------------------------------------------------------
@@ -381,6 +518,16 @@ func _process(_delta: float) -> void:
 	# Geometric observables first — readable every frame, including pre-battle
 	# frames where the player does not exist yet (before the null-check below).
 	_update_geometry_observables()
+
+	# Battle action buttons: disabled whenever the battle input gate is closed
+	# (not the player's turn, or paused). Must run BEFORE the player null-check
+	# so the state is readable every frame. A click on a disabled Button emits
+	# nothing — double protection behind the handler gates. Pre-battle
+	# (phase == IDLE) the gate is closed, so both buttons start disabled.
+	if is_instance_valid(_end_turn_button) and is_instance_valid(_attack_button):
+		var allowed: bool = _battle_input_allowed()
+		_end_turn_button.disabled = not allowed
+		_attack_button.disabled = not allowed
 
 	for bar in _health_bars:
 		if is_instance_valid(bar) and bar.has_method("follow_character"):
