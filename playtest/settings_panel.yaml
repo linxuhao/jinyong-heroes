@@ -35,7 +35,7 @@ timeline:
 - at: 85
   actions: []
   assert:
-    SettingsManager.sfx_volume_db: changed
+    GameManager.current_state: changed
 - at: 90
   actions:
   - move_down
