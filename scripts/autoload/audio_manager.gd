@@ -48,6 +48,14 @@ var _music_player: AudioStreamPlayer = null
 ## Timestamp (ms) of the last played hurt sound, for throttling.
 var _last_hurt_msec: int = 0
 
+## Mirror of the persisted SFX volume (SettingsManager drives this).
+## Initial value matches the SFXPlayer volume built in _build_players().
+var sfx_volume_db: float = 0.0
+
+## Mirror of the persisted music volume. Initial value equals MUSIC_VOLUME_DB
+## (keep both in sync with SettingsManager.DEFAULT_MUSIC_DB).
+var music_volume_db: float = -10.0
+
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
@@ -99,6 +107,20 @@ func stop_music() -> void:
 	if _music_player == null or not is_instance_valid(_music_player):
 		return
 	_music_player.stop()
+
+## Set the SFX player volume (mirror + live player, guarded). Called by
+## SettingsManager._apply(); safe before the players are built.
+func set_sfx_volume_db(v: float) -> void:
+	sfx_volume_db = v
+	if _sfx_player != null and is_instance_valid(_sfx_player):
+		_sfx_player.volume_db = v
+
+## Set the music player volume (mirror + live player, guarded). Called by
+## SettingsManager._apply(); safe before the players are built.
+func set_music_volume_db(v: float) -> void:
+	music_volume_db = v
+	if _music_player != null and is_instance_valid(_music_player):
+		_music_player.volume_db = v
 
 # ---------------------------------------------------------------------------
 # Private helpers
