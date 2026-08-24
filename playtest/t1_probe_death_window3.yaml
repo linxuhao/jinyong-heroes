@@ -1,0 +1,229 @@
+# TEMPORARY PROBE #1c (scratch, deleted before delivery).
+# Full terminal_victory timeline (all inputs, byte-identical) — this is the line
+# the SOTA scan claimed dies at round 10. Sampling the death window to find the
+# ACTUAL death frame on current code. All asserts always-false to force observed.
+name: t1_probe_death_window3
+description: 'TEMPORARY PROBE #1c (scratch, deleted before delivery): full terminal_victory timeline + death-window samples to locate the real death frame on current code.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 46
+  actions:
+  - move_up
+- at: 61
+  actions:
+  - move_up
+- at: 76
+  actions:
+  - move_up
+- at: 91
+  actions:
+  - skill_1
+- at: 106
+  actions:
+  - attack_confirm
+- at: 121
+  actions:
+  - end_turn
+- at: 620
+  actions:
+  - skill_4
+- at: 635
+  actions:
+  - attack_confirm
+- at: 650
+  actions:
+  - end_turn
+- at: 970
+  actions:
+  - skill_3
+- at: 985
+  actions:
+  - attack_confirm
+- at: 1000
+  actions:
+  - end_turn
+- at: 1045
+  actions:
+  - skill_8
+- at: 1060
+  actions:
+  - attack_confirm
+- at: 1075
+  actions:
+  - end_turn
+- at: 1300
+  actions:
+  - skill_1
+- at: 1315
+  actions:
+  - attack_confirm
+- at: 1330
+  actions:
+  - end_turn
+- at: 1560
+  actions:
+  - skill_3
+- at: 1575
+  actions:
+  - attack_confirm
+- at: 1590
+  actions:
+  - end_turn
+- at: 1820
+  actions:
+  - skill_7
+- at: 1835
+  actions:
+  - attack_confirm
+- at: 1850
+  actions:
+  - end_turn
+- at: 2080
+  actions:
+  - skill_4
+- at: 2095
+  actions:
+  - attack_confirm
+- at: 2110
+  actions:
+  - end_turn
+- at: 2340
+  actions:
+  - skill_5
+- at: 2355
+  actions:
+  - attack_confirm
+- at: 2370
+  actions:
+  - end_turn
+- at: 2600
+  actions:
+  - skill_1
+- at: 2615
+  actions:
+  - attack_confirm
+- at: 2630
+  actions:
+  - end_turn
+- at: 2870
+  actions:
+  - skill_7
+- at: 2885
+  actions:
+  - attack_confirm
+- at: 2900
+  actions:
+  - end_turn
+- at: 2960
+  actions:
+  - skill_1
+- at: 2975
+  actions:
+  - attack_confirm
+- at: 2990
+  actions:
+  - end_turn
+- at: 900
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 1100
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 1300
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 1500
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 1700
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 1900
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 2100
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 2300
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 2500
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 2700
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 2900
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+- at: 2999
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1

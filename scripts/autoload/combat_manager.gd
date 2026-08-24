@@ -1476,11 +1476,13 @@ func _handle_death(target: Node) -> void:
 	debug_death_target_name = str(target.name)
 
 	# Determine if this is the player or an enemy.
-	var is_player: bool = false
-	if target.has_method("is_player") or target.name == "Player" \
-			or target.name == "YangGuo":
-		is_player = true
-	# Observable: record what the CURRENT classifier decided (surface-only).
+	# Structural classification: instance-id equality against the registered
+	# player (name fallback only when get_player() is null), plus the
+	# has_method belt for any node carrying the Player script. Closes the whole
+	# name-based misclassification class (tutorial "Yang Guo"/"Player",
+	# encounter "ProgressionHero", sparring "Sparring_Partner") at once.
+	var is_player: bool = target.has_method("is_player") or _is_player(target)
+	# Observable: record what the classifier decided (surface-only).
 	debug_death_classified_player = is_player
 
 	if is_player:
@@ -1495,6 +1497,20 @@ func _handle_death(target: Node) -> void:
 
 		# Remove from scene tree.
 		target.queue_free()
+
+
+## Battle-over invariant: while a battle is live, a player at 0 HP MUST be a
+## LOST state. Idempotent (end_battle no-ops once WON/LOST). Called from the
+## two turn-transition chokepoints so ANY future HP-zero path (hazard zones,
+## new damage sources) still ends the battle.
+func _check_battle_over() -> void:
+	var state: String = GameManager.get_state()
+	if state == "WON" or state == "LOST":
+		return
+	var player: Node = GameManager.get_player()
+	if player != null and is_instance_valid(player) \
+			and "health" in player and int(player.health) <= 0:
+		GameManager.end_battle(false)
 
 
 ## Create a damage flash effect on a target Node2D.

@@ -1,0 +1,135 @@
+# TEMPORARY PROBE #1e (scratch, deleted before delivery). Confirms the real
+# value of debug_death_classified_player at the death frame (f2680). The
+# previous probe's expression referenced current_state on CombatManager (invalid
+# index) so it never read the observable.
+name: t1_probe_death_window5
+description: 'TEMPORARY PROBE #1e (scratch): read debug_death_classified_player at the pinned death frame f2680.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 46
+  actions:
+  - move_up
+- at: 61
+  actions:
+  - move_up
+- at: 76
+  actions:
+  - move_up
+- at: 91
+  actions:
+  - skill_1
+- at: 106
+  actions:
+  - attack_confirm
+- at: 121
+  actions:
+  - end_turn
+- at: 620
+  actions:
+  - skill_4
+- at: 635
+  actions:
+  - attack_confirm
+- at: 650
+  actions:
+  - end_turn
+- at: 970
+  actions:
+  - skill_3
+- at: 985
+  actions:
+  - attack_confirm
+- at: 1000
+  actions:
+  - end_turn
+- at: 1045
+  actions:
+  - skill_8
+- at: 1060
+  actions:
+  - attack_confirm
+- at: 1075
+  actions:
+  - end_turn
+- at: 1300
+  actions:
+  - skill_1
+- at: 1315
+  actions:
+  - attack_confirm
+- at: 1330
+  actions:
+  - end_turn
+- at: 1560
+  actions:
+  - skill_3
+- at: 1575
+  actions:
+  - attack_confirm
+- at: 1590
+  actions:
+  - end_turn
+- at: 1820
+  actions:
+  - skill_7
+- at: 1835
+  actions:
+  - attack_confirm
+- at: 1850
+  actions:
+  - end_turn
+- at: 2080
+  actions:
+  - skill_4
+- at: 2095
+  actions:
+  - attack_confirm
+- at: 2110
+  actions:
+  - end_turn
+- at: 2340
+  actions:
+  - skill_5
+- at: 2355
+  actions:
+  - attack_confirm
+- at: 2370
+  actions:
+  - end_turn
+- at: 2600
+  actions:
+  - skill_1
+- at: 2615
+  actions:
+  - attack_confirm
+- at: 2630
+  actions:
+  - end_turn
+- at: 2680
+  actions: []
+  assert:
+    CombatManager.debug_death_classified_player: debug_death_classified_player == false
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1

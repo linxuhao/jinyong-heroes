@@ -1,0 +1,146 @@
+# TEMPORARY PROBE #1 — deleted before delivery (delete_file'd at end of t1).
+# Replays the terminal_victory LOSING line (preamble + scripted passivity) and
+# samples the death window. Every assert is an always-false diagnostic whose
+# `observed` value the playtest report prints — that is how the real values of
+# current_state / end_overlay_text / health / debug_death_* are forced out.
+name: t1_probe_death_window
+description: 'TEMPORARY PROBE #1 (scratch, deleted before delivery): replay the losing line of terminal_victory and sample frames 740..1100 every ~40 frames for current_state / end_overlay_text / health / empty_round_stalls / debug_death_target_name / debug_death_classified_player. All asserts are always-false to force observed values into the report.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 46
+  actions:
+  - move_up
+- at: 61
+  actions:
+  - move_up
+- at: 76
+  actions:
+  - move_up
+- at: 91
+  actions:
+  - skill_1
+- at: 106
+  actions:
+  - attack_confirm
+- at: 121
+  actions:
+  - end_turn
+- at: 620
+  actions:
+  - skill_4
+- at: 635
+  actions:
+  - attack_confirm
+- at: 650
+  actions:
+  - end_turn
+- at: 740
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 780
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 820
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 860
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 900
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 940
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 980
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 1020
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 1060
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
+- at: 1100
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: current_state == "PROBE"
