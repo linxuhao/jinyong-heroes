@@ -1,0 +1,264 @@
+# PROBE scratch — never delivered (t5). Candidate win v14: r3 四海无量 pressed
+# VERY late (f1130 — the round-3 enemy phase runs ~450-500f, r3 turn ~f1000+).
+# SE-first chain: r4 徘徊空谷 (EH dead now -> jumps to SE by registration, 26),
+# r5 力斩千钧 (cross-2 from landing covers SE+CD+NB), r6 十七式 (SE dead, CD->1,
+# WP 24), r7-r8 singles, r9 四海无量 finisher (cd6 from r3), r10-r11 cleanup.
+name: t5_probe_win_v14
+description: 'PROBE — candidate win v14. Never delivered.'
+timeline:
+- at: 3
+  actions: [ui_accept]
+- at: 5
+  actions: [ui_accept]
+- at: 7
+  actions: [ui_accept]
+- at: 9
+  actions: [ui_accept]
+- at: 11
+  actions: [ui_accept]
+- at: 13
+  actions: [ui_accept]
+- at: 15
+  actions: [ui_accept]
+- at: 46
+  actions: [move_up]
+- at: 61
+  actions: [move_up]
+- at: 76
+  actions: [move_up]
+- at: 91
+  actions: [skill_1]
+- at: 106
+  actions: [attack_confirm]
+- at: 121
+  actions: [end_turn]
+- at: 500
+  actions: [skill_3]
+- at: 515
+  actions: [attack_confirm]
+- at: 530
+  actions: [end_turn]
+- at: 1130
+  actions: [skill_4]
+- at: 1145
+  actions: [attack_confirm]
+- at: 1160
+  actions: [end_turn]
+- at: 1175
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 1210
+  actions: [skill_7]
+- at: 1225
+  actions: [attack_confirm]
+- at: 1240
+  actions: [end_turn]
+- at: 1255
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 1430
+  actions: [skill_3]
+- at: 1445
+  actions: [attack_confirm]
+- at: 1460
+  actions: [end_turn]
+- at: 1475
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 1690
+  actions: [skill_8]
+- at: 1705
+  actions: [attack_confirm]
+- at: 1720
+  actions: [end_turn]
+- at: 1735
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 1960
+  actions: [skill_5]
+- at: 1975
+  actions: [attack_confirm]
+- at: 1990
+  actions: [end_turn]
+- at: 2005
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 2200
+  actions: [skill_5]
+- at: 2215
+  actions: [attack_confirm]
+- at: 2230
+  actions: [end_turn]
+- at: 2245
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 2440
+  actions: [skill_4]
+- at: 2455
+  actions: [attack_confirm]
+- at: 2470
+  actions: [end_turn]
+- at: 2485
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 2680
+  actions: [skill_5]
+- at: 2695
+  actions: [attack_confirm]
+- at: 2710
+  actions: [end_turn]
+- at: 2725
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 2920
+  actions: [skill_5]
+- at: 2935
+  actions: [attack_confirm]
+- at: 2950
+  actions: [end_turn]
+- at: 2965
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 2999
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    GameManager.current_state: current_state == "NEVER"
+    Player.health: health == -1
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
