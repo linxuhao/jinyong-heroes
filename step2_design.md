@@ -1,353 +1,289 @@
-# step2_design.md — Round: 「战斗要能结束」/ *The Battle Must Be Able to End*
+# step2_design — Main Menu, Creation-Before-Tutorial, Save/Load Chain Repair
 
 ## 1. Overview
 
-This round fixes the one failure mode that poisons every combat conclusion: **a battle that cannot end**. All other combat verdicts (balance, win/lose routing, DoT premise) hang off it. The five goals, mapped to components:
+This run delivers three coupled features on the Godot 4.7 wuxia game "Huashan Sword Tournament":
 
-| # | Goal | Approach chosen (from SOTA research) | Component |
-|---|------|--------------------------------------|-----------|
-| 1 | Player HP = 0 **must** end the battle | Structural (instance-id) death classification + a battle-over invariant seam + a committed regression scenario | C0/C1/C2 |
-| 2 | `dot_resolves_at_victim_turn_start` — decide AI defect vs scenario premise | **Branch (b): scenario premise** (code-verified). Rewrite the scenario as a fixture: poison is *injected*, then tick timing is asserted | C3 |
-| 3 | `save_load_roundtrip` 13/13 with **non-vacuous** deep-equality asserts | Test-side hardening first: non-empty precondition guards on all three equality asserts; fix the write side only if the probe proves it broken | C4 |
-| 4 | Skill-bar waiting state visually distinct (vision Q3 bad votes ≤ 5/19) | Dramatically widen the waiting palette (darker, Δluma ≈ 0.23 vs ready) **and** add a `等待中` tag on all 8 buttons during enemy turns | C5 |
-| 5 | Re-evaluate `terminal_victory_8_12_rounds_hp_15_40` | **Strictly gated on goal 1 landing.** Probe the losing line, re-script a correct gather+AoE play; balance change only via explicit design-change declaration | C6 |
+1. **A real main menu** (mouse-first, keyboard-compatible) with four entries — 新的冒险 / 读取存档 / 设置 / 退出 — as the new launch entry point (`project.godot run/main_scene` → `res://scenes/menu.tscn`).
+2. **Character creation moved before the tutorial** (design order segment 0), so the real flow is `MENU → 捏人 → 教程战 → 穿越 → 选门派 → …`; the tutorial protagonist stays the orchestrated Yang Guo (settled, not an open question).
+3. **Save/load chain repair** — instrument the six `io_error` sites with real error codes, harden the atomic-write protocol, fix load-while-hosted staleness, and wire the menu's 读取存档 entry to a proper load route.
 
-Method discipline for the whole round (**先取值,再动手** — probe first, then change): every pin in a rewritten scenario is re-baselined from a probe run against the **current** code, never from memory of old numbers. Two outcomes are known in advance from the SOTA research and drive the design:
+**Hard constraint (the load-bearing wall of this design):** the 27 existing playtest scenario files stay **byte-identical** and the in-scope ones stay/return **green**. This is achieved by the already-released per-scenario `scene:` boot capability of the harness (see the comment block at the top of `playtest/_common.yaml`): the shared default `scene:` stays `res://scenes/main.tscn`, so every existing scenario boots exactly as today — zero file edits, absolute frames unmoved. The menu/creation/settings screens are name-tested headlessly by **new additive scenario files** that carry their own `scene:` line. **No headless/env-var/`--skip-menu` branching exists anywhere** — the menu is not bypassed in test; it is the thing being tested (the reviewer's hard veto from SOTA).
 
-1. `_handle_death` in `scripts/autoload/combat_manager.gd` (line 1448) classifies the player **by name** (`target.name == "Player" or target.name == "YangGuo"`), while the engine already has a reference-equality helper `_is_player()` (line 1549) that the rest of the turn engine uses. The stuck-run scan's 8 identical samples (f820–f1100: hp=0, phase=ENEMY_TURN, active=Central Divine) are *byte-consistent with either* "battle stuck" or "battle properly ended LOST" — `end_battle(false)` never resets `phase`/`active_unit_name`, and the scan did not sample `current_state`. **PROBE #1 (current_state at the death window) is the disambiguator**, and the new regression scenario captures it permanently.
-2. `ai_west_poison.gd` **can** poison (decision 2 = Spirit Serpent, adjacency-gated) but in 26 sampled frames of the losing battle West Poison was never adjacent to the player, so poison was never applied — the old scenario asserted frames that do not exist. The code-level verdict is **(b) scenario premise**; no AI code changes this round.
+Note on language: this document's prose is English per pipeline convention; the **in-game UI strings are quoted Chinese data values** mandated by `design/30_presentation.md` (界面文字一律中文) and pinned by existing playtest assertions — they are not translated.
 
-**Hard constraints (unchanged, non-negotiable):** `empty_round_stalls == 0`; 0 runtime errors; 0 compile errors; no `Trying to cast a freed object`; the 12 protected battle scenarios and all segment scenarios **not named by a goal** stay byte-identical; `current_state == "WON"` in the terminal scenario is never softened.
+## 2. Design-change declarations (for `5_design`)
 
-## 2. Architecture diagram (text)
+The `design/` record is **not edited this run**; these updates are declared for `5_design` to apply after final verification:
+
+| # | Change | Why |
+|---|---|---|
+| D1 | `design/40_progression.md` §1: "真正的 `PlayerProfile` 在下一段由玩家创建" → the real profile is created at **segment 0 (捏人), before the tutorial**; the tutorial still uses the separate orchestrated Yang Guo profile (`20_content.md` 编排数值, unchanged). | `00_overview.md` already mandates the 2026-08-24 order (捏人 first); §1 still describes the old order. |
+| D2 | `design/40_progression.md` §2 heading "第 3 段 · 开局:捏人 + 选门派" → 捏人 has moved to segment 0; segment 3 is 选门派 only. | Same order change. |
+| D3 | `tutorial_done` flag semantics flip: set **false** at creation (`SaveManager.new_profile()`), set **true** at tutorial completion (`TutorialManager._finish_tutorial()`). "保留一条教程已完成的标记" (40_progression §1) is preserved — only *when* the mark is written changes. | Creation now happens before the tutorial; the old "creation is only reachable after the tutorial" comment is factually wrong. |
+| D4 | `STABLE_STATES` stays `["CULTIVATION", "MAP"]`; MENU/SETTINGS are deliberately **never saveable** states. Documented, not changed — prevents a future run from "helpfully" adding them. | Menu/settings screens have no saveable progress; keeping the save domain tight protects the atomic-write guard. |
+
+No numbers in `20_content.md` change. No changes to `00_overview.md` (it already describes the menu and the reorder).
+
+## 3. Architecture diagram (text)
 
 ```
-DEATH PATH (goal 1) — every damage source converges on one pipeline:
-  player skill / enemy AI / DoT tick / counter-reflect / debug hooks
-    -> CombatManager.apply_damage(target, amount, source, is_melee, ignore_dr)
-         DR -> shield absorb -> HP clamp (the ONLY place health reaches 0)
-         -> fatal guards (先天罡气 / 铁布衫 clamp lethal to 1, survive)
-         -> if still lethal: _handle_death(target)
-              [FIXED C1] classify via _is_player(target)  (instance-id, name fallback)
-                 + write debug_death_target_name / debug_death_classified_player [C0]
-              player  -> GameManager.end_battle(false) -> LOST + 战败 overlay
-              enemy   -> GridManager.free_tile + unregister_enemy + queue_free
-                         (last enemy gone -> end_battle(true) via unregister_enemy)
-    -> [NEW C1] belt-and-braces invariant: _check_battle_over()
-         called at _begin_round() entry and end_current_turn() —
-         if state is BATTLE and player.health <= 0 -> end_battle(false).
-         Idempotent (end_battle no-ops on WON/LOST). Covers ANY future HP-zero
-         path that bypasses apply_damage (hazard zones etc.).
-    -> turn engine guards (EXISTING, unchanged): _next_turn() re-checks
-         WON/LOST before/after every await; a terminated battle stops
-         progressing, phase/active_unit_name are left as-is by design.
+                    ┌─────────────────────────── boot: menu.tscn (real launches) ───────────────────────────┐
+                    │  menu.tscn = persistent shell copy (root "Main" + SceneHost + SegmentLayer/SegmentHost │
+                    │  + HUDLayer/HUD + TutorialLayer/TutorialOverlay) + authored MenuPanel under SegmentHost│
+                    └──────────────────────────────────────────────┬────────────────────────────────────────┘
+                                                                     │ MenuPanel._ready:
+                                                                     │   1. hide HUDLayer
+                                                                     │   2. SceneManager.claim_boot(self,"menu")   (sets _current_node, current_scene)
+                                                                     │   3. GameManager.enter_menu()               (state MENU; swap no-ops, already hosted)
+                    ┌────────────────── main.tscn boot (all 27 scenarios; byte-identical path) ──────────────┐
+                    │  main.tscn untouched; GameManager.current_state defaults TUTORIAL,                      │
+                    │  SceneManager.current_scene == "none" → its deferred _ready still swaps to battlefield  │
+                    └─────────────────────────────────────────────────────────────────────────────────────────┘
 
-SAVE/LOAD (goal 3) — pipeline unchanged; only the TEST surface changes:
-  cultivation menu -> SaveManager.save_slot(1)  [atomic 5-step write, unchanged]
-     success -> has_save = true; snapshot_profile_json / snapshot_rng_state /
-                snapshot_decks_string captured  (all-or-nothing)
-  cultivation menu -> SaveManager.load_slot(1)
-     success -> loaded_profile_json / loaded_rng_state / loaded_decks_string
-  scenario asserts (CHANGED C4): non-empty precondition guard on every
-     deep-equality assert -> a vacuous "" == "" pass is now impossible;
-     has_save == true and last_error == "" pinned at the save frame.
+GameManager state machine (extended in place):
 
-WAITING RENDER (goal 4) — HUD wiring unchanged, palette only:
-  HUD._refresh_skill_button_states (unchanged):
-     phase != "IDLE" and not is_player_turn() -> btn.state_text = "waiting"
-  SkillButton._apply_state -> state_palette("waiting")  [CHANGED C5]
-     bg Color(0.12, 0.16, 0.22) (luma 0.1558), border Color(0.30, 0.36, 0.44),
-     tag "等待中" on every visible button -> state_luma / state_tag_text observables
-  playtest skill_bar_waiting_state (re-pinned) + vision gate Q3 (per-scenario ≤ 5/19)
+        MENU ──新的冒险──▶ CHARACTER_CREATION ──confirm (creation_entry=="MENU")──▶ TUTORIAL ──tutorial done──▶ BATTLE
+         │                      │                                                        ▲                        │
+         │ 设置                (creation_entry=="TRANSITION", legacy/test-only)            │ LOST → retry        │ WON
+         ▼                      ▼                                                        └─── request_retry     ▼
+      SETTINGS ──返回──▶ MENU  SECT_SELECTION ◀──TRANSITION (last page, creation_done==true)              TRANSITION (2× ui_accept;
+         │                            │                                                                      last page branches on
+         ▼                            ▼                                                                      GameManager.creation_done)
+      (quit)                      CULTIVATION ──▶ MAP ──▶ ENDING
+         ▲                            │ save/load (STABLE_STATES)
+      MENU ──读取存档──▶ load_slot(1) ok & segment ∈ STABLE_STATES → direct state set (bypasses SEGMENT_PREDECESSORS)
 
-DOT FIXTURE (goal 2):
-  debug_poison_player input action -> GameManager._process -> 
-     CombatManager.debug_poison_player() -> apply_dot(player, 8, 2, 1.3)
-     (the REAL pipeline; stored tick round(8*1.3)=10, 2 rounds)
-  tick at victim's own turn start via begin_turn -> _tick_statuses (unchanged)
+Legacy boot flow (27 scenarios, byte-identical): TUTORIAL → BATTLE → WON → TRANSITION →(creation_done=false)→
+CHARACTER_CREATION → SECT_SELECTION → CULTIVATION → MAP → ENDING.
 ```
 
-## 3. Design decisions (rationale for downstream steps)
+**Boot-claim protocol** (the one ordering-sensitive piece): autoload `_ready` runs before the main scene enters the tree; the main scene's `_ready` runs before the first process frame; `SceneManager._ready()` resumes on `await get_tree().process_frame` after that. Therefore the MenuPanel's `_ready` (which claims the boot) always lands before SceneManager's deferred default swap. SceneManager's `_ready` becomes `if current_scene == "none": swap_to("battlefield")` — for main.tscn boots nothing changes (current_scene is "none"); for menu.tscn boots the claim suppresses the default battlefield swap.
 
-- **D1 — Death detection becomes structural.** Reference equality (`get_instance_id()`), already implemented as `_is_player()`, is the standard robust node-classification pattern in Godot and the engine already trusts it everywhere else (turn routing, `_begin_round`). Keeping a parallel name-check in one spot is exactly the drift the round theme is about. One-function change closes the whole misclassification class for tutorial ("Yang Guo"/"Player"), encounter ("ProgressionHero"), and sparring ("Sparring_Partner") nodes at once.
-- **D2 — The battle-over invariant becomes a seam, not a call sprinkled around.** `_check_battle_over()` at the two turn-transition chokepoints (`_begin_round`, `end_current_turn`) makes "player at 0 HP while BATTLE ⇒ LOST" structural. Rationale for the belt *despite* `apply_damage` already calling `end_battle`: (a) the only unverified HP-zero path (hazard-zone damage site, PROBE #3 in SOTA) is automatically covered; (b) the seam is idempotent and costs nothing on healthy battles; (c) it protects against future damage paths forgetting the loss half — the historical failure was precisely an asymmetric seam (win half exists, loss half implicit).
-- **D3 — DoT verdict is branch (b), scenario premise.** Code evidence: poison skills exist and are adjacency-gated; in the 26-point scan West Poison never reached adjacency; the AI's decision order is correct (basic attack, not poison, fires at dist ≤ 1 only after the two poison skills were already checked and not ready). No AI change. The scenario becomes fixture-driven per `design/30_presentation.md`'s pyramid rule ("DEBUG 接口要把状态置成 X"): the first asserted behavior is **poison IS applied**, then timing (victim's own turn start, after cooldown decrement, before regen — `design/10_systems.md` §5.2 order) and duration (2 ticks, then expiry).
-- **D4 — Save/load: test-side hardening before any write-side change.** `save_slot()` is a guarded atomic 5-step write and `snapshot_*`/`loaded_*` are captured all-or-nothing on success — the most probable cause of 9/13 is scenario drift (menu navigation or `save_refused` from the pending-swap/stable-state guards), not a broken write path. The guards make failure *visible at the right frame* instead of vacuous-green or late-red. `save_manager.gd` is only touched if the probe proves a write-side bug.
-- **D5 — Waiting contrast via dimming + text, not just luma.** Luminance alone cannot separate 5 states (the ready↔hp_gated gap is only 0.1854; the old waiting luma 0.26596 sat 0.12 from ready — below the vision model's threshold). The new palette moves waiting to luma ≈ 0.1558 (Δ ≈ 0.23 vs ready) and — decisively — adds a `等待中` tag on **all 8 buttons** during enemy turns, the same mechanism 锁定/气血 already use. Text appearing on every button is the strongest possible cross-frame signal for the vision model.
-- **D6 — Goal 5 re-evaluation has exactly two exits.** After goal 1 lands, either (i) a correct gather+AoE script wins in 8–12 rounds at 15–40% HP → pin the existing asserts; or (ii) it does not → **explicit design-change declaration** (new `20_content.md` values + `99_changelog.md` row), never silent tuning, never softening `current_state == "WON"`.
+## 4. State machine (GameManager, extended in place)
 
-## 4. Design-change declarations (for `5_design`)
+New states (NOT in `SEGMENT_STATES`, NOT in `SEGMENT_PREDECESSORS`, never saveable):
 
-No conflict with the `design/` record for goals 1–4: they are bug fixes and test hardening fully consistent with the record (which itself documents the stuck battle, the non-existent poison frames, and the pairwise-distinctness requirement). The only *potential* record change is **conditional**:
+- `STATE_MENU = "MENU"`, `STATE_SETTINGS = "SETTINGS"`.
 
-> **Conditional declaration (goal 5):** if, after goal 1 lands, a correct gather+AoE play of the tutorial battle (per `design/10_systems.md` §5.4–5.5 and `20_content.md` roster) still loses, this run changes the balance numbers in `design/20_content.md` §1/§2 — the specific old→new values are determined by the goal-5 probe and listed in the PM task card as an explicit 设计变更 with: what changed, why, which playtest scenarios are impacted (only `terminal_victory_8_12_rounds_hp_15_40`). `5_design` then edits `20_content.md` and appends one row to `99_changelog.md`. If a correct play wins, **no design change is made** and the record's balance section is untouched. The `current_state == "WON"` assertion and the 8–12 round / 15–40% HP band are **never** softened in either exit.
+Routing flags (boot defaults preserve the legacy path exactly):
+
+- `creation_entry: String = "TRANSITION"` — the discriminator for creation confirm. Set to `"MENU"` by `menu_new_adventure()`; stays `"TRANSITION"` in the legacy flow (boot default). Reset in `restart_game()`.
+- `creation_done: bool = false` — set true when creation confirms via the MENU entry; read by the TRANSITION screen's last-page advance: `creation_done ? SECT_SELECTION : CHARACTER_CREATION`. Reset in `restart_game()`. Boot-default false pins the 27 scenarios' `TRANSITION → CHARACTER_CREATION` route.
+
+New methods (each guarded to its legal state; all mirror the existing "set state + emit `state_changed`" shape — none of them goes through `enter_segment`, so `SEGMENT_PREDECESSORS` is never consulted for menu routes):
+
+| Method | Guard | Effect |
+|---|---|---|
+| `enter_menu()` | none (idempotent) | `current_state = MENU` + emit. Used by MenuPanel boot claim. |
+| `menu_new_adventure() -> bool` | `current_state == MENU` | `creation_entry = "MENU"`; state → CHARACTER_CREATION + emit. |
+| `menu_open_settings() -> bool` | `current_state == MENU` | state → SETTINGS + emit. |
+| `menu_close_settings() -> bool` | `current_state == SETTINGS` | state → MENU + emit. |
+| `menu_load_game() -> bool` | `current_state == MENU` | `SaveManager.load_slot(1)`; if ok **and** `SaveManager.segment ∈ STABLE_STATES`: `clear_battle()`; `current_state = SaveManager.segment`; emit. Else return false (menu shows the Chinese failure hint; entry stays enabled for retry). |
+| `menu_quit()` | — | `get_tree().quit()`. |
+| `finish_creation()` | called from creation CONFIRM | `creation_entry == "MENU"` → `creation_done = true`; state → TUTORIAL + emit (SceneManager swaps to battlefield; `battlefield.gd`'s `_ready` defers `TutorialManager.start()`, which drives TUTORIAL→BATTLE). Else → `enter_segment("SECT_SELECTION")` — **byte-identical legacy call**. |
+
+Changed table: `SEGMENT_PREDECESSORS["SECT_SELECTION"]` becomes `[STATE_CHARACTER_CREATION, STATE_TRANSITION]` (additive — the legacy `CHARACTER_CREATION → SECT_SELECTION` edge is untouched). `restart_game()` additionally resets `creation_entry` / `creation_done`. `_unhandled_input` (WON/LOST) unchanged.
+
+`TUTORIAL` is deliberately not a segment state — the new flow reaches it by direct state set (same shape as `WON`/`LOST` routing), and the tutorial's own completion protocol (`TutorialManager._finish_tutorial() → GameManager.start_battle()`) is reused untouched.
 
 ## 5. Component specifications
 
-### C0 — Death-path observables (CombatManager)
+### C1 — MenuShell: `scenes/menu.tscn` (NEW)
+- Root `Main` (Node2D) with **exactly the same host paths as main.tscn**: `Camera`, `SceneHost`, `SegmentLayer/SegmentHost` (full-rect Control in CanvasLayer), `HUDLayer` + HUD instance, `TutorialLayer` + TutorialOverlay instance — or `SceneManager._find_host()` fails with `host_missing`.
+- Plus one authored instance of `scenes/ui/menu_panel.tscn` under `SegmentHost`.
+- No root script: the boot-claim lives in MenuPanel (`_ready`), which is guaranteed to run before SceneManager's post-frame resume.
+- **Known hazard (documented, accepted):** the shell node block is duplicated from main.tscn. main.tscn cannot be refactored into a shared base this run (byte-identity constraint), so any future shell change must touch both files.
 
-- **File:** `scripts/autoload/combat_manager.gd`.
-- **Responsibility:** make the death classification observable so the regression scenario can assert *why* the battle ended, not just that it ended.
-- **Interface (new surface vars, safe defaults):**
-  ```gdscript
-  var debug_death_target_name: String = ""   # node .name of the last _handle_death target
-  var debug_death_classified_player: bool = false  # what the classifier decided
+### C2 — MenuPanel: `scripts/ui/menu_panel.gd` + `scenes/ui/menu_panel.tscn` (NEW)
+- **Responsibility:** the four-entry menu; single activation path for mouse and keyboard; boot claim; load-availability surface.
+- **Structure:** `Panel`/`ColorRect` backdrop (color-block style, existing `global_theme.tres` font — no new assets), `VBoxContainer` with `Button` nodes `MenuEntry0..3` (texts 新的冒险 / 读取存档 / 设置 / 退出), a `Label` hint. All buttons `focus_mode = FOCUS_NONE` — **deliberate**: keyboard `ui_accept` is handled only by the panel's `_unhandled_input`, so no button-native press can double-activate and no focus fights the global WON/LOST listeners.
+- **Surface vars:** `focused_entry: int = 0`, `hint_text: String = ""`, `load_available: bool`.
+- **Interface (script API):**
+  - `_ready()`: (1) hide `/root/Main/HUDLayer` (the swap protocol only toggles HUD when a swap runs; boot shows none); (2) `SceneManager.claim_boot(self, "menu")`; (3) `GameManager.enter_menu()` (its emit reaches SceneManager, whose `swap_to("menu")` no-ops because the claim already set `current_scene`); (4) `_refresh_load_availability()` + `_render()`.
+  - `_unhandled_input(event)` — active only when `GameManager.current_state == "MENU"`: `move_up`/`move_down` cycle `focused_entry` (mod 4), `ui_accept` → `_activate_entry(focused_entry)`; each handled event calls `set_input_as_handled()`.
+  - `_process(_delta)` — harness-only: `debug_click_menu_entry` → `_activate_entry(focused_entry)` (the **same function** the `Button.pressed` signals call); `debug_seed_save`/`debug_delete_save` → `_refresh_load_availability()`.
+  - `_activate_entry(i)` — 0 → `GameManager.menu_new_adventure()`; 1 → `if not GameManager.menu_load_game(): hint_text = _failure_hint(); _render()`; 2 → `GameManager.menu_open_settings()`; 3 → `GameManager.menu_quit()`. Button `pressed` → `_activate_entry(0..3)`.
+  - `_failure_hint()` — maps `SaveManager.last_error`: `no_save` → 没有找到存档; `bad_json`/`bad_schema`/`bad_version` → 存档已损坏，无法读取; else 读取失败.
+- **Load availability rule (hard):** `load_available = SaveManager.has_save_file(1)` (autosave slot) — **file existence, never `SaveManager.has_save`**, which is session-memory (set only by a successful `save_slot` this session). `MenuEntry1.disabled = not load_available`; hint shows 没有找到存档 when unavailable. A failed load keeps the entry enabled (retry) and shows the failure hint.
+
+### C3 — SceneManager boot-claim + menu/settings entries (`scripts/autoload/scene_manager.gd`, MODIFIED)
+- `SCENE_MAP` += `"MENU": "menu"`, `"SETTINGS": "settings"`; `SCENE_PATHS` += `"menu": "res://scenes/ui/menu_panel.tscn"`, `"settings": "res://scenes/ui/settings_panel.tscn"` (preloaded at startup like all others).
+- New `claim_boot(node: Node, scene_key: String) -> void`: no-op unless `current_scene == "none" and _current_node == null`; sets `_current_node = node; current_scene = scene_key; last_error = ""`. The claimed node is freed by the normal `_do_swap` teardown on swap-away — the authored panel behaves exactly like a hosted scene.
+- `_ready()` tail becomes:
   ```
-  Written at the top of `_handle_death()` on every call (after the `is_instance_valid` guard). Zero behavior impact.
-
-### C1 — Structural death handling + battle-over invariant (goal 1)
-
-- **File:** `scripts/autoload/combat_manager.gd`.
-- **Change A — classify structurally.** In `_handle_death()` (line ~1453), replace the name-based block with:
-  ```gdscript
-  var is_player: bool = target.has_method("is_player") or _is_player(target)
+  await get_tree().process_frame
+  _find_host()
+  if current_scene == "none":
+      swap_to("battlefield")
   ```
-  (`_is_player` already does instance-id equality with name fallback when `get_player()` is null; the `has_method` OR keeps the belt for any node with the Player script.) Then write the C0 observables and keep the existing player/enemy branches byte-identical.
-- **Change B — invariant seam.** Add:
-  ```gdscript
-  ## Battle-over invariant: while a battle is live, a player at 0 HP MUST be a
-  ## LOST state. Idempotent (end_battle no-ops once WON/LOST). Called from the
-  ## two turn-transition chokepoints so ANY future HP-zero path (hazard zones,
-  ## new damage sources) still ends the battle.
-  func _check_battle_over() -> void:
-      var state: String = GameManager.get_state()
-      if state == "WON" or state == "LOST":
-          return
-      var player: Node = GameManager.get_player()
-      if player != null and is_instance_valid(player) \
-              and "health" in player and int(player.health) <= 0:
-          GameManager.end_battle(false)
+  main.tscn boots: `current_scene == "none"` → default swap fires, byte-identical. menu.tscn boots: claim already set `current_scene = "menu"` → skip. Direct segment boots (e.g. creation.tscn): no `/root/Main` → `host_missing`, scene left alone — exactly today's behavior.
+- Everything else (`_do_swap`, `pending_swap`, `_teardown_battle_refs`, HUD toggle `next_is_battle`) unchanged.
+
+### C4 — Creation reorder + mouse UI (`scripts/segments/creation.gd` + `scenes/segments/creation.tscn`, MODIFIED)
+- **Routing branch:** CONFIRM (`_on_accept`, after `confirmed = true; SaveManager.new_profile(attrs, trait_ids)`) now calls `GameManager.finish_creation()` instead of `GameManager.enter_segment("SECT_SELECTION")` directly. `finish_creation()` reproduces the legacy call byte-for-byte when `creation_entry != "MENU"` (boot default), so the 11/11 `creation_budget_clamp_and_traits` scenario and `spine_to_ending` see identical behavior.
+- **Mouse UI (hybrid, single source of truth):** the existing keyboard handlers (`_on_move_left` / `_on_move_right` / `_on_accept` / `_toggle_trait`, plus `attr_index`/`trait_index`) stay exactly as-is. Add per-phase button groups to `creation.tscn`:
+  - ATTRS: `AttrRow0..4`, each an HBox with `Label` (attr name+value, rendered by `_render`'s existing text model or a row label) + `Button` `AttrMinus0..4` / `AttrPlus0..4` → `_focus_attr(i); _on_move_left()` / `_on_move_right()` (`.tscn` connection with `binds=[i]`).
+  - TRAITS: `TraitToggle0..12` → `trait_index = i; _toggle_trait(i); _render()`.
+  - CONFIRM: `ConfirmButton` → `_on_accept()`; `BackButton` → phase back (`_on_move_left()` semantics).
+  - `_render()` toggles which group is visible per phase. Keyboard text menu (`BodyLabel`) unchanged.
+- New script methods: `_focus_attr(i)`, `_on_attr_minus_pressed(i)`, `_on_attr_plus_pressed(i)`, `_on_trait_toggle_pressed(i)` — one-line callables into the existing private handlers (the pressed→handler link is engine-guaranteed; the handlers themselves are what the keyboard scenario already pins).
+- `_process`: harness-only `debug_click_creation_widget` → `_on_attr_plus_pressed(attr_index)` (the exact bound callable of the focused row's + button) — proves convergence without a mouse-synthesis harness extension.
+- Clamps (`ATTR_MIN/ATTR_MAX`, tiered pricing) unchanged; `confirmed` guard unchanged; `points_left` semantics unchanged.
+
+### C5 — Transition branch (`scripts/segments/transition.gd`, MODIFIED)
+- Only the last-page routing line changes: `GameManager.enter_segment("SECT_SELECTION" if GameManager.creation_done else "CHARACTER_CREATION")`.
+- Page count (2), advance cadence (1 × `ui_accept` per page), `lines_shown`/`done` surface semantics, and every absolute frame in `spine_to_ending` are untouched. `creation_done` defaults false → legacy route byte-identical. The 穿越 narrative content stays as-is this run (content change is not in scope; if a future run adds lines they must fit the existing 2-advance cadence or be deferred — recorded for the PM).
+
+### C6 — SaveManager: flag flip + instrumentation + hardening (`scripts/autoload/save_manager.gd`, MODIFIED)
+- **`tutorial_done` flip (D3):** `new_profile()` sets `profile.flags["tutorial_done"] = false` (comment updated); `restart_game()`'s redundant explicit reset stays (harmless) with its comment corrected. `TutorialManager._finish_tutorial()` sets it `true` (C7-adjacent, in `tutorial_manager.gd`) — no scenario asserts this flag, so zero observable impact on the 27.
+- **Instrumentation (mandatory BEFORE any root-cause claim — the brief's 先取值再动手):** new surface vars `last_io_error_code: int = 0`, `last_io_error_text: String = ""`, `debug_user_dir_path: String = OS.get_user_data_dir()`, `debug_user_dir_exists: bool = false`. A private `_record_io_error()` captures `FileAccess.get_open_error()` → `error_string()` (or `DirAccess.get_open_error()` at the two dir-op sites) and sets `last_error = "io_error"`. All six sites call it: empty-JSON guard, `FileAccess.open(tmp, WRITE) == null`, step-2 `_apply_save_dict` fail, `copy_absolute` fail, `rename_absolute` fail, step-5 re-validate fail.
+- **User-dir self-heal:** public `ensure_user_dir() -> bool` — `DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://"))`, then records `debug_user_dir_exists`. Called in `_ready()` and at the top of `save_slot()` (and by SettingsManager before its ConfigFile save). Kills the top IO failure candidate (missing `user://` root → `FileAccess.open` WRITE returns null) unconditionally and safely.
+- **Step-5 leftover-file hole (rollback completion):** on step-5 re-validate failure, `_restore_bak` currently no-ops when no `.bak` exists, leaving the invalid `real` file behind (→ later `bad_schema`/`bad_json` on load). Fix:
   ```
-  Call sites: first statement of `_begin_round()` (after the re-entry guard at line 409) and at the end of `end_current_turn()` before `_next_turn()` (line 617). **Do NOT** touch the empty-round-order branch (line 448–465) — `empty_round_stalls == 0` must stay exactly as protected.
-- **Explicitly unchanged:** `apply_damage` pipeline order, `_next_turn` WON/LOST guards, `end_battle` idempotency, `_begin_round`'s dead-unit filter.
-- **Acceptance:** `tutorial_loss_restarts_tutorial` stays 5/5; `trait_combat_effects_and_twelve_slots` stays 22/22 (its 铁布衫 survive-at-1 asserts must be unaffected — the fatal guards still fire *before* death handling); `empty_round_stalls == 0`; the new C2 scenario is green.
-
-### C2 — Regression scenario `player_death_ends_battle` (goal 1)
-
-- **File (new):** `playtest/player_death_ends_battle.yaml`.
-- **Responsibility:** the permanent regression test for the round's central invariant — from the frame the player reaches 0 HP, `current_state == "LOST"` with the 战败 overlay, forever; no silently continuing BATTLE, no empty-round stalls. This is also **PROBE #1** made permanent.
-- **Skeleton:** replay the losing line of `terminal_victory_8_12_rounds_hp_15_40` — identical tutorial preamble (7× `ui_accept` at f3..15), `move_up ×3`, `skill_1`, `attack_confirm`, `end_turn` (f46..121), then `skill_4` / `attack_confirm` / `end_turn` at f620..650, then **no further input** (the player's turn is event-driven; the round-10 enemy phase kills the passive player). Sample the death window:
-  ```yaml
-  name: player_death_ends_battle
-  description: 'Regression for the round invariant "the battle must be able to end": replays the losing line of terminal_victory (preamble + scripted passivity), and asserts that once the player reaches 0 HP the state is LOST with the 战败 overlay at every post-death sample — never a silently continuing BATTLE, empty_round_stalls stays 0.'
-  timeline:
-  - at: 3
-    actions: [ui_accept]
-  # ... 7x ui_accept at f3..15, move_up x3 / skill_1 / attack_confirm / end_turn
-  #     at f30..121, skill_4 / attack_confirm / end_turn at f620..650
-  #     (copy byte-identical from terminal_victory_8_12_rounds_hp_15_40.yaml)
-  - at: <PM: pinned first post-death sample — implementer probes the exact frame where health hits 0, then samples every ~40 frames>
-    actions: []
-    assert:
-      Player.health: health == 0
-      GameManager.current_state: current_state == "LOST"
-      GameManager.end_overlay_text: end_overlay_text.contains("战败") == true
-      CombatManager.empty_round_stalls: empty_round_stalls == 0
-      CombatManager.debug_death_classified_player: debug_death_classified_player == true
-      CombatManager.debug_death_target_name: debug_death_target_name == <PM: pinned player node name>
-  # ... 2-3 more identical samples spaced ~80 frames apart, last assert <= 2999
+  if not _apply_save_dict(_read_json(real)):
+      if FileAccess.file_exists(bak):
+          _restore_bak(bak, real)
+      else:
+          _remove_file(real)
+      last_error = "io_error"
+      return false
   ```
-- **Probe procedure for the implementer (scratch run, not committed):** create a temporary yaml with sample entries at f740..f1100 every 40 frames asserting `GameManager.current_state: current_state == "BATTLE" or current_state == "LOST"` and read the actual values from the playtest report to find the death frame; then pin the committed scenario's frames and the `debug_death_target_name` value (expect `"Player"` — the tutorial node name — but pin what the probe shows).
-- **Acceptance:** scenario green; `tutorial_loss_restarts_tutorial` 5/5 (both loss routes now structurally identical).
+  Invariant after the fix: a failed save never leaves a promoted-but-invalid `real` file. (The `month == 4` staleness is a separate scene-refresh issue — C8.)
+- **`loaded` signal + file-existence helper:**
+  - `signal loaded(slot: int)` — emitted on `load_slot()` success (before `return true`).
+  - `func has_save_file(s: int) -> bool` — `s in 1..3 and FileAccess.file_exists("user://save_%d.json" % s)`.
+- `has_save` semantics **unchanged** (session-memory; the playtest surface contract keeps it). Splitmix64 constants untouched (never touch the IO path — do not attribute IO failures to them without evidence).
 
-### C3 — DoT fixture + `debug_poison_player` (goal 2, branch b)
+### C7 — Load entry + load refresh
+- **GameManager load entry** (C0 above, `menu_load_game()`): `load_slot(1)` → validate `SaveManager.segment ∈ STABLE_STATES` (hostile-save hardening; a file claiming `segment: "MENU"` is refused as `bad_schema`) → `clear_battle()` → direct state set + emit, **bypassing `SEGMENT_PREDECESSORS`** (loading from the menu into CULTIVATION/MAP is not a predecessor-legal edge and must not be gated by that map).
+- **CultivationScreen refresh** (`scripts/segments/cultivation.gd`, MODIFIED): `_ready()` connects `SaveManager.loaded` → `_on_loaded()` which runs `_sync_surface(); _render()`. `_sync_surface()` already reads `year`/`month` from the restored `SaveManager.profile.cultivation` (verified line 636-638), so the observed `month == 4` staleness (load-while-cultivation-is-already-hosted → `swap_to` no-ops → stale counters) disappears: the restored month replaces the stale one. Fresh-instance loads (from the menu) already re-sync in `_ready()` — the signal covers only the same-scene case, which is exactly the `save_load_roundtrip` red.
+- **Save-while-pending discipline:** unchanged — `save_slot` still refuses while `SceneManager.pending_swap` (the existing scenarios already respect the spacing; new scenarios inherit the same spacing discipline).
 
-- **Files:** `project.godot` (new input action), `scripts/autoload/game_manager.gd` (wire the action), `scripts/autoload/combat_manager.gd` (the hook), `playtest/dot_resolves_at_victim_turn_start.yaml` (rewrite).
-- **Hook** (mirrors the AI's Spirit Serpent values through the REAL pipeline, per `20_content.md` §2.2: 中毒 8/轮 × 2, fhd 1.3 → stored tick `round(8*1.3) = 10`):
-  ```gdscript
-  ## DEBUG hook (unbound harness action): apply Spirit Serpent poison to the
-  ## player THROUGH THE NORMAL apply_dot pipeline (stored tick round(8*1.3)=10,
-  ## 2 rounds). No-op when no battle is running. Fixture for the DoT scenario.
-  func debug_poison_player() -> void:
-      if not _battle_active():
-          return
-      var player: Node = GameManager.get_player()
-      if player == null or not is_instance_valid(player):
-          return
-      apply_dot(player, 8, 2, DEFAULT_FA_HUI_DU)
-  ```
-- **Wiring:** `project.godot` `[input]`:
-  ```
-  debug_poison_player={
-  "deadzone": 0.5,
-  "events": []
-  }
-  ```
-  `game_manager.gd` `_process` (next to the other debug branches):
-  ```gdscript
-  if Input.is_action_just_pressed("debug_poison_player"):
-      CombatManager.debug_poison_player()
-  ```
-- **Scenario rewrite** (the brief's branch (b): the first asserted behavior is *poison IS applied*; tick timing and expiry follow; all exact frames/HP pinned by the PM from a probe run):
-  ```yaml
-  name: dot_resolves_at_victim_turn_start
-  description: 'Fixture-driven DoT contract: debug_poison_player applies Spirit Serpent poison (stored tick round(8*1.3)=10, 2 rounds) on the player''s turn; the first asserted behavior is that poison IS applied. The tick then resolves at the VICTIM''s own turn start (after cooldown decrement, before 神雕之力 regen +26 — design/10_systems.md §5.2) and expires after the second tick.'
-  timeline:
-  - at: 3
-    actions: [ui_accept]
-  # ... 7x ui_accept at f3..15 (tutorial preamble, byte-identical)
-  - at: 20
-    actions: [debug_poison_player]
-  - at: 40
-    actions: []
-    assert:
-      Player.status_names: status_names.has("poison") == true
-  - at: 60
-    actions: [end_turn]
-  - at: <PM: first player-turn frame after the round-1 enemy phase, pinned from probe>
-    actions: []
-    assert:
-      CombatManager.phase: phase == "PLAYER_TURN"
-      Player.status_names: status_names.has("poison") == true
-      Player.health: health == <PM: pinned value>
-  - at: <PM: +20 frames>
-    actions: [end_turn]
-  - at: <PM: second player-turn frame, pinned from probe>
-    actions: []
-    assert:
-      Player.status_names: status_names.has("poison") == false
-      Player.health: health == <PM: pinned value>
-  ```
-- **Semantics the pins must respect:** tick #1 at the victim's first turn start (−10, rounds 2→1, poison still present), tick #2 at the second (−10, rounds 1→0, removed). Regeneration +26 fires *after* the tick; enemy damage between the turns is deterministic (zero-RNG engine, fixed script) so the HP pins are exact. The player survives (500 HP, only one enemy phase per tick).
-- **Explicitly unchanged:** `ai_west_poison.gd`, `_tick_statuses`, `apply_dot` semantics (tick captured at application; `source = null` so no reflect/lifesteal off poison).
-- **Acceptance:** scenario green with a real poison lifecycle; no AI file touched.
+### C8 — Settings: `scripts/autoload/settings_manager.gd` (NEW) + `scripts/ui/settings_panel.gd` + `scenes/ui/settings_panel.tscn` (NEW)
+- **SettingsManager (autoload, inserted after AudioManager and before SceneManager — SceneManager must stay the LAST entry, its header comment says why):**
+  - Persistence: `user://settings.cfg` via `ConfigFile`; fields `sfx_volume_db` (default 0.0), `music_volume_db` (default −10.0, matching AudioManager's current constant), `fullscreen` (default false).
+  - API: `set_sfx_volume_db(v)`, `set_music_volume_db(v)` (clamped to `[-40.0, +6.0]`), `set_fullscreen(b)`, `reset_to_defaults()`. Each setter applies + persists.
+  - `_apply()`: `AudioManager.set_sfx_volume_db(...)` / `set_music_volume_db(...)`; fullscreen applied only when `DisplayServer.get_name() != "headless"` (`get_window().mode = Window.MODE_FULLSCREEN/WINDOWED`) — a platform-API guard, **not** a behavior branch of main.tscn (the veto covers only the menu-vs-tutorial decision; volume is pure data and safe headless).
+  - `_ready()`: `_load()` then `_apply()` (runs after AudioManager's `_ready`, so the players exist).
+  - `_process()`: harness-only `debug_reset_settings` → `reset_to_defaults()` (deterministic starting point for the scenario, since `settings.cfg` persists across processes on the same user dir).
+- **AudioManager additions** (`scripts/autoload/audio_manager.gd`, MODIFIED): mirror surface vars `sfx_volume_db: float = 0.0` / `music_volume_db: float = -10.0` and setters that assign to the mirror **and** the players' `volume_db` (null-guarded). No bus layout is introduced — the repo owns exactly two players (SFXPlayer 0 dB, MusicPlayer −10 dB); bus-based mixing is only worth it when ducking/mixing exists.
+- **SettingsPanel:** keyboard + mouse hybrid, same pattern as the menu. Rows: 音效音量 / 音乐音量 / 全屏 / 返回. `move_up/down` cycle `focus_index` (0..3); `move_left/right`: vol rows ±3 dB (clamped by SettingsManager), 全屏 toggles; `ui_accept`: 返回 → `GameManager.menu_close_settings()`; Buttons (`Button0..3`, `FOCUS_NONE`-free focus handled by the panel) mirror the same handlers. Guarded to `current_state == "SETTINGS"`. Surface: `SettingsPanel: [visible, focus_index]`; values asserted on `SettingsManager`/`AudioManager`.
+- **Playtest asserts persisted intent, not window state:** volume asserts read `SettingsManager.*` and `AudioManager.*`; fullscreen asserts read `SettingsManager.fullscreen` only (headless has no window).
 
-### C4 — Non-vacuous save/load asserts (goal 3)
+### C9 — `project.godot` (MODIFIED)
+- `run/main_scene` → `"res://scenes/menu.tscn"`.
+- `[autoload]` += `SettingsManager="*res://scripts/autoload/settings_manager.gd"` inserted **before** SceneManager (SceneManager remains last).
+- `[input]` += five unbound harness-only actions (empty event lists, the repo's established DEBUG pattern): `debug_click_menu_entry`, `debug_click_creation_widget`, `debug_seed_save`, `debug_delete_save`, `debug_reset_settings`. Every one of them drives the same code path the corresponding mouse/kb action drives, or seeds/deletes test fixtures — none branches game behavior.
 
-- **File:** `playtest/save_load_roundtrip.yaml` (asserts only; timeline unchanged unless the probe proves navigation drift).
-- **Change — frame 310 (save must have REALLY succeeded):** add
-  ```yaml
-      SaveManager.snapshot_profile_json: snapshot_profile_json != ""
-  ```
-  keeping `has_save == true` and `last_error == ""`.
-- **Change — frame 490 (deep equality, vacuous pass impossible):**
-  ```yaml
-      SaveManager.loaded_profile_json: snapshot_profile_json != "" and loaded_profile_json == snapshot_profile_json
-      SaveManager.loaded_rng_state: snapshot_profile_json != "" and loaded_rng_state == snapshot_rng_state
-      SaveManager.loaded_decks_string: snapshot_profile_json != "" and loaded_decks_string == snapshot_decks_string
-  ```
-  (The profile-snapshot guard is the sound non-vacuity witness for all three: `snapshot_*`/`loaded_*` are captured all-or-nothing on success only. `loaded_profile_json != ""` is folded into the equality side by the guard.)
-- **Probe (PROBE #5) + decision tree** — implementer records at f310/f490: `has_save`, `last_error`, `snapshot_profile_json == ""`?, `CultivationScreen.month/year`, `SceneManager.pending_swap`:
-  - `has_save == false` or `last_error != ""` → record the **concrete** string. `"save_refused"` ⇒ the menu's save press landed while the stable-state/pending-swap guard refused it (navigation drift) ⇒ **re-baseline the scenario's menu navigation** from a probe (fix the yaml input sequence; `save_manager.gd` untouched). `"io_error"` / `"no_save"` ⇒ write-side bug ⇒ fix `save_manager.gd` (implementation-side, per SOTA).
-  - `has_save == true` but `month != 3` ⇒ the month-advance pins drifted ⇒ re-pin from the probe.
-- **Explicitly frozen:** splitmix64 constants (`save_manager.gd:65-67`) — known to be wrong (int64 overflow, errors every call) but changing them silently changes the RNG stream; out of scope this round, documented for a future run.
-- **Acceptance:** `save_load_roundtrip` 13/13, with the three equality asserts non-vacuously true.
+### C10 — DEBUG save fixture (`scripts/autoload/game_manager.gd`, MODIFIED)
+- `_process()` additions (harness-only):
+  - `debug_seed_save`: no-op unless state is MENU/SETTINGS; `var prev = current_state; current_state = STATE_CULTIVATION; SaveManager.autosave(); current_state = prev` — **no `state_changed` emission** (no swap triggered). Runs through `save_slot`'s real atomic pipeline (the repo rule "injection walks the normal pipeline").
+  - `debug_delete_save`: `SaveManager.delete_slot(1)` (existing public API) — makes the "no save → entry disabled" assertions deterministic against a dirty user dir from earlier runs.
 
-### C5 — Waiting-state contrast (goal 4)
+### C11 — Documentation & delivery notes (`README.md`, MODIFIED)
+- Menu entry/keys (arrows + Enter, mouse), 读取存档 behavior + failure hints, settings (volume/fullscreen), updated boot description, new debug actions, and the **explicit debt record** (see §9).
 
-- **Files:** `scripts/ui/skill_button.gd` (palette + doc comments), `playtest/skill_bar_waiting_state.yaml` (re-pin), `tests/test_skill_button_states.gd` (if it pins the old waiting palette — verify during implementation), `README.md` (luma reference).
-- **Change — `state_palette("waiting")` entry becomes:**
-  ```gdscript
-  "waiting":
-      # "It is not your turn": dark desaturated cool blue-gray PLUS the 等待中
-      # tag on every button (same mechanism as 锁定/气血). bg luma:
-      # 0.2126*0.12 + 0.7152*0.16 + 0.0722*0.22 = 0.155828 (raw BT.709,
-      # Color.get_luminance()). Δ vs ready 0.3874 ≈ 0.23 (was 0.12 — the
-      # vision model could not see the old subtle dim); text appearance is the
-      # primary cross-frame signal.
-      return {
-          "bg_color": Color(0.12, 0.16, 0.22),
-          "border_color": Color(0.30, 0.36, 0.44),
-          "border_width": 1,
-          "tag_text": "等待中",
-      }
-  ```
-  Update the three doc-comment blocks that pin the old numbers (the state table at ~line 210, the `state_luma` var comment at ~line 64, the `state_luma_value` comment at ~line 277).
-- **Pairwise distinctness check (all five states, `design/30_presentation.md` item 2):** ready 0.3874 no tag · cooldown 0.0814 + number · phase_locked 0.5306 + 锁定 · hp_gated 0.2020 red + 气血 · waiting 0.1558 + 等待中. Waiting separates from cooldown/hp_gated by tag/text and hue (dark blue-gray vs near-black+number vs dark red), from ready by Δ0.23 luma + tag, from phase_locked by Δ0.37 luma + different text. The four player-turn palettes are **untouched** — their luma pins in `skill_button_visual_states.yaml` stay green.
-- **Re-pin `playtest/skill_bar_waiting_state.yaml` frame 210:**
-  ```yaml
-      SkillButton1.state_luma: state_luma >= 0.14 and state_luma <= 0.17
-      SkillButton1.state_tag_text: state_tag_text == "等待中"
-  ```
-  (`state_text == "waiting"` / `state_text == "ready"` asserts stay byte-identical.)
-- **Sampling enrichment (editable scenarios only):** ensure the vision gate captures ≥ 1 enemy-turn frame per scenario it can: `dot_resolves_at_victim_turn_start` and `terminal_victory_8_12_rounds_hp_15_40` (rewrites) and `player_death_ends_battle` (new) each include enemy-turn `actions: []` entries; `skill_bar_waiting_state` already captures f210. **Protected scenarios are not edited** — their Q3 votes come from whatever frames the gate already captures, and the dramatic waiting change makes any captured enemy-turn frame vote YES.
-- **Acceptance:** `skill_bar_waiting_state` green (7/7 with re-pinned values); `skill_button_visual_states` green; `vision_report.json` Q3 per-scenario bad votes ≤ 5 of 19 battle scenarios (per-scenario counts are authoritative — the gate aggregate is not).
+## 6. Data flow — save/load chain (post-repair)
 
-### C6 — Terminal victory re-evaluation (goal 5, **gated on C1/C2 landing**)
+```
+save (CULTIVATION menu row 存盘)                        load (menu entry 1 / cultivation 读档)
+──────────────────────────────                        ─────────────────────────────────────
+SaveManager.ensure_user_dir()                         GameManager.menu_load_game()          [from menu]
+save_slot(1): STABLE_STATES ✓, !pending_swap ✓          └─ SaveManager.load_slot(1)
+  1. JSON.stringify dict (non-empty guard)                   ├─ file exists?  no  → last_error="no_save" → menu hint
+  2. write tmp → get_open_error()/error_string() recorded    ├─ parse/schema/version validate (fresh-profile fallback, coded error)
+  3. re-read+validate tmp                                    └─ ok → _apply_save_dict (seed→rng→profile→decks→segment)
+  4. backup old real → copy_absolute (recorded on fail)          → loaded.emit(1)
+  5. remove old, rename tmp→real (recorded on fail)              → segment ∈ STABLE_STATES ✓
+  6. re-read+validate real; on fail: restore bak OR remove real      → clear_battle(); current_state=segment; state_changed →
+     (no invalid promoted file survives)                              SceneManager swap → scene _ready reads restored profile
+  → snapshots, slot=1, has_save=true, last_error=""              CultivationScreen already hosted? loaded → _sync_surface()
+                                                                  (month/year refreshed — fixes the month==4 staleness)
+```
 
-- **File:** `playtest/terminal_victory_8_12_rounds_hp_15_40.yaml` (timeline only; the four final asserts are frozen).
-- **Phase 1 (probe):** run the current script after C1. Expected: explicit **LOST at round 10** (the goal-1 fix makes the loss visible instead of a silent stuck state). Record the full losing line (player HP per round, enemy positions).
-- **Phase 2 (re-script):** replace the timeline with a correct gather+AoE play per `design/10_systems.md` §5.3–5.5. Hard requirements for the script:
-  - Only the 8 tutorial skills, respecting cooldowns and the two-phase unlock (rounds 1–3: 玄铁剑法 skills 1–4 only; round 4+: 黯然销魂掌 skills 5–8; 十七式 additionally HP < 50%).
-  - Damage math the script must exploit (all ×1.3, `round()` half-away-from-zero): 四海无量 radius-2 self **91** each (455 on a 5-man cluster — the intended clear), 力斩千钧 cross-2 **44**, 大巧不工 line-3 **49**, 徘徊空谷 landing-adjacent **26**, 重剑无锋 **59** (cd 1 filler), 十七式 adjacent **91**. Enemy HP totals 560; 中神通's 先天罡气 survives the first lethal at 1 (plan an extra hit); 南帝's 一阳续命 heals 78 once below 40% (expect it).
-  - Survival math: 神雕之力 +26/turn, melee DR −50% (remote specialists 东邪/南帝 bypass it — kill or out-range them early per the design's own articulation).
-- **Phase 3 (decision, exactly two exits):** (i) correct play wins → pin the probe's frames, the four existing asserts (`WON`, round ∈ [8,12], HP ∈ [75,200], `turns_taken` changed) go green → **no design change**; (ii) correct play cannot win in band → **trigger the §4 conditional design-change declaration** with concrete old→new values in the PM task card → `5_design` edits `design/20_content.md` + appends `99_changelog.md`.
-- **Acceptance:** scenario 6/6, or a documented design-change declaration with the scenario 6/6 after re-balance. `current_state == "WON"` never softened.
+**Mandated diagnostic sequence (PM task, before any root-cause claim):** land C6 instrumentation first, then run single-scenario `godot_playtest_scenario save_load_roundtrip` (and `cultivation_month_cycle_and_deck_bookkeeping` for its f200 probe) on the staged overlay (~50 s each), and read the observed `last_io_error_code`/`last_io_error_text`/`debug_user_dir_exists`. The C6 fixes (user-dir ensure + step-5 rollback completion) are correct regardless of the observed code and land unconditionally; the root-cause *narrative* goes into the delivery notes from the observed values, not from conjecture.
 
-### C7 — Playtest contract updates (`playtest/_common.yaml`)
+## 7. Irreversible-operation safety & rollback
 
-- **`actions`:** append `- debug_poison_player` (after `debug_enter_encounter`).
-- **`surface` `CombatManager`:** append `- debug_death_target_name` and `- debug_death_classified_player`.
-- **`scenario_order`:** insert `- player_death_ends_battle` after `terminal_victory_8_12_rounds_hp_15_40` (file basename must equal `name:`).
-- **Documentation:** `README.md` — add `debug_poison_player` to the debug-action table; update the waiting-palette luma reference (0.26596 → 0.1558 + 等待中 tag); update scenario count and the testing-section status lines for the three rewritten scenarios + the new one.
+- **Save files are the only user-state writes.** The existing protocol is already backup→execute→verify→delete shaped; this run only (a) adds a verify-then-delete completion where the rollback path had a hole (C6 step-5 fix — the *invalid* file is removed only after re-validation failed and only when no backup exists to restore), and (b) makes the user dir self-heal. No schema migration, no version bump (`SAVE_VERSION` stays 1 — the save dict shape is unchanged).
+- **`project.godot` main-scene change** is a single reversible line; rollback = revert the line to `res://scenes/main.tscn` (menu remains reachable for tests via per-scenario `scene:`), so the menu can be reverted independently of everything else.
+- **Protected files:** `scenes/main.tscn`, all 27 existing `playtest/<scenario>.yaml`, and every `design/*` file are untouched this run; the acceptance check is `git diff --stat` showing **only new files** under `playtest/` plus the append-only `_common.yaml` additions. If a diff ever shows an existing scenario file modified, the implementer has violated the hard constraint and must revert before anything else.
+- **Rollback for the whole feature set:** every behavior delta is gated behind boot-default flags (`creation_entry == "TRANSITION"`, `creation_done == false`) or additive tables; reverting menu.tscn + the project.godot line + the two default-guarded branches restores the legacy boot flow exactly.
 
-## 6. Tech stack
+## 8. Playtest contract (observable surface + scenario skeletons — PM fills frames/thresholds)
 
-- **Runtime/engine:** Godot 4.4 (unchanged; `config/features=4.7` pre-existing and accepted). No engine or library swaps — every alternative would violate the protected scenarios.
-- **Language:** GDScript for all code changes (no new Python; the repo's Python is harness-only).
-- **Testing:** existing playtest harness (per-scenario YAML under `playtest/`, `godot_playtest_scenario` via the godot-builder sidecar HTTP, ~50 s/run) — extended, not replaced. Assertion rule enforced throughout (from the design record): every assert value must contain a comparison/logical operator; `changed` is the exception.
-- **Linters:** GDScript is parsed by the `gdscript_check` gate (NOT listed in `linter_manifest.json`, per harness convention); `.yaml` / `.json` / `.md` map to `basic`.
+### 8.1 `playtest/_common.yaml` — append-only edits (every existing line stays byte-identical; the default `scene:` line untouched)
+- `actions:` append: `debug_click_menu_entry`, `debug_click_creation_widget`, `debug_seed_save`, `debug_delete_save`, `debug_reset_settings`.
+- `surface:` append:
+  - `MenuPanel: [focused_entry, hint_text, load_available]`
+  - `MenuEntry0..3: [visible, disabled, size, mouse_filter]`
+  - `SettingsPanel: [visible, focus_index]`
+  - `SettingsManager: [sfx_volume_db, music_volume_db, fullscreen]`
+  - `AudioManager: [sfx_volume_db, music_volume_db]`
+  - under the existing `SaveManager:` block append: `last_io_error_code`, `last_io_error_text`, `debug_user_dir_exists`
+  - `AttrPlus0: [visible, size, mouse_filter]`, `TraitToggle0: [visible, size, mouse_filter]`, `ConfirmButton: [visible, size, mouse_filter]`
+- `scenario_order:` append the five new scenario names.
 
-## 7. Determinism & protected scenarios
+### 8.2 New scenario files (each self-contained; `scene:` per file)
+1. **`main_menu_entries.yaml`** — `scene: res://scenes/menu.tscn`. Press `debug_delete_save` early, then: all four `MenuEntry*` `visible == true`, `size.x > 0 and size.y > 0`, `mouse_filter == 0` (MOUSE_FILTER_STOP); `MenuPanel.load_available == false`; `MenuEntry1.disabled == true`; `hint_text.contains("存档") == true` (remember the repo rule: comparison operators mandatory, `== true` for String.contains). Keyboard: `move_down ×2` → `focused_entry == 2`; `ui_accept` → `SettingsPanel.visible == true`; back via 返回 → `MenuPanel.visible == true`, `GameManager.current_state == "MENU"`. Then `debug_click_menu_entry` (focus 0) → `GameManager.current_state == "CHARACTER_CREATION"` and `SceneManager.current_scene == "creation"` — the debug-click path is the same `_activate_entry` the buttons call.
+2. **`menu_to_creation_to_tutorial_order.yaml`** — `scene: res://scenes/menu.tscn`. Order proof, **state asserts only, never absolute frame numbers**: `ui_accept` (menu → CHARACTER_CREATION) → `ui_accept` (ATTRS→TRAITS) → `move_right` (TRAITS→CONFIRM) → `ui_accept` (confirm) → assert `GameManager.current_state == "TUTORIAL"`, `SceneManager.current_scene == "battlefield"`, `GameManager.creation_done == true` (surface add: `GameManager: [creation_done, creation_entry]`). Then the existing tutorial cadence: `ui_accept ×7` → `debug_win_tutorial` → WON → `ui_accept` → TRANSITION → `ui_accept ×2` → assert `current_state == "SECT_SELECTION"` (the `creation_done` skip — **no second creation**) — this scenario is the real-flow proof the brief demands.
+3. **`creation_mouse_interaction.yaml`** — `scene: res://scenes/segments/creation.tscn` (direct boot, assert from f30 per the verified capability). ATTRS phase: `AttrPlus0.visible == true`, `mouse_filter == 0`, `size.x > 0`; `debug_click_creation_widget` → `CreationScreen.attrs["bone"] == 11` and `points_left == 29` (the same bound callable as the + button); repeat to clamp: presses past 20 leave `attrs["bone"] == 20` (clamp via the same handler). Keyboard sanity: `move_right` after resetting focus produces the identical delta (convergence proof; the full keyboard path stays pinned by the existing 11/11 scenario).
+4. **`menu_load_continues.yaml`** — `scene: res://scenes/menu.tscn`. `debug_delete_save` → `debug_seed_save` → `MenuPanel.load_available == true`, `MenuEntry1.disabled == false`; focus 1 (`move_down`) + `debug_click_menu_entry` → `current_state == "CULTIVATION"`, `CultivationScreen.visible == true`, `CultivationScreen.month == 1` (restored profile). Optionally re-seed with a modified month via the fixture if PM wants a non-1 month (fixture spec in C10 allows writing the default profile only — month 1 is the deterministic assertion).
+5. **`settings_panel.yaml`** — `scene: res://scenes/menu.tscn`. `debug_reset_settings` (deterministic baseline), `move_down ×2` + `ui_accept` → `SettingsPanel.visible == true`; `move_right` → `SettingsManager.sfx_volume_db == 3.0` and `AudioManager.sfx_volume_db == 3.0`; `move_down`, `ui_accept` (全屏) → `SettingsManager.fullscreen == true` (persisted intent only — no window assert headless); `move_down`, `ui_accept` (返回) → `current_state == "MENU"`, `MenuPanel.visible == true`.
 
-- The combat engine is already zero-RNG (pure functions of state); the new hooks (`debug_poison_player`, death observables) are deterministic state setters/readers through the real pipeline. No new randomness anywhere.
-- **Protected (byte-identical, never edited this round):** every playtest scenario **except** the four the goals authorize — `dot_resolves_at_victim_turn_start`, `save_load_roundtrip`, `skill_bar_waiting_state`, `terminal_victory_8_12_rounds_hp_15_40` — plus the two new files (`player_death_ends_battle.yaml`, contract entries). In particular: `each_unit_acts_once_per_round_initiative_order` (15 asserts), `two_phase_skill_unlock_and_hp_gate` (20), `tutorial_loss_restarts_tutorial` (5), `trait_combat_effects_and_twelve_slots` (22), `cultivation_changes_combat` (30), `spine_to_ending`, `central_divine_innate_qi_fatal_guard`, `fahui_du_multiplies_damage`, `cooldowns_decrement_by_round`, `round_one_snapshot_and_turn_order`, `enemy_acts_only_after_player_ends_turn`, `skill_button_turn_overlay`, `ui_geometry_readability`, `skill_button_visual_states`, and all segment/spine scenarios.
-- **Hard invariants:** `empty_round_stalls == 0`; 0 compile errors; 0 runtime errors; no freed-object errors; no `input_dead`.
+PM fills exact `at` frames (respecting the ~2-frame post-swap spacing discipline and the f2999 cap) and any additional structural asserts; **scenario 2 must never hard-code frame numbers into its asserts** — the frames only sample, the asserts only check state order.
 
-## 8. Irreversible-operation safety
+## 9. Recorded debt (delivery notes must state these plainly)
 
-- **No irreversible operations exist in this design.** No database/schema migrations, no bulk data rewrites, no save-format change (existing `user://save_<slot>.json` files remain valid and untouched).
-- The only edits are code + test files, all reversible via git. `save_manager.gd` is edited only if the C4 probe proves a write-side bug, and any such edit must preserve the existing atomic 5-step write protocol (write `.tmp` → validate → backup old → rename → re-validate → drop backup, restore-on-failure) — that protocol already implements "backup → execute → validate → then remove old".
-- Scenario rewrites are done as *re-baselined replacements*, and each rewritten yaml is verified green before the run reports success; the previous content remains recoverable from git history.
+1. **`spine_to_ending` and `creation_budget_clamp_and_traits` walk a test-only path** (TUTORIAL WON → TRANSITION → CHARACTER_CREATION → SECT_SELECTION), which no longer exists in the real flow. A 27-file rewrite is deliberately not undertaken. Follow-up: convert `creation_budget_clamp_and_traits` to a direct `creation.tscn` boot; keep `spine_to_ending` as the boot-flow spine proof.
+2. **Mouse-click testing is structural + handler-convergence, not coordinate hit-testing.** The DPE harness has no coordinate input; extending `godot_playtest` to synthesize `InputEventMouseButton` via `Input.parse_input_event` is a tooling change outside this repo. Until then the `debug_click_*` actions + `mouse_filter == 0`/rect asserts are the pragmatic honest stand-in (engine-guaranteed pressed→handler link).
+3. **Shell duplication:** menu.tscn duplicates main.tscn's shell node block (forced by main.tscn's byte-identity). Future shell edits must touch both.
+4. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
+5. Out-of-scope pre-existing reds (`two_phase_skill_unlock_and_hp_gate` 18/20, `terminal_victory_8_12_rounds_hp_15_40` 4/6, `each_unit_acts_once_per_round_initiative_order` 6/12, `dot_resolves_at_victim_turn_start` 2/8, `ui_geometry_readability` 23/24, `sect_switch_same_school_connects` 6/8) are **not** this run's targets and must not be "fixed" via assertion edits; in-scope targets: `save_load_roundtrip` (9/13 → all green), `cultivation_month_cycle_and_deck_bookkeeping` (15/17 → all green) via code only, with `has_save`/`last_error` observed values recorded in the delivery notes.
 
-## 9. Task decomposition boundaries (for the PM)
+## 10. Tech stack & assets
 
-Stages are ordered by dependency; within a stage, tasks are single-responsibility. **Every numeric pin marked `<PM: ...>` is filled from an implementer probe run, never from memory.**
+- **Godot 4.7 GDScript + text-authored `.tscn`** — no plugins, no new engine features. Scenes are authored as diffable text (established repo practice); no code-builds-scene.
+- **ConfigFile** (`user://settings.cfg`) for settings persistence; existing `global_theme.tres` + NotoSansSC font; color-block style per roadmap stage.
+- **No new art/audio assets this run** — the menu/settings screens reuse the existing theme and color blocks (roadmap: 简单美术 as default; no asset generation until the vertical-slice decision).
+- Harness: `godot_playtest_scenario` + per-file scenarios (no `playtest_spec.yaml` monolith; the loader prefers `playtest/`).
 
-- **T0 — Contract skeleton (C0 + C7):** add the two CombatManager observables + write them in `_handle_death`'s classification site (no branch behavior change yet), add `debug_poison_player` (action + `game_manager` wire + `CombatManager` hook), update `_common.yaml` (actions/surface/order), drop in the two skeleton scenario files with placeholder frames, update `README.md` wiring notes. Expectation: all 26 existing scenarios keep their current status; the new scenario is red until T1.
-- **T1 — Goal 1 (C1 + C2):** structural classification + `_check_battle_over()` + complete `player_death_ends_battle` with probe-pinned frames. Verify: new scenario green; `tutorial_loss_restarts_tutorial` 5/5; `trait_combat_effects_and_twelve_slots` 22/22; `empty_round_stalls == 0`.
-- **T2 — Goal 2 (C3):** rewrite `dot_resolves_at_victim_turn_start` fixture; probe-pin frames/HP. Verify: scenario green; no AI file touched.
-- **T3 — Goal 3 (C4):** guards on `save_load_roundtrip`; run PROBE #5; apply the decision-tree branch (re-baseline navigation OR fix save code). Verify: 13/13 non-vacuous.
-- **T4 — Goal 4 (C5):** waiting palette + tag + re-pin yaml + comment/README updates. Verify: `skill_bar_waiting_state` green; `skill_button_visual_states` green; vision Q3 per-scenario bad ≤ 5/19.
-- **T5 — Goal 5 (C6):** **starts only after T1 is green.** Probe the losing line, re-script, and either pin the win or produce the conditional design-change declaration. Verify: 6/6 or declared re-balance with 6/6.
+## 11. Task decomposition boundaries (for the PM)
 
-T2/T3/T4 are mutually independent and may run in parallel after T0; T5 strictly after T1. Each task's card cites the authoritative `playtest_report.json`/`vision_report.json` per-scenario counts.
+Independent workstreams, sized so each lands green incrementally:
 
-## 10. Extensibility
+| Task | Files | Depends on | Risk |
+|---|---|---|---|
+| T1 | `scripts/autoload/settings_manager.gd` (NEW), `scripts/autoload/audio_manager.gd`, `project.godot` (autoload + input actions) | none | low |
+| T2 | `scripts/autoload/scene_manager.gd` (claim_boot, guard, SCENE_MAP/PATHS) | none | medium — ordering-sensitive; verify main.tscn boot unchanged via `spine_to_ending` |
+| T3 | `scripts/autoload/game_manager.gd` (states, flags, menu_* methods, finish_creation, restart resets, DEBUG save fixtures, SEGMENT_PREDECESSORS extension) | none | medium — legacy path must stay byte-identical |
+| T4 | `scenes/menu.tscn`, `scripts/ui/menu_panel.gd`, `scenes/ui/menu_panel.tscn` (NEW) | T2, T3 interfaces | medium — boot-claim ordering |
+| T5 | `scripts/segments/creation.gd`, `scenes/segments/creation.tscn` (buttons + finish_creation call) | T3 | low — 11/11 must stay green |
+| T6 | `scripts/segments/transition.gd` (branch) | T3 | low — spine frames pinned |
+| T7 | `scripts/autoload/tutorial_manager.gd` (tutorial_done=true at finish) | none | trivial |
+| T8 | `scripts/autoload/save_manager.gd` (flip, instrumentation, ensure_user_dir, step-5 fix, loaded signal, has_save_file) | none | medium — **instrument first, probe, then claim root cause** |
+| T9 | `scripts/segments/cultivation.gd` (loaded → _sync_surface) | T8 (signal) | low |
+| T10 | `playtest/_common.yaml` (append-only) + 5 new scenario files | T1–T9 | medium — assertion-operator rule, spacing discipline |
+| T11 | `README.md` + delivery notes (debt records) | all | trivial |
 
-- `_check_battle_over()` is the single invariant seam: any future damage source (hazard zones, environmental damage, new statuses) is automatically covered for the loss half without touching `apply_damage`.
-- The debug-hook pattern (`unbound input action → GameManager._process → CombatManager fixture`) is the sanctioned way to inject battle states; future scenarios (buff application, forced adjacency, force HP thresholds) follow the same three-step shape.
-- `debug_death_*` observables generalize to any classification-sensitive pipeline (e.g., future companion deaths).
-- No new abstraction layers: all changes are local to existing components.
+## 12. Extensibility considerations
 
-## 11. Out of scope (explicit)
+- **Menu entries are data-shaped** (`ENTRIES` array in the panel) — adding a 5th entry is one row + one `match` arm; the harness surface pattern (`MenuEntryN`) extends trivially.
+- **The load entry (`menu_load_game`) is the future "continue" seam**: any later in-game "return to menu" state can reuse it verbatim (it validates segment ∈ STABLE_STATES and bypasses the predecessor map by design).
+- **SettingsManager** is the single persistence point for future prefs (key rebinding, language) — add a ConfigFile section, no new components.
+- **`claim_boot`** generalizes: any future full-screen boot scene (splash, title cinematic) claims the boot the same way, keeping SceneManager's single-hosted-scene invariant.
+- Deliberately **not** built: a generic "any state → any state" FSM (overdesign — menu routes are closed and enumerated), bus-based audio (no mixing exists), coordinate mouse synthesis in the harness (tooling outside the repo), and a save schema migration (no schema change).
 
-- `each_unit_acts_once_per_round_initiative_order` (6/12, declared legacy) — **untouched**, protected.
-- `two_phase_skill_unlock_and_hp_gate` (18/20, protected tutorial) — **untouched**.
-- `ui_geometry_readability` / `round_pause_overlap` — **untouched**.
-- `cultivation_month_cycle_and_deck_bookkeeping` (15/17) — **untouched**; note for 5_review: if the C4 probe shows a *shared* save-path root cause, the same guard pattern may be proposed in a future round, but this round does not edit it.
-- `sect_switch_same_school_connects` — **untouched**.
-- splitmix64 constants in `save_manager.gd` — frozen (documented in C4).
-- AI code (`scripts/ai/*.gd`) — no changes (branch (b) verdict).
-- GDScript unit-suite wiring (`tests/`, unwired) — declared non-goal; only incidental expectation updates if a test pins the old waiting palette.
-- 桃花迷阵 zone-entry damage site (PROBE #3) — not hunted; the C1 seam covers its end-of-battle consequence regardless of where it lives.
+## 13. Deliverable summary
 
-## 12. Deliverable summary
+| File | Status |
+|---|---|
+| `scenes/menu.tscn`, `scenes/ui/menu_panel.tscn`, `scenes/ui/settings_panel.tscn` | NEW |
+| `scripts/ui/menu_panel.gd`, `scripts/ui/settings_panel.gd`, `scripts/autoload/settings_manager.gd` | NEW |
+| `project.godot`, `scripts/autoload/{game,scene,save,audio,tutorial}_manager.gd`, `scripts/segments/{creation,transition,cultivation}.gd`, `scenes/segments/creation.tscn`, `README.md` | MODIFIED (additive where possible) |
+| `playtest/_common.yaml` | APPEND-ONLY (default `scene:` line untouched) |
+| `playtest/{main_menu_entries,menu_to_creation_to_tutorial_order,creation_mouse_interaction,menu_load_continues,settings_panel}.yaml` | NEW |
+| `scenes/main.tscn`, all 27 existing `playtest/*.yaml`, `design/*` | UNTOUCHED (hard constraint) |
 
-| File | Change |
-|------|--------|
-| `scripts/autoload/combat_manager.gd` | C0 observables; C1 structural classification + `_check_battle_over()` + 2 call sites; C3 `debug_poison_player()` |
-| `scripts/autoload/game_manager.gd` | C3 wire `debug_poison_player` in `_process` |
-| `scripts/ui/skill_button.gd` | C5 waiting palette + tag + comment updates |
-| `project.godot` | C3 `debug_poison_player` empty-events input action |
-| `playtest/_common.yaml` | C7 actions + surface + scenario_order |
-| `playtest/player_death_ends_battle.yaml` | C2 new regression scenario |
-| `playtest/dot_resolves_at_victim_turn_start.yaml` | C3 fixture rewrite |
-| `playtest/save_load_roundtrip.yaml` | C4 non-vacuous guards (+ navigation re-baseline if probe requires) |
-| `playtest/skill_bar_waiting_state.yaml` | C5 luma re-pin + 等待中 tag assert |
-| `playtest/terminal_victory_8_12_rounds_hp_15_40.yaml` | C6 timeline re-script (gated on T1) |
-| `tests/test_skill_button_states.gd` | C5 expectation update only if it pins the old palette |
-| `README.md` | debug action table, waiting luma, scenario counts/status |
-| `linter_manifest.json` | `.yaml` / `.json` / `.md` → `basic` (`.gd` handled by `gdscript_check`, not listed) |
-
-**Assumptions (for downstream steps):** (1) The vision gate captures frames at playtest timeline entries, so enemy-turn `actions: []` entries in editable scenarios are what feed Q3 — verify against the harness if per-scenario votes do not move. (2) The tutorial player node's `.name` is `"Player"` (the C2 pin is probe-verified, not assumed). (3) `DEFAULT_FA_HUI_DU == 1.3` in `combat_manager.gd` (already used by the existing poison path). (4) The pre-fix probe (current `terminal_victory` run) will show `current_state == "LOST"` once the battle is truly stuck-versus-ended — if it instead shows BATTLE continuing, C1 is *exactly* the fix that closes it, and C2 still goes green.
+Acceptance: 27 existing scenario files byte-identical; in-scope reds (`save_load_roundtrip`, `cultivation_month_cycle_and_deck_bookkeeping`) green via code only; new scenarios green; compile gate clean; real launches land on the menu; headless harness runs the same code paths.
