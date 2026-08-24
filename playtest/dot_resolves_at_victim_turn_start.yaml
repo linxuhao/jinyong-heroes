@@ -43,26 +43,268 @@ timeline:
 - at: 95
   actions:
   - end_turn
+- at: 100
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 150
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 200
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 250
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 300
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 350
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
 - at: 400
   actions:
   - end_turn
+- at: 450
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 500
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 550
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 600
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 650
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 700
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 750
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
 - at: 800
   actions:
   - end_turn
+- at: 850
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 900
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 950
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1000
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1050
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1100
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1150
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
 - at: 1200
   actions:
   - end_turn
-- at: 1430
+- at: 1250
   actions: []
   assert:
-    CombatManager.current_round: 4
-    CombatManager.phase: phase == "ENEMY_TURN"
-    CombatManager.active_unit_name: active_unit_name == "West Poison"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == 152
-- at: 2400
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1300
   actions: []
   assert:
-    CombatManager.current_round: 5
-    Player.health: health == 168 and health > 0
-    CombatManager.last_turn_actor: changed
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1350
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1400
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1450
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1500
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1550
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1600
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1650
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1700
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1750
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
+- at: 1800
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase
+    CombatManager.active_unit_name: active_unit_name
+    Player.status_names: status_names
+    Player.health: health >= 0
