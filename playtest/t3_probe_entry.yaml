@@ -1,0 +1,109 @@
+name: t3_probe_entry
+description: TEMPORARY diagnostic — samples the undisturbed cultivation state after the save_load_roundtrip preamble (f3..f225) to find the deterministic month-1 CARD_PICK entry frame. Deleted before delivery.
+timeline:
+- at: 3
+  actions: [ui_accept]
+- at: 5
+  actions: [ui_accept]
+- at: 7
+  actions: [ui_accept]
+- at: 9
+  actions: [ui_accept]
+- at: 11
+  actions: [ui_accept]
+- at: 13
+  actions: [ui_accept]
+- at: 15
+  actions: [ui_accept]
+- at: 20
+  actions: [debug_win_tutorial]
+- at: 40
+  actions: [ui_accept]
+- at: 60
+  actions: [ui_accept]
+- at: 70
+  actions: [ui_accept]
+- at: 80
+  actions: [ui_accept]
+- at: 90
+  actions: [move_right]
+- at: 100
+  actions: [ui_accept]
+- at: 110
+  actions: [ui_accept]
+- at: 120
+  actions: [ui_accept]
+- at: 135
+  actions: [ui_accept]
+- at: 150
+  actions: [ui_accept]
+- at: 165
+  actions: [ui_accept]
+- at: 180
+  actions: [ui_accept]
+- at: 195
+  actions: [ui_accept]
+- at: 210
+  actions: [ui_accept]
+- at: 225
+  actions: [ui_accept]
+- at: 235
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 245
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 255
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 265
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 275
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 285
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 295
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 305
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 315
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+- at: 325
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999

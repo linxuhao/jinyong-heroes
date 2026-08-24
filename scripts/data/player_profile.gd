@@ -113,13 +113,15 @@ static func from_dict(d: Variant) -> PlayerProfile:
 		return p
 	var src: Dictionary = d
 
-	# attrs — every known key coerced; missing/non-int -> floor; value clamped >= floor.
+	# attrs — every known key coerced; missing/non-number -> floor; value clamped >= floor.
+	# JSON has one numeric type (this build's parse_string returns floats for all
+	# numbers), so int-or-float is accepted and coerced — never dropped.
 	var src_attrs: Variant = src.get("attrs", {})
 	if src_attrs is Dictionary:
 		for key in ATTR_KEYS:
 			var v: Variant = (src_attrs as Dictionary).get(key, ATTR_FLOOR)
-			if v is int:
-				p.attrs[key] = maxi(v as int, ATTR_FLOOR)
+			if v is int or v is float:
+				p.attrs[key] = maxi(int(v), ATTR_FLOOR)
 			else:
 				p.attrs[key] = ATTR_FLOOR
 
@@ -140,7 +142,7 @@ static func from_dict(d: Variant) -> PlayerProfile:
 			if not (grade is String):
 				grade = ""
 			var practice: Variant = entry.get("practice", 0)
-			if not (practice is int):
+			if not (practice is int or practice is float):
 				practice = 0
 			var mastered: Variant = entry.get("mastered", false)
 			if not (mastered is bool):
@@ -152,10 +154,10 @@ static func from_dict(d: Variant) -> PlayerProfile:
 				"mastered": mastered as bool,
 			})
 
-	# silver — clamp >= 0.
+	# silver — clamp >= 0 (int-or-float per JSON roundtrip).
 	var src_silver: Variant = src.get("silver", 0)
-	if src_silver is int:
-		p.silver = maxi(src_silver as int, 0)
+	if src_silver is int or src_silver is float:
+		p.silver = maxi(int(src_silver), 0)
 
 	# inventory / companions — non-empty Strings only.
 	_append_string_array(p.inventory, src.get("inventory", []))
@@ -166,13 +168,13 @@ static func from_dict(d: Variant) -> PlayerProfile:
 	if src_cult is Dictionary:
 		var cd: Dictionary = src_cult
 		var year: Variant = cd.get("year", 1)
-		if not (year is int):
+		if not (year is int or year is float):
 			year = 1
-		p.cultivation["year"] = clampi(year as int, 1, 3)
+		p.cultivation["year"] = clampi(int(year), 1, 3)
 		var month: Variant = cd.get("month", 1)
-		if not (month is int):
+		if not (month is int or month is float):
 			month = 1
-		p.cultivation["month"] = clampi(month as int, 1, 12)
+		p.cultivation["month"] = clampi(int(month), 1, 12)
 		var sect_id: Variant = cd.get("sect_id", "")
 		if sect_id is String:
 			p.cultivation["sect_id"] = sect_id as String

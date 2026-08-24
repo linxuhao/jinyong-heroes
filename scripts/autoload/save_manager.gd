@@ -50,9 +50,6 @@ var snapshot_decks_string: String = ""
 var loaded_profile_json: String = ""
 var loaded_rng_state: int = 0
 var loaded_decks_string: String = ""
-var debug_save_fail_step: String = ""   # TEMP probe — removed before delivery
-var debug_apply_fail_reason: String = ""   # TEMP probe — removed before delivery
-var debug_json_preview: String = ""   # TEMP probe — removed before delivery
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 
@@ -151,12 +148,10 @@ func save_slot(s: int) -> bool:
     # documented io_error and leave no file behind.
     var json_text := JSON.stringify(_build_save_dict(), "\t")
     if json_text == "":
-        debug_save_fail_step = "stringify"
         last_error = "io_error"
         return false
     var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
     if f == null:
-        debug_save_fail_step = "open"
         last_error = "io_error"
         return false
     f.store_string(json_text)
@@ -164,12 +159,8 @@ func save_slot(s: int) -> bool:
 
     # Step 2: re-read and validate the tmp — never trust the write.
     var parsed_tmp: Variant = _read_json(tmp)
-    if parsed_tmp is Dictionary:
-        var pd: Dictionary = parsed_tmp
-        debug_json_preview = "v=" + str(pd.get("version")) + "|visint=" + str(pd.get("version") is int) + "|vcheck=" + str(not (pd.get("version") is int) or pd.get("version") as int != SAVE_VERSION) + "|scheck=" + str(not (pd.get("seed") is int)) + "|sav=" + str(SAVE_VERSION)
     if not _apply_save_dict(parsed_tmp):
         _remove_file(tmp)
-        debug_save_fail_step = "validate_tmp"
         last_error = "io_error"
         return false
 
@@ -177,7 +168,6 @@ func save_slot(s: int) -> bool:
     if FileAccess.file_exists(real):
         if DirAccess.copy_absolute(real, bak) != OK:
             _remove_file(tmp)
-            debug_save_fail_step = "backup"
             last_error = "io_error"
             return false
 
@@ -186,14 +176,12 @@ func save_slot(s: int) -> bool:
         DirAccess.remove_absolute(real)
     if DirAccess.rename_absolute(tmp, real) != OK:
         _restore_bak(bak, real)
-        debug_save_fail_step = "rename"
         last_error = "io_error"
         return false
 
     # Step 5: re-read and re-validate the real file, then drop the backup.
     if not _apply_save_dict(_read_json(real)):
         _restore_bak(bak, real)
-        debug_save_fail_step = "validate_real"
         last_error = "io_error"
         return false
     _remove_file(bak)
@@ -201,15 +189,14 @@ func save_slot(s: int) -> bool:
     # Surface snapshots from the exact dict that was written (steps 2/5 of the
     # atomic write validated this state, so the end-of-function values are
     # identical to the file contents). Success path only.
-    var saved := _build_save_dict()
-    snapshot_profile_json = JSON.stringify(saved["profile"])
-    snapshot_rng_state = saved["rng_state"] as int
-    snapshot_decks_string = _decks_string(saved["decks"] as Dictionary)
+    var file_dict: Dictionary = parsed_tmp as Dictionary
+    snapshot_profile_json = JSON.stringify(file_dict["profile"])
+    snapshot_rng_state = int(file_dict["rng_state"])
+    snapshot_decks_string = _decks_string(file_dict["decks"] as Dictionary)
 
     slot = s
     has_save = true
     last_error = ""
-    debug_save_fail_step = ""
     return true
 
 
@@ -232,7 +219,7 @@ func load_slot(s: int) -> bool:
         _fallback_fresh_profile("bad_schema")
         return false
     var version: Variant = (parsed as Dictionary).get("version", null)
-    if not (version is int) or version as int != SAVE_VERSION:
+    if not _is_int_or_float(version) or int(version) != SAVE_VERSION:
         _fallback_fresh_profile("bad_version")
         return false
     if not _apply_save_dict(parsed):
@@ -453,38 +440,40 @@ func _join_ids(v: Variant) -> String:
 ## it resets the stream), then state (resumes it).
 func _apply_save_dict(d: Variant) -> bool:
     if not (d is Dictionary):
-        debug_apply_fail_reason = "not_dict"
         return false
     var src: Dictionary = d
     var version: Variant = src.get("version", null)
-    if not (version is int) or version as int != SAVE_VERSION:
-        debug_apply_fail_reason = "version"
+    if not _is_int_or_float(version) or int(version) != SAVE_VERSION:
         return false
     var seed_v: Variant = src.get("seed", null)
     var rng_state_v: Variant = src.get("rng_state", null)
     var segment_v: Variant = src.get("segment", null)
     var decks_v: Variant = src.get("decks", null)
-    if not (seed_v is int):
-        debug_apply_fail_reason = "seed_int"
+    if not _is_int_or_float(seed_v):
         return false
-    if not (rng_state_v is int):
-        debug_apply_fail_reason = "rng_int"
+    if not _is_int_or_float(rng_state_v):
         return false
     if not (segment_v is String):
-        debug_apply_fail_reason = "segment"
         return false
     if not _validate_decks(decks_v):
-        debug_apply_fail_reason = "decks"
         return false
     profile = PlayerProfile.from_dict(src.get("profile", null))
-    seed = seed_v as int
+    seed = int(seed_v)
     rng.seed = seed
-    rng.state = rng_state_v as int
+    rng.state = int(rng_state_v)
     segment = segment_v as String
     _restore_decks(decks_v)
     _refresh_deck_counts()
-    debug_apply_fail_reason = ""
     return true
+
+
+## JSON has one numeric type (per spec); Godot's int/float split does not
+## survive a JSON.stringify/parse_string roundtrip deterministically, so a
+## validated save may present version/seed/rng_state as int OR float. Accept
+## either and coerce — strings/bools/null are still rejected, so a hostile
+## hand-edited save can never pass a non-number here.
+func _is_int_or_float(v: Variant) -> bool:
+    return v is int or v is float
 
 
 ## Schema check for the decks subtree (all six categories, remaining/drawn are

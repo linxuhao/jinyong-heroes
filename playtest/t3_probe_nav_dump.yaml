@@ -1,0 +1,103 @@
+name: t3_probe_nav_dump
+description: TEMPORARY diagnostic — always-false asserts to force observed phase/month/year/focus/snapshot/file-text. Deleted before delivery.
+timeline:
+- at: 3
+  actions: [ui_accept]
+- at: 5
+  actions: [ui_accept]
+- at: 7
+  actions: [ui_accept]
+- at: 9
+  actions: [ui_accept]
+- at: 11
+  actions: [ui_accept]
+- at: 13
+  actions: [ui_accept]
+- at: 15
+  actions: [ui_accept]
+- at: 20
+  actions: [debug_win_tutorial]
+- at: 40
+  actions: [ui_accept]
+- at: 60
+  actions: [ui_accept]
+- at: 70
+  actions: [ui_accept]
+- at: 80
+  actions: [ui_accept]
+- at: 90
+  actions: [move_right]
+- at: 100
+  actions: [ui_accept]
+- at: 110
+  actions: [ui_accept]
+- at: 120
+  actions: [ui_accept]
+- at: 135
+  actions: [ui_accept]
+- at: 150
+  actions: [ui_accept]
+- at: 165
+  actions: [ui_accept]
+- at: 180
+  actions: [ui_accept]
+- at: 195
+  actions: [ui_accept]
+- at: 210
+  actions: [ui_accept]
+- at: 225
+  actions: [ui_accept]
+- at: 240
+  actions: [move_down]
+- at: 255
+  actions: [move_down]
+- at: 270
+  actions: [move_down]
+- at: 285
+  actions: [ui_accept]
+- at: 310
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+    CultivationScreen._action_focus: _action_focus == 999
+    SaveManager.snapshot_profile_json: snapshot_profile_json == "NEVER"
+    SaveManager.debug_json_text: debug_json_text == "NEVER"
+- at: 320
+  actions: [move_up]
+- at: 330
+  actions: [move_up]
+- at: 340
+  actions: [move_up]
+- at: 350
+  actions: [move_up]
+- at: 360
+  actions: [ui_accept]
+- at: 370
+  actions: [ui_accept]
+- at: 385
+  actions: [ui_accept]
+- at: 400
+  actions: [move_down]
+- at: 410
+  actions: [move_down]
+- at: 420
+  actions: [move_down]
+- at: 430
+  actions: [move_down]
+- at: 440
+  actions: [move_down]
+- at: 450
+  actions: [ui_accept]
+- at: 490
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "NEVERPHASE"
+    CultivationScreen.month: month == 999
+    CultivationScreen.year: year == 999
+    CultivationScreen._action_focus: _action_focus == 999
+    SaveManager.loaded_profile_json: loaded_profile_json == "NEVER"
+    SaveManager.snapshot_profile_json: snapshot_profile_json == "NEVER"
+    SaveManager.debug_json_text: debug_json_text == "NEVER"
+    SaveManager.slot: slot == 999

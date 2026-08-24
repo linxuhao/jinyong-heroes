@@ -108,8 +108,6 @@ surface:
   - loaded_profile_json
   - loaded_rng_state
   - loaded_decks_string
-  - debug_save_fail_step
-  - debug_json_preview
   Player:
   - health
   - max_health
