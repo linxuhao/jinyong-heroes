@@ -405,3 +405,5 @@ func _process(_delta: float) -> void:
 		CombatManager.debug_kill_player()
 	if Input.is_action_just_pressed("debug_enter_encounter"):
 		start_encounter()
+	if Input.is_action_just_pressed("debug_poison_player"):
+		CombatManager.debug_poison_player()

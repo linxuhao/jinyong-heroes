@@ -170,6 +170,16 @@ var debug_iron_shirt_procs: int = 0
 ## (basic attack / skill damage) and in reset_battle().
 var debug_lang_attack_mult: float = 1.0
 
+## Observable: the node .name of the last _handle_death target ("" until the
+## first death). Lets the playtest surface record WHY a battle ended, not just
+## that it ended.
+var debug_death_target_name: String = ""
+
+## Observable: what the CURRENT (name-based) death classifier decided for the
+## last _handle_death call. Pure observation — the player/enemy branch behavior
+## is unchanged (the structural classification lands in a later stage).
+var debug_death_classified_player: bool = false
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -354,6 +364,19 @@ func debug_kill_player() -> void:
 		return
 	if "health" in player and int(player.health) > 0:
 		apply_damage(player, int(player.health), null, false, true)
+
+
+## DEBUG hook (unbound harness action, consumed by GameManager._process): apply
+## Spirit Serpent poison to the player THROUGH THE NORMAL apply_dot pipeline
+## (stored tick round(8*1.3)=10, 2 rounds). No-op when no battle is running.
+## Fixture for the DoT scenario.
+func debug_poison_player() -> void:
+	if not _battle_active():
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	apply_dot(player, 8, 2, DEFAULT_FA_HUI_DU)
 
 
 ## True while a battle is actually running: the player exists, the engine is
@@ -1449,11 +1472,16 @@ func _handle_death(target: Node) -> void:
 	if not is_instance_valid(target):
 		return
 
+	# Observable: record which node died (surface-only; no behavior change).
+	debug_death_target_name = str(target.name)
+
 	# Determine if this is the player or an enemy.
 	var is_player: bool = false
 	if target.has_method("is_player") or target.name == "Player" \
 			or target.name == "YangGuo":
 		is_player = true
+	# Observable: record what the CURRENT classifier decided (surface-only).
+	debug_death_classified_player = is_player
 
 	if is_player:
 		GameManager.end_battle(false)

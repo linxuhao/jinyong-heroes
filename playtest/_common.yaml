@@ -63,6 +63,7 @@ actions:
 - debug_step_month
 - debug_grant_art
 - debug_enter_encounter
+- debug_poison_player
 - skill_9
 - skill_10
 - skill_11
@@ -85,6 +86,8 @@ surface:
   - debug_iron_shirt_procs
   - debug_lang_attack_mult
   - empty_round_stalls
+  - debug_death_target_name
+  - debug_death_classified_player
   GameManager:
   - current_state
   - end_overlay_text
@@ -428,6 +431,7 @@ scenario_order:
 - two_phase_skill_unlock_and_hp_gate
 - central_divine_innate_qi_fatal_guard
 - terminal_victory_8_12_rounds_hp_15_40
+- player_death_ends_battle
 - ui_geometry_readability
 - skill_button_visual_states
 - spine_to_ending

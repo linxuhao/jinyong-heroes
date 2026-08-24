@@ -1,0 +1,31 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: player_death_ends_battle
+description: 'Regression scenario for the round invariant "the battle must be able to end": replays the losing line of terminal_victory_8_12_rounds_hp_15_40 (byte-identical 7x ui_accept tutorial preamble at frames 3..15) and asserts the battle boots with the player alive ahead of the scripted passivity that drives the defeat line.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    Player.health: health >= 0

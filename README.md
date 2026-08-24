@@ -66,6 +66,7 @@ Defined in `project.godot` `[input]` with **empty event lists** (never visible i
 | `debug_step_month` | Advance exactly one month through the normal phase machine with fixed auto-choices (card 0; 练功 = first unmastered **external** art, else first unmastered art, else 修习 根骨; year-end stay). Reusable N times; one press also resolves a parked year-end. |
 | `debug_grant_art` | Grant the 甲级 (A) art of the main external school (fallback: the sect's internal A) via the real `add_gongfa` path |
 | `debug_enter_encounter` | In CULTIVATION, start an encounter battle (`start_encounter()`) |
+| `debug_poison_player` | Apply Spirit Serpent poison to the player through the real apply_dot pipeline (tick round(8*1.3)=10, 2 rounds) |
 
 ## Chinese Font Theme
 

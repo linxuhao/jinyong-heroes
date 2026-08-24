@@ -64,3 +64,53 @@ all five enemies' 85/80/76/74/70) and the SOTA-observed turn_order.
 
 Sibling regression: `round_one_snapshot_and_turn_order` ran 14/14 green in the same
 invocation (files are disjoint; zero expected collateral).
+
+---
+
+# Research Notes — t0_contract_skeleton (implementation run log)
+
+Round theme: 「战斗要能结束」/ "the battle must be able to end". This task stages the
+shared test infrastructure for the round (components C0 + C7): death-path observables,
+the `debug_poison_player` DoT fixture hook, and the playtest contract updates. **No
+branch-behavior change anywhere** — all 26 existing scenarios must keep their status.
+
+## Edits applied (six files)
+
+1. `scripts/autoload/combat_manager.gd`
+   - Added surface vars `debug_death_target_name: String = ""` and
+     `debug_death_classified_player: bool = false` after `debug_lang_attack_mult`.
+   - `_handle_death()`: writes `debug_death_target_name = str(target.name)` right after
+     the `is_instance_valid` guard; name-based classification block (1453-1456)
+     kept byte-identical; writes `debug_death_classified_player = is_player` right after it.
+     Observables only — the player/enemy branch behavior is untouched (that is t1's job).
+   - Added `debug_poison_player()` after `debug_kill_player()`, mirroring its guard style:
+     `_battle_active()` check → player validity check → `apply_dot(player, 8, 2,
+     DEFAULT_FA_HUI_DU)` (stored tick `int(round(8*1.3)) == 10`, 2 rounds).
+2. `scripts/autoload/game_manager.gd` — `_process()` polls `debug_poison_player` after the
+   `debug_enter_encounter` branch → `CombatManager.debug_poison_player()`.
+3. `project.godot` — `[input]` adds the empty-events action `debug_poison_player` (4-line
+   block identical in shape to `debug_enter_encounter`).
+4. `playtest/_common.yaml` — appended `- debug_poison_player` to `actions`; appended
+   `- debug_death_target_name` and `- debug_death_classified_player` to the CombatManager
+   surface; inserted `- player_death_ends_battle` in `scenario_order` after
+   `- terminal_victory_8_12_rounds_hp_15_40`.
+5. `playtest/player_death_ends_battle.yaml` — NEW skeleton: 7x `ui_accept` at frames
+   3..15 (byte-identical preamble to terminal_victory), exactly one `actions: []` assert
+   row (`Player.health: health >= 0`). Full probe-pinned death-window asserts are t1's
+   scope (per the task card), so no placeholder/`== -1`/`== "NEVER"` values here.
+6. `README.md` — `debug_poison_player` row added to the debug-action table after
+   `debug_enter_encounter`.
+
+## REAL RUN OUTPUT (last real run, `godot_playtest_scenario player_death_ends_battle`)
+
+```
+{"scenarios": [{"name": "player_death_ends_battle", "passed": true, "ok": 1, "total": 1}], "all_passed": true, "hard_passed": true, "staged_files_applied": ["README.md", "playtest/_common.yaml", "playtest/player_death_ends_battle.yaml", "project.godot", "scripts/autoload/combat_manager.gd", "scripts/autoload/game_manager.gd"], "report": "ran 1 scenario(s) against repo + 6 staged file(s): README.md, playtest/_common.yaml, playtest/player_death_ends_battle.yaml, project.godot, scripts/autoload/combat_manager.gd, scripts/autoload/game_manager.gd\nspec source: playtest/\nhard gate passed: True — Playtest ran 1 scenario(s); all assertions passed.\n\n[PASS] player_death_ends_battle  1/1"}
+```
+
+Result: **1/1 PASS, hard gate passed** — no failing asserts, so no `observed` values to
+report. All 6 staged files were applied to the repo copy for the run. The scenario parses
+(basename == `name:`), the single comparison assert (`Player.health: health >= 0`, true at
+frame 30 where the tutorial battle boots with 500 HP) evaluated green, and the new
+`debug_*` surface vars / `debug_poison_player` action were accepted by the harness without
+parse errors. Zero runtime errors, zero freed-object errors, `empty_round_stalls` untouched.
+
