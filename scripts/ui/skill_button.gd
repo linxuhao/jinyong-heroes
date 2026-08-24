@@ -64,7 +64,7 @@ var cooldown_label_text: String = ""
 ## Observable: bg luminance (Color.get_luminance(), raw-component BT.709
 ## convention) of the state currently applied to this button. Written EVERY
 ## frame by _apply_state via the static state_luma_value() helper. Playtest
-## surface: asserts the "waiting" palette's window [0.1814, 0.2874] on
+## surface: asserts the "waiting" palette's window [0.14, 0.17] on
 ## enemy-turn frames and the four documented values on player-turn frames.
 ## Named `state_luma` (not the helper's name) because the playtest surface
 ## contract requires SkillButtonN.state_luma to be a script var — and GDScript
@@ -215,8 +215,8 @@ func update_cooldown(remaining: int, total: int) -> void:
 ##   cooldown:     bg (0.08,0.08,0.10) border (0.32,0.32,0.36) w1 tag ""
 ##   phase_locked: bg (0.55,0.53,0.48) border (0.68,0.66,0.60) w2 tag "锁定"
 ##   hp_gated:     bg (0.58,0.10,0.10) border (0.85,0.28,0.28) w2 tag "气血"
-##   waiting:      bg (0.18,0.28,0.38) border (0.32,0.42,0.52) w1 tag ""
-##                 (bg luma 0.26596 — see the arm's comment)
+##   waiting:      bg (0.12,0.16,0.22) border (0.30,0.36,0.44) w1 tag "等待中"
+##                 (bg luma 0.155828)
 ## Unknown state -> ready palette.
 static func state_palette(state: String) -> Dictionary:
 	match state:
@@ -242,19 +242,19 @@ static func state_palette(state: String) -> Dictionary:
 				"tag_text": "气血",
 			}
 		"waiting":
-			# Dimmed desaturated cool blue-gray — "it is not your turn".
-			# bg luma: 0.2126*0.18 + 0.7152*0.28 + 0.0722*0.38 = 0.26596
-			# (raw-component BT.709, the repo convention; verified with
-			# Color.get_luminance()). Inside the hard window
-			# [0.1814, 0.2874]: >= 0.10 below ready (0.3874) AND >= 0.10
-			# above cooldown (0.0814). Also being >= 0.10 from hp_gated
-			# (0.2020) is IMPOSSIBLE — the ready <-> hp_gated gap is only
-			# 0.1854 < 0.20 — so the remaining separation from hp_gated
-			# (dark red + 气血 tag) and cooldown (near-black + number) comes
-			# from hue + markers. No tag, thin border.
+			# "It is not your turn": dark desaturated cool blue-gray PLUS the
+			# 等待中 tag on every button (same mechanism as 锁定/气血). bg luma:
+			# 0.2126*0.12 + 0.7152*0.16 + 0.0722*0.22 = 0.155828 (raw BT.709,
+			# Color.get_luminance()). Δ vs ready 0.3874 ≈ 0.23 (was 0.12 — the
+			# vision model could not see the old subtle dim); text appearance is the
+			# primary cross-frame signal.
+			# Separation from cooldown (near-black + number) and hp_gated
+			# (dark red + 气血) rides on the tag/text + hue, not luma alone
+			# (waiting 0.1558 sits between them). Same key set as before — only
+			# the four values changed: bg, border, w1, tag 等待中.
 			return {
-				"bg_color": Color(0.18, 0.28, 0.38),
-				"border_color": Color(0.32, 0.42, 0.52),
+				"bg_color": Color(0.12, 0.16, 0.22),
+				"border_color": Color(0.30, 0.36, 0.44),
 				"border_width": 1,
 				"tag_text": "",
 			}
@@ -316,10 +316,10 @@ func _stylebox_for(state: String) -> StyleBoxFlat:
 ##                   driven by update_cooldown, untouched here)
 ##   phase_locked -> light gray fill + 2px border + 锁定 tag
 ##   hp_gated     -> dark red fill + 2px red border + 气血 tag
-##   waiting      -> dimmed desaturated cool blue-gray, thin border, no tag,
-##                   no cooldown number (accepted side effect: the big number
-##                   hides while the round-fill overlay stays — the whole bar
-##                   reads as dimmed/waiting during enemy turns)
+##   waiting      -> dimmed desaturated cool blue-gray, thin border + 等待中
+##                   tag, no cooldown number (accepted side effect: the big
+##                   number hides while the round-fill overlay stays — the
+##                   whole bar reads as dimmed/waiting during enemy turns)
 ## The golden selected border (已选中) is layered on top of any state and never
 ## changes state_text. `modulate` is NOT used (theme stylebox overrides
 ## restyle the button) and `disabled` is never touched (HUD-owned).
@@ -359,7 +359,7 @@ func _apply_state(state: String) -> void:
 	add_theme_color_override("font_pressed_color", text_color)
 	add_theme_color_override("font_focus_color", text_color)
 
-	# Chinese state tag (界面文字一律中文): 锁定 / 气血, "" for ready/cooldown.
+	# Chinese state tag (界面文字一律中文): 锁定 / 气血 / 等待中, "" only for ready.
 	state_tag_text = palette["tag_text"]
 	var state_tag: Label = _state_tag
 	if state_tag == null:
