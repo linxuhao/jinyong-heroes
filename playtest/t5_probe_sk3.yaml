@@ -1,0 +1,75 @@
+# PROBE scratch — never delivered (t5). Isolates the r2 skill_3 press:
+# does it register as selected, fire, set cooldown, and hit? Samples the
+# press + confirm window and the post-action state.
+name: t5_probe_sk3
+description: 'PROBE — r2 skill_3 isolation. Never delivered.'
+timeline:
+- at: 3
+  actions: [ui_accept]
+- at: 5
+  actions: [ui_accept]
+- at: 7
+  actions: [ui_accept]
+- at: 9
+  actions: [ui_accept]
+- at: 11
+  actions: [ui_accept]
+- at: 13
+  actions: [ui_accept]
+- at: 15
+  actions: [ui_accept]
+- at: 40
+  actions: [end_turn]
+- at: 300
+  actions: [skill_3]
+- at: 340
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    Player.selected_skill_index: selected_skill_index == -99
+    Player.acted: acted == -99
+    Player.skill_cooldowns: skill_cooldowns == [-99]
+- at: 355
+  actions: [attack_confirm]
+- at: 400
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    Player.selected_skill_index: selected_skill_index == -99
+    Player.acted: acted == -99
+    Player.skill_cooldowns: skill_cooldowns == [-99]
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
+- at: 440
+  actions: [end_turn]
+- at: 560
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-99, -99)
+    Player.selected_skill_index: selected_skill_index == -99
+    Player.acted: acted == -99
+    Player.skill_cooldowns: skill_cooldowns == [-99]
+    East_Heretic.health: health == -1
+    East_Heretic.grid_pos: grid_pos == Vector2i(-99, -99)
+    West_Poison.health: health == -1
+    West_Poison.grid_pos: grid_pos == Vector2i(-99, -99)
+    South_Emperor.health: health == -1
+    South_Emperor.grid_pos: grid_pos == Vector2i(-99, -99)
+    North_Beggar.health: health == -1
+    North_Beggar.grid_pos: grid_pos == Vector2i(-99, -99)
+    Central_Divine.health: health == -1
+    Central_Divine.grid_pos: grid_pos == Vector2i(-99, -99)
