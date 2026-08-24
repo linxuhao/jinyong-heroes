@@ -50,16 +50,9 @@ var snapshot_decks_string: String = ""
 var loaded_profile_json: String = ""
 var loaded_rng_state: int = 0
 var loaded_decks_string: String = ""
-## Playtest observability: which save_slot step last failed ("" on success |
-## "stringify" | "open" | "validate_tmp" | "backup" | "rename" | "validate_real").
-var debug_save_fail_step: String = ""
-## Playtest observability: which check inside _apply_save_dict last failed
-## ("" on success | "not_dict" | "version" | "seed_int" | "rng_int" | "segment" | "decks").
-var debug_apply_fail_reason: String = ""
-## Playtest observability: head of the last stringified save dict (diagnosis).
-var debug_save_json_preview: String = ""
-## Playtest observability: "seed=<seed> rng_state=<rng.state>" at the last save.
-var debug_seed_str: String = ""
+var debug_save_fail_step: String = ""   # TEMP probe — removed before delivery
+var debug_apply_fail_reason: String = ""   # TEMP probe — removed before delivery
+var debug_json_preview: String = ""   # TEMP probe — removed before delivery
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 
@@ -157,8 +150,6 @@ func save_slot(s: int) -> bool:
     # file that then fails Step-2 validation opaquely. Guard it into the
     # documented io_error and leave no file behind.
     var json_text := JSON.stringify(_build_save_dict(), "\t")
-    debug_save_json_preview = json_text  # TEMP probe: full file text
-    debug_seed_str = "seed=" + str(seed) + " rng_state=" + str(rng.state)
     if json_text == "":
         debug_save_fail_step = "stringify"
         last_error = "io_error"
@@ -175,9 +166,7 @@ func save_slot(s: int) -> bool:
     var parsed_tmp: Variant = _read_json(tmp)
     if parsed_tmp is Dictionary:
         var pd: Dictionary = parsed_tmp
-        debug_save_json_preview = "version=" + str(pd.get("version")) + " vtype=" + type_string(typeof(pd.get("version"))) + " seed=" + str(pd.get("seed")) + " stype=" + type_string(typeof(pd.get("seed"))) + " rng=" + str(pd.get("rng_state")) + " rtype=" + type_string(typeof(pd.get("rng_state")))
-        var seed_v0: Variant = pd.get("seed", null)
-        debug_seed_str = "seed=" + str(seed) + " rng_state=" + str(rng.state) + " parsed_seed=" + str(seed_v0) + " type=" + type_string(typeof(seed_v0))
+        debug_json_preview = "v=" + str(pd.get("version")) + "|visint=" + str(pd.get("version") is int) + "|vcheck=" + str(not (pd.get("version") is int) or pd.get("version") as int != SAVE_VERSION) + "|scheck=" + str(not (pd.get("seed") is int)) + "|sav=" + str(SAVE_VERSION)
     if not _apply_save_dict(parsed_tmp):
         _remove_file(tmp)
         debug_save_fail_step = "validate_tmp"
