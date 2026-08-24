@@ -182,3 +182,70 @@ preconditions (39 damage), and the `Player.acted: changed` differential + the
 `health == max_health - 39` numeric asserts remain the contract for when the harness can
 hit the tile. The 32 existing scenario files and `playtest/_common.yaml` are untouched
 (byte-identical); `click_targeting_fixed.yaml` is the only added scenario file.
+
+---
+
+# Task battle_action_buttons — EndTurn + Attack battle buttons + `playtest/battle_end_turn_attack_buttons.yaml` (appended)
+
+## 1. Deliverables (reviewer-verified: all code/scene/contract edits correct)
+
+- `scenes/ui/hud.tscn`: authored `EndTurnButton` (anchors_preset 3, x -140..-8, y 52..88,
+  text `结束回合`) and `AttackButton` (y 96..132, text `出招 (J)`) in the right column under
+  PauseButton (y 8..44), both without a script attribute; the sibling `SkillDescLabel` node
+  (skill_desc_visible) is preserved byte-identical.
+- `scripts/ui/hud.gd`: `_battle_input_allowed()` verbatim
+  `return CombatManager.is_player_turn() and not CombatManager.get_is_paused()`;
+  `_on_end_turn_pressed()` gates then `CombatManager.end_current_turn()` (the Space call);
+  `_on_attack_pressed()` gates then LIVE `GameManager.get_player()` with
+  null/is_instance_valid/has_method triple guard before `_try_keyboard_attack()` (the J call);
+  `_wire_battle_action_buttons()` disconnect-first wiring with the `pressed_connected`
+  snapshot `{"EndTurnButton": …, "AttackButton": …}` taken AFTER the connects;
+  per-frame `disabled = not _battle_input_allowed()` refresh in `_process` BEFORE the
+  player null-check; `hud_button_overlap` / `hud_desc_overlap` computed every frame from
+  `get_global_rect().intersects(...)`. Sibling `_refresh_skill_desc_text()` /
+  `_skill_desc_label` / `_DEFAULT_SKILL_DESC_TEXT` preserved (not reverted).
+- `playtest/_common.yaml` (append-only): HUD surface += `pressed_connected` /
+  `hud_button_overlap` / `hud_desc_overlap`; new `EndTurnButton:` / `AttackButton:` surface
+  blocks (visible, size, mouse_filter, disabled); `scenario_order` tail +=
+  `battle_end_turn_attack_buttons`. No existing entry removed or altered.
+
+## 2. Scenario probe results (4 `godot_playtest_scenario` runs, repo + staged edits)
+
+Final scenario `playtest/battle_end_turn_attack_buttons.yaml` is **green 20/20** with
+`hard_passed: true` (clean run, no runtime errors). The PROBE-calibrated values recorded
+from the observed runs:
+
+- **f35 (round 1, player turn):** both buttons `visible`, `size.x/y > 0`,
+  `mouse_filter == 0`, `disabled == false`; `HUD.pressed_connected` both true;
+  `HUD.hud_button_overlap == false`; `HUD.hud_desc_overlap == false` — all green.
+- **f40 click EndTurnButton → f120:** `CombatManager.phase == "ENEMY_TURN"`,
+  `active_unit_name != "Yang Guo"`, `EndTurnButton.disabled == true` — the click ended the
+  player turn and the per-frame gate disabled the button during the enemy turn.
+- **f1500 (round 2):** `CombatManager.current_round` observed **2** (the `changed`
+  differential), `phase == "PLAYER_TURN"`, `EndTurnButton.disabled == false`,
+  `hud_button_overlap == false` — re-enabled on the player's turn. **PROBE finding:** the
+  player's round-2 position is **(5,5)**, not (7,5) — round-1 enemy skills knocked the
+  player 2 tiles west during the enemy turns (observed at f500/f1000/f1500). f1500 is the
+  safe round-2 assert frame (the player's turn stays open until end_turn).
+- **f1560/1575/1590 3× move_up → f1750:** player observed at **(5,2)** with the full 4-tile
+  budget spent (the column above (5,5) is unoccupied; the plan's (7,2) assumption was
+  invalidated by the knockback, so the destination is (5,2)).
+- **f1660 click AttackButton → f1750:** `Player.acted == true`. **PROBE finding — target
+  recalibration:** with no skill selected the button fired the basic attack at the NEAREST
+  adjacent enemy (exactly like J), which is **East_Heretic at (4,2)** (max_health **95**)
+  — Central_Divine sits out of range at (7,4), so the plan's `Central_Divine.health` assert
+  was replaced by `East_Heretic.health == max_health - 39` per the plan's own PROBE
+  instruction ("add `X.health == max_health - <n>` with probed value"). Observed damage:
+  East_Heretic 95 → **56** = 30 basic × fa_hui_du 1.3 = **39**; `turns_taken == 2` (no
+  self-inflicted or AoE damage — the 95→56 delta is exactly the one hit).
+- All 20 asserts pass; frames strictly increasing; last assert f1750 ≤ 2999.
+
+## 3. Contract compliance
+
+- All artifact paths written: `scripts/ui/hud.gd`, `scenes/ui/hud.tscn`,
+  `playtest/_common.yaml` (append-only), `playtest/battle_end_turn_attack_buttons.yaml` (new).
+- No input action / autoload / scene / dependency added; `project.godot` untouched;
+  keyboard paths (Space/J) unchanged — the buttons are additive delegates.
+- PROBE frames and the observed damage value (39 on East_Heretic, max_health 95 → 56)
+  recorded above; the only deviation from the plan's skeleton is the damage-target
+  recalibration, which the plan explicitly authorized for the probed value.
