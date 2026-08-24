@@ -53,16 +53,16 @@ visible = false
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -240.0
+offset_left = -200.0
 offset_top = 8.0
-offset_right = 240.0
+offset_right = 200.0
 offset_bottom = 72.0
 mouse_filter = 2
 script = ExtResource("3")
 
 [node name="RoundLabel" type="Label" parent="RoundIndicator"]
 layout_mode = 0
-offset_right = 480.0
+offset_right = 400.0
 offset_bottom = 20.0
 horizontal_alignment = 1
 clip_text = false
@@ -72,7 +72,7 @@ text = "回合 0"
 [node name="ActiveLabel" type="Label" parent="RoundIndicator"]
 layout_mode = 0
 offset_top = 22.0
-offset_right = 480.0
+offset_right = 400.0
 offset_bottom = 42.0
 horizontal_alignment = 1
 clip_text = false
@@ -82,7 +82,7 @@ text = "行动: "
 [node name="OrderLabel" type="Label" parent="RoundIndicator"]
 layout_mode = 0
 offset_top = 44.0
-offset_right = 480.0
+offset_right = 400.0
 offset_bottom = 64.0
 theme_override_font_sizes/font_size = 10
 horizontal_alignment = 1
@@ -103,6 +103,7 @@ text = "内力: 0"
 
 [node name="PauseButton" type="Button" parent="."]
 anchors_preset = 3
+anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -140.0
 offset_top = 8.0
