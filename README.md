@@ -4,13 +4,15 @@ A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. You boot
 
 ## What this round delivers
 
-Three coupled features, under the hard constraint that the 27 pre-existing playtest scenario files stay **byte-identical** and the protected-green scenarios stay green (achieved via the per-scenario `scene:` boot capability of the harness — the shared default `scene:` stays `res://scenes/main.tscn`, so every existing scenario boots exactly as before):
+**One action per turn, actually enforced.** The `acted` action budget was a write-only flag — the engine set it `true` on a successful basic attack / skill and reset it `false` at turn start, but **nobody ever read it to refuse a second action**, so a player could attack any number of times in one turn. This round closes that gap (design `10_systems.md` §5.1: a turn = move ≤ `moves_left` + **one action**, order free):
 
-- **A real main menu** — the new launch entry point. Four entries, **mouse-clickable** and keyboard-navigable (up/down + Enter): **新的冒险 / 读取存档 / 设置 / 退出**. 新的冒险 → character creation → tutorial; 读取存档 loads the autosave (slot 1) and is **disabled with a Chinese hint when no save exists**; 设置 opens the settings screen; 退出 quits.
-- **Character creation moved before the tutorial** (design segment 0). The rules are unchanged (30-point attribute buy with tiered pricing + innate trait/flaw toggles); what changed is the **timing** and the **interaction** — attribute +/−, trait toggles and confirm are all mouse-clickable, and the same private handlers serve keyboard and mouse.
-- **Save/load chain repair — DONE.** `save_load_roundtrip` **14/14**, `cultivation_month_cycle_and_deck_bookkeeping` **17/17**, `menu_load_continues` **14/14**; hard gate `passed: True`, runtime errors 0. Two distinct defects, both measured rather than guessed — see 「存档链:真因」 below.
+- **Player funnel gate** (`scripts/characters/player.gd`): `_try_attack_target` (L494) and `_try_keyboard_attack` (L537) refuse a second action in the same turn and emit the 7th Chinese rejection reason **「本回合已行动」** through the existing `action_hint` → HUD `ActionHintLabel` mechanism. Movement is **not** locked — the movement budget (`moves_left`/`moved`) is separate and order-free (move then act, or act then move).
+- **Engine invariant guard** (`scripts/autoload/combat_manager.gd` `_execute_action` L1172): any non-`move` action from a unit whose `acted == true` is refused at the action entry point, protecting any future caller (new AI, queued actions). Belt-and-braces behind the player gate; enemies are unaffected because their caller sets `acted = true` only *after* their single action.
+- **Scenario made true to its name**: `each_unit_acts_once_per_round_initiative_order` grows **14 → 25** asserts — the 14 turn-order asserts stay byte-identical, and 11 new asserts pin the budget (a same-turn second `attack_confirm` is rejected, target health unchanged, hint shows 「本回合已行动」).
+- **`central_divine_innate_qi_fatal_guard`** no longer depends on the multi-attack bug: its blows now land on separate player turns, and its 4 asserts (incl. the 先天罡气 guarded-lethal `health == 1`) hold.
+- **Enemy probe (measured, not assumed)**: enemies act **at most once per turn** — the caller (`_next_turn`) evaluates AI once, awaits one action, then ends. Full tables in `final/enemy_probe_notes.md`.
 
-The **tutorial protagonist is still the maxed-out Yang Guo** — the "maxed opening → reset to zero" pillar is unchanged; creation happens first precisely so the player knows from the start that they are not Yang Guo.
+The **tutorial protagonist is still the maxed-out Yang Guo** — the "maxed opening → reset to zero" pillar is unchanged.
 
 ## Quick Start
 
@@ -189,7 +191,7 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 ## HUD
 
 - **Grid overlay** (`GridLines`): 1 px semi-transparent cell boundaries across the 15×11 board plus a border ring.
-- **Action hint line** (`ActionHintLabel`): shows `按 J 出招 / 点击目标` after a technique is selected and a specific Chinese reason on every rejection — 射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在.
+- **Action hint line** (`ActionHintLabel`): shows `按 J 出招 / 点击目标` after a technique is selected and a specific Chinese reason on every rejection — 射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在 / 本回合已行动.
 - **Range/target highlight** (`RangeHighlight`): draws reachable tiles (translucent blue) and valid enemy targets (translucent red), mirroring `player.can_skill_hit()` exactly.
 - **Skill bar**: up to **12** `SkillButton` nodes; default 2 arts / 8 slots, with 左右互搏 = 3 arts / 12 slots. Each button shows the technique name, hotkey, a `发挥 ×N.N` label, and a round-based cooldown overlay with a state tag (`ready` / `cooldown` / `phase_locked` / `hp_gated` / `waiting`).
 - **Health bars** (`HealthBar`): 64 px wide, name label above, fill green→yellow→red by HP fraction.
@@ -296,18 +298,18 @@ A passing run requires a clean compile, a playtest that executes frames with no 
 ## Verification Status
 
 **Gate results:**
-- Compile: ✅ 65 scripts, 0 errors.
-- Vision: ✅ passed.
-- Unit tests: ⚠️ `no_tests_collected` — the Godot unit tests under `tests/` are unwired this round, so this is **NOT a pass** signal (see Recorded Debt #6).
-- Playtest: ✅ hard gate `passed: True`, runtime errors 0, 32/32 scenarios execute.
+- Compile: ⏳ pending — `compile_report.json` is produced by the downstream `5_compile` gate (not present this step).
+- Vision: ⏳ pending — `vision_report.json` is produced by the downstream `5_vision` gate.
+- Unit tests: ⚠️ `no_tests_collected` — the Godot unit tests under `tests/` are unwired this round, so this is **NOT a pass** signal (Recorded Debt #6).
+- Playtest: ⏳ full-suite pending — `playtest_summary.md` is produced by the downstream `5_compile` gate; this round's single-scenario probes are all green (below).
 
-**Scenario results:**
-- `save_load_roundtrip` **14/14** — fixed by `fix_save_load_roundtrip_autosave_clobber`. The failure was NOT "load-while-hosted staleness" (that refresh was already wired and working): `_after_action()` autosaved slot 1 *after* advancing the month, clobbering the manual month-3 save. See 「存档链:真因」 above.
-- `menu_load_continues` 14/14, `settings_panel` 10/10, `cultivation_month_cycle_and_deck_bookkeeping` 17/17, `main_menu_entries` 32/32, `menu_to_creation_to_tutorial_order` 19/19, `creation_mouse_interaction` 14/14.
-- `terminal_victory_8_12_rounds_hp_15_40` 5/6 — deliberately red (difficulty contract), acceptable.
-- Measure-before-act diagnostics: **recorded** — `last_io_error_code = 0`, `last_io_error_text = "OK"`, `debug_user_dir_exists = true`. See 「存档链:真因」 above.
+**Scenario results (single-scenario probes, this round — all `hard_passed: true`):**
+- `each_unit_acts_once_per_round_initiative_order` **25/25** (14 pre-existing + 11 new budget asserts).
+- `central_divine_innate_qi_fatal_guard` **4/4** (blows split across turns, guarded-lethal `health == 1`).
+- `skill_rejection_reason_texts` 3/3, `round_one_snapshot_and_turn_order` 14/14, `enemy_acts_only_after_player_ends_turn` 9/9, `cooldowns_decrement_by_round` 6/6, `two_phase_skill_unlock_and_hp_gate` 21/21, `fahui_du_multiplies_damage` 10/10, `dot_resolves_at_victim_turn_start` 9/9, `player_death_ends_battle` 27/27.
+- `terminal_victory_8_12_rounds_hp_15_40` **5/6** — deliberately red (difficulty contract), stays 5/6.
 
-**Acceptance bar — MET** (`final/verify_report.json`: `all_goals_met: true` / `ready_for_deploy: true`). 32 scenarios, **31 green**. The two residuals are both declared non-goals: the deliberately-red `terminal_victory` 5/6 (difficulty contract — the Yang Guo buff overshot at 78% remaining HP vs a 40% ceiling; stage-5 tuning) and the unwired unit-test leg (Recorded Debt #6, `no_tests_collected` is **NOT** a pass).
+**Acceptance bar — PENDING downstream gates** (`final/verify_report.json`: `all_goals_met: false` / `ready_for_deploy: false`). The code changes are complete and code-inspected, but the objective acceptance criteria (full 32-scenario playtest = 31 green with `terminal_victory` 5/6, `empty_round_stalls == 0`, runtime errors 0, compile 0 errors, and the vision/unit-test gates) are verified by the downstream `5_compile` / `5_vision` / `5_test` gates, whose reports do not yet exist at this step. The Final Verifier records these as unverifiable rather than assuming them passed.
 
 ## Recorded Debt
 
@@ -317,3 +319,4 @@ A passing run requires a clean compile, a playtest that executes frames with no 
 4. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
 5. **Segment-2 穿越 narrative content is deferred** — this run delivers only the flow skeleton; the dictated performance (切磋既毕 → 主角从天而降 → 五绝与杨过发动面子) is roadmap stage-3 content.
 6. **Unit-test gate reports `no_tests_collected`** — the Godot unit tests under `tests/` (16 `test_*.gd` + `unit_test_runner.gd`) are **unwired this round**: `no_tests_collected` is **NOT a pass** signal. Wiring the suite into `run_tests.sh` is deferred to a separate round by reviewer budget decision.
+7. **Battle mouse-attack path is untestable this round (measured inert)**: `_handle_click_targeting()` (player.gd) reads `get_global_mouse_position()` — a viewport-cached pointer the harness's synthesized `click:` cannot update (probe 0/2 with no error). Fix direction (downstream): use the `InputEventMouseButton` coordinates the handler already receives. Never ship a mouse-interaction scenario asserting only 'no runtime errors' — this failure is silent.
