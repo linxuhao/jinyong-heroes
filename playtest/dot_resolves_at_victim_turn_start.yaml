@@ -43,26 +43,295 @@ timeline:
 - at: 95
   actions:
   - end_turn
-- at: 400
+- at: 155
   actions:
   - end_turn
-- at: 800
+- at: 215
   actions:
   - end_turn
-- at: 1200
+- at: 275
   actions:
   - end_turn
-- at: 1430
+- at: 335
+  actions:
+  - end_turn
+- at: 395
+  actions:
+  - end_turn
+- at: 455
+  actions:
+  - end_turn
+- at: 515
+  actions:
+  - end_turn
+- at: 575
+  actions:
+  - end_turn
+- at: 635
+  actions:
+  - end_turn
+- at: 695
+  actions:
+  - end_turn
+- at: 755
+  actions:
+  - end_turn
+- at: 815
+  actions:
+  - end_turn
+- at: 875
+  actions:
+  - end_turn
+- at: 935
+  actions:
+  - end_turn
+- at: 995
+  actions:
+  - end_turn
+- at: 1055
+  actions:
+  - end_turn
+- at: 1115
+  actions:
+  - end_turn
+- at: 1175
+  actions:
+  - end_turn
+- at: 1235
+  actions:
+  - end_turn
+- at: 1295
+  actions:
+  - end_turn
+- at: 1355
+  actions:
+  - end_turn
+- at: 1415
+  actions:
+  - end_turn
+- at: 1475
+  actions:
+  - end_turn
+- at: 1535
+  actions:
+  - end_turn
+- at: 1595
+  actions:
+  - end_turn
+- at: 1655
+  actions:
+  - end_turn
+- at: 1715
+  actions:
+  - end_turn
+- at: 1775
+  actions:
+  - end_turn
+- at: 1835
+  actions:
+  - end_turn
+- at: 1895
+  actions:
+  - end_turn
+- at: 1955
+  actions:
+  - end_turn
+# --- temporary diagnostic sweep (FINE: round-5 WP poison window + round-6/7 anchors) ---
+- at: 560
   actions: []
   assert:
-    CombatManager.current_round: 4
-    CombatManager.phase: phase == "ENEMY_TURN"
-    CombatManager.active_unit_name: active_unit_name == "West Poison"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == 152
-- at: 2400
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 565
   actions: []
   assert:
-    CombatManager.current_round: 5
-    Player.health: health == 168 and health > 0
-    CombatManager.last_turn_actor: changed
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 570
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 575
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 580
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 585
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 590
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 595
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 600
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 605
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 610
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 615
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 620
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 625
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 630
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 635
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 640
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 660
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 680
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 700
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 720
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 740
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names == ["NEVER"]
+    West_Poison.skill_cooldowns: skill_cooldowns == []
