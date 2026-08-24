@@ -379,7 +379,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT \
 			and event.pressed:
-		_handle_click_targeting()
+		_handle_click_targeting(event)
 		get_viewport().set_input_as_handled()
 
 
@@ -459,8 +459,14 @@ func _on_move_completed() -> void:
 
 ## Handle a left mouse click: find which enemy (if any) was clicked on the grid
 ## and execute the appropriate action.
-func _handle_click_targeting() -> void:
-	var click_world: Vector2 = get_global_mouse_position()
+func _handle_click_targeting(event: InputEventMouseButton) -> void:
+	# Use the click event's own viewport coordinates, converted to battlefield
+	# world space, instead of the viewport-cached pointer position. The canvas
+	# transform is identity today (no Camera2D offset in the battlefield; the
+	# main camera is centered with zero offset), so event.position already equals
+	# world coordinates; the affine inverse keeps the path correct if a camera
+	# ever moves or zooms.
+	var click_world: Vector2 = get_canvas_transform().affine_inverse() * event.position
 	var click_grid: Vector2i = GridManager.world_to_grid(click_world)
 
 	# Iterate living enemies to see if one occupies the clicked tile.

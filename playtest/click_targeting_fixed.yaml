@@ -1,0 +1,70 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# PROVES defect-1 fix: world-click attack now reads the click event's own
+# viewport coordinates (get_canvas_transform().affine_inverse() * event.position)
+# instead of the viewport-cached pointer, which synthesized harness clicks cannot
+# update. The player walks to (7,2), adjacent to Central_Divine at (7,1), then a
+# real InputEventMouseButton (left, pressed) is fired at Central_Divine's rect
+# center. If the click lands, Player.acted flips false→true (the "changed"
+# differential — the click changed state) and Central_Divine takes 39 damage
+# (basic attack 30 × fa_hui_du 1.3; Central has no damage reduction — PROBE
+# number, recalibrate to observed if a run disagrees).
+name: click_targeting_fixed
+description: >-
+  The mouse attack path after the defect-1 fix: player moves to (7,2), a real
+  InputEventMouseButton is fired at Central_Divine's rect center (harness
+  clicks: key), and the click must flip Player.acted false→true and deal
+  30 * 1.3 = 39 damage (basic attack × fa_hui_du; Central has no damage
+  reduction). Player.acted "changed" is the primary click→action proof and the
+  contract's hard differential rule; the 39 is the PROBEd numeric damage proof.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 40
+  actions:
+  - move_up
+- at: 55
+  actions:
+  - move_up
+- at: 70
+  actions:
+  - move_up
+- at: 100
+  actions: []
+  clicks:
+  - Central_Divine
+- at: 140
+  actions: []
+  assert:
+    Player.acted: changed
+    Central_Divine.health: health == max_health - 39

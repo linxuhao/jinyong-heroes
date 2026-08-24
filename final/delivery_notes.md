@@ -129,3 +129,56 @@ re-querying `get_global_mouse_position()`).
 - No figure contradicts repo evidence: every probe/assert number matches
   `final/enemy_probe_notes.md`, `final/delivery_notes_each_unit_acts_once_double_attack.md`,
   or the assert count of the two scenario YAMLs.
+
+---
+
+# Task click_target_fix — defect-1 fix + `playtest/click_targeting_fixed.yaml` (appended)
+
+## 1. Code fix (scripts/characters/player.gd — exactly the three contract sites)
+
+1. Dispatch site (`_unhandled_input`, the already-narrowed left-click `elif`): call is now
+   `_handle_click_targeting(event)` — the `InputEventMouseButton` is passed through.
+2. Signature: `func _handle_click_targeting(event: InputEventMouseButton) -> void:`.
+3. Body: `var click_world: Vector2 = get_canvas_transform().affine_inverse() * event.position`
+   (replaces `get_global_mouse_position()`; `get_global_mouse_position` no longer appears
+   anywhere in the repo's `.gd` files).
+
+The unified input gate (state == BATTLE / `is_player_turn()` / not paused / not `is_moving`),
+the enemy-match loop, `_try_attack_target` gates and auto-deselect are byte-identical.
+
+## 2. Probe results (5 `godot_playtest_scenario` runs, all against repo + staged fix)
+
+**Observed damage number CONFIRMED (keyboard control probe, identical timeline):**
+boot default `main.tscn`, 7× `ui_accept` f3..15, 3× `tutorial_next` f20/25/30, `move_up` ×3
+f40/55/70 → player (7,2), `attack_confirm` at f100 (no skill selected → basic attack):
+`Player.acted == true` and `Central_Divine.health` observed **91** (full 130 − **39** =
+30 × fa_hui_du 1.3; Central has no damage reduction). The timeline and the 39 assert are
+both correct — the scenario's numeric assert is NOT wrong.
+
+**`clicks:` harness diagnostics (the enemy-click leg):**
+- `clicks: [SkillButton1]` at f85 → `Player.selected_skill_index` observed **0** — the
+  harness delivers a real click at a Control's rect center (button `pressed` fired).
+- `clicks: [Central_Divine]` at f100 (enemy at grid (7,1), node at (480,96)) → **completely
+  inert**: `Player.acted` stayed false, `ActionHintLabel.text` stayed `""` (so
+  `_try_attack_target` never ran with a matched enemy — no rejection hint either),
+  `Central_Divine.health` stayed 130. No runtime error (run hard-passed).
+- `clicks: [HealthBar]` → hard runtime error revealing the mechanism:
+  `"click: node has mouse_filter=IGNORE (cannot be hit): HealthBar"` — the harness targets
+  **Control nodes via `get_global_rect()` + `mouse_filter`**; it cannot compute a click
+  point on the enemy's grid tile for a bare `Node2D` (the enemy node is `Node2D` with a
+  `Sprite2D` child; its sprite visual centre sits off the tile, so no tile-based click is
+  produced and nothing reaches `_handle_click_targeting`).
+
+**Status: scenario authored as the target contract; fix correct but unproven-by-harness.**
+The `clicks:` node-targeting capability is **Control-only** in the harness as it exists
+today (README debt #2: "the harness has no coordinate input"; this task's probe extends
+that: Control clicks work, Node2D clicks do not). The enemy-click leg of
+`click_targeting_fixed.yaml` therefore cannot be driven green by the harness, so this task
+claims **NO harness-verified mouse-path attack**: the click-to-attack proof awaits either a
+coordinate-capable `clicks:` key or a Control hit-surface on enemies (out of scope —
+task contract allows code edits only in `scripts/characters/player.gd`). What IS verified:
+the fix compiles/parses clean, the keyboard path on the identical timeline proves the
+preconditions (39 damage), and the `Player.acted: changed` differential + the
+`health == max_health - 39` numeric asserts remain the contract for when the harness can
+hit the tile. The 32 existing scenario files and `playtest/_common.yaml` are untouched
+(byte-identical); `click_targeting_fixed.yaml` is the only added scenario file.
