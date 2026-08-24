@@ -1,0 +1,96 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Movement-range highlight (gap 7): MoveRangeHighlight is a green BFS mirror of
+# player._try_move showing every tile the player can still reach with the
+# remaining movement budget. Round 1, player at (7,5), moves_left 4: the
+# |dx|+|dy| <= 4 diamond (41 tiles) loses only the two occupied tiles inside it
+# ((7,1) Central_Divine and (7,9)) → tile_count 39 (PROBE: assert > 0, record
+# observed). fill_color observables on BOTH highlights prove green-vs-blue
+# distinctness numerically. After 3x move_up (budget 1, tile_count changes), the
+# REGRESSION PIN: act (skill_1 + attack_confirm) WITHOUT moving → acted == true
+# AND moves_left == 1 AND the highlight STAYS visible — an action does not spend
+# the movement budget (design §5.1 order-free move+action; _try_move never reads
+# acted). After end_turn the highlight hides (enemy turn, is_player_turn false).
+name: movement_range_highlight
+description: >-
+  The movement-range highlight: green BFS mirror of _try_move, visible on the
+  player's turn with moves_left > 0 (round 1, player (7,5), budget 4 → 39-tile
+  diamond minus the two occupied landing tiles); color-distinct from the blue
+  skill-range highlight via fill_color observables; shrinks as budget is spent;
+  stays visible AFTER acting (acted is not a visibility condition — acting does
+  not spend movement); hides on the enemy turn after end_turn.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 35
+  actions: []
+  assert:
+    MoveRangeHighlight.visible: visible == true
+    MoveRangeHighlight.tile_count: tile_count > 0
+    MoveRangeHighlight.fill_color: fill_color.g > fill_color.r and fill_color.g > fill_color.b
+    RangeHighlight.fill_color: fill_color.b > fill_color.r and fill_color.b > fill_color.g
+- at: 40
+  actions:
+  - move_up
+- at: 55
+  actions:
+  - move_up
+- at: 70
+  actions:
+  - move_up
+- at: 85
+  actions: []
+  assert:
+    Player.moves_left: moves_left == 1
+    MoveRangeHighlight.tile_count: changed
+- at: 90
+  actions:
+  - skill_1
+- at: 95
+  actions:
+  - attack_confirm
+- at: 110
+  actions: []
+  assert:
+    Player.acted: acted == true
+    Player.moves_left: moves_left == 1
+    MoveRangeHighlight.visible: visible == true
+    MoveRangeHighlight.tile_count: tile_count > 0
+- at: 140
+  actions:
+  - end_turn
+- at: 150
+  actions: []
+  assert:
+    MoveRangeHighlight.visible: visible == false
+    MoveRangeHighlight.tile_count: tile_count == 0

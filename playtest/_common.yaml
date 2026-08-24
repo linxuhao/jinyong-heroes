@@ -400,6 +400,11 @@ surface:
   - visible
   - tile_count
   - target_count
+  - fill_color
+  MoveRangeHighlight:
+  - visible
+  - tile_count
+  - fill_color
   SceneManager:
   - current_scene
   - pending_swap
@@ -545,3 +550,4 @@ scenario_order:
 - menu_load_continues
 - settings_panel
 - skill_description_visible
+- movement_range_highlight

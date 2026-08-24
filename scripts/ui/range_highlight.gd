@@ -32,6 +32,11 @@ const TARGET_EDGE: Color = Color(1.00, 0.30, 0.20, 0.75)
 # Observables (playtest surface contract)
 # ---------------------------------------------------------------------------
 
+## Observable fill color — the exact REACH_FILL constant, exposed so playtest
+## scenarios can assert blue-dominant distinctness vs MoveRangeHighlight's
+## green fill. Read-only observable; zero behavior change.
+var fill_color: Color = REACH_FILL
+
 ## Number of tiles in the reachable set (0 when hidden or for "global" shape).
 var tile_count: int = 0
 
