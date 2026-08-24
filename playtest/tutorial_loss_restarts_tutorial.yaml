@@ -41,4 +41,4 @@ timeline:
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
     SceneManager.current_scene: current_scene == "battlefield"
-    Player.health: health == 500
+    Player.health: health == max_health

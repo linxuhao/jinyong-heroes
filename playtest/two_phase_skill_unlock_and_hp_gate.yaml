@@ -2,7 +2,15 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: two_phase_skill_unlock_and_hp_gate
-description: Rounds 1-3 phase-lock palm arts (buttons 5-8); round 4 unlocks 5-7, and button 8's HP gate (usable only below 50% HP) is tracked by the pure hp_gated predicate.
+description: >-
+  Rounds 1-3 phase-lock the palm arts (buttons 5-8); round 4 unlocks 5-7, and the HP
+  gate on button 8 (usable only below 50% HP) is tracked by the pure hp_gated
+  predicate. The below-half precondition is INJECTED at f2600 via
+  debug_damage_player (apply_damage down to 40% of max, the normal damage pipeline),
+  NOT ground out by the enemies: whether five rounds of enemy attacks happen to take
+  Yang Guo past half health is a BALANCE outcome, and tying a gate-logic test to it
+  meant every buff reddened this scenario. Every HP assert is written against
+  max_health so the contract survives the next rebalance too.
 timeline:
 - at: 3
   actions:
@@ -29,7 +37,7 @@ timeline:
   actions: []
   assert:
     CombatManager.current_round: 1
-    Player.health: 500
+    Player.health: health == max_health
     SkillButton1.disabled: false
     SkillButton2.disabled: false
     SkillButton3.disabled: false
@@ -59,11 +67,14 @@ timeline:
 - at: 2150
   actions:
   - end_turn
+- at: 2600
+  actions:
+  - debug_damage_player
 - at: 2700
   actions: []
   assert:
     CombatManager.current_round: current_round >= 4
-    Player.health: health < 250
+    Player.health: health < max_health * 0.5
     SkillButton1.hp_gated: false
     SkillButton5.disabled: false
     SkillButton6.disabled: false

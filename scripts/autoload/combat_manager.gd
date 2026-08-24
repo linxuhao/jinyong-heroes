@@ -180,6 +180,15 @@ var debug_death_target_name: String = ""
 ## is unchanged (the structural classification lands in a later stage).
 var debug_death_classified_player: bool = false
 
+
+## Observable: how many DoT ticks have actually been APPLIED, and the damage
+## the last one dealt. The DoT scenario used to pin absolute HP (health == 326)
+## to prove the tick fired, which silently also pinned every enemy attack that
+## landed before the sample — so a balance change reddened a scenario that
+## tests tick ORDERING, not damage. Counting the mechanism decouples the two.
+var debug_dot_ticks_applied: int = 0
+var debug_dot_last_tick: int = 0
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -377,6 +386,29 @@ func debug_poison_player() -> void:
 	if player == null or not is_instance_valid(player):
 		return
 	apply_dot(player, 8, 2, DEFAULT_FA_HUI_DU)
+
+
+## DEBUG hook (unbound harness action, consumed by GameManager._process): drive
+## the player DOWN TO 40% of max HP through the normal apply_damage pipeline.
+## Fixture for the HP-gate scenario: button 8 unlocks below 50% HP, and the
+## scenario used to reach that by letting the enemies grind the player down —
+## which made a LOGIC test (does the gate open?) depend on a BALANCE outcome
+## (is the player beatable in five rounds?). Injecting the precondition means
+## the gate stays tested no matter how the numbers move. No-op when no battle
+## is running, or when the player is already below the gate.
+func debug_damage_player() -> void:
+	if not _battle_active():
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	if not ("health" in player and "max_health" in player):
+		return
+	var target_hp: int = int(round(float(player.max_health) * 0.4))
+	var delta: int = int(player.health) - target_hp
+	if delta <= 0:
+		return
+	apply_damage(player, delta, null, false, true)
 
 
 ## True while a battle is actually running: the player exists, the engine is
@@ -712,6 +744,8 @@ func _tick_statuses(unit: Node) -> void:
 		if id == "poison" and rounds > 0:
 			var tick: int = int(st.get("params", {}).get("tick", 0))
 			if tick > 0:
+				debug_dot_ticks_applied += 1
+				debug_dot_last_tick = tick
 				apply_damage(unit, tick, st.get("params", {}).get("source", null), false)
 
 		rounds -= 1

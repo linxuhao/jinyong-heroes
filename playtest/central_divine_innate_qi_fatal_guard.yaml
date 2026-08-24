@@ -43,7 +43,7 @@ timeline:
 - at: 140
   actions: []
   assert:
-    Central_Divine.health: health == 71
+    Central_Divine.health: health < max_health
 - at: 150
   actions:
   - end_turn

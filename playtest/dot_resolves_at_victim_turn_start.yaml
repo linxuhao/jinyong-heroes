@@ -1,8 +1,25 @@
-# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# One play-test scenario. Loaded by playtest/_common.yaml sibling scan —
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: dot_resolves_at_victim_turn_start
-description: 'Fixture-driven DoT contract (branch b — the premise is INJECTED, never AI-applied): debug_poison_player applies Spirit Serpent poison on the player''s round-1 turn (stored tick round(8*1.3)=10, 2 rounds) and the first asserted behavior is that poison IS applied (f40). Tick #1 resolves at the VICTIM''s own turn start — the first PLAYER_TURN frame after the round-1 enemy phase (f250): health 310 -> 326 = -10 tick +26 神雕之力 regen (regen fires after the tick, design/10_systems.md §5.2), rounds 2 -> 1, poison still present. Tick #2 resolves at the round-3 turn start (f370): rounds 1 -> 0, poison removed, health 291. Deterministic zero-RNG line; HP pins read from the probe run.'
+description: >-
+  Fixture-driven DoT contract (the premise is INJECTED, never AI-applied):
+  debug_poison_player applies Spirit Serpent poison on the round-1 player turn
+  through the normal apply_dot pipeline, stored tick round(8*1.3) = 10 over 2
+  rounds. Three claims, in order: (a) applying poison does NOT tick it — at f40
+  the status is present and debug_dot_ticks_applied is still 0; (b) tick #1
+  resolves at the VICTIM OWN turn start, the first PLAYER_TURN frame after the
+  round-1 enemy phase; (c) the status clears after exactly 2 ticks.
+
+  This used to assert absolute HP (health == 326, then 291). Those pins did not
+  measure the tick — they measured the tick PLUS every enemy blow that had
+  landed by the sample frame PLUS the 神雕之力 regen, so any balance change
+  reddened a scenario that tests tick ORDERING. Counting the mechanism
+  (debug_dot_ticks_applied / debug_dot_last_tick, combat_manager.gd:
+  _tick_statuses) isolates the contract and pins the tick magnitude directly.
+  The counter is global across units, which is deliberate: it is currently the
+  only DoT in play, so if another one ever starts landing this scenario says so
+  instead of silently absorbing it.
 timeline:
 - at: 3
   actions:
@@ -28,24 +45,30 @@ timeline:
 - at: 20
   actions:
   - debug_poison_player
+# (a) applied, but NOT yet ticked — the tick belongs to the victim turn start.
 - at: 40
   actions: []
   assert:
     Player.status_names: status_names.has("poison") == true
+    CombatManager.debug_dot_ticks_applied: debug_dot_ticks_applied == 0
 - at: 60
   actions:
   - end_turn
+# (b) tick #1 lands at the first PLAYER_TURN frame after the enemy phase.
 - at: 250
   actions: []
   assert:
     CombatManager.phase: phase == "PLAYER_TURN"
     Player.status_names: status_names.has("poison") == true
-    Player.health: health == 326
+    CombatManager.debug_dot_ticks_applied: debug_dot_ticks_applied == 1
+    CombatManager.debug_dot_last_tick: debug_dot_last_tick == 10
 - at: 270
   actions:
   - end_turn
+# (c) tick #2 resolves and the 2-round status expires.
 - at: 370
   actions: []
   assert:
     Player.status_names: status_names.has("poison") == false
-    Player.health: health == 291
+    CombatManager.debug_dot_ticks_applied: debug_dot_ticks_applied == 2
+    CombatManager.debug_dot_last_tick: debug_dot_last_tick == 10

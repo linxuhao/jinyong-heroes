@@ -230,36 +230,36 @@ func _create_all_skill_data() -> Dictionary:
 	# --- Yang Guo: Profound Iron Sword Art (hotkeys 1-4) ---
 	skills["heavy_edge"] = _skill("重剑无锋",
 		"Single-target heavy strike with knockback. 1 round cooldown.",
-		45, 1, 1, "single", 0, "self", 1)
+		63, 1, 1, "single", 0, "self", 1)
 	skills["grand_simplicity"] = _skill("大巧不工",
 		"Line attack reaching 3 tiles. 2 round cooldown.",
-		38, 3, 2, "line", 3, "self", 0)
+		53, 3, 2, "line", 3, "self", 0)
 	skills["thousand_force_cleave"] = _skill("力斩千钧",
 		"Cross strike with 2-tile arms centered on self. 3 round cooldown.",
-		34, 2, 3, "cross", 2, "self", 0)
+		48, 2, 3, "cross", 2, "self", 0)
 	var boundless_seas = _skill("四海无量",
 		"Finisher: shockwave around self with radius 2. 6 round cooldown.",
-		70, 2, 6, "square", 2, "self", 0)
+		98, 2, 6, "square", 2, "self", 0)
 	boundless_seas.is_finisher = true
 	skills["boundless_seas"] = boundless_seas
 
 	# --- Yang Guo: Melancholy Palms (hotkeys 5-8) ---
 	skills["heart_rending_strike"] = _skill("心惊肉跳",
 		"Single-target palm strike. 1 round cooldown.",
-		38, 1, 1, "single", 0, "self", 0)
+		53, 1, 1, "single", 0, "self", 0)
 	var dragging_mire = _skill("拖泥带水",
 		"Single-target palm strike that reduces the target's next move. 2 round cooldown.",
-		25, 1, 2, "single", 0, "self", 0)
+		35, 1, 2, "single", 0, "self", 0)
 	dragging_mire.status_applied = "move_minus_next_turn"
 	skills["dragging_mire"] = dragging_mire
 	var wandering_valley = _skill("徘徊空谷",
 		"Jump up to 3 tiles and strike all units adjacent to the landing tile. 3 round cooldown.",
-		20, 3, 3, "adjacent", 0, "landing", 0)
+		28, 3, 3, "adjacent", 0, "landing", 0)
 	wandering_valley.jump_tiles = 3
 	skills["wandering_valley"] = wandering_valley
 	var seventeen_forms = _skill("黯然销魂十七式",
 		"Finisher: strike all adjacent units with heavy knockback. Usable only below 50% HP. 8 round cooldown.",
-		70, 0, 8, "adjacent", 0, "self", 2)
+		98, 0, 8, "adjacent", 0, "self", 2)
 	seventeen_forms.hp_gate_below_ratio = 0.5
 	seventeen_forms.is_finisher = true
 	skills["seventeen_melancholy_forms"] = seventeen_forms
@@ -469,7 +469,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	var cd = CharacterData.new()
 	cd.character_name = "Yang Guo"
 	cd.display_name = "杨过"
-	cd.max_health = 500
+	cd.max_health = 1000
 	cd.move_range = 4
 	cd.attack_damage = 30
 	cd.attack_range = 1

@@ -1,8 +1,23 @@
-# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# One play-test scenario. Loaded by playtest/_common.yaml sibling scan —
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: player_death_ends_battle
-description: 'Regression for the round invariant "the battle must be able to end": replays the LOSING line of terminal_victory_8_12_rounds_hp_15_40 (byte-identical inputs f3..f2630; PROBE #1 showed the shorter no-input-after-f650 line never kills the player because the player''s turn is event-driven and waits forever, so the full line is required to reach round-10 HP=0), then no further input. Asserts that from the first post-death sample (f2660) the state is LOST with the 战败 overlay at every sample — never a silently continuing BATTLE — with empty_round_stalls staying 0.'
+description: >-
+  Round invariant: the battle must be ABLE to end. Player death stops the round
+  loop, sets LOST with the 战败 overlay, and stays there — never a silently
+  continuing BATTLE.
+
+  The premise is INJECTED, not played out. This scenario used to replay a
+  2630-frame losing input line to grind the player to 0 HP, which made a LOGIC
+  test depend on a BALANCE outcome: the moment Yang Guo was strong enough to
+  survive that line, the scenario went red while the logic it guards was still
+  perfectly correct. debug_lose_tutorial routes through CombatManager.
+  debug_kill_player -> apply_damage, i.e. the same death path a killing enemy
+  blow takes, so the classification fields below are exercised exactly as
+  before. The kill lands at f620 — MID-BATTLE, after round 1 has fully
+  resolved and the player has spent a real turn — so what is under test is that
+  an in-flight round loop halts on death, not merely that a fresh battle can be
+  aborted.
 timeline:
 - at: 3
   actions:
@@ -25,6 +40,8 @@ timeline:
 - at: 15
   actions:
   - ui_accept
+# A real round first: move into range, strike, end the turn, let the enemy
+# phase run. Death must interrupt a loop that is genuinely turning.
 - at: 46
   actions:
   - move_up
@@ -43,88 +60,18 @@ timeline:
 - at: 121
   actions:
   - end_turn
+- at: 600
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    Player.health: health > 0
+    GameManager.current_state: current_state != "LOST"
 - at: 620
   actions:
-  - skill_4
-- at: 635
-  actions:
-  - attack_confirm
-- at: 650
-  actions:
-  - end_turn
-- at: 970
-  actions:
-  - skill_3
-- at: 985
-  actions:
-  - attack_confirm
-- at: 1000
-  actions:
-  - end_turn
-- at: 1045
-  actions:
-  - skill_8
-- at: 1060
-  actions:
-  - attack_confirm
-- at: 1075
-  actions:
-  - end_turn
-- at: 1300
-  actions:
-  - skill_1
-- at: 1315
-  actions:
-  - attack_confirm
-- at: 1330
-  actions:
-  - end_turn
-- at: 1560
-  actions:
-  - skill_3
-- at: 1575
-  actions:
-  - attack_confirm
-- at: 1590
-  actions:
-  - end_turn
-- at: 1820
-  actions:
-  - skill_7
-- at: 1835
-  actions:
-  - attack_confirm
-- at: 1850
-  actions:
-  - end_turn
-- at: 2080
-  actions:
-  - skill_4
-- at: 2095
-  actions:
-  - attack_confirm
-- at: 2110
-  actions:
-  - end_turn
-- at: 2340
-  actions:
-  - skill_5
-- at: 2355
-  actions:
-  - attack_confirm
-- at: 2370
-  actions:
-  - end_turn
-- at: 2600
-  actions:
-  - skill_1
-- at: 2615
-  actions:
-  - attack_confirm
-- at: 2630
-  actions:
-  - end_turn
-- at: 2660
+  - debug_lose_tutorial
+# No input from here on. LOST must PERSIST — the four samples below are the
+# whole point: a battle that ends and then quietly resumes is the bug.
+- at: 700
   actions: []
   assert:
     Player.health: health == 0
@@ -133,7 +80,7 @@ timeline:
     CombatManager.empty_round_stalls: empty_round_stalls == 0
     CombatManager.debug_death_classified_player: debug_death_classified_player == true
     CombatManager.debug_death_target_name: debug_death_target_name == "Player"
-- at: 2740
+- at: 1400
   actions: []
   assert:
     Player.health: health == 0
@@ -142,7 +89,7 @@ timeline:
     CombatManager.empty_round_stalls: empty_round_stalls == 0
     CombatManager.debug_death_classified_player: debug_death_classified_player == true
     CombatManager.debug_death_target_name: debug_death_target_name == "Player"
-- at: 2820
+- at: 2200
   actions: []
   assert:
     Player.health: health == 0

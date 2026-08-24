@@ -64,6 +64,7 @@ actions:
 - debug_grant_art
 - debug_enter_encounter
 - debug_poison_player
+- debug_damage_player
 - skill_9
 - skill_10
 - skill_11
@@ -88,6 +89,8 @@ surface:
   - empty_round_stalls
   - debug_death_target_name
   - debug_death_classified_player
+  - debug_dot_ticks_applied
+  - debug_dot_last_tick
   GameManager:
   - current_state
   - end_overlay_text
