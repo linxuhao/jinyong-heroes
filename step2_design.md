@@ -238,8 +238,11 @@ baseline" appendix). Nothing in this design changes game logic, combat balance, 
 ### C6 — Movement-range highlight (new `scripts/ui/move_range_highlight.gd` + `scenes/battlefield.tscn`)
 
 - **Responsibility:** show every tile the player could still reach with the remaining movement
-  budget, using the exact `_try_move` rules — the displayed set must never suggest a move
-  `_try_move` would refuse.
+  budget, using the exact `_try_move` rules. The displayed set must **equal** the executable set:
+  it must never suggest a move `_try_move` would refuse, **and it must never omit a move
+  `_try_move` would allow**. Over-showing and under-showing are both the interface lying about
+  the rules; under-showing is the more insidious one — the player just believes a tile is
+  unreachable and stops trying.
 - **Pattern reuse:** a sibling of `RangeHighlight` (`range_highlight.gd` — self-driving
   `_process`, cheap-diff keys, `_hide()` as the only writer of `visible = false`, observables).
   Node: `Battlefield/MoveRangeHighlight` (Node2D) with the new script, added to `battlefield.tscn`
@@ -263,13 +266,21 @@ baseline" appendix). Nothing in this design changes game logic, combat balance, 
   The origin tile is included (cost 0). The occupied slide-through tile itself is NOT in the set
   (it is never a legal landing tile). Border ring is excluded by `is_walkable` automatically.
 - **Visibility rule:** show only while `GameManager.get_state() == BATTLE` **and**
-  `CombatManager.is_player_turn()` **and** `not player.acted` **and** the player is valid.
-  (After acting, the movement budget is spent; the highlight hides — matches semantics, not just
-  presentation.) No tutorial gating: during TUTORIAL state `is_player_turn()` is false → hidden.
+  `CombatManager.is_player_turn()` **and** `player.moves_left > 0` **and** the player is valid.
+  **`acted` is deliberately NOT a condition.** Design §5.1 makes move and action order-free
+  (≤ 移动力格 of movement + one action, either order), and `_try_move` (player.gd L391-400) gates
+  only on the tutorial `move` allowance and `moves_left <= 0` — it never reads `acted` (the only
+  two readers of `acted` in the file are the attack paths, L494/L537). A unit that has acted but
+  still has movement budget can still walk; hiding the highlight then would show the player a
+  board that says "you cannot move" while the engine accepts the move — the exact
+  interface-lies-about-the-rules defect this round exists to eliminate, in the over-conservative
+  direction. What governs movement is `moves_left`, so `moves_left > 0` is the only budget
+  condition. No tutorial gating: during TUTORIAL state `is_player_turn()` is false → hidden.
 - **Diff keys:** `grid_pos`, `moves_left`, `acted`, and an occupancy signature
   (sorted join of `GridManager.occupancy.keys()`), mirroring the RangeHighlight cheap-diff so
   `empty_round_stalls` can never be triggered by this node. Recompute → `queue_redraw()` only on
-  change.
+  change. `acted` may stay in the diff-key set (it cannot change the reachable set, so it cannot
+  hurt), but it must never enter the visibility condition — see the visibility rule above.
 - **Colors (assertable distinctness — success criterion 5):**
   - `MOVE_FILL = Color(0.35, 0.85, 0.30, 0.16)`, `MOVE_EDGE = Color(0.35, 0.85, 0.30, 0.45)`
     (green family) — vs skill REACH blue (0.30,0.65,1.00) and TARGET red (1.00,0.30,0.20).
@@ -431,15 +442,25 @@ baseline" appendix). Nothing in this design changes game logic, combat balance, 
      (default guidance). `skill_1` f35 → f50: `SkillDescLabel.text: text.contains("击退") == true`
      (heavy_edge 文案) and `text.contains("点击") == false`. `skill_1` again f55 (toggle-off) →
      f70: default text restored (`text.contains("点击") == true`).
-  5. **`movement_range_highlight.yaml`** — 7× `ui_accept` f3..f15. Assert f30 (round 1, player
-     turn, moves_left 4): `MoveRangeHighlight.visible == true`; `tile_count > 0` (PROBE: expect
-     40 — the |dx|+|dy| ≤ 4 diamond from (7,5) lies fully inside the border ring and loses only
-     the occupied (7,1)); `MoveRangeHighlight.fill_color: fill_color.g > fill_color.r and fill_color.g > fill_color.b`
+  5. **`movement_range_highlight.yaml`** — 7× `ui_accept` f3..f15; then 3× `tutorial_next`
+     f20/f25/f30 so `attack_confirm` is allowed (needed by the act-then-look segment below).
+     Assert f35 (round 1, player turn, moves_left 4): `MoveRangeHighlight.visible == true`;
+     `tile_count > 0` (PROBE: expect 40 — the |dx|+|dy| ≤ 4 diamond from (7,5) lies fully inside
+     the border ring and loses only the occupied (7,1));
+     `MoveRangeHighlight.fill_color: fill_color.g > fill_color.r and fill_color.g > fill_color.b`
      (green-dominant); `RangeHighlight.fill_color: fill_color.b > fill_color.r and fill_color.b > fill_color.g`
      (blue-dominant) — together the color-distinctness proof. `move_up` ×3 f40/f55/f70 → f85
-     `Player.moves_left == 1` and `MoveRangeHighlight.tile_count: changed`. `end_turn` f100 →
-     f200 (PROBE) `MoveRangeHighlight.visible == false` and `tile_count == 0` (enemy turn).
-     Optionally at ~f1500 (PROBE) round changed and highlight visible again on the next player turn.
+     `Player.moves_left == 1` and `MoveRangeHighlight.tile_count: changed`. **Act without
+     moving:** `skill_1` f90, `attack_confirm` f95 (heavy_edge from (7,2) hits the adjacent
+     Central_Divine at (7,1)) → f110 **the regression assert for this rule**:
+     `Player.acted == true` **and** `Player.moves_left == 1` **and**
+     `MoveRangeHighlight.visible == true` **and** `tile_count > 0` — the highlight must stay
+     visible after acting, because an action does NOT spend the movement budget (design §5.1:
+     move and action are order-free; `_try_move` never reads `acted`). This is the pin for the
+     reviewer-flagged rule: a run that hides the highlight on `acted` fails here.
+     `end_turn` f140 → f240 (PROBE) `MoveRangeHighlight.visible == false` and `tile_count == 0`
+     (enemy turn). Optionally at ~f1500 (PROBE) round changed and highlight visible again on the
+     next player turn.
   6. **`battle_end_turn_attack_buttons.yaml`** — 7× `ui_accept` f3..f15; 3× `tutorial_next`
      f20/f25/f30. Assert f35: `EndTurnButton.visible == true`, `size.x > 0`,
      `mouse_filter == 0`, `disabled == false`; `AttackButton` same; `HUD.pressed_connected`
@@ -544,8 +565,13 @@ HUD geometry/disabled refresh) is read-only observation.
 - **D5 (C7):** `AttackButton` = J, not "basic attack only": `_try_keyboard_attack` fires the
   selected skill or falls back to basic attack. Label `出招 (J)` advertises the key.
 - **D6 (C6):** BFS mirrors `_try_move` bit-for-bit (walkable, unoccupied landing, 身轻如燕
-  slide cost 2 with budget ≥ 2); the displayed set is a subset of the executable set.
-- **D7 (C6):** hide the movement highlight once `acted` — after acting the budget is spent.
+  slide cost 2 with budget ≥ 2); the displayed set equals the executable set — it must neither
+  suggest a move `_try_move` would refuse, nor omit a move `_try_move` would allow.
+- **D7 (C6):** movement-highlight visibility is governed by `moves_left > 0` (plus BATTLE state
+  and player turn), NOT by `acted`. Design §5.1 makes move and action order-free and `_try_move`
+  never reads `acted`; hiding the highlight after acting would show the player a board that says
+  "cannot move" while the engine accepts the move — an over-conservative lie. `acted` stays in
+  the diff-key set only.
 - **D8 (C6):** green/blue color distinctness is asserted numerically via `fill_color` observables
   on both highlight nodes ("just visible" proves nothing).
 - **D9 (C5):** the description label is always visible (default guidance → selected skill's
@@ -568,8 +594,12 @@ HUD geometry/disabled refresh) is read-only observation.
 ## Appendix — Verified baseline (file:line references, 2026-08-24)
 
 - `scripts/characters/player.gd`: input gate L299-307; click dispatch L379-383; broken click
-  targeting L462-463; `_try_move` L391-439 (walkable, occupied, 身轻如燕 slide cost 2);
+  targeting L462-463; `_try_move` L391-439 — gate at L391-400 reads ONLY the tutorial `move`
+  allowance and `moves_left <= 0`, never `acted` (`acted` is read only on the attack paths
+  L494/L537); then walkable, occupied, 身轻如燕 slide cost 2;
   `_try_keyboard_attack` L536; `_try_attack_target` L490-529; `can_skill_hit` L605-634.
+- `design/10_systems.md` §5.1 回合结构: a unit's turn = movement (≤ 移动力格) + one action
+  (普攻/招式/等待), either order — the authority D7 and the movement-highlight visibility rule cite.
 - `scenes/main.tscn`: Camera2D (480,352) current — identity screen transform; SceneHost;
   SegmentLayer/SegmentHost; HUDLayer(layer 10)/HUD; TutorialLayer(layer 100)/TutorialOverlay.
 - `scenes/ui/tutorial_overlay.tscn`: Dim full-rect `mouse_filter = 2`; Panel 600×400 centered
