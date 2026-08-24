@@ -52,6 +52,12 @@ const STATE_SECT_SELECTION: String = "SECT_SELECTION"
 const STATE_CULTIVATION: String = "CULTIVATION"
 const STATE_MAP: String = "MAP"
 const STATE_ENDING: String = "ENDING"
+## Menu states — deliberately NOT segment states, NOT in SEGMENT_PREDECESSORS,
+## and never saveable: SaveManager.STABLE_STATES is only ["CULTIVATION", "MAP"],
+## so save_slot() naturally refuses them. Reached only through the menu_* methods
+## below, which set state + emit directly and never consult the predecessor map.
+const STATE_MENU: String = "MENU"
+const STATE_SETTINGS: String = "SETTINGS"
 
 ## enter_segment()'s validation domain: the six segment scenes only. The battle
 ## states (TUTORIAL/BATTLE/WON/LOST) are reached through their own entry points
@@ -68,7 +74,7 @@ const SEGMENT_STATES: Array[String] = [
 const SEGMENT_PREDECESSORS: Dictionary = {
 	"TRANSITION": [STATE_WON],
 	"CHARACTER_CREATION": [STATE_TRANSITION],
-	"SECT_SELECTION": [STATE_CHARACTER_CREATION],
+	"SECT_SELECTION": [STATE_CHARACTER_CREATION, STATE_TRANSITION],
 	"CULTIVATION": [STATE_SECT_SELECTION],
 	"MAP": [STATE_CULTIVATION],
 	"ENDING": [STATE_MAP],
@@ -76,6 +82,16 @@ const SEGMENT_PREDECESSORS: Dictionary = {
 
 ## The current game state — one of the STATE_* constants above.
 var current_state: String = STATE_TUTORIAL
+
+## Routing flags (boot defaults preserve the legacy path exactly):
+## creation_entry discriminates how creation was entered — "MENU" (new flow:
+## confirm routes to TUTORIAL) or "TRANSITION" (legacy boot-flow path: confirm
+## routes to SECT_SELECTION, byte-identical). creation_done is set when the
+## MENU-entry creation confirms; the TRANSITION screen's last-page advance
+## branches on it (creation_done ? SECT_SELECTION : CHARACTER_CREATION).
+## Both are reset in restart_game().
+var creation_entry: String = "TRANSITION"
+var creation_done: bool = false
 
 ## Array of living enemy nodes registered via register_enemy().
 var enemies_alive: Array[Node] = []
@@ -228,6 +244,91 @@ func enter_segment(state: String) -> bool:
 	state_changed.emit(state)
 	return true
 
+# ---------------------------------------------------------------------------
+# Public API — Menu states & routing (step2: main menu before creation)
+# ---------------------------------------------------------------------------
+
+## Enter the main-menu state. Idempotent, no guard: any state moves to MENU and
+## emits state_changed("MENU"). Used by the MenuPanel boot claim (menu.tscn),
+## whose _ready runs before SceneManager's deferred default swap.
+func enter_menu() -> void:
+	current_state = STATE_MENU
+	state_changed.emit(STATE_MENU)
+
+
+## MENU -> CHARACTER_CREATION for a new adventure. Marks creation_entry = "MENU"
+## so creation confirm routes to TUTORIAL (new flow) instead of SECT_SELECTION.
+## No-op (false, no side effects) outside MENU.
+func menu_new_adventure() -> bool:
+	if current_state != STATE_MENU:
+		return false
+	creation_entry = "MENU"
+	current_state = STATE_CHARACTER_CREATION
+	state_changed.emit(STATE_CHARACTER_CREATION)
+	return true
+
+
+## MENU -> SETTINGS (settings screen entry). No-op (false, no side effects)
+## outside MENU.
+func menu_open_settings() -> bool:
+	if current_state != STATE_MENU:
+		return false
+	current_state = STATE_SETTINGS
+	state_changed.emit(STATE_SETTINGS)
+	return true
+
+
+## SETTINGS -> MENU (settings screen back button). No-op (false, no side
+## effects) outside SETTINGS.
+func menu_close_settings() -> bool:
+	if current_state != STATE_SETTINGS:
+		return false
+	current_state = STATE_MENU
+	state_changed.emit(STATE_MENU)
+	return true
+
+
+## MENU 读取存档: load autosave slot 1 and route directly into the restored
+## stable segment (CULTIVATION/MAP), bypassing SEGMENT_PREDECESSORS — loading
+## from the menu is not a predecessor-legal edge and must not be gated by that
+## map. Returns false with no emit when the load fails (SaveManager.last_error
+## already carries no_save/bad_json/bad_version/bad_schema/io_error) or when a
+## hostile save claims a non-stable segment (forced to "bad_schema"). No-op
+## (false, SaveManager untouched) outside MENU.
+func menu_load_game() -> bool:
+	if current_state != STATE_MENU:
+		return false
+	if not SaveManager.load_slot(1):
+		return false
+	if not SaveManager.STABLE_STATES.has(SaveManager.segment):
+		SaveManager.last_error = "bad_schema"
+		return false
+	clear_battle()
+	current_state = SaveManager.segment
+	state_changed.emit(SaveManager.segment)
+	return true
+
+
+## MENU 退出: quit the game.
+func menu_quit() -> void:
+	get_tree().quit()
+
+
+## Character-creation confirm routing. MENU entry (creation_entry == "MENU"):
+## creation is done — mark creation_done, set TUTORIAL directly (TUTORIAL is not
+## a segment state, so enter_segment cannot express it; the battlefield _ready
+## defers TutorialManager.start(), which drives TUTORIAL -> BATTLE). Legacy entry
+## (boot default "TRANSITION"): byte-identical enter_segment("SECT_SELECTION")
+## call and nothing else. Deliberately not guarded by current_state — it
+## branches on creation_entry only.
+func finish_creation() -> void:
+	if creation_entry == "MENU":
+		creation_done = true
+		current_state = STATE_TUTORIAL
+		state_changed.emit(STATE_TUTORIAL)
+	else:
+		enter_segment("SECT_SELECTION")
+
 
 ## Restart from ENDING (or anywhere): drop every battle reference, reset
 ## SaveManager to a fresh default profile, then route to a truly-fresh TUTORIAL.
@@ -239,6 +340,8 @@ func restart_game() -> void:
 	clear_battle()
 	SaveManager.new_profile({}, [])
 	SaveManager.profile.flags["tutorial_done"] = false
+	creation_entry = "TRANSITION"
+	creation_done = false
 	current_state = STATE_TUTORIAL
 	state_changed.emit(STATE_TUTORIAL)
 	restart_requested.emit()
@@ -409,3 +512,19 @@ func _process(_delta: float) -> void:
 		CombatManager.debug_poison_player()
 	if Input.is_action_just_pressed("debug_damage_player"):
 		CombatManager.debug_damage_player()
+	# DEBUG save fixtures (harness-only; actions registered by project.godot
+	# [input] as empty-event lists). debug_seed_save walks the real atomic save
+	# pipeline (autosave -> save_slot) with a temporary state swap to
+	# CULTIVATION so the save dict's "segment" field records a stable state; the
+	# restore to prev happens unconditionally because save_slot is fully
+	# synchronous (no await). No state_changed emission, no SceneManager call,
+	# no scene swap. debug_delete_save removes autosave slot 1 so the "no save"
+	# menu state is deterministic against a dirty user dir.
+	if Input.is_action_just_pressed("debug_seed_save"):
+		if current_state == STATE_MENU or current_state == STATE_SETTINGS:
+			var prev: String = current_state
+			current_state = STATE_CULTIVATION
+			SaveManager.autosave()
+			current_state = prev
+	if Input.is_action_just_pressed("debug_delete_save"):
+		SaveManager.delete_slot(1)
