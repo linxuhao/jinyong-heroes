@@ -1,0 +1,446 @@
+# playtest/_common.yaml — the SHARED half of the play-test contract.
+#
+# The contract used to be one 1478-line `playtest_spec.yaml` holding all 26
+# scenarios. That shape made every single-scenario edit a whole-file rewrite,
+# and a whole-file rewrite is how assertions get dropped: the 2026-08-24 audit
+# of the previous round found scenarios that came back from a "fix" with fewer
+# asserts than they went in with, and nobody noticed because the diff was 1478
+# lines wide. One file per scenario makes the blast radius one scenario.
+#
+# LAYOUT
+#   playtest/_common.yaml      <- this file: scene / actions / surface + order
+#   playtest/<scenario>.yaml   <- ONE scenario each: {name, description, timeline}
+#                                 the file IS the scenario mapping; the file's
+#                                 basename must equal its `name:`.
+#
+# `scenario_order` fixes the run order (it is the order the monolith had). A
+# scenario file that is not listed still runs — it is appended after the listed
+# ones — so adding a scenario is "drop in a file", and listing it is only about
+# where it lands in the report.
+#
+# The loader (aitelier/tools/godot_playtest/impl.py:_read_spec) prefers this
+# directory when it exists and falls back to a root `playtest_spec.yaml` for
+# projects that still carry the monolith. Do not keep both: if a
+# `playtest_spec.yaml` reappears next to this directory it is IGNORED, and the
+# play-test summary says so in its `summary` line.
+#
+# ── AUTHORED HEADER, carried verbatim from the monolithic
+#    playtest_spec.yaml this directory replaced ──
+# Playtest contract — audited (step playtest_contract, A1-A19) against the
+# implemented code: every surface var, state string, trait index, deck count,
+# sect order, menu cell index, debug action and frame number verified matching
+# (scripts/autoload/*, scripts/segments/*, scripts/data/*, scripts/ui/*,
+# project.godot [input]). Zero drift found — the 12 protected battle scenarios
+# are byte-unchanged except the four Chinese display-text sites and the one
+# CJK-presence assertion; the 8 segment/spine scenarios are consistent with the
+# runtime. Harness contract (from repo usage): scene boots main.tscn; actions
+# are Input.action_press names present in project.godot [input]; assert values
+# are "changed" | YAML literal | single-quoted GDScript boolean expression;
+# frame cap 3000 (last assert <= 2999; spine <= 2900).
+
+scene: res://scenes/main.tscn
+actions:
+- move_up
+- move_down
+- move_left
+- move_right
+- skill_1
+- skill_2
+- skill_3
+- skill_4
+- skill_5
+- skill_6
+- skill_7
+- skill_8
+- attack_confirm
+- end_turn
+- pause_game
+- ui_accept
+- tutorial_next
+- debug_fast_forward
+- debug_win_tutorial
+- debug_lose_tutorial
+- debug_step_month
+- debug_grant_art
+- debug_enter_encounter
+- skill_9
+- skill_10
+- skill_11
+- skill_12
+surface:
+  CombatManager:
+  - current_round
+  - phase
+  - active_unit_name
+  - turn_order
+  - turn_log
+  - last_turn_actor
+  - debug_await_total
+  - debug_await_timeouts
+  - debug_await_frames
+  - debug_round_frame
+  - debug_reflect_hits
+  - tutorial_battle
+  - debug_sha_heal_total
+  - debug_iron_shirt_procs
+  - debug_lang_attack_mult
+  - empty_round_stalls
+  GameManager:
+  - current_state
+  - end_overlay_text
+  SaveManager:
+  - seed
+  - last_error
+  - slot
+  - has_save
+  - eco_left
+  - eq_left
+  - growth_left
+  - pow_left
+  - trait_left
+  - art_left
+  - snapshot_profile_json
+  - snapshot_rng_state
+  - snapshot_decks_string
+  - loaded_profile_json
+  - loaded_rng_state
+  - loaded_decks_string
+  Player:
+  - health
+  - max_health
+  - grid_pos
+  - moves_left
+  - moved
+  - acted
+  - turns_taken
+  - selected_skill_index
+  - skill_cooldowns
+  - shield
+  - status_names
+  - energy
+  - sprite_top
+  - traits
+  East_Heretic:
+  - health
+  - max_health
+  - grid_pos
+  - turns_taken
+  - acted
+  - skill_cooldowns
+  - shield
+  - status_names
+  - sprite_top
+  West_Poison:
+  - health
+  - max_health
+  - grid_pos
+  - turns_taken
+  - acted
+  - skill_cooldowns
+  - shield
+  - status_names
+  South_Emperor:
+  - health
+  - max_health
+  - grid_pos
+  - turns_taken
+  - acted
+  - skill_cooldowns
+  - shield
+  - status_names
+  North_Beggar:
+  - health
+  - max_health
+  - grid_pos
+  - turns_taken
+  - acted
+  - skill_cooldowns
+  - shield
+  - status_names
+  Central_Divine:
+  - health
+  - max_health
+  - grid_pos
+  - turns_taken
+  - acted
+  - skill_cooldowns
+  - shield
+  - status_names
+  - sprite_top
+  HUD:
+  - visible
+  - size
+  - skill8_right_edge
+  - skill12_right_edge
+  - round_pause_overlap
+  RoundIndicator:
+  - visible
+  - current_round
+  - active_actor
+  - order_names
+  - active_text
+  SkillBar:
+  - visible
+  - size
+  - global_position
+  ActionHintLabel:
+  - visible
+  - text
+  SkillButton1:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton2:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton3:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton4:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton5:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton6:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton7:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton8:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton9:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton10:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton11:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  SkillButton12:
+  - visible
+  - text
+  - fahui_text
+  - disabled
+  - hp_gated
+  - state_text
+  - cooldown_remaining
+  - overlay_visible
+  - state_tag_text
+  - cooldown_label_text
+  - state_luma
+  Sparring_Partner:
+  - health
+  - max_health
+  - grid_pos
+  - turns_taken
+  - acted
+  - skill_cooldowns
+  - shield
+  - status_names
+  PauseButton:
+  - visible
+  - global_position
+  HealthBar:
+  - visible
+  - global_position
+  - size
+  - name_text
+  - bar_width
+  - follow_delta
+  - fill_color
+  - total_height
+  - track_bg
+  Battlefield:
+  - board_aligned
+  - grid_lines_visible
+  RangeHighlight:
+  - visible
+  - tile_count
+  - target_count
+  SceneManager:
+  - current_scene
+  - pending_swap
+  - last_error
+  TransitionScreen:
+  - lines_shown
+  - done
+  - visible
+  - size
+  CreationScreen:
+  - phase
+  - points_left
+  - attr_index
+  - attrs
+  - trait_ids
+  - confirmed
+  - visible
+  - size
+  SectSelectScreen:
+  - focus_index
+  - selected_sect_id
+  - visible
+  - size
+  CultivationScreen:
+  - year
+  - month
+  - sect_id
+  - phase
+  - silver
+  - attr_bone
+  - attr_inner
+  - attr_agility
+  - attr_wisdom
+  - attr_fortune
+  - gongfa_count
+  - mastered_count
+  - drawn_card_categories
+  - event_id
+  - fast_forward_used
+  - visible
+  - size
+  - gongfa_ids
+  - gongfa_grades
+  - gongfa_names
+  MapScreen:
+  - current_node_id
+  - focus_id
+  - ended
+  - visible
+  - size
+  EndingScreen:
+  - tier
+  - done
+  - visible
+  - size
+  Backdrop:
+  - visible
+  - size
+scenario_order:
+- round_one_snapshot_and_turn_order
+- enemy_acts_only_after_player_ends_turn
+- each_unit_acts_once_per_round_initiative_order
+- cooldowns_decrement_by_round
+- skill_button_turn_overlay
+- dot_resolves_at_victim_turn_start
+- fahui_du_multiplies_damage
+- two_phase_skill_unlock_and_hp_gate
+- central_divine_innate_qi_fatal_guard
+- terminal_victory_8_12_rounds_hp_15_40
+- ui_geometry_readability
+- skill_button_visual_states
+- spine_to_ending
+- tutorial_win_routes_to_transition
+- tutorial_loss_restarts_tutorial
+- creation_budget_clamp_and_traits
+- lone_bane_sect_grants_external_only
+- cultivation_month_cycle_and_deck_bookkeeping
+- cultivation_year_end_stay
+- save_load_roundtrip
+- sect_switch_same_school_connects
+- cultivation_changes_combat
+- trait_combat_effects_and_twelve_slots
+- skill_hint_and_range_highlight
+- skill_rejection_reason_texts
+- skill_bar_waiting_state

@@ -1,0 +1,60 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: enemy_acts_only_after_player_ends_turn
+description: Enemies stay idle while the player's turn is open; they act only after Space (end_turn).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - move_up
+- at: 35
+  actions:
+  - move_up
+- at: 50
+  actions:
+  - move_up
+- at: 65
+  actions:
+  - attack_confirm
+- at: 80
+  actions: []
+  assert:
+    CombatManager.active_unit_name: active_unit_name == "Yang Guo"
+    East_Heretic.turns_taken: 0
+    West_Poison.turns_taken: 0
+    Player.acted: changed
+    Central_Divine.health: changed
+- at: 90
+  actions:
+  - end_turn
+- at: 100
+  actions: []
+  assert:
+    CombatManager.active_unit_name: active_unit_name != "Yang Guo"
+    CombatManager.phase: phase == "ENEMY_TURN"
+- at: 500
+  actions: []
+  assert:
+    East_Heretic.turns_taken: changed
+    CombatManager.last_turn_actor: last_turn_actor != "Yang Guo"

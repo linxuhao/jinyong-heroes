@@ -1,0 +1,246 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: cultivation_changes_combat
+description: 'The round''s thesis (发挥度真算): a debug-granted 甲级 sword (独孤九剑) starts at 发挥 ×0.7 (sword D mastered only -> 缺2) and deals round(30*0.7)=21 damage; after the year-2/3 ladder practice it reaches ×0.85 (D+C mastered, B unmastered -> 缺1) and deals round(30*0.85)=26. NOTE for the reviewer: the design''s nominal battle-2 values ×1.0/30 presume the 乙 sword mastered by year 3 m9, but the implemented _add_practice targets the FIRST unmastered art in grant order, so the year-3 练功 goes to 独孤九剑 (9/10) and 乙 never masters — the achievable battle-2 values are ×0.85/26/34 (the cascade is real either way: 0.7 -> 0.85, damage 21 -> 26).'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions: []
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 110
+  actions: []
+- at: 120
+  actions:
+  - ui_accept
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - ui_accept
+- at: 160
+  actions:
+  - move_down
+- at: 170
+  actions:
+  - ui_accept
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.sect_id: sect_id == "wudang"
+- at: 215
+  actions:
+  - debug_step_month
+- at: 230
+  actions:
+  - debug_step_month
+- at: 245
+  actions:
+  - debug_step_month
+- at: 260
+  actions:
+  - debug_step_month
+- at: 275
+  actions:
+  - debug_step_month
+- at: 290
+  actions:
+  - debug_step_month
+- at: 305
+  actions:
+  - debug_step_month
+- at: 320
+  actions:
+  - debug_step_month
+- at: 335
+  actions:
+  - debug_step_month
+- at: 350
+  actions:
+  - debug_step_month
+- at: 365
+  actions:
+  - debug_step_month
+- at: 380
+  actions:
+  - debug_step_month
+- at: 395
+  actions:
+  - debug_step_month
+- at: 420
+  actions: []
+- at: 435
+  actions:
+  - debug_grant_art
+- at: 450
+  actions:
+  - debug_enter_encounter
+- at: 490
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    CombatManager.tutorial_battle: tutorial_battle == false
+    Sparring_Partner.health: 60
+    Sparring_Partner.grid_pos: grid_pos == Vector2i(7,4)
+    Player.grid_pos: grid_pos == Vector2i(7,5)
+    SkillButton1.fahui_text: fahui_text == "发挥 ×0.7"
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    CombatManager.current_round: 1
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.active_unit_name: active_unit_name == "ProgressionHero"
+- at: 505
+  actions:
+  - skill_1
+- at: 520
+  actions:
+  - attack_confirm
+- at: 560
+  actions: []
+  assert:
+    Sparring_Partner.health: health == 39
+    Player.acted: changed
+- at: 575
+  actions:
+  - debug_win_tutorial
+- at: 595
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 610
+  actions:
+  - ui_accept
+- at: 640
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.year: 2
+    CultivationScreen.month: 1
+- at: 655
+  actions:
+  - debug_step_month
+- at: 670
+  actions:
+  - debug_step_month
+- at: 685
+  actions:
+  - debug_step_month
+- at: 700
+  actions:
+  - debug_step_month
+- at: 715
+  actions:
+  - debug_step_month
+- at: 730
+  actions:
+  - debug_step_month
+- at: 745
+  actions:
+  - debug_step_month
+- at: 760
+  actions:
+  - debug_step_month
+- at: 775
+  actions:
+  - debug_step_month
+- at: 790
+  actions:
+  - debug_step_month
+- at: 805
+  actions:
+  - debug_step_month
+- at: 820
+  actions:
+  - debug_step_month
+- at: 835
+  actions:
+  - debug_step_month
+- at: 850
+  actions:
+  - debug_step_month
+- at: 865
+  actions:
+  - debug_step_month
+- at: 880
+  actions:
+  - debug_step_month
+- at: 895
+  actions:
+  - debug_step_month
+- at: 910
+  actions:
+  - debug_step_month
+- at: 925
+  actions:
+  - debug_step_month
+- at: 940
+  actions:
+  - debug_step_month
+- at: 955
+  actions:
+  - debug_step_month
+- at: 985
+  actions: []
+  assert:
+    CultivationScreen.year: 3
+    CultivationScreen.month: 9
+- at: 1000
+  actions:
+  - debug_enter_encounter
+- at: 1040
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    CombatManager.tutorial_battle: tutorial_battle == false
+    Sparring_Partner.health: 60
+    SkillButton1.fahui_text: fahui_text == "发挥 ×0.85"
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    CombatManager.current_round: 1
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.active_unit_name: active_unit_name == "ProgressionHero"
+- at: 1055
+  actions:
+  - skill_1
+- at: 1070
+  actions:
+  - attack_confirm
+- at: 1110
+  actions: []
+  assert:
+    Sparring_Partner.health: health == 34
+    Player.acted: changed
+    SkillButton1.fahui_text: fahui_text == "发挥 ×0.85"
+- at: 1125
+  actions:
+  - debug_win_tutorial

@@ -1,0 +1,146 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: spine_to_ending
+description: 'The full six-segment spine inside the frame cap: tutorial win -> transition -> creation -> sect select -> cultivation (DEBUG fast-forward through all 36 months) -> map (4 moves to 昆仑) -> tiered ending.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    GameManager.end_overlay_text: end_overlay_text.contains("胜利") and not end_overlay_text.contains("...") and not end_overlay_text.contains("…")
+- at: 50
+  actions:
+  - ui_accept
+- at: 70
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+    TransitionScreen.visible: true
+    TransitionScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 110
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    CreationScreen.visible: true
+    CreationScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - ui_accept
+- at: 210
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 220
+  actions:
+  - ui_accept
+- at: 260
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.year: 1
+    CultivationScreen.month: 1
+    CultivationScreen.gongfa_count: 2
+    CultivationScreen.visible: true
+    CultivationScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.visible: true
+    MapScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 440
+  actions:
+  - move_right
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions:
+  - move_right
+- at: 470
+  actions:
+  - ui_accept
+- at: 480
+  actions:
+  - move_right
+- at: 490
+  actions:
+  - ui_accept
+- at: 520
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.visible: true
+    EndingScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0

@@ -1,0 +1,194 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: creation_budget_clamp_and_traits
+description: Tiered attr pricing (bone 10->20 costs 15, inner 10->15 costs 5), the 20 cap, flaw refunds and positive-trait spends, toggling off, and confirm with leftover points allowed.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions:
+  - ui_accept
+- at: 60
+  actions:
+  - ui_accept
+- at: 70
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - move_right
+- at: 100
+  actions:
+  - move_right
+- at: 110
+  actions:
+  - move_right
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - move_right
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - move_right
+- at: 210
+  actions:
+  - move_right
+- at: 220
+  actions:
+  - move_right
+- at: 230
+  actions:
+  - move_right
+- at: 240
+  actions:
+  - move_right
+- at: 260
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 10
+    CreationScreen.visible: true
+    CreationScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0
+- at: 270
+  actions:
+  - move_up
+- at: 280
+  actions:
+  - move_right
+- at: 300
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 10
+    CreationScreen.attrs: attrs["bone"] == 20
+- at: 310
+  actions:
+  - ui_accept
+- at: 320
+  actions:
+  - move_down
+- at: 330
+  actions:
+  - move_down
+- at: 340
+  actions:
+  - move_down
+- at: 350
+  actions:
+  - move_down
+- at: 360
+  actions:
+  - move_down
+- at: 370
+  actions:
+  - move_down
+- at: 380
+  actions:
+  - move_down
+- at: 390
+  actions:
+  - move_down
+- at: 400
+  actions:
+  - move_down
+- at: 410
+  actions:
+  - ui_accept
+- at: 430
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 18
+- at: 440
+  actions:
+  - move_up
+- at: 450
+  actions:
+  - move_up
+- at: 460
+  actions:
+  - move_up
+- at: 470
+  actions:
+  - move_up
+- at: 480
+  actions:
+  - move_up
+- at: 490
+  actions:
+  - move_up
+- at: 500
+  actions:
+  - move_up
+- at: 510
+  actions:
+  - move_up
+- at: 520
+  actions:
+  - move_up
+- at: 530
+  actions:
+  - ui_accept
+- at: 550
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 8
+- at: 560
+  actions:
+  - ui_accept
+- at: 580
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 18
+- at: 590
+  actions:
+  - move_right
+- at: 600
+  actions:
+  - ui_accept
+- at: 620
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"

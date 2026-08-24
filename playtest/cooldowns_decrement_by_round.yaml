@@ -1,0 +1,60 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: cooldowns_decrement_by_round
+description: Heavy Edge (cooldown 1) is ready again at the player's NEXT turn start (decremented by round, not seconds).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - move_up
+- at: 35
+  actions:
+  - move_up
+- at: 50
+  actions:
+  - move_up
+- at: 65
+  actions:
+  - skill_1
+- at: 80
+  actions:
+  - attack_confirm
+- at: 95
+  actions: []
+  assert:
+    SkillButton1.state_text: state_text == "cooldown"
+    SkillButton1.cooldown_remaining: cooldown_remaining == 1
+- at: 120
+  actions: []
+  assert:
+    Player.skill_cooldowns: changed
+    Central_Divine.health: changed
+- at: 130
+  actions:
+  - end_turn
+- at: 500
+  actions: []
+  assert:
+    CombatManager.current_round: 2
+    Player.skill_cooldowns: skill_cooldowns[0] == 0

@@ -1,0 +1,61 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: skill_hint_and_range_highlight
+description: 'Selection UX: the hint line and range highlight are hidden before any selection; selecting Heavy Edge (skill_1, range 1, player at (7,5), all five enemies >= 4 tiles away) shows a non-empty hint and the reachable-tile highlight with zero in-range targets; the out-of-range attack_confirm at frame 35 leaves the hint showing the specific reason 射程不够; toggling skill_1 off at frame 55 hides both.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions: []
+  assert:
+    ActionHintLabel.visible: visible == false
+    RangeHighlight.visible: visible == false
+- at: 25
+  actions:
+  - skill_1
+- at: 30
+  actions: []
+  assert:
+    Player.selected_skill_index: changed
+    ActionHintLabel.visible: visible == true
+    ActionHintLabel.text: text != ""
+    RangeHighlight.visible: visible == true
+    RangeHighlight.tile_count: tile_count > 0
+    RangeHighlight.target_count: target_count == 0
+- at: 35
+  actions:
+  - attack_confirm
+- at: 50
+  actions: []
+  assert:
+    ActionHintLabel.text: text == "射程不够"
+- at: 55
+  actions:
+  - skill_1
+- at: 60
+  actions: []
+  assert:
+    ActionHintLabel.visible: visible == false
+    RangeHighlight.visible: visible == false
+    RangeHighlight.tile_count: tile_count == 0
+    RangeHighlight.target_count: target_count == 0

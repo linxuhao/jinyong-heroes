@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: dot_resolves_at_victim_turn_start
+description: West Poison applies Spirit Serpent poison mid-round 4; the player's round-5 turn start ticks round(8*1.3)=10, masked to a net +16 by the Shen Diao regen (+26).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - move_up
+- at: 35
+  actions:
+  - move_up
+- at: 50
+  actions:
+  - move_up
+- at: 65
+  actions:
+  - skill_1
+- at: 80
+  actions:
+  - attack_confirm
+- at: 95
+  actions:
+  - end_turn
+- at: 400
+  actions:
+  - end_turn
+- at: 800
+  actions:
+  - end_turn
+- at: 1200
+  actions:
+  - end_turn
+- at: 1430
+  actions: []
+  assert:
+    CombatManager.current_round: 4
+    CombatManager.phase: phase == "ENEMY_TURN"
+    CombatManager.active_unit_name: active_unit_name == "West Poison"
+    Player.status_names: status_names.has("poison") == true
+    Player.health: health == 152
+- at: 2400
+  actions: []
+  assert:
+    CombatManager.current_round: 5
+    Player.health: health == 168 and health > 0
+    CombatManager.last_turn_actor: changed

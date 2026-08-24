@@ -1,0 +1,242 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: trait_combat_effects_and_twelve_slots
+description: 'Trait engine hooks + 12-slot bar: creation takes 左右互搏(idx0)/铁布衫(idx4)/身轻如燕(idx5)/杀破狼(idx8, flaw refund), 唐门 -> debug_step_month x26 -> year 3 m1 -> dart A (小李飞刀) -> encounter: 9 equipped skills (A+B+C) render two rows (SkillButton9 visible, 10 hidden), 身轻如燕 slides through the occupied (7,4) tile to (7,3) for 2 movement, 狼 scales the dart attack to round(30*0.85*1.08)=28 damage (fhd 0.85: 乙 unmastered), 杀 heals round(28*0.2)=6, and 铁布衫 absorbs the debug lethal hit to 1 HP without LOST.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions: []
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 110
+  actions: []
+- at: 120
+  actions:
+  - ui_accept
+- at: 130
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - move_down
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - move_down
+- at: 170
+  actions:
+  - move_down
+- at: 180
+  actions:
+  - ui_accept
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - move_down
+- at: 220
+  actions:
+  - move_down
+- at: 230
+  actions:
+  - move_down
+- at: 240
+  actions:
+  - ui_accept
+- at: 250
+  actions:
+  - move_right
+- at: 260
+  actions:
+  - ui_accept
+- at: 280
+  actions: []
+- at: 290
+  actions:
+  - move_down
+- at: 300
+  actions:
+  - move_down
+- at: 310
+  actions:
+  - move_down
+- at: 320
+  actions:
+  - move_down
+- at: 330
+  actions:
+  - ui_accept
+- at: 360
+  actions: []
+- at: 375
+  actions:
+  - debug_step_month
+- at: 390
+  actions:
+  - debug_step_month
+- at: 405
+  actions:
+  - debug_step_month
+- at: 420
+  actions:
+  - debug_step_month
+- at: 435
+  actions:
+  - debug_step_month
+- at: 450
+  actions:
+  - debug_step_month
+- at: 465
+  actions:
+  - debug_step_month
+- at: 480
+  actions:
+  - debug_step_month
+- at: 495
+  actions:
+  - debug_step_month
+- at: 510
+  actions:
+  - debug_step_month
+- at: 525
+  actions:
+  - debug_step_month
+- at: 540
+  actions:
+  - debug_step_month
+- at: 555
+  actions:
+  - debug_step_month
+- at: 570
+  actions:
+  - debug_step_month
+- at: 585
+  actions:
+  - debug_step_month
+- at: 600
+  actions:
+  - debug_step_month
+- at: 615
+  actions:
+  - debug_step_month
+- at: 630
+  actions:
+  - debug_step_month
+- at: 645
+  actions:
+  - debug_step_month
+- at: 660
+  actions:
+  - debug_step_month
+- at: 675
+  actions:
+  - debug_step_month
+- at: 690
+  actions:
+  - debug_step_month
+- at: 705
+  actions:
+  - debug_step_month
+- at: 720
+  actions:
+  - debug_step_month
+- at: 735
+  actions:
+  - debug_step_month
+- at: 750
+  actions:
+  - debug_step_month
+- at: 775
+  actions: []
+- at: 790
+  actions:
+  - debug_grant_art
+- at: 805
+  actions:
+  - debug_enter_encounter
+- at: 845
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    CombatManager.tutorial_battle: tutorial_battle == false
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    SkillButton9.visible: visible == true
+    SkillButton10.visible: visible == false
+    SkillButton1.global_position: global_position.y <= 680
+    SkillButton9.global_position: global_position.y >= 690
+    HUD.skill8_right_edge: skill8_right_edge <= 960
+    HUD.skill12_right_edge: skill12_right_edge <= 960
+    Player.traits: traits.has("sha_po_lang") == true
+    CombatManager.debug_lang_attack_mult: debug_lang_attack_mult == 1.0
+    Sparring_Partner.health: 60
+    Player.grid_pos: grid_pos == Vector2i(7,5)
+- at: 860
+  actions:
+  - move_up
+- at: 885
+  actions: []
+  assert:
+    Player.grid_pos: changed
+    Player.moves_left: moves_left == 0
+- at: 900
+  actions:
+  - skill_1
+- at: 915
+  actions:
+  - attack_confirm
+- at: 960
+  actions: []
+  assert:
+    CombatManager.debug_lang_attack_mult: debug_lang_attack_mult == 1.08
+    Sparring_Partner.health: health == 32
+    CombatManager.debug_sha_heal_total: debug_sha_heal_total == 6
+    Player.grid_pos: grid_pos == Vector2i(7,3)
+- at: 975
+  actions:
+  - debug_lose_tutorial
+- at: 1000
+  actions: []
+  assert:
+    Player.health: health == 1
+    CombatManager.debug_iron_shirt_procs: debug_iron_shirt_procs == 1
+    GameManager.current_state: current_state != "LOST"
+- at: 1015
+  actions:
+  - debug_win_tutorial

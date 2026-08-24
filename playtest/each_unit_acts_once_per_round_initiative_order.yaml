@@ -1,0 +1,48 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: each_unit_acts_once_per_round_initiative_order
+description: Ending the player's turn lets all six units act exactly once, then round 2 begins with Yang Guo.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - end_turn
+- at: 30
+  actions: []
+  assert:
+    CombatManager.active_unit_name: active_unit_name != "Yang Guo"
+    CombatManager.phase: phase == "ENEMY_TURN"
+- at: 1200
+  actions: []
+  assert:
+    CombatManager.current_round: 2
+    CombatManager.active_unit_name: active_unit_name == "Yang Guo"
+    CombatManager.last_turn_actor: changed
+    Player.turns_taken: 1
+    East_Heretic.turns_taken: 1
+    Central_Divine.turns_taken: 1
+    South_Emperor.turns_taken: 1
+    North_Beggar.turns_taken: 1
+    West_Poison.turns_taken: 1
+    CombatManager.turn_log: turn_log.size() == 6 and turn_log[0] == "Yang Guo" and turn_log[5] == "West Poison"

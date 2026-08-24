@@ -1,0 +1,60 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: skill_button_turn_overlay
+description: After a cooldown-1 cast (Heavy Edge at frame 65) SkillButton1's cooldown overlay is VISIBLE with 1 round remaining; at the player's next turn start (frame 500, cooldown decremented to 0) the overlay is hidden again. Visibility is driven by remaining > 0 alone.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - move_up
+- at: 35
+  actions:
+  - move_up
+- at: 50
+  actions:
+  - move_up
+- at: 65
+  actions:
+  - skill_1
+- at: 80
+  actions:
+  - attack_confirm
+- at: 95
+  actions: []
+  assert:
+    SkillButton1.overlay_visible: overlay_visible == true
+    SkillButton1.cooldown_remaining: cooldown_remaining == 1
+- at: 120
+  actions: []
+  assert:
+    SkillButton1.overlay_visible: overlay_visible == true
+    SkillButton1.cooldown_remaining: cooldown_remaining == 1
+- at: 130
+  actions:
+  - end_turn
+- at: 500
+  actions: []
+  assert:
+    CombatManager.current_round: 2
+    SkillButton1.overlay_visible: overlay_visible == false

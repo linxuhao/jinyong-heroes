@@ -1,0 +1,47 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: tutorial_win_routes_to_transition
+description: After the WON overlay continue press, SceneManager swaps the battlefield out for the TransitionScreen with no pending swap left in flight.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+    SceneManager.current_scene: current_scene == "transition"
+    SceneManager.pending_swap: pending_swap == false
+    TransitionScreen.visible: true
+    TransitionScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0

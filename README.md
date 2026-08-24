@@ -185,7 +185,9 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ```
 ├── project.godot                 # Engine config, autoload singletons, input map, display/stretch, theme
-├── playtest_spec.yaml            # Headless playtest contract (actions / surface / 26 scenarios)
+├── playtest/                     # Headless playtest contract, one file per scenario
+│   ├── _common.yaml              #   shared scene / actions / surface + scenario_order
+│   └── <scenario>.yaml           #   26 of them, basename == the scenario's `name:`
 ├── run_tests.sh                  # CLI gate: compile + headless playtest + unit tests
 ├── resources.md                  # Asset/tool reference notes
 ├── design/                       # Authoritative design archive (00..99)
@@ -257,7 +259,9 @@ Signals: `round_started`, `turn_started`, `turn_ended`, `phase_changed`, `action
 
 `SaveManager` exposes `seed`, `last_error`, `slot`, `has_save`, the six deck counts `eco_left/eq_left/growth_left/pow_left/trait_left/art_left`, and the roundtrip observables `snapshot_profile_json` / `snapshot_rng_state` / `snapshot_decks_string` + `loaded_profile_json` / `loaded_rng_state` / `loaded_decks_string`. `SceneManager` exposes `current_scene`, `pending_swap`, `last_error`.
 
-### Playtest surface contract (`playtest_spec.yaml`)
+### Playtest surface contract (`playtest/_common.yaml`)
+
+The contract is split one file per scenario under `playtest/`: `_common.yaml` holds `scene` / `actions` / `surface` and a `scenario_order`, and each `playtest/<name>.yaml` holds one scenario (its basename must equal its `name:`). It used to be a single 1478-line `playtest_spec.yaml`, which made every one-scenario repair a rewrite of all 26 — and that is how assertions quietly went missing. An unlisted scenario file still runs, appended, so adding a scenario is just dropping in a file. Editing the whole contract in one place is no longer possible, and that is the point.
 
 Observable nodes/variables include `CombatManager` (turn engine + trait diagnostics), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`/`traits`, `SkillButton1..12` (`text`, `fahui_text`, `disabled`, `hp_gated`, `state_text`, `cooldown_remaining`, `state_luma`), `ActionHintLabel` (`visible`, `text`), `RangeHighlight` (`visible`, `tile_count`, `target_count`), `RoundIndicator`, `EnergyLabel`, `HUD` (`visible`, `size`, `skill8_right_edge`, `skill12_right_edge`, `round_pause_overlap`), `HealthBar`, `Battlefield`, the six segment screens (`TransitionScreen`, `CreationScreen`, `SectSelectScreen`, `CultivationScreen` — incl. `gongfa_ids`/`gongfa_grades`/`gongfa_names` — `MapScreen`, `EndingScreen`), and the `SceneManager` / `SaveManager` autoloads.
 
@@ -279,7 +283,7 @@ Observable nodes/variables include `CombatManager` (turn engine + trait diagnost
 ./run_tests.sh
 ```
 
-Runs a compile check (which triggers the Godot import pass), then a headless playtest against `playtest_spec.yaml`, then the Godot unit tests under `tests/`. The playtest contract carries **26 scenarios**: the ten battle behaviour scenarios (round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, two-phase unlock + HP gate, 先天罡气 fatal guard, terminal victory within 8–12 rounds with player HP 15%–40%, `ui_geometry_readability` + `skill_button_visual_states`), the segment/scene scenarios (`spine_to_ending`, `tutorial_win_routes_to_transition`, `tutorial_loss_restarts_tutorial`, `creation_budget_clamp_and_traits`, `lone_bane_sect_grants_external_only`, `cultivation_month_cycle_and_deck_bookkeeping`, `cultivation_year_end_stay`, `save_load_roundtrip`, `sect_switch_same_school_connects`, `cultivation_changes_combat`, `trait_combat_effects_and_twelve_slots`), and the three scenarios added this round (`skill_hint_and_range_highlight`, `skill_rejection_reason_texts`, `skill_bar_waiting_state`).
+Runs a compile check (which triggers the Godot import pass), then a headless playtest against the `playtest/` contract, then the Godot unit tests under `tests/`. The playtest contract carries **26 scenarios**: the ten battle behaviour scenarios (round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, two-phase unlock + HP gate, 先天罡气 fatal guard, terminal victory within 8–12 rounds with player HP 15%–40%, `ui_geometry_readability` + `skill_button_visual_states`), the segment/scene scenarios (`spine_to_ending`, `tutorial_win_routes_to_transition`, `tutorial_loss_restarts_tutorial`, `creation_budget_clamp_and_traits`, `lone_bane_sect_grants_external_only`, `cultivation_month_cycle_and_deck_bookkeeping`, `cultivation_year_end_stay`, `save_load_roundtrip`, `sect_switch_same_school_connects`, `cultivation_changes_combat`, `trait_combat_effects_and_twelve_slots`), and the three scenarios added this round (`skill_hint_and_range_highlight`, `skill_rejection_reason_texts`, `skill_bar_waiting_state`).
 
 A passing run requires a clean compile, a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
 

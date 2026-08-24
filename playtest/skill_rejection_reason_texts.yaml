@@ -1,0 +1,55 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: skill_rejection_reason_texts
+description: 'Rejection reasons are specific and non-empty: at round 1 skill_5 is phase-locked so selecting it shows 教程尚未解锁; after Heavy Edge''s cooldown-1 cast lands on Central Divine (frame 80) re-selecting skill_1 at frame 90 shows 冷却中 1 回合. Central_Divine.health changed (130 -> 71) proves the cast landed.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - skill_5
+  - move_up
+- at: 30
+  actions: []
+  assert:
+    ActionHintLabel.text: text == "教程尚未解锁"
+- at: 35
+  actions:
+  - move_up
+- at: 50
+  actions:
+  - move_up
+- at: 65
+  actions:
+  - skill_1
+- at: 80
+  actions:
+  - attack_confirm
+- at: 90
+  actions:
+  - skill_1
+- at: 95
+  actions: []
+  assert:
+    Central_Divine.health: changed
+    ActionHintLabel.text: text == "冷却中 1 回合"

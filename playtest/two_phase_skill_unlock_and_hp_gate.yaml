@@ -1,0 +1,72 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: two_phase_skill_unlock_and_hp_gate
+description: Rounds 1-3 phase-lock palm arts (buttons 5-8); round 4 unlocks 5-7, and button 8's HP gate (usable only below 50% HP) is tracked by the pure hp_gated predicate.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    CombatManager.current_round: 1
+    Player.health: 500
+    SkillButton1.disabled: false
+    SkillButton2.disabled: false
+    SkillButton3.disabled: false
+    SkillButton4.disabled: false
+    SkillButton5.disabled: true
+    SkillButton6.disabled: true
+    SkillButton7.disabled: true
+    SkillButton8.disabled: true
+    SkillButton8.hp_gated: true
+    SkillButton1.hp_gated: false
+- at: 40
+  actions:
+  - end_turn
+- at: 500
+  actions:
+  - end_turn
+- at: 1000
+  actions:
+  - end_turn
+- at: 1500
+  actions: []
+  assert:
+    CombatManager.current_round: changed
+- at: 1600
+  actions:
+  - end_turn
+- at: 2150
+  actions:
+  - end_turn
+- at: 2700
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 4
+    Player.health: health < 250
+    SkillButton1.hp_gated: false
+    SkillButton5.disabled: false
+    SkillButton6.disabled: false
+    SkillButton7.disabled: false
+    SkillButton8.disabled: false
+    SkillButton8.hp_gated: false

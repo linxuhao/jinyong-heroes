@@ -1,0 +1,69 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: ui_geometry_readability
+description: Grid overlay is visible above the backdrop; the health bar is <= 64 px (one cell) and tracks the player across a scripted move; the 8th skill button's right edge stays inside the viewport; the round indicator never overlaps the pause button; the four skill-button states are data-distinct (phase-locked 5-8, ready 1).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    Battlefield.grid_lines_visible: true
+    HealthBar.bar_width: bar_width <= 64
+    HealthBar.total_height: total_height <= 26
+    HUD.skill8_right_edge: skill8_right_edge <= 960
+    HUD.round_pause_overlap: round_pause_overlap == false
+    SkillButton5.state_text: state_text == "phase_locked"
+    SkillButton8.state_text: state_text == "phase_locked"
+    SkillButton1.state_text: state_text == "ready"
+    HealthBar.follow_delta: follow_delta <= 24
+    HealthBar.fill_color: fill_color.g > 0.5 and fill_color.g > fill_color.r
+    HealthBar.track_bg: track_bg.get_luminance() > 0.30
+    HealthBar.name_text: name_text == "杨过"
+    RoundIndicator.active_text: active_text.contains("移动") and active_text.ends_with("行动 ✓")
+    SkillButton1.text: text.contains("…") == false
+    SkillButton2.text: text.contains("…") == false
+    SkillButton3.text: text.contains("…") == false
+    SkillButton4.text: text.contains("…") == false
+    SkillButton5.text: text.contains("…") == false
+    SkillButton6.text: text.contains("…") == false
+    SkillButton7.text: text.contains("…") == false
+    SkillButton8.text: text.contains("…") == false
+- at: 40
+  actions:
+  - move_up
+- at: 50
+  actions: []
+  assert:
+    Player.grid_pos: changed
+- at: 55
+  actions:
+  - move_up
+- at: 70
+  actions:
+  - move_up
+- at: 85
+  actions: []
+  assert:
+    HealthBar.follow_delta: follow_delta <= 24
+    HealthBar.global_position: changed

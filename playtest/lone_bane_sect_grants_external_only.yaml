@@ -1,0 +1,110 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: lone_bane_sect_grants_external_only
+description: 'The 孤煞 flaw suppresses the sect''s internal gongfa grant: entering 峨眉 with lone_bane yields exactly one gongfa (external only).'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions:
+  - ui_accept
+- at: 60
+  actions:
+  - ui_accept
+- at: 70
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - move_down
+- at: 100
+  actions:
+  - move_down
+- at: 110
+  actions:
+  - move_down
+- at: 120
+  actions:
+  - move_down
+- at: 130
+  actions:
+  - move_down
+- at: 140
+  actions:
+  - move_down
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - move_down
+- at: 170
+  actions:
+  - move_down
+- at: 180
+  actions:
+  - move_down
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - move_right
+- at: 220
+  actions:
+  - ui_accept
+- at: 240
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 250
+  actions:
+  - move_down
+- at: 260
+  actions:
+  - move_down
+- at: 270
+  actions:
+  - move_down
+- at: 280
+  actions:
+  - ui_accept
+- at: 320
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.sect_id: sect_id == "emei"
+    CultivationScreen.gongfa_count: gongfa_count == 1
+    CultivationScreen.visible: true
+    CultivationScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0

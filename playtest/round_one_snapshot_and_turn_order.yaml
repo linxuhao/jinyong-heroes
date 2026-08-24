@@ -1,0 +1,47 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: round_one_snapshot_and_turn_order
+description: Tutorial completes; round 1 snapshots initiative order with Yang Guo first.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    GameManager.current_state: changed
+    CombatManager.current_round: 1
+    CombatManager.empty_round_stalls: 0
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.active_unit_name: active_unit_name == "Yang Guo"
+    CombatManager.turn_order: turn_order.size() == 6 and turn_order[0] == "Yang Guo" and turn_order[1] == "East Heretic" and turn_order[2] == "Central Divine" and turn_order[3] == "South Emperor" and turn_order[4] == "North Beggar" and turn_order[5] == "West Poison"
+    Player.turns_taken: 0
+    East_Heretic.turns_taken: 0
+    RoundIndicator.visible: true
+    RoundIndicator.current_round: 1
+    RoundIndicator.active_actor: active_actor == "杨过"
+- at: 200
+  actions: []
+  assert:
+    CombatManager.active_unit_name: active_unit_name == "Yang Guo"
+    RoundIndicator.active_text: active_text.contains("行动") == true
+    Player.acted: acted == false

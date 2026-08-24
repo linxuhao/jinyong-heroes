@@ -1,0 +1,185 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: cultivation_year_end_stay
+description: 'Twelve manual months: 练功 the two 丁 arts to mastery (months 1-8), then 修习 根骨 (months 9-12); year-end 留下 rolls into year 2 and the year-2 丙 grant lands two more arts (gongfa_count 4, both 丁 mastered).'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions:
+  - ui_accept
+- at: 60
+  actions:
+  - ui_accept
+- at: 70
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - move_right
+- at: 100
+  actions:
+  - ui_accept
+- at: 110
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - ui_accept
+- at: 135
+  actions:
+  - ui_accept
+- at: 150
+  actions:
+  - ui_accept
+- at: 165
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - ui_accept
+- at: 195
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - ui_accept
+- at: 225
+  actions:
+  - ui_accept
+- at: 240
+  actions:
+  - ui_accept
+- at: 255
+  actions:
+  - ui_accept
+- at: 270
+  actions:
+  - ui_accept
+- at: 285
+  actions:
+  - ui_accept
+- at: 300
+  actions:
+  - ui_accept
+- at: 315
+  actions:
+  - ui_accept
+- at: 330
+  actions:
+  - ui_accept
+- at: 345
+  actions:
+  - ui_accept
+- at: 360
+  actions:
+  - ui_accept
+- at: 375
+  actions:
+  - ui_accept
+- at: 390
+  actions:
+  - ui_accept
+- at: 405
+  actions:
+  - ui_accept
+- at: 420
+  actions:
+  - ui_accept
+- at: 435
+  actions:
+  - ui_accept
+- at: 450
+  actions:
+  - ui_accept
+- at: 465
+  actions:
+  - ui_accept
+- at: 480
+  actions:
+  - ui_accept
+- at: 495
+  actions:
+  - move_down
+- at: 510
+  actions:
+  - ui_accept
+- at: 525
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - ui_accept
+- at: 555
+  actions:
+  - move_down
+- at: 570
+  actions:
+  - ui_accept
+- at: 585
+  actions:
+  - ui_accept
+- at: 600
+  actions:
+  - ui_accept
+- at: 615
+  actions:
+  - move_down
+- at: 630
+  actions:
+  - ui_accept
+- at: 645
+  actions:
+  - ui_accept
+- at: 660
+  actions:
+  - ui_accept
+- at: 675
+  actions:
+  - move_down
+- at: 690
+  actions:
+  - ui_accept
+- at: 705
+  actions:
+  - ui_accept
+- at: 720
+  actions:
+  - ui_accept
+- at: 760
+  actions: []
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+    CultivationScreen.gongfa_count: gongfa_count == 4
+    CultivationScreen.mastered_count: mastered_count == 2
+    CultivationScreen.visible: true
+    CultivationScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0

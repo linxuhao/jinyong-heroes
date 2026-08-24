@@ -1,0 +1,83 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: cultivation_month_cycle_and_deck_bookkeeping
+description: Month 1 stages a 3-category card draw (decks 12/12/9 -> 11/11/8 at frame 130); picking card 0 then 练功 on the first gongfa completes the month, which immediately stages month 2's draw — so at frame 200 each monthly deck has lost exactly two cards (10/10/7), the calendar shows month 2, and the autosave landed cleanly.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions:
+  - ui_accept
+- at: 60
+  actions:
+  - ui_accept
+- at: 70
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - move_right
+- at: 100
+  actions:
+  - ui_accept
+- at: 110
+  actions:
+  - ui_accept
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.drawn_card_categories: drawn_card_categories.size() == 3
+    SaveManager.eco_left: eco_left == 11
+    SaveManager.eq_left: eq_left == 11
+    SaveManager.growth_left: growth_left == 8
+    CultivationScreen.visible: true
+    CultivationScreen.size: size.x > 0 and size.y > 0
+    Backdrop.visible: true
+    Backdrop.size: size.x > 0 and size.y > 0
+- at: 140
+  actions:
+  - ui_accept
+- at: 150
+  actions:
+  - ui_accept
+- at: 160
+  actions:
+  - ui_accept
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.month: month == 2
+    CultivationScreen.phase: phase == "CARD_PICK"
+    SaveManager.eco_left: eco_left == 10
+    SaveManager.eq_left: eq_left == 10
+    SaveManager.growth_left: growth_left == 7
+    SaveManager.has_save: has_save == true
+    SaveManager.last_error: last_error == ""
