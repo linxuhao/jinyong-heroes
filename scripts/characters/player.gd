@@ -66,7 +66,10 @@ var moves_left: int = 0
 ## True once the unit has moved this turn.
 var moved: bool = false
 
-## True once the unit has performed an action this turn.
+## True once the unit has performed an action this turn. READ by the
+## action-budget gates (_try_attack_target / _try_keyboard_attack) and the
+## engine guard (engine_acted_guard task); WRITTEN only by the engine
+## (CombatManager) on successful execution.
 var acted: bool = false
 
 ## Number of turns this unit has taken since the battle began.
@@ -488,6 +491,10 @@ func _try_attack_target(enemy: Node) -> void:
 	if enemy == null or not is_instance_valid(enemy):
 		return  # Precondition guard — not a user-facing rejection.
 
+	if acted:
+		action_hint.emit("本回合已行动")
+		return
+
 	if selected_skill_index >= 0:
 		# Using a skill — re-validate all gates at execution time (HP gate
 		# re-check included; the engine re-checks again as belt-and-braces).
@@ -527,6 +534,10 @@ func _try_attack_target(enemy: Node) -> void:
 ## no-op when no enemy satisfies the skill's shape/range (mirrors the click
 ## path's out-of-range ignore).
 func _try_keyboard_attack() -> void:
+	if acted:
+		action_hint.emit("本回合已行动")
+		return
+
 	var target: Node = null
 	if selected_skill_index >= 0:
 		var skill = skills[selected_skill_index]
