@@ -1,6 +1,8 @@
-## TransitionScreen — segment 2: tutorial win -> character creation.
+## TransitionScreen — segment 2: tutorial win -> creation/next segment.
 ## Two full-screen Chinese text pages; ui_accept advances; the last page routes
-## to CHARACTER_CREATION via GameManager.enter_segment.
+## onward via GameManager.enter_segment, branching on GameManager.creation_done:
+## true (creation already done from the menu) -> SECT_SELECTION, skipping the
+## second creation; false (legacy boot flow) -> CHARACTER_CREATION.
 extends Control
 
 const PAGES: Array[String] = [
@@ -32,7 +34,7 @@ func _advance() -> void:
 	if lines_shown >= PAGES.size():
 		done = true
 		if not SceneManager.pending_swap:
-			GameManager.enter_segment("CHARACTER_CREATION")
+			GameManager.enter_segment("SECT_SELECTION" if GameManager.creation_done else "CHARACTER_CREATION")
 	else:
 		_render()
 
