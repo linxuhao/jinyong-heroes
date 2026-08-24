@@ -395,3 +395,60 @@ v = (v ^ (v >> 27)) * 0x94D049BB133111EB
 而超时恰恰是最需要看输出的时候。`subprocess.TimeoutExpired` 本身就带
 `.stdout` / `.stderr`。改成捞回来之后,答案在第一次运行里就全在那儿了。
 
+## 打不赢,是因为先死了——而且死了之后游戏不知道
+
+`terminal_victory_8_12_rounds_hp_15_40` 长期 4/6,失败的两条是
+`current_state == "WON"` 和 `health >= 75 and health <= 200`,而
+`current_round >= 8 and <= 12` 是**通过**的。前几轮据此判断「节奏是对的,打不赢是伤害不够」,
+并推出「单体输出打不完五个人,要聚怪 + 群攻」。
+
+2026-08-24 手工跑了一次全时间线扫描(教程战,26 个采样点,f100 → f1100):
+
+```
+f620  round=7   hp=177
+f660  round=7   hp=129
+f700  round=8   hp=55
+f740  round=9   hp=35
+f780  round=10  hp=1
+f820  round=10  hp=0   active=Central Divine  phase=ENEMY_TURN
+f860  round=10  hp=0   active=Central Divine  phase=ENEMY_TURN
+f900 / f940 / f980 / f1020 / f1060 / f1100  ——  八个连续采样点完全相同
+```
+
+那个「第 8–12 回合」不是打赢所需要的回合数,**是输掉所需要的回合数**。
+
+而更要紧的是后半截:**血量归零之后,战斗没有任何状态转移。** 没有 LOST、没有结算、
+没有 `end_battle`,phase 停在 `ENEMY_TURN`,当前单位一直是中神通,一直到扫描结束。
+
+这不是「失败路径没写」:`tutorial_loss_restarts_tutorial` 现在 5/5 全绿,
+而出问题的这一局**就是教程战**(同样的 7× `ui_accept` 前导)。失败路径存在、在别处跑得通,
+在这里没触发。
+
+**推测(未验证,先证再改)**:`combat_manager.gd` 的 `_begin_round` 从
+`GameManager.get_player()` 加 `get_enemies_alive()` 建回合序,并剔除 `health <= 0` 的单位。
+玩家血量为 0 时被剔出回合序,但敌人还活着,于是 `_turn_order_units` 不为空、
+`empty_round_stalls` 不自增、那条「无人可行动」的 `push_error` 也不触发——
+战斗就这样静悄悄地永远进行下去。胜利路径是 `unregister_enemy()` → `end_battle(true)`
+在 `enemies_alive` 清空时触发;失败路径大概率缺少对称的那一半。
+
+**这条压在所有战斗平衡讨论的上面。** 在它修好之前,任何「伤害够不够、要不要聚怪」的结论
+都建立在一个不会结束的战斗上。
+
+## 这一局里,毒从来没有被施加过
+
+同一次扫描,26 个采样帧里 `Player.status_names` **一次都没有出现 `poison`**——
+出现过的只有 `init_minus_20`、`no_techniques_next_turn`、`no_move_next_turn`、`[]`。
+西毒从头到尾没有用过灵蛇缠身。
+
+于是 `dot_resolves_at_victim_turn_start` 这个场景断言的「西毒中途施毒 → 玩家下回合开始跳伤」,
+**它要求的两个帧根本不存在**。
+
+代价是具体的:jinyong-winnable 那一轮的 `repin_dot_timing` 连续四次交付失败,
+每次都交出加密的扫描脚手架。看起来像实现者不肯收尾,实际上它在找一个没发生过的事件,
+永远收敛不了。轮次预算从 15 提到 24 也没有改变任何事。
+
+**教训:一个场景连续多轮修不好的时候,先问它要求的状态是不是真的会出现,再问实现者为什么做不到。**
+这是本档案里第三次记同一件事(前两次是 `two_phase` 要求满血时按钮 8 可用、
+`each_unit_acts_once` 要求第 2 回合杨过先手)。**断言的前提出错,比断言的数值出错更难发现,
+因为它每次都失败得很有道理。**
+
