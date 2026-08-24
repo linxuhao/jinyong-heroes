@@ -48,3 +48,41 @@ timeline:
     West_Poison.turns_taken: 2
     CombatManager.last_turn_actor: changed
     CombatManager.empty_round_stalls: empty_round_stalls == 0
+# Appended budget proof on the player's round-2 turn (live at f1200): the
+# player has never moved, so the probe showed no enemy adjacent at (5,5) —
+# first move_down to (5,6) puts South Emperor (5,7) at Chebyshev 1. The first
+# attack_confirm must LAND (acted flips, SE 100 -> 61, hint cleared); the
+# same-turn second must be REJECTED (本回合已行动, SE still 61); end_turn then
+# opens round 3 with Yang Guo first (init_minus_20 expired). Frames probed.
+- at: 1210
+  actions:
+  - move_down
+- at: 1240
+  actions:
+  - attack_confirm
+- at: 1280
+  actions: []
+  assert:
+    Player.acted: acted == true
+    ActionHintLabel.text: text == ""
+    South_Emperor.health: round(100.0 * health / float(max_health)) == 61
+- at: 1300
+  actions:
+  - attack_confirm
+- at: 1340
+  actions: []
+  assert:
+    Player.acted: acted == true
+    ActionHintLabel.visible: visible == true
+    ActionHintLabel.text: text == "本回合已行动"
+    South_Emperor.health: round(100.0 * health / float(max_health)) == 61
+- at: 1400
+  actions:
+  - end_turn
+- at: 1610
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == 3
+    CombatManager.active_unit_name: active_unit_name == "Yang Guo"
+    Player.turns_taken: turns_taken == 2
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
