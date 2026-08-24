@@ -520,8 +520,19 @@ func _process(_delta: float) -> void:
 	# synchronous (no await). No state_changed emission, no SceneManager call,
 	# no scene swap. debug_delete_save removes autosave slot 1 so the "no save"
 	# menu state is deterministic against a dirty user dir.
+	#
+	# Data-seeding: on the MENU/SETTINGS boot path SaveManager.decks is still {}
+	# (new_profile() is the only _init_decks() caller on the normal path, and it
+	# is never reached before the menu), so an autosave would crash in
+	# _build_save_dict/_decks_snapshot on a missing deck category key. Call
+	# new_profile({}, []) FIRST so profile/decks/rng/seed are initialized (fresh
+	# profile, cultivation year 1 month 1, six real DECK_CATEGORIES decks)
+	# before the state swap and autosave. new_profile() semantics are unchanged;
+	# the autosave then persists the seeded state as a valid save_1.json, which
+	# enables the menu's 读取存档 entry.
 	if Input.is_action_just_pressed("debug_seed_save"):
 		if current_state == STATE_MENU or current_state == STATE_SETTINGS:
+			SaveManager.new_profile({}, [])
 			var prev: String = current_state
 			current_state = STATE_CULTIVATION
 			SaveManager.autosave()
