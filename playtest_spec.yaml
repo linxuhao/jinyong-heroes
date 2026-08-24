@@ -456,6 +456,27 @@ scenarios:
       - { at: 2600, actions: [skill_1] }
       - { at: 2615, actions: [attack_confirm] }
       - { at: 2630, actions: [end_turn] }
+      # --- Round 11 (player first): Wandering Valley jump re-closes on any
+      #     straggler that survived the round-10 cleanup (East Heretic parks at
+      #     range 3), dealing 26 to it and any neighbour. skill_7 is cd3 and
+      #     always available by round 11 (unlock at round 4); the player's turn
+      #     is event-driven, so the 2870 press is safe as long as round 11 has
+      #     begun (round-10 enemy turns finish <= ~2860 by the same 230-frame
+      #     cadence as rounds 5-9; with fewer enemies alive round 10 ends
+      #     earlier). ---
+      - { at: 2870, actions: [skill_7] }
+      - { at: 2885, actions: [attack_confirm] }
+      - { at: 2900, actions: [end_turn] }
+      # --- Round 12 (player first): Heavy Edge (cd1, ready every round, no
+      #     HP gate) puts the final 59 on the survivor from adjacency — the
+      #     last kill lands at frame 2975, inside the 2999 assert, with WON in
+      #     round 12 (within the 8-12 window). The 2990 end_turn is a harmless
+      #     no-op once the WON overlay is up; the overlay waits for ui_accept
+      #     before any scene swap, so the Player node stays alive for the 2999
+      #     asserts. ---
+      - { at: 2960, actions: [skill_1] }
+      - { at: 2975, actions: [attack_confirm] }
+      - { at: 2990, actions: [end_turn] }
       # --- Final victory assert (sampled at the victory instant: WON at round
       #     8-12 with player HP 75-200; turns_taken differential vs frame 30). ---
       - at: 2999
