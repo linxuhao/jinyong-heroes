@@ -1,0 +1,65 @@
+name: t3_probe_diag
+description: TEMPORARY diagnostic — always-false asserts to force observed values. Deleted before delivery.
+timeline:
+- at: 3
+  actions: [ui_accept]
+- at: 5
+  actions: [ui_accept]
+- at: 7
+  actions: [ui_accept]
+- at: 9
+  actions: [ui_accept]
+- at: 11
+  actions: [ui_accept]
+- at: 13
+  actions: [ui_accept]
+- at: 15
+  actions: [ui_accept]
+- at: 20
+  actions: [debug_win_tutorial]
+- at: 40
+  actions: [ui_accept]
+- at: 60
+  actions: [ui_accept]
+- at: 70
+  actions: [ui_accept]
+- at: 80
+  actions: [ui_accept]
+- at: 90
+  actions: [move_right]
+- at: 100
+  actions: [ui_accept]
+- at: 110
+  actions: [ui_accept]
+- at: 120
+  actions: [ui_accept]
+- at: 135
+  actions: [ui_accept]
+- at: 150
+  actions: [ui_accept]
+- at: 165
+  actions: [ui_accept]
+- at: 180
+  actions: [ui_accept]
+- at: 195
+  actions: [ui_accept]
+- at: 210
+  actions: [ui_accept]
+- at: 225
+  actions: [move_down]
+- at: 240
+  actions: [move_down]
+- at: 255
+  actions: [move_down]
+- at: 270
+  actions: [move_down]
+- at: 285
+  actions: [ui_accept]
+- at: 310
+  actions: []
+  assert:
+    SaveManager.debug_save_json_preview: debug_save_json_preview.right(260) == "NEVER"
+    SaveManager.debug_save_fail_step: debug_save_fail_step == "NEVER"
+    SaveManager.debug_apply_fail_reason: debug_apply_fail_reason == "NEVER"
+    SaveManager.debug_seed_str: debug_seed_str == "NEVER"
+    SaveManager.seed: seed == 999999999

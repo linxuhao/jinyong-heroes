@@ -157,7 +157,7 @@ func save_slot(s: int) -> bool:
     # file that then fails Step-2 validation opaquely. Guard it into the
     # documented io_error and leave no file behind.
     var json_text := JSON.stringify(_build_save_dict(), "\t")
-    debug_save_json_preview = json_text.right(600)
+    debug_save_json_preview = json_text  # TEMP probe: full file text
     debug_seed_str = "seed=" + str(seed) + " rng_state=" + str(rng.state)
     if json_text == "":
         debug_save_fail_step = "stringify"
@@ -174,7 +174,9 @@ func save_slot(s: int) -> bool:
     # Step 2: re-read and validate the tmp — never trust the write.
     var parsed_tmp: Variant = _read_json(tmp)
     if parsed_tmp is Dictionary:
-        var seed_v0: Variant = (parsed_tmp as Dictionary).get("seed", null)
+        var pd: Dictionary = parsed_tmp
+        debug_save_json_preview = "version=" + str(pd.get("version")) + " vtype=" + type_string(typeof(pd.get("version"))) + " seed=" + str(pd.get("seed")) + " stype=" + type_string(typeof(pd.get("seed"))) + " rng=" + str(pd.get("rng_state")) + " rtype=" + type_string(typeof(pd.get("rng_state")))
+        var seed_v0: Variant = pd.get("seed", null)
         debug_seed_str = "seed=" + str(seed) + " rng_state=" + str(rng.state) + " parsed_seed=" + str(seed_v0) + " type=" + type_string(typeof(seed_v0))
     if not _apply_save_dict(parsed_tmp):
         _remove_file(tmp)
