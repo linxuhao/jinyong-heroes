@@ -1,86 +1,105 @@
-# 武林群侠大乱斗 — 招式打得出去,门派选得对
+# 华山论剑 (Huashan Sword Tournament)
 
-A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. Yang Guo faces the Five Grandmasters on a summit grid in a keyboard-completable tutorial duel, and behind it sits the full six-segment line: **tutorial win → transition → character creation → sect selection → cultivation (36 months) → map → ending**.
+A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. You boot into a **main menu** (mouse-first), create your own character **before** the tutorial, fight a keyboard-completable tutorial duel as the orchestrated Yang Guo, and then walk the six-segment line: **tutorial win → transition → sect selection → cultivation (36 months) → map → ending**.
 
-This round closes the playability gap a human tester hit (真人试玩): **the mechanism worked but the player didn't know how to fire** (`fahui_du_multiplies_damage` was 10/10 green because the script knows to move then `skill_1` then `basic_attack` — a human does not). It also finishes the two leftovers queued last round: the sect-select pick and the skill-bar turn states.
+## What this round delivers
 
-- **A HUD hint line** (`ActionHintLabel`) now tells the player what to do next: after selecting a technique it reads `按 J 出招 / 点击目标`, and every previously-silent rejection now shows a specific Chinese reason — **射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在**.
-- **A range/target highlight** (`RangeHighlight`, a `Node2D` overlay) draws the selected skill's reachable tiles in translucent blue and valid enemy targets in red, driven by the player's own hit test so what you see is exactly what executes; it vanishes on deselect / toggle-off / use / battle exit.
-- **The confirm key got a real name**: the input action `basic_attack` → **`attack_confirm`** (J / keycode 74 unchanged). The *engine* action string `"basic_attack"` (AI decisions + `CombatManager.execute_action`) is a different thing and stays byte-identical.
-- **The skill bar now has a real "waiting" state**: on enemy-turn frames every visible button dims to a desaturated cool blue-gray (`state_palette("waiting")`, bg luma 0.1558 — a ≈0.23 drop from ready's 0.3874) **and** shows a 等待中 tag, so the enemy-turn frame is unmistakable (text appearing on every button is the primary cross-frame signal; the old 0.26596 dim was too subtle for the vision model). The bug was that the override was nested inside the `elif hp_gated:` branch — dead code for every ready button.
-- **The sect pick is fixed**: `cultivation_changes_combat` now presses `move_down` at frame 160 so the check at frame 200 pins `CultivationScreen.sect_id == "wudang"` (武当, the sword sect the scenario's 剑法 damage pins actually describe). No frame numbers were renumbered.
+Three coupled features, under the hard constraint that the 27 pre-existing playtest scenario files stay **byte-identical** and the protected-green scenarios stay green (achieved via the per-scenario `scene:` boot capability of the harness — the shared default `scene:` stays `res://scenes/main.tscn`, so every existing scenario boots exactly as before):
 
-> **⚠️ 本节是 2026-08-23 那一轮结束时的快照,其中的逐场景计数已于 2026-08-24 作废。**
-> 之后的两个提交(`3268eae` 杨过加强 + 六条场景与数值解耦、`30d8aa2` 剩血窗口改比例)
-> 让下面点名的六条里有**六条转绿**:two_phase 21/21、each_unit 14/14、dot_resolves 9/9、
-> ui_geometry 24/24、sect_switch 8/8、terminal_victory 5/6。当前状态是 **27 条 24 绿 3 红**,
-> 权威来源是 `playtest_report.json`,摘要见 `.aitelier/knowledge.md` 顶部横幅。
-> 保留下文是因为它记录了当时的判断与理由;**不要把它当成当前状态读**。
->
-> **⚠️ Verification status: FAILED — do NOT ship this round.** `final/verify_report.json` reports `all_goals_met: false` / `ready_for_deploy: false`. Gates (per the `5_review` verdict): `5_compile` **passes** (62 scripts, 0 errors, 0 warnings); `5_test` reports "no Python sources, not applicable" (the GDScript suite is unwired — a declared non-goal, correctly not read as a pass). The playtest hard gate passes (no crash / scenes load / no `input_dead`), but **8/26 scenarios still fail assertions**, including one protected tutorial scenario and the game-cannot-be-won blocker — see the Testing section for the exact list. This round's new deliverables themselves are **green**: `skill_hint_and_range_highlight` 13/13, `skill_bar_waiting_state` 7/7, `skill_rejection_reason_texts` 3/3, `trait_combat_effects_and_twelve_slots` 22/22, the sect pick pins `sect_id == "wudang"`, and the vision gate classifies both encounter battles as `battle` (`passed: true`). What still blocks shipping: `two_phase_skill_unlock_and_hp_gate` 18/20 (a protected tutorial scenario), `ui_geometry_readability` 23/24 (`round_pause_overlap`, readability #6), the three declared-legacy scenarios (`terminal_victory` 4/6 — game cannot be won, `each_unit_acts_once` 6/12, `dot_resolves` 2/8), plus `save_load_roundtrip` / `cultivation_month_cycle_and_deck_bookkeeping` / `sect_switch_same_school_connects` regressions.
->
-> `5_review` concurs with the do-not-ship verdict. ⚠️ **Data provenance:** the per-scenario counts above come from the `5_review` verdict (which read the compile-step `playtest_summary.md` / `vision_report.json`); the authoritative per-assertion source is `playtest_report.json` on disk, which this step cannot access — the PM must cite it before targeting fixes. The verdict is unaffected (8/26 failing is far from green).
+- **A real main menu** — the new launch entry point. Four entries, **mouse-clickable** and keyboard-navigable (up/down + Enter): **新的冒险 / 读取存档 / 设置 / 退出**. 新的冒险 → character creation → tutorial; 读取存档 loads the autosave (slot 1) and is **disabled with a Chinese hint when no save exists**; 设置 opens the settings screen; 退出 quits.
+- **Character creation moved before the tutorial** (design segment 0). The rules are unchanged (30-point attribute buy with tiered pricing + innate trait/flaw toggles); what changed is the **timing** and the **interaction** — attribute +/−, trait toggles and confirm are all mouse-clickable, and the same private handlers serve keyboard and mouse.
+- **Save/load chain repair** — the atomic JSON save pipeline is instrumented with real error codes, the `user://` root self-heals, the step-5 rollback hole is closed, load-while-hosted staleness is fixed, and the menu 读取存档 entry routes a proper load.
+
+The **tutorial protagonist is still the maxed-out Yang Guo** — the "maxed opening → reset to zero" pillar is unchanged; creation happens first precisely so the player knows from the start that they are not Yang Guo.
 
 ## Quick Start
 
-1. Open the project in **Godot 4.4+**.
-2. Run the import/compile pass so Godot produces `.import` sidecars (the harness `--compile` step does this; in the editor it happens automatically on open).
-3. Press **F5** (or click *Run Project*).
-4. Advance the tutorial with **Enter / Space** (or click *Next*), then fight.
+1. Open the project in **Godot 4.4+** (project.godot `config/features` records `4.7`).
+2. Run the import/compile pass so Godot produces `.import` sidecars (the harness `--compile` step does this; in the editor it happens on open).
+3. Press **F5** (or *Run Project*). The game boots into the **main menu**.
+4. Click **新的冒险** (or arrow-down/up + Enter to navigate), create your character with the mouse, then confirm to enter the tutorial.
 
 ## How to Play
 
 | Action | Input |
 |--------|-------|
+| Menu / settings navigation | Arrow keys (up/down) + **Enter** — or **click** the entry |
 | Move (one tile per press, 4-tile budget) | WASD / Arrow keys |
 | Select technique | **1–8** (9–12 with 左右互搏; or click the HUD skill buttons) |
-| Execute selected technique / basic attack | **J** (`attack_confirm`; left-click an enemy to target the same way) |
+| Execute selected technique / basic attack | **J** (`attack_confirm`; left-click an enemy targets the same way) |
 | End turn | **Space** |
 | Advance tutorial | Enter / Space |
 | Pause / unpause | Escape |
 
 - Every turn = move up to your movement range **plus** one action, in any order. Space ends the turn at any point.
 - Press `J` with no skill selected to perform a basic attack on the **nearest adjacent** enemy.
-- Select a skill with `1`–`8` (or `9`–`12`), then press `J` to fire it at the nearest valid target. The hint line tells you the next step, and the grid highlight shows the reachable + target tiles.
-- **Two-phase unlock** (tutorial only): techniques `5`–`8` (Melancholy Palms) are locked until **round 4**; technique `8` (Seventeen Melancholy Forms) additionally requires HP **below 50%**. A rejected selection now says why instead of doing nothing.
+- Select a skill with `1`–`8` (or `9`–`12`), then press `J` to fire it. The hint line tells you the next step, and the grid highlight shows the reachable + target tiles.
+- **Two-phase unlock** (tutorial only): techniques `5`–`8` (Melancholy Palms) are locked until **round 4**; technique `8` (Seventeen Melancholy Forms) additionally requires HP **below 50%**. A rejected selection says why instead of doing nothing.
 - Each unit acts once per round in initiative order: Yang Guo (88) → East Heretic (85) → Central Divine (80) → South Emperor (76) → North Beggar (74) → West Poison (70).
 - Defeat all five Grandmasters to win; let your health reach zero to lose.
 
-## The Six-Segment Line
+## The Flow (state machine)
 
-The whole game runs inside one persistent shell (`scenes/main.tscn`): a `SceneManager` autoload listens to `GameManager.state_changed` and swaps exactly one preloaded segment scene under the shell's `SceneHost` node (`GameManager.current_state` is the playtest-visible FSM state — `TUTORIAL → BATTLE → WON/LOST → TRANSITION → CHARACTER_CREATION → SECT_SELECTION → CULTIVATION → MAP → ENDING`). WON/LOST are transitions, not terminals.
+```
+MENU ──新的冒险──▶ CHARACTER_CREATION ──confirm (creation_entry=="MENU")──▶ TUTORIAL ──done──▶ BATTLE
+  │                       │                                                                    │ WON
+  │ 设置                 (creation_entry=="TRANSITION", legacy/test-only)                       ▼
+  ▼                       ▼                                                             TRANSITION (2 pages)
+SETTINGS ──返回──▶ MENU  SECT_SELECTION ◀──TRANSITION (last page: creation_done ? SECT_SELECTION : CHARACTER_CREATION)
+  │                          │
+  ▼                          ▼
+(quit)                  CULTIVATION ──▶ MAP ──▶ ENDING
+                           ▲ save/load (STABLE_STATES)
+MENU ──读取存档──▶ load_slot(1) ok & segment ∈ STABLE_STATES → direct state set (bypasses SEGMENT_PREDECESSORS)
+```
+
+The whole game runs inside one persistent shell: `SceneManager` (an autoload) listens to `GameManager.state_changed` and swaps exactly one active scene under the shell's `SceneHost` (Node2D for the battlefield) or `SegmentHost` (full-rect Control for segment scenes). `GameManager.current_state` is the playtest-visible FSM state.
+
+**Two shell scenes exist.** `scenes/menu.tscn` is the real launch entry (a shell-identical copy of `main.tscn` plus an authored `MenuPanel`); its panel's `_ready` claims the boot (`SceneManager.claim_boot`) before SceneManager's deferred default battlefield swap, so real launches land on the menu. `scenes/main.tscn` is untouched and still boots the legacy flow — that is what keeps all 27 pre-existing scenarios frame-identical (their absolute frames are never renumbered). **No headless/env-var/`--skip-menu` branching exists anywhere**: the menu is name-tested headlessly, not bypassed.
 
 | Segment | Scene | What happens |
 |---|---|---|
+| 0. Creation | `creation` | 30-point attribute buy (tiered pricing, 10–20) + trait/flaw toggles — **mouse-clickable**, before the tutorial |
 | 1. Tutorial | `battlefield` | Yang Guo vs the Five Greats (keyboard-completable tutorial) |
-| 2. Transition | `transition` | Full-screen Chinese text pages → character creation |
-| 3. Creation | `creation` | 30-point attribute buy (tiered pricing, 10–20) + trait/flaw toggles |
-| 4. Sect select | `sect_select` | Pick one of five sects → its 丁 internal + 丁 external gongfa |
-| 5. Cultivation | `cultivation` | 36 monthly cycles: card draws + 练功/修习/做工/游历 + year-end stay/switch + 存盘/读档/删档 |
-| 6. Map / ending | `map` → `ending` | Node-graph map (adjacency-checked moves) → tiered ending text |
+| 2. Transition | `transition` | Full-screen Chinese text pages → next segment (skips a second creation when creation is already done) |
+| 3. Sect select | `sect_select` | Pick one of five sects → its 丁 internal + 丁 external gongfa |
+| 4. Cultivation | `cultivation` | 36 monthly cycles: card draws + 练功/修习/做工/游历 + year-end stay/switch + 存盘/读档/删档 |
+| 5. Map / ending | `map` → `ending` | Node-graph map (adjacency-checked moves) → tiered ending text |
 
-**Saves** live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` → validate → `.bak` rollback writes). The save carries the RNG seed + `rng_state` + the per-category deck `remaining`/`drawn` lists, so a reloaded save replays the identical card sequence.
+## Main Menu & Settings
 
-### Debug actions (harness-only — no physical keys)
+**Menu entries** (single activation path — mouse `pressed`, keyboard `ui_accept`, and the harness `debug_click_menu_entry` action all converge on `_activate_entry(i)`):
 
-Defined in `project.godot` `[input]` with **empty event lists** (never visible in normal UI; the headless playtest triggers them via `Input.action_press`):
+| Index | Label | Action |
+|---|---|---|
+| 0 | 新的冒险 | `menu_new_adventure()` — sets `creation_entry="MENU"`, routes to CHARACTER_CREATION |
+| 1 | 读取存档 | `menu_load_game()` — loads autosave slot 1; disabled (greyed) with the hint 没有找到存档 when no file exists; a failed load shows a Chinese failure hint and keeps the entry enabled for retry |
+| 2 | 设置 | `menu_open_settings()` — routes to the settings screen |
+| 3 | 退出 | `menu_quit()` — `get_tree().quit()` |
 
-| Action | Effect |
-|---|---|
-| `debug_win_tutorial` | Wipe every living enemy through the real damage/death pipeline → `WON` |
-| `debug_lose_tutorial` | Kill the player through the real damage/death pipeline → `LOST` |
-| `debug_fast_forward` | In cultivation, advance all remaining months synchronously through the normal month path |
-| `debug_step_month` | Advance exactly one month through the normal phase machine with fixed auto-choices (card 0; 练功 = first unmastered **external** art, else first unmastered art, else 修习 根骨; year-end stay). Reusable N times; one press also resolves a parked year-end. |
-| `debug_grant_art` | Grant the 甲级 (A) art of the main external school (fallback: the sect's internal A) via the real `add_gongfa` path |
-| `debug_enter_encounter` | In CULTIVATION, start an encounter battle (`start_encounter()`) |
-| `debug_poison_player` | Apply Spirit Serpent poison to the player through the real apply_dot pipeline (tick round(8*1.3)=10, 2 rounds) |
+**Load availability is file existence** (`SaveManager.has_save_file(1)`), never `SaveManager.has_save` — `has_save` is session-memory (set only by a successful `save_slot()` this session) and would wrongly disable the entry on a fresh boot that already has a file on disk.
+
+**Settings screen** (four rows: 音效音量 / 音乐音量 / 全屏 / 返回): volumes step ±3 dB (clamped to [−40, +6] dB) and persist via `SettingsManager` → `user://settings.cfg` (ConfigFile); 全屏 toggles the persisted fullscreen intent. Fullscreen is applied only when not headless (`DisplayServer.get_name() != "headless"`) — a platform-API guard, not a behavior branch. Volume is pure data and applies headless.
+
+## Save / Load
+
+**Saves** live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` → validate → `.bak` rollback → promote → re-validate → drop backup). The save carries the RNG seed + `rng_state` + the per-category deck `remaining`/`drawn` lists, so a reloaded save replays the identical card sequence. `STABLE_STATES` is `["CULTIVATION", "MAP"]` — menu/settings are never saveable.
+
+**This round's repair:**
+
+- `ensure_user_dir()` self-heals the `user://` root before the first write (an unset HOME in CI previously made `FileAccess.open(..., WRITE)` return null).
+- All six `io_error` sites now latch `last_io_error_code` / `last_io_error_text` (via `FileAccess.get_open_error()` / `DirAccess.get_open_error()` → `error_string()`), so a probe reads the real error instead of a bare string.
+- The step-5 re-validate failure path now removes the invalid promoted file when no `.bak` exists (previously `_restore_bak` no-oped and left it behind, surfacing later as `bad_schema` / `bad_json`).
+- `load_slot()` emits `loaded(slot)` on success; the cultivation screen connects it to `_sync_surface()` + `_render()` so a load landing on the already-hosted screen refreshes its year/month/attrs/decks (fixes the stale `month` after load-while-hosted).
+
+The splitmix64 constants are **frozen** (not touched — they never touch the IO path).
 
 ## Chinese Font Theme
 
 The whole UI ships in Chinese under one **global font theme** (design §2.1 — 界面文字一律中文):
 
 - **`assets/themes/global_theme.tres`** — a committed `Theme` with `default_font` = the shipped Noto Sans SC FontFile (`res://assets/fonts/NotoSansSC-Regular.otf`, SIL OFL), referenced by **res:// path** and `default_font_size = 12`.
-- Wired via `ProjectSettings gui/theme/custom`; the `ThemeManager` autoload installs the same font as `ThemeDB.fallback_font` at startup.
+- Wired via `ProjectSettings gui/theme/custom`; `ThemeManager` installs the same font as `ThemeDB.fallback_font` at startup.
 - **No per-node font overrides**; labels keep `text_overrun_behavior` = trim (never ellipsis).
 - Display layer only: `character_name`, node names, skill ids, state strings and turn-order names stay canonical English. Chinese replaces only the rendered strings.
 
@@ -100,82 +119,45 @@ Each enemy is driven by a distinct AI controller (`scripts/ai/*.gd`) that decide
 
 - **Round snapshot**: living units sorted by effective initiative (身法, minus 20 while a 碧海潮生 debuff is active) descending, ties broken by registration order. Godot's `sort_custom` is unstable, so the engine uses a decorate-sort-undecorate insertion sort for determinism.
 - **Turn-start lifecycle** (exact order): cooldown decrement (int rounds) → DoT/status ticks → constant regen (神雕之力 +26, 一阳续命 +13) → the unit acts.
-- **Damage pipeline**: attack side `round(base × buffs × fa_hui_du)` → defense side `round(output × (1 − DR))`. 发挥度 applies to damage / heal / shield / DoT-tick values only — never cooldown, range, knockback, or duration. **Percentages never take the fhd multiplier** (design/40_progression.md): DR / hit / crit / trait percentages apply raw.
-- **Melee vs ranged** (design/10_systems.md §2.2): decided by the declaring external art's **weapon class** (刀/剑/长兵/拳掌/轻功/横练 = melee; 指/暗器/奇门毒/乐器 = ranged) — never by shape, reach, or damage.
+- **Damage pipeline**: attack side `round(base × buffs × fa_hui_du)` → defense side `round(output × (1 − DR))`. 发挥度 applies to damage / heal / shield / DoT-tick values only — never cooldown, range, knockback, or duration. **Percentages never take the fhd multiplier**: DR / hit / crit / trait percentages apply raw.
+- **Melee vs ranged**: decided by the declaring external art's **weapon class** (刀/剑/长兵/拳掌/轻功/横练 = melee; 指/暗器/奇门毒/乐器 = ranged) — never by shape, reach, or damage.
 - **Pause** is a boolean gate (no `Engine.time_scale`).
 
 ## 功法 (Gongfa) Data Structure
 
 `scripts/data/gongfa_data.gd` models internal/external martial arts. Internal arts produce the energy pool + a passive id; external arts produce technique lists.
 
-Every art exposes `get_fa_hui_du(unit)` — the **real 甲乙丙丁 prerequisite cascade** (design/10_systems.md §3–§4), interval 0.6~1.3:
+Every art exposes `get_fa_hui_du(unit)` — the **real 甲乙丙丁 prerequisite cascade**, interval 0.6~1.3:
 
 1. `unit == null` → the art's flat `fa_hui_du` field (pre-cascade default).
 2. Otherwise: `missing` = count of lower-grade prerequisite slots in the same school with no mastered art (甲 needs 乙丙丁, 乙 needs 丙丁, 丙 needs 丁, 丁 needs none); `base = [1.0, 0.85, 0.7, 0.6][missing]`; if `base < 1.0` return it (prerequisites incomplete → no attribute bonus); else return `1.0 + 0.1 × min(same-attribute mastered arts, 3)`.
 
-The pure cascade is the **ONLY** path — there is no 特判 bypass. The tutorial battle's protected 编排数值 1.3 comes out of this same cascade: `TutorialFillers.fill()` (scripts/data/tutorial_fillers.gd) appends real mastered filler arts (missing lower-grade same-school slots + same-attribute arts) to each tutorial unit, graded descending, until every art's prereqs are genuinely complete.
-
-`GongfaData` carries a `mastered` flag; `CharacterData` carries the battle-side `traits` array. `scripts/data/battle_setup.gd` builds progression-side `CharacterData` from a `PlayerProfile` via the design §7 formulas: 气血 = 根骨×5, 内力值 = 内力×2, 移动力 = 2+floor(身法/20), 先攻 = 身法, 普攻 = 10+根骨, range 1 (melee school) / 2 (唐门/暗器). Profile traits are copied onto the CharacterData, and only the top **2** (or top **3** with 左右互搏) external arts by grade rank are equipped (grade ties break by profile order).
+The pure cascade is the **ONLY** path — there is no 特判 bypass. The tutorial battle's protected 编排数值 1.3 comes out of this same cascade: `TutorialFillers.fill()` appends real mastered filler arts to each tutorial unit, graded descending, until every art's prereqs are genuinely complete.
 
 ### Progression ladder (丁丙乙甲)
 
-`scripts/data/progression_gongfa_data.gd` registers 5 sects × (internal + external) × 丁丙乙 = 30 generated arts, plus the **甲级 (A) ladder**:
-
-- **4 hand-authored external A arts** (one per school, each with 4 real techniques incl. a `绝招` finisher):
-  | Art | School | Attribute | Techniques |
-  |-----|--------|-----------|------------|
-  | 独孤九剑 (a_sword) | sword | 刚 | 总诀式 / 破剑式(ignores DR) / 破气式(line) / 绝招·无招胜有招 |
-  | 降龙十八掌 (a_palm) | palm | 阳 | 亢龙有悔(kb1) / 飞龙在天 / 见龙在田 / 绝招·潜龙勿用(kb2) |
-  | 杨家枪法 (a_polearm) | polearm | 刚 | 回马枪 / 梨花枪 / 锁喉枪(kb1) / 绝招·枪出如龙 |
-  | 小李飞刀 (a_dart) | dart | 阴 | 例不虚发 / 连环飞刀 / 满天刀雨 / 绝招·一刀飞仙 |
-- **5 internal A arts** (one per sect, same attribute as the line): 易筋经·圆满 / 纯阳无极功·圆满 / 混天功·圆满 / 峨眉九阳功·圆满 / 唐门心法·圆满.
-- Grade tables: `GRADE_STEP` 丁入门/丙精进/乙大成/甲圆满, `PRACTICE_TO_MASTER` 丁4/丙6/乙8/甲10, `TECHNIQUE_COUNT` 丁1/丙2/乙3/甲4, `TECHNIQUE_DAMAGE` 丁18/丙22/乙26/甲30.
-- The **9-row A pool** (`a_pool()`) is the 神功 card grant pool. The year ladder tops at 乙 — 甲 comes only from the 神功 card (or `debug_grant_art`).
-
-External A attributes deliberately never equal their school's feeding sect lines (e.g. sword lines are 柔/阴 → a_sword 刚), so a completed 3-year ladder sits at exactly 1.0 and the climb toward 1.3 stays a real pursuit.
+`scripts/data/progression_gongfa_data.gd` registers 5 sects × (internal + external) × 丁丙乙 = 30 generated arts, plus the **甲级 (A) ladder**: 4 hand-authored external A arts (each with 4 real techniques incl. a 绝招 finisher) and 5 internal A arts. Grade tables: `GRADE_STEP` 丁入门/丙精进/乙大成/甲圆满, `PRACTICE_TO_MASTER` 丁4/丙6/乙8/甲10, `TECHNIQUE_COUNT` 丁1/丙2/乙3/甲4, `TECHNIQUE_DAMAGE` 丁18/丙22/乙26/甲30. The **9-row A pool** (`a_pool()`) is the 神功 card grant pool; the year ladder tops at 乙 — 甲 comes only from the 神功 card (or `debug_grant_art`).
 
 ### 修习 lookup table
 
-`TraitEffects.practice_gain(wisdom, roll)` maps one `SaveManager.rng.randf()` draw through 悟性-tier cumulative thresholds:
-
-| 悟性 | +1 | +2 | +3 | expected |
-|---|---|---|---|---|
-| ≤15 | 60% | 30% | 10% | 1.50 |
-| 16–25 | 35% | 45% | 20% | 1.85 |
-| 26–35 | 20% | 50% | 30% | 2.10 |
-| ≥36 | 10% | 45% | 45% | 2.35 |
-
-练功 adds +1 practice per action; 破 (sha_po_lang) multiplies gongfa practice amounts ×1.5 (`round(amount × 1.5)`).
+`TraitEffects.practice_gain(wisdom, roll)` maps one `SaveManager.rng.randf()` draw through 悟性-tier cumulative thresholds: ≤15 → 60/30/10 (+1.50 expected); 16–25 → 35/45/20 (+1.85); 26–35 → 20/50/30 (+2.10); ≥36 → 10/45/45 (+2.35). 练功 adds +1 practice per action; 破 (sha_po_lang) multiplies gongfa practice amounts ×1.5.
 
 ## Encounter Battles
 
-`GameManager.start_encounter()` (a new entry point, distinct from `start_battle()` which is gated to TUTORIAL) sets `battle_return_state = "CULTIVATION"` and routes CULTIVATION → BATTLE. The battlefield detects encounter mode (`battle_return_state == "CULTIVATION"`), builds the player from `SaveManager.profile` via `BattleSetup.build_character`, spawns a deterministic sparring partner (`EncounterData.sparring_partner()` — 60 HP, 4 mastered D 阳 arts → fhd 1.3), and does **not** start the tutorial overlay. `request_retry()` / `request_continue()` route LOST/WON back to `battle_return_state` (with `clear_battle()` so a second encounter rebuilds fresh refs).
+`GameManager.start_encounter()` (distinct from `start_battle()`, which is gated to TUTORIAL) sets `battle_return_state = "CULTIVATION"` and routes CULTIVATION → BATTLE. The battlefield detects encounter mode, builds the player from `SaveManager.profile` via `BattleSetup.build_character`, spawns a deterministic sparring partner (60 HP, 4 mastered D 阳 arts → fhd 1.3), and does **not** start the tutorial overlay. `request_retry()` / `request_continue()` route LOST/WON back to `battle_return_state`.
 
-**Round-1 kick-off sequencing** (the wiring fix): `start_encounter()` emits `battle_started` *before* the async scene swap, while the roster is still empty. `CombatManager._on_battle_started()` therefore delegates to the guarded `_begin_if_ready()` — phase `IDLE` + live player + ≥1 enemy — and silently skips the empty pre-swap signal instead of tripping `empty_round_stalls`. The new battlefield's `_ready()` (ENCOUNTER branch) then queues `_wire_hud.call_deferred(...)` followed by `CombatManager.begin_battle.call_deferred()` (FIFO, same frame flush), so the HUD is wired **before** `round_started`/`turn_started` fire. `begin_battle()` is public, idempotent, and safe to call sync or deferred (after a `reset_battle()` + `clear_battle()` teardown it self-guards to a no-op). The tutorial path is unchanged: its units exist before `start_battle()`, so the skip never fires there.
+## Trait Effects
 
-## Trait Effects (first implementations)
-
-Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in `CombatManager` / `player.gd` / `battlefield.gd`:
-
-| Trait | Effect |
-|-------|--------|
-| 杀 (sha_po_lang) | Heal `round(actual HP loss × 0.20)`, capped at `round(max HP × 0.15)` per round (per-owner counter reset at round start) |
-| 破 (sha_po_lang) | Gongfa practice experience ×1.5 (`round(amount × 1.5)`) on every `_add_practice` / practice card |
-| 狼 (sha_po_lang) | Attack side ×`(1 + 0.08 × living enemies)`; defense side extra DR `0.05 × living enemies` |
-| 铁布衫 (iron_shirt) | First lethal damage per battle → stay at 1 HP, clear negative statuses (per-battle flag, mirror of 先天罡气) |
-| 身轻如燕 (swallow_lightness) | Player single-tile move may slide **through** an enemy-occupied tile to the free tile beyond (costs 2 movement) |
-| 左右互搏 (ambidextrous) | Equipment cap 3 external arts → **12-slot** skill bar (two rows × 6 buttons) |
+Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in `CombatManager` / `player.gd` / `battlefield.gd`. `杀` heals 20% of HP loss (capped 15% max HP/round); `破` gives gongfa practice ×1.5; `狼` gives attack ×(1+0.08×living enemies) and defense DR 0.05×living enemies; `铁布衫` survives the first lethal blow at 1 HP; `身轻如燕` lets the player slide through an enemy tile (cost 2 movement); `左右互搏` raises the equipment cap to 3 external arts (12-slot skill bar).
 
 ## HUD
 
-- **Grid overlay** (`GridLines`): 1 px semi-transparent cell-boundary lines across the 15×11 board plus a border ring; exposed as `Battlefield.grid_lines_visible`.
-- **Action hint line** (`ActionHintLabel`, new this round): a bottom-center label (hidden by default) that shows `按 J 出招 / 点击目标` after a technique is selected and a specific Chinese reason on every rejection — 射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在. The player emits a `action_hint` signal; the HUD forwards it to the label and clears it on deselect / success / battle exit (`clear_battle_refs()`).
-- **Range/target highlight** (`RangeHighlight`, new this round): a `Node2D` overlay between the grid lines and the characters. It polls `GameManager.get_player()` each frame, recomputes only when the selected skill / player tile / living-enemy count changes, and draws reachable tiles (translucent blue, alpha ≤ 0.28 so grid lines stay visible) plus valid enemy targets (translucent red). Reachability mirrors `player.can_skill_hit()` exactly; the target test *is* `can_skill_hit()`.
-- **Skill bar**: up to **12** `SkillButton` nodes. Default = 2 arts / 8 slots (one row); with 左右互搏 = 3 arts / 12 slots (**two rows × 6**). Buttons beyond `skills.size()` are created but hidden, so `SkillButton9..12` surface reads are stable in every mode. Each button shows the technique name, hotkey, a `发挥 ×N.N` label, and a round-based cooldown overlay with a remaining-rounds number plus a state tag (`LOCKED` / `HP`). `state_text` is one of `"ready"` / `"cooldown"` / `"phase_locked"` / `"hp_gated"` / **`"waiting"`** — the new fifth state renders on every visible button while the battle is live but it is not the player's turn. `SkillButtonN.state_luma` exposes the bg luminance (`Color.get_luminance()`; waiting bg luma 0.1558, ≈0.23 below ready 0.3874) and `SkillButtonN.state_tag_text` exposes the rendered tag (`等待中` on enemy-turn frames). The two-phase unlock gate is `tutorial_battle`-scoped; the HP gate is data-driven from `SkillData.hp_gate_below_ratio`. `HUD.skill8_right_edge` / `HUD.skill12_right_edge` expose the right edges (≤ 960).
-- **Health bars** (`HealthBar`): a **64 px** wide bar with the **name label above**, fill green→yellow→red by HP fraction, edge-clamped via `get_final_transform()`.
-- **Round indicator** (top-center): `回合 N`, `行动: <name> · 移动 <m> · 行动 ✓/结束`, `顺序: <Chinese names>`; never overlaps `PauseButton`.
-- **Energy label**: `内力: 180` (display only).
-- All rendered UI text is Chinese; identity strings stay canonical English.
+- **Grid overlay** (`GridLines`): 1 px semi-transparent cell boundaries across the 15×11 board plus a border ring.
+- **Action hint line** (`ActionHintLabel`): shows `按 J 出招 / 点击目标` after a technique is selected and a specific Chinese reason on every rejection — 射程不够 / 冷却中 N 回合 / 须在半血以下 / 本回合无法用招 / 教程尚未解锁 / 该招式不存在.
+- **Range/target highlight** (`RangeHighlight`): draws reachable tiles (translucent blue) and valid enemy targets (translucent red), mirroring `player.can_skill_hit()` exactly.
+- **Skill bar**: up to **12** `SkillButton` nodes; default 2 arts / 8 slots, with 左右互搏 = 3 arts / 12 slots. Each button shows the technique name, hotkey, a `发挥 ×N.N` label, and a round-based cooldown overlay with a state tag (`ready` / `cooldown` / `phase_locked` / `hp_gated` / `waiting`).
+- **Health bars** (`HealthBar`): 64 px wide, name label above, fill green→yellow→red by HP fraction.
+- **Round indicator**: `回合 N`, `行动: <name> · 移动 <m>`, `顺序: <Chinese names>`; never overlaps `PauseButton`.
 
 ### Health-bar display aliases
 
@@ -192,31 +174,31 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 ## Project Structure
 
 ```
-├── project.godot                 # Engine config, autoload singletons, input map, display/stretch, theme
+├── project.godot                 # Engine config, autoloads, input map, theme, run/main_scene -> menu.tscn
 ├── playtest/                     # Headless playtest contract, one file per scenario
 │   ├── _common.yaml              #   shared scene / actions / surface + scenario_order
-│   └── <scenario>.yaml           #   26 of them, basename == the scenario's `name:`
+│   └── <scenario>.yaml           #   32 of them (27 pre-existing + 5 new), basename == name:
 ├── run_tests.sh                  # CLI gate: compile + headless playtest + unit tests
-├── resources.md                  # Asset/tool reference notes
 ├── design/                       # Authoritative design archive (00..99)
-├── assets/
-│   ├── characters/ terrain/ backdrop/ audio/ fonts/ themes/ seed_manifest.json
+├── assets/                       # characters / terrain / backdrop / audio / fonts / themes / seed_manifest
 ├── scenes/
-│   ├── main.tscn battlefield.tscn player.tscn enemy.tscn
-│   ├── ui/ (hud, health_bar, skill_button, tutorial_overlay)
-│   └── segments/ (transition / creation / sect_select / cultivation / map / ending)
+│   ├── menu.tscn                 # NEW: persistent shell + authored MenuPanel (real launch entry)
+│   ├── main.tscn                 # untouched persistent shell (legacy boots)
+│   ├── battlefield.tscn player.tscn enemy.tscn
+│   ├── ui/ (menu_panel, settings_panel, hud, health_bar, skill_button, tutorial_overlay)
+│   └── segments/ (creation / transition / sect_select / cultivation / map / ending)
 ├── scripts/
 │   ├── battlefield.gd grid_lines.gd
-│   ├── autoload/ (game_manager, scene_manager, save_manager, grid_manager,
+│   ├── autoload/ (game_manager, scene_manager, save_manager, settings_manager, grid_manager,
 │   │              combat_manager, tutorial_manager, theme_manager, audio_manager)
 │   ├── characters/ (player.gd, enemy.gd)
 │   ├── ai/ (ai_base + 5 Grandmaster controllers + ai_sparring)
-│   ├── data/ (character_data, skill_data, gongfa_data, player_profile, trait_data,
-│   │          trait_effects, tutorial_fillers, encounter_data,
-│   │          progression_gongfa_data, card_data, event_data, map_data, battle_setup)
-│   ├── segments/ (transition, creation, sect_select, cultivation, map, ending)
-│   └── ui/ (hud, health_bar, skill_button, round_indicator, pause_button,
-│             tutorial_step, range_highlight)
+│   ├── data/ (character_data, skill_data, gongfa_data, player_profile, trait_data, trait_effects,
+│   │          tutorial_fillers, encounter_data, progression_gongfa_data, card_data, event_data,
+│   │          map_data, battle_setup)
+│   ├── segments/ (creation, transition, sect_select, cultivation, map, ending)
+│   └── ui/ (menu_panel, settings_panel, hud, health_bar, skill_button, round_indicator,
+│             pause_button, tutorial_step, range_highlight)
 └── tests/                        # 16 test_*.gd + unit_test_runner.gd (unwired this round)
 ```
 
@@ -224,66 +206,40 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ### Autoload singletons (`project.godot` `[autoload]`)
 
-`GameManager` (six-segment FSM), `SaveManager` (PlayerProfile + seeded RNG + 3-slot JSON IO), `GridManager`, `CombatManager` (turn engine + `reset_battle()` / DEBUG hooks), `TutorialManager`, `AudioManager`, `ThemeManager`, `SceneManager` (state-driven scene router; kept last).
+`GameManager` (state machine + menu routing), `SaveManager` (PlayerProfile + seeded RNG + 3-slot JSON IO), `GridManager`, `CombatManager` (turn engine + `reset_battle()` / DEBUG hooks), `TutorialManager`, `AudioManager`, `ThemeManager`, `SettingsManager` (persisted volume/fullscreen), `SceneManager` (state-driven scene router + boot claim; kept **last**).
 
 ### Input actions (`project.godot` `[input]`)
 
-`move_up/down/left/right`, `skill_1`..`skill_8` (digits 1–8), `skill_9`..`skill_12` (keys 9 / 0 / minus / equal), `attack_confirm` (J — renamed from `basic_attack`; the *input* action only), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the six harness-only DEBUG actions `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` / `debug_step_month` / `debug_grant_art` / `debug_enter_encounter`.
+`move_up/down/left/right`, `skill_1`..`skill_12`, `attack_confirm` (J), `end_turn` (Space), `pause_game` (Escape), `tutorial_next` (Enter), plus the harness-only DEBUG actions (empty event lists): `debug_fast_forward` / `debug_win_tutorial` / `debug_lose_tutorial` / `debug_step_month` / `debug_grant_art` / `debug_enter_encounter` / `debug_poison_player` / `debug_damage_player` / **`debug_click_menu_entry` / `debug_click_creation_widget` / `debug_seed_save` / `debug_delete_save` / `debug_reset_settings`**.
 
-> **Naming caveat (important):** `basic_attack` exists as **two different strings**. The input action was renamed to `attack_confirm` (project.godot `[input]`, `player.gd` `ATTACK_ACTION` const + its two input sites, `tutorial_manager.gd` `_allowed_actions` lists, `playtest_spec.yaml`). The **engine action string** `"basic_attack"` — the AI decision dicts in `scripts/ai/*.gd` and the `CombatManager.execute_action(unit, "basic_attack", …)` resolution — is unchanged. Grep must show `basic_attack` only in the AI/combat resolution sites.
-
-### `CombatManager` public API
-
-| Member | Behaviour |
-|--------|-----------|
-| `current_round` / `phase` / `active_unit_name` / `turn_order` / `turn_log` / `last_turn_actor` / `empty_round_stalls` | Observable turn-engine state (the last is a loud guard counter — must stay 0) |
-| `tutorial_battle` | Encounter/tutorial mode flag |
-| `begin_battle()` | Guarded round-1 kick-off (phase IDLE + live player + ≥1 enemy); idempotent, callable sync or deferred |
-| `debug_sha_heal_total` / `debug_iron_shirt_procs` / `debug_lang_attack_mult` | Trait diagnostic counters |
-| `is_player_turn()` | True while the player's turn is active |
-| `end_current_turn()` | End the active unit's turn |
-| `begin_turn(unit)` | Turn-start lifecycle: cooldown → DoT/status → regen |
-| `execute_move_path` / `execute_action` | Execute movement / `"basic_attack"` / `"skill"` |
-| `apply_damage(target, amount, source, is_melee, ignore_dr)` | Two-stage pipeline + fatal guard (先天罡气 / 铁布衫) + 杀 lifesteal + counters |
-| `apply_heal` / `apply_shield` / `apply_dot` / `apply_status` | Heal / shield / DoT / status |
-| `get_fa_hui_du(gongfa, unit)` | Delegates to the `GongfaData` 甲乙丙丁 cascade |
-| `reset_battle()` / `debug_wipe_enemies()` / `debug_kill_player()` | Battle teardown + harness-only WON/LOST drivers |
-
-Signals: `round_started`, `turn_started`, `turn_ended`, `phase_changed`, `action_executed`, `damage_dealt`, `paused`, `unpaused`.
-
-### `GridManager` public API
-
-`is_in_bounds`, `is_walkable`, `is_occupied` / `reserve_tile` / `free_tile`, `find_path`, `get_move_range`, `get_units_in_range`, `get_tiles_in_aoe`, `get_units_in_aoe` (origin / shape / size / direction / team filter), `grid_to_world` / `world_to_grid`, `clamp_sprite_offset`, `clear_grid`.
+> **Naming caveat (important):** `basic_attack` exists as **two different strings**. The input action was renamed to `attack_confirm`; the **engine action string** `"basic_attack"` (AI decisions + `CombatManager.execute_action`) is unchanged.
 
 ### `GameManager` public API
 
-`get_state()`, `start_battle()` (tutorial-gated), `start_encounter()` (CULTIVATION → BATTLE), `end_battle(won)`, `register_enemy`, `unregister_enemy`, `get_enemies_alive()`, `set_player`, `get_player`, plus the six-segment surface: `set_battle_return_state` / `get_battle_return_state`, `enter_segment(state)`, `request_continue` / `request_retry`, `restart_game()`, `clear_battle()`, and the `end_overlay_text` observable.
+`get_state()`, `start_battle()` (tutorial-gated), `start_encounter()`, `end_battle(won)`, `request_continue` / `request_retry`, `restart_game()`, `clear_battle()`, `release_stale_units()`, `enter_segment(state)`, and the **menu surface** (new this round): `enter_menu()`, `menu_new_adventure()`, `menu_open_settings()`, `menu_close_settings()`, `menu_load_game()`, `menu_quit()`, `finish_creation()`. Routing flags `creation_entry` (default `"TRANSITION"`) and `creation_done` (default `false`) preserve the legacy path; both reset in `restart_game()`.
 
-### `Player` surface (this round's additions)
+### `SaveManager` public API
 
-`signal action_hint(text)` (forwarded to the HUD hint label), `_skill_reject_reason(index) -> String` (single source of truth for the six rejection reasons, gate order byte-identical to the former `_skill_selectable()`), public `can_skill_hit(skill, enemy)` (authoritative hit test the highlight mirrors). `const ATTACK_ACTION: StringName = &"attack_confirm"` replaces the two hard-coded input-action strings.
+`save_slot(s)` / `load_slot(s)` / `autosave()` / `delete_slot(s)`, `has_save_file(s)` (file existence), `ensure_user_dir()`, `new_profile(attrs, traits)`, `apply_seed(seed)`, `draw_cards(monthly)`, and the surface vars: `seed`, `last_error`, `slot`, `has_save`, the six deck counts, the roundtrip observables (`snapshot_*` / `loaded_*`), and the new diagnostics `last_io_error_code` / `last_io_error_text` / `debug_user_dir_exists`. Signal: `loaded(slot)`.
 
-### `SaveManager` / `SceneManager` surface
+### `SettingsManager` public API
 
-`SaveManager` exposes `seed`, `last_error`, `slot`, `has_save`, the six deck counts `eco_left/eq_left/growth_left/pow_left/trait_left/art_left`, and the roundtrip observables `snapshot_profile_json` / `snapshot_rng_state` / `snapshot_decks_string` + `loaded_profile_json` / `loaded_rng_state` / `loaded_decks_string`. `SceneManager` exposes `current_scene`, `pending_swap`, `last_error`.
+`set_sfx_volume_db(v)` / `set_music_volume_db(v)` (clamped [−40, +6]), `set_fullscreen(b)`, `reset_to_defaults()`; surface `sfx_volume_db` / `music_volume_db` / `fullscreen`.
 
-### Playtest surface contract (`playtest/_common.yaml`)
+### `SceneManager` surface
 
-The contract is split one file per scenario under `playtest/`: `_common.yaml` holds `scene` / `actions` / `surface` and a `scenario_order`, and each `playtest/<name>.yaml` holds one scenario (its basename must equal its `name:`). It used to be a single 1478-line `playtest_spec.yaml`, which made every one-scenario repair a rewrite of all 26 — and that is how assertions quietly went missing. An unlisted scenario file still runs, appended, so adding a scenario is just dropping in a file. Editing the whole contract in one place is no longer possible, and that is the point.
-
-Observable nodes/variables include `CombatManager` (turn engine + trait diagnostics), per-unit `health`/`grid_pos`/`turns_taken`/`acted`/`skill_cooldowns`/`shield`/`status_names`/`traits`, `SkillButton1..12` (`text`, `fahui_text`, `disabled`, `hp_gated`, `state_text`, `cooldown_remaining`, `state_luma`), `ActionHintLabel` (`visible`, `text`), `RangeHighlight` (`visible`, `tile_count`, `target_count`), `RoundIndicator`, `EnergyLabel`, `HUD` (`visible`, `size`, `skill8_right_edge`, `skill12_right_edge`, `round_pause_overlap`), `HealthBar`, `Battlefield`, the six segment screens (`TransitionScreen`, `CreationScreen`, `SectSelectScreen`, `CultivationScreen` — incl. `gongfa_ids`/`gongfa_grades`/`gongfa_names` — `MapScreen`, `EndingScreen`), and the `SceneManager` / `SaveManager` autoloads.
+`current_scene` (adds `"menu"` / `"settings"`), `pending_swap`, `last_error`, plus `claim_boot(node, scene_key)`.
 
 ## Technical Notes
 
 - **Godot version**: targets 4.4; `project.godot` `config/features` records `4.7` — pre-existing, compiles/runs under the current toolchain.
 - **Stable initiative sort**: decorate-sort-undecorate with a registration-index tie-break.
 - **Freed-object safety**: `is_instance_valid()` before every `as` cast / typed assignment; scene swaps await the outgoing scene's `tree_exited`.
-- **Tween safety**: `_await_tween_safe()` caps every action tween at `TWEEN_TIMEOUT_SEC` (0.25 s).
+- **Tween safety**: `_await_tween_safe()` caps every action tween at 0.25 s.
 - **Deterministic AI**: zero RNG — pure priority lists.
-- **Seeded RNG**: one `RandomNumberGenerator` owned by `SaveManager`, seeded from `mix_seed(system_entropy)` (splitmix64 finalizer); all card draws / deck shuffles / 修习 rolls / shen_gong picks go through it in operation order. No stray `randi()` / `randomize()`.
+- **Seeded RNG**: one `RandomNumberGenerator` owned by `SaveManager`, seeded from `mix_seed(system_entropy)` (splitmix64 finalizer — **frozen**); all card draws / shuffles / 修习 rolls go through it in operation order. No stray `randi()` / `randomize()`.
 - **Rounding**: GDScript `round()` rounds half away from zero; `45 * 1.3` = 58.5 → 59. Percentages never take the fhd multiplier.
-- **Static AStar graph**: only the border ring is disabled once; occupancy re-checked at move time.
-- **Highlight layering**: `RangeHighlight` sits between `GridLines` and `Characters` in `battlefield.tscn`; translucent fills (alpha ≤ 0.28) keep grid lines readable, and health bars (CanvasLayer 10) always float on top.
+- **Highlight layering**: `RangeHighlight` sits between `GridLines` and `Characters`; translucent fills (alpha ≤ 0.28) keep grid lines readable.
 
 ## Testing
 
@@ -291,29 +247,26 @@ Observable nodes/variables include `CombatManager` (turn engine + trait diagnost
 ./run_tests.sh
 ```
 
-Runs a compile check (which triggers the Godot import pass), then a headless playtest against the `playtest/` contract, then the Godot unit tests under `tests/`. The playtest contract carries **26 scenarios**: the ten battle behaviour scenarios (round-one snapshot + initiative order, enemy-acts-only-after-player-ends-turn, each-unit-acts-once-per-round, cooldown-by-round, DoT-at-victim-turn-start, the 1.3× damage multiplier, two-phase unlock + HP gate, 先天罡气 fatal guard, terminal victory within 8–12 rounds with player HP 15%–40%, `ui_geometry_readability` + `skill_button_visual_states`), the segment/scene scenarios (`spine_to_ending`, `tutorial_win_routes_to_transition`, `tutorial_loss_restarts_tutorial`, `creation_budget_clamp_and_traits`, `lone_bane_sect_grants_external_only`, `cultivation_month_cycle_and_deck_bookkeeping`, `cultivation_year_end_stay`, `save_load_roundtrip`, `sect_switch_same_school_connects`, `cultivation_changes_combat`, `trait_combat_effects_and_twelve_slots`), and the three scenarios added this round (`skill_hint_and_range_highlight`, `skill_rejection_reason_texts`, `skill_bar_waiting_state`).
+Runs a compile check (triggering the Godot import pass), then a headless playtest against the `playtest/` contract, then the Godot unit tests under `tests/`. The playtest contract carries **32 scenarios**: the 27 pre-existing battle/segment/spine scenarios (all boot `res://scenes/main.tscn`, absolute frames untouched) plus the **5 new scenarios** (each boots its own `scene:`):
 
-A passing run requires a clean compile, a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), and every assertion green.
+- `main_menu_entries` — menu.tscn boots headlessly; four entries clickable, 读取存档 disabled with the no-save hint, keyboard focus cycles, 设置 opens/returns, debug-click starts a new adventure.
+- `menu_to_creation_to_tutorial_order` — the real-flow order proof: MENU → creation → TUTORIAL → battle → WON → transition → SECT_SELECTION (no second creation); state asserts only, never absolute frame numbers.
+- `creation_mouse_interaction` — direct creation.tscn boot; mouse widgets clickable + wired, debug-click drives the same handler as the + button, clamp at the 20 cap.
+- `menu_load_continues` — delete → seed a save → entry enabled → load routes directly into CULTIVATION with the restored month.
+- `settings_panel` — settings opens, SFX row steps +3 dB through the SettingsManager/AudioManager mirror, 全屏 toggles persisted intent, 返回 returns to MENU.
 
-> **Verification status: FAILED (gates have run) — do not claim shipped.** `5_compile` passes (62 scripts, 0 errors, 0 warnings) and `5_test` reports "no Python sources, not applicable" (the GDScript suite is explicitly unwired this round — non-goal, correctly not read as a pass). The playtest hard gate passes (no crash, scenes load, no `input_dead`), but **8/26 scenarios fail assertions**:
->
-> - **This round's new deliverables — green:** `skill_hint_and_range_highlight` **13/13**, `skill_bar_waiting_state` **7/7**, `skill_rejection_reason_texts` **3/3**, and `trait_combat_effects_and_twelve_slots` **22/22**. The W5 sect pick is confirmed: `cultivation_changes_combat` is **30/30 GREEN** (`sect_id == "wudang"` passes, and the `发挥 ×0.85` damage pins are green).
-> - **5_vision — `passed: true`.** Both encounter battles are classified `battle` (skill bar + health bars visible) and `skill_bar_waiting_state` answers Q3 = YES. Residual caveat: waiting-state visual distinctness is still shaky — Q3 (skill-button appearance changes over time) had **7 bad answers across 19 answered battle scenarios** (including `round_one`, `central_divine`, `ui_geometry`, `tutorial_win`, `tutorial_loss`, `cultivation_changes_combat`), so success criterion #5 ("Q3 green in battle scenarios") is only partially met.
-> - **Blockers still red (genuine core gameplay):**
->   - `terminal_victory_8_12_rounds_hp_15_40` 4/6 — `current_state != "WON"`, HP out of range → **the game cannot be won** (declared legacy, still unreachable).
->   - `each_unit_acts_once_per_round_initiative_order` 6/12 — all five enemies `turns_taken != 1`, wrong `turn_log` (declared legacy).
->   - `dot_resolves_at_victim_turn_start` 2/8 — round/phase/active_unit/health pins wrong (declared legacy).
->   - `two_phase_skill_unlock_and_hp_gate` 18/20 — `SkillButton8.disabled`/`hp_gated` wrong → a protected tutorial scenario is not green (violates success criterion #8).
->   - `ui_geometry_readability` 23/24 — `HUD.round_pause_overlap == false` fails (readability #6).
->   - `cultivation_month_cycle_and_deck_bookkeeping` 15/17 and `save_load_roundtrip` 9/13 — `has_save` / `last_error` / `month == 3` wrong.
->   - `sect_switch_same_school_connects` 6/8 — `sect_id != "emei"`, `gongfa_ids` missing.
-> - **Spec-contract note:** the earlier "`Array == String` operator" defects are **already resolved** — the current failing asserts already use the `.has()` / numeric form, so do not delete any timeline.
-> - **Data provenance:** per-scenario counts come from the `5_review` verdict (which read `playtest_summary.md` / `vision_report.json`); the authoritative per-assertion source is `playtest_report.json` on disk, which this step cannot access — the PM must cite it before creating fix tasks.
+A passing run requires a clean compile, a playtest that executes frames with no `input_dead` scenarios, zero runtime errors (including no `Trying to cast a freed object`), `empty_round_stalls == 0`, and every assertion green.
 
-`final/verify_report.json` reports `all_goals_met: false` and `ready_for_deploy: false`. Fix the genuine blockers above (turn-engine / HP-gate / DoT regressions, `round_pause_overlap`, and the save/cultivation/sect regressions), then re-run the full gate and confirm every gate green (compile + 26 playtest scenarios + vision battle classification + 0 runtime errors + `empty_round_stalls == 0`) before flipping the verdict:
+## Verification Status
 
-```bash
-./run_tests.sh
-```
+> **Pending downstream gates — do NOT claim shipped yet.** This step (final verification) sampled the implementation for integration correctness (menu boot-claim, mouse/keyboard single activation path, file-existence load availability, creation-before-tutorial routing + `creation_done` skip, save/load hardening + instrumentation, settings persistence, `tutorial_done` flip, and the five new scenarios) — all present and correctly wired. The **objective gates run after this step** and their evidence (`compile_report.json`, `test_report.json`, `vision_report.json`, `playtest_report.json` / `playtest_summary.md`) does **not exist yet**, so `final/verify_report.json` reports `all_goals_met: false` / `ready_for_deploy: false` until they pass.
 
-Re-run instructions: after any change, re-run and confirm: (a) `playtest_report.json` shows no `Trying to cast a freed object` errors, (b) the terminal scenario reports `WON` / round in `[8,12]` / HP in `[75,200]`, (c) the six protected tutorial behaviour scenarios stay green (including `two_phase_skill_unlock_and_hp_gate`) with byte-identical damage numbers and `发挥 ×1.3`, (d) `spine_to_ending` reaches `ENDING`, (e) `cultivation_changes_combat` stays **30/30 GREEN** — `sect_id == "wudang"` and `fahui_text == "发挥 ×0.85"` / damage pins, (f) `save_load_roundtrip` snapshot/loaded equality is green, (g) `skill_hint_and_range_highlight` / `skill_rejection_reason_texts` / `skill_bar_waiting_state` are green, and (h) `ui_geometry_readability` (`round_pause_overlap == true`) + `skill_button_visual_states` are green.
+The acceptance bar: the **24 protected-green scenarios** (2026-08-24 full-gate measurement) stay green; the in-scope reds `save_load_roundtrip` (→ 14/14) and `cultivation_month_cycle_and_deck_bookkeeping` (→ 17/17) go green **via code only**; the 5 new scenarios go green; `terminal_victory_8_12_rounds_hp_15_40` stays **deliberately red** (its health-window failure is the difficulty contract — stage-5 tuning, not this run); 0 compile errors, 0 runtime errors, `empty_round_stalls == 0`.
+
+## Recorded Debt
+
+1. **`spine_to_ending` and `creation_budget_clamp_and_traits` walk a test-only path** (TUTORIAL WON → TRANSITION → CHARACTER_CREATION → SECT_SELECTION) that no longer exists in the real flow. Follow-up: convert `creation_budget_clamp_and_traits` to a direct `creation.tscn` boot; keep `spine_to_ending` as the boot-flow spine proof.
+2. **Mouse-click testing is structural + handler-convergence**, not coordinate hit-testing: the harness has no coordinate input, so `debug_click_*` actions + `mouse_filter == 0`/rect/wiring asserts are the stand-in (the pressed→handler link is engine-guaranteed).
+3. **Shell duplication**: `menu.tscn` duplicates `main.tscn`'s shell node block (forced by `main.tscn`'s byte-identity). Future shell edits must touch both.
+4. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
+5. **Segment-2 穿越 narrative content is deferred** — this run delivers only the flow skeleton; the dictated performance (切磋既毕 → 主角从天而降 → 五绝与杨过发动面子) is roadmap stage-3 content.
