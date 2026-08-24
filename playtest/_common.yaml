@@ -584,8 +584,9 @@ scenario_order:
 - creation_mouse_interaction
 - menu_load_continues
 - settings_panel
-- skill_description_visible
-- movement_range_highlight
+- click_targeting_fixed
 - creation_traits_back_next_buttons
 - creation_back_to_menu_walk
+- skill_description_visible
+- movement_range_highlight
 - battle_end_turn_attack_buttons
