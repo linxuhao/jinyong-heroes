@@ -1,0 +1,84 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: main_menu_entries
+description: 'menu.tscn boots the real main menu headlessly (no main.tscn, no boot preamble): on a clean user dir all four entries are clickable (mouse_filter STOP, non-empty rect, pressed signal wired), 读取存档 is disabled with the Chinese no-save hint, keyboard focus cycles (move_down x2 -> entry 2 设置), 设置 opens and 返回 returns to a FRESH MenuPanel (focused_entry reset to 0), and the debug-click path — the SAME _activate_entry the Button.pressed signals call — starts a new adventure into creation (current_scene changed menu -> creation).'
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 30
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    SceneManager.current_scene: current_scene == "menu"
+    MenuPanel.visible: true
+    MenuPanel.load_available: load_available == false
+    MenuPanel.hint_text: hint_text.contains("存档") == true
+    MenuPanel.pressed_connected: pressed_connected[0] == true and pressed_connected[1] == true and pressed_connected[2] == true and pressed_connected[3] == true
+    MenuEntry0.visible: true
+    MenuEntry0.disabled: false
+    MenuEntry0.size: size.x > 0 and size.y > 0
+    MenuEntry0.mouse_filter: mouse_filter == 0
+    MenuEntry1.visible: true
+    MenuEntry1.disabled: true
+    MenuEntry1.size: size.x > 0 and size.y > 0
+    MenuEntry1.mouse_filter: mouse_filter == 0
+    MenuEntry2.visible: true
+    MenuEntry2.disabled: false
+    MenuEntry2.size: size.x > 0 and size.y > 0
+    MenuEntry2.mouse_filter: mouse_filter == 0
+    MenuEntry3.visible: true
+    MenuEntry3.disabled: false
+    MenuEntry3.size: size.x > 0 and size.y > 0
+    MenuEntry3.mouse_filter: mouse_filter == 0
+- at: 40
+  actions:
+  - move_down
+- at: 50
+  actions:
+  - move_down
+- at: 60
+  actions: []
+  assert:
+    MenuPanel.focused_entry: focused_entry == 2
+- at: 70
+  actions:
+  - ui_accept
+- at: 90
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SETTINGS"
+    SettingsPanel.visible: true
+    SettingsPanel.pressed_connected: pressed_connected[0] == true and pressed_connected[1] == true and pressed_connected[2] == true and pressed_connected[3] == true
+- at: 100
+  actions:
+  - move_down
+- at: 110
+  actions:
+  - move_down
+- at: 120
+  actions:
+  - move_down
+- at: 130
+  actions:
+  - ui_accept
+- at: 150
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    MenuPanel.visible: true
+    MenuPanel.focused_entry: focused_entry == 0
+- at: 160
+  actions:
+  - debug_click_menu_entry
+- at: 180
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    SceneManager.current_scene: current_scene == "creation"
+- at: 185
+  actions: []
+  assert:
+    SceneManager.current_scene: changed

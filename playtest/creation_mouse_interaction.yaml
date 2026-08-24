@@ -1,0 +1,69 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: creation_mouse_interaction
+description: 'creation.tscn direct boot (asserts hold at f30 — verified scene-path capability): the ATTRS mouse widgets are clickable (AttrPlus0 visible with non-empty rect and MOUSE_FILTER_STOP) and every widget class is wired (pressed_connected snapshot for AttrPlus0 / TraitToggle0 / ConfirmButton); debug_click_creation_widget drives the SAME _on_attr_plus_pressed the + buttons call (bone 10 -> 11, points 30 -> 29); the keyboard move_right afterwards produces the identical delta (convergence proof — one handler, two input paths); eight more debug clicks walk 12 -> 20 (tiered cost 1,1,1,2,2,2,2,2 = 13 -> points 15) and a ninth press clamps at the 20 cap.'
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attrs: attrs["bone"] == 10
+    CreationScreen.points_left: points_left == 30
+    CreationScreen.pressed_connected: pressed_connected["AttrPlus0"] == true and pressed_connected["TraitToggle0"] == true and pressed_connected["ConfirmButton"] == true
+    AttrPlus0.visible: true
+    AttrPlus0.size: size.x > 0 and size.y > 0
+    AttrPlus0.mouse_filter: mouse_filter == 0
+- at: 40
+  actions:
+  - debug_click_creation_widget
+- at: 60
+  actions: []
+  assert:
+    CreationScreen.attrs: attrs["bone"] == 11
+    CreationScreen.points_left: points_left == 29
+- at: 65
+  actions: []
+  assert:
+    CreationScreen.points_left: changed
+- at: 70
+  actions:
+  - move_right
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.attrs: attrs["bone"] == 12
+    CreationScreen.points_left: points_left == 28
+- at: 100
+  actions:
+  - debug_click_creation_widget
+- at: 110
+  actions:
+  - debug_click_creation_widget
+- at: 120
+  actions:
+  - debug_click_creation_widget
+- at: 130
+  actions:
+  - debug_click_creation_widget
+- at: 140
+  actions:
+  - debug_click_creation_widget
+- at: 150
+  actions:
+  - debug_click_creation_widget
+- at: 160
+  actions:
+  - debug_click_creation_widget
+- at: 170
+  actions:
+  - debug_click_creation_widget
+- at: 190
+  actions:
+  - debug_click_creation_widget
+- at: 220
+  actions: []
+  assert:
+    CreationScreen.attrs: attrs["bone"] == 20
+    CreationScreen.points_left: points_left == 15

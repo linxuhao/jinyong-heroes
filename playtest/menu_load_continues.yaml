@@ -1,0 +1,51 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: menu_load_continues
+description: '读取存档 availability is FILE EXISTENCE (SaveManager.has_save_file(1)), never session-memory has_save: delete slot 1 -> entry disabled with the no-save hint; debug_seed_save writes a fresh default profile (year 1 / month 1 / attrs 10) through the real atomic pipeline -> entry enabled; focus 1 + debug-click (the SAME _activate_entry the buttons call) -> load routes directly into CULTIVATION (bypassing SEGMENT_PREDECESSORS) and the freshly hosted screen reads the restored profile (month == 1).'
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 30
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    MenuPanel.load_available: load_available == false
+    MenuEntry1.disabled: true
+    MenuPanel.hint_text: hint_text.contains("存档") == true
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 60
+  actions: []
+  assert:
+    MenuPanel.load_available: load_available == true
+    MenuEntry1.disabled: false
+    GameManager.current_state: current_state == "MENU"
+- at: 65
+  actions: []
+  assert:
+    MenuPanel.load_available: changed
+- at: 70
+  actions:
+  - move_down
+- at: 80
+  actions: []
+  assert:
+    MenuPanel.focused_entry: focused_entry == 1
+- at: 90
+  actions:
+  - debug_click_menu_entry
+- at: 120
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.visible: true
+    CultivationScreen.month: month == 1
+- at: 125
+  actions: []
+  assert:
+    GameManager.current_state: changed

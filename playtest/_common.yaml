@@ -94,6 +94,11 @@ actions:
 - skill_10
 - skill_11
 - skill_12
+- debug_click_menu_entry
+- debug_click_creation_widget
+- debug_seed_save
+- debug_delete_save
+- debug_reset_settings
 surface:
   CombatManager:
   - current_round
@@ -119,6 +124,8 @@ surface:
   GameManager:
   - current_state
   - end_overlay_text
+  - creation_done
+  - creation_entry
   SaveManager:
   - seed
   - last_error
@@ -136,6 +143,9 @@ surface:
   - loaded_profile_json
   - loaded_rng_state
   - loaded_decks_string
+  - last_io_error_code
+  - last_io_error_text
+  - debug_user_dir_exists
   Player:
   - health
   - max_health
@@ -408,6 +418,7 @@ surface:
   - confirmed
   - visible
   - size
+  - pressed_connected
   SectSelectScreen:
   - focus_index
   - selected_sect_id
@@ -448,6 +459,55 @@ surface:
   Backdrop:
   - visible
   - size
+  MenuPanel:
+  - visible
+  - focused_entry
+  - hint_text
+  - load_available
+  - pressed_connected
+  MenuEntry0:
+  - visible
+  - disabled
+  - size
+  - mouse_filter
+  MenuEntry1:
+  - visible
+  - disabled
+  - size
+  - mouse_filter
+  MenuEntry2:
+  - visible
+  - disabled
+  - size
+  - mouse_filter
+  MenuEntry3:
+  - visible
+  - disabled
+  - size
+  - mouse_filter
+  SettingsPanel:
+  - visible
+  - focus_index
+  - pressed_connected
+  SettingsManager:
+  - sfx_volume_db
+  - music_volume_db
+  - fullscreen
+  AudioManager:
+  - sfx_volume_db
+  - music_volume_db
+  AttrPlus0:
+  - visible
+  - size
+  - mouse_filter
+  TraitToggle0:
+  - visible
+  - size
+  - mouse_filter
+  ConfirmButton:
+  - visible
+  - size
+  - mouse_filter
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -476,3 +536,8 @@ scenario_order:
 - skill_hint_and_range_highlight
 - skill_rejection_reason_texts
 - skill_bar_waiting_state
+- main_menu_entries
+- menu_to_creation_to_tutorial_order
+- creation_mouse_interaction
+- menu_load_continues
+- settings_panel

@@ -1,0 +1,62 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: settings_panel
+description: '设置 opens from the menu (entry 2, keyboard focus move_down x2 + ui_accept); the SFX row steps +3.0 dB through the SAME SettingsManager/AudioManager mirror path the mouse buttons call; 全屏 toggles persisted intent only (SettingsManager.fullscreen — headless has no window to assert); 返回 returns to MENU with a fresh MenuPanel. debug_reset_settings first pins the deterministic baseline because settings.cfg persists across processes (defaults 0.0 dB / -10.0 dB / false).'
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions:
+  - debug_reset_settings
+- at: 20
+  actions:
+  - move_down
+- at: 30
+  actions:
+  - move_down
+- at: 40
+  actions:
+  - ui_accept
+- at: 60
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SETTINGS"
+    SettingsPanel.visible: true
+    SettingsManager.sfx_volume_db: sfx_volume_db == 0.0
+    AudioManager.sfx_volume_db: sfx_volume_db == 0.0
+- at: 70
+  actions:
+  - move_right
+- at: 80
+  actions: []
+  assert:
+    SettingsManager.sfx_volume_db: sfx_volume_db == 3.0
+    AudioManager.sfx_volume_db: sfx_volume_db == 3.0
+- at: 85
+  actions: []
+  assert:
+    SettingsManager.sfx_volume_db: changed
+- at: 90
+  actions:
+  - move_down
+- at: 100
+  actions:
+  - move_down
+- at: 110
+  actions:
+  - ui_accept
+- at: 120
+  actions: []
+  assert:
+    SettingsManager.fullscreen: true
+- at: 130
+  actions:
+  - move_down
+- at: 140
+  actions:
+  - ui_accept
+- at: 160
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    MenuPanel.visible: true

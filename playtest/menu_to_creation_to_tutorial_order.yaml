@@ -1,0 +1,101 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: menu_to_creation_to_tutorial_order
+description: 'The real-flow order proof the brief demands: menu.tscn boot -> 新的冒险 -> creation (ATTRS -> TRAITS -> CONFIRM) -> confirm routes to TUTORIAL with creation_done set (creation_entry == "MENU") -> tutorial intro (7x ui_accept) -> debug_win_tutorial -> WON -> transition (2 pages) -> SECT_SELECTION directly — the creation_done skip, NO second creation. STATE/SCENE-KEY asserts only, never absolute frame numbers: the frames only sample, the asserts only check the order.'
+scene: res://scenes/menu.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    SceneManager.current_scene: current_scene == "menu"
+    MenuPanel.visible: true
+- at: 40
+  actions:
+  - ui_accept
+- at: 60
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    SceneManager.current_scene: current_scene == "creation"
+    CreationScreen.visible: true
+- at: 70
+  actions:
+  - ui_accept
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+- at: 100
+  actions:
+  - move_right
+- at: 120
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+- at: 130
+  actions:
+  - ui_accept
+- at: 150
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+    SceneManager.current_scene: current_scene == "battlefield"
+    GameManager.creation_done: creation_done == true
+    GameManager.creation_entry: creation_entry == "MENU"
+- at: 155
+  actions: []
+  assert:
+    SceneManager.current_scene: changed
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - ui_accept
+- at: 190
+  actions:
+  - ui_accept
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+- at: 230
+  actions:
+  - debug_win_tutorial
+- at: 250
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    GameManager.end_overlay_text: end_overlay_text.contains("胜利") == true
+- at: 260
+  actions:
+  - ui_accept
+- at: 280
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 290
+  actions:
+  - ui_accept
+- at: 300
+  actions:
+  - ui_accept
+- at: 320
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+    SectSelectScreen.visible: true
+- at: 325
+  actions: []
+  assert:
+    GameManager.current_state: changed
