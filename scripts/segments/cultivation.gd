@@ -85,6 +85,14 @@ var _delete_armed: bool = false
 
 
 func _ready() -> void:
+	# Refresh the surface whenever a load succeeds while this scene is already
+	# hosted (SceneManager.swap_to early-returns on the same scene key, so a
+	# load from the in-screen 读档 menu would otherwise leave stale
+	# year/month/attr_* behind). The signal fires synchronously on load_slot
+	# success only — failed loads never invoke _on_loaded. Staging stays in
+	# _on_load() (in-screen loads) and _ready() (fresh instances); the handler
+	# only re-syncs + re-renders.
+	SaveManager.loaded.connect(_on_loaded)
 	_sync_surface()
 	# Year-start grant: entering (fresh or via load) at month 1 grants the
 	# sect's arts for the current year (year 1 -> 丁, 2 -> 丙, 3 -> 乙).
@@ -92,6 +100,11 @@ func _ready() -> void:
 	if month == 1:
 		_grant_year_arts()
 	_stage_next_month()
+	_render()
+
+
+func _on_loaded(_slot: int) -> void:
+	_sync_surface()
 	_render()
 
 
