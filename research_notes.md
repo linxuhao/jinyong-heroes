@@ -114,3 +114,84 @@ frame 30 where the tutorial battle boots with 500 HP) evaluated green, and the n
 `debug_*` surface vars / `debug_poison_player` action were accepted by the harness without
 parse errors. Zero runtime errors, zero freed-object errors, `empty_round_stalls` untouched.
 
+---
+
+# Research Notes — t1_goal1_death_ends_battle (implementation run log)
+
+Task: Goal 1 — player HP=0 MUST end the battle. Structural death handling (C1:
+`_is_player(target)` classification + `_check_battle_over()` invariant seam) and the
+permanent regression scenario `player_death_ends_battle` (C2).
+
+## T1 Real Run Output (implementer — REQUIRED, acceptance evidence)
+
+### PROBE #1 (scratch runs; the scratch `t1_probe_death_window*.yaml` files were
+delete_file'd from the deliverable after pinning)
+- Scratch yaml paths: `playtest/t1_probe_death_window6.yaml` (comprehensive death-window
+  sample) + `playtest/t1_probe_death_window5.yaml` (debug_death_classified_player
+  confirmation). All asserts were always-false diagnostics to force `observed` values
+  into the report.
+- Sampled frames: f2620, f2660, f2700, f2740, f2780, f2820, f2860, f2999.
+- Observed per frame:
+
+| frame | health | current_state | end_overlay_text | current_round | empty_round_stalls | debug_death_target_name |
+|---|---|---|---|---|---|---|
+| 2620 | 72 | BATTLE | "" | 10 | 0 | West_Poison |
+| 2660 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+| 2700 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+| 2740 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+| 2780 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+| 2820 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+| 2860 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+| 2999 | 0 | LOST | 战败于华山论剑\n\n按回车重试 | 10 | 0 | Player |
+
+- `debug_death_classified_player` at f2680 (probe5): **true** (assert `== false` failed,
+  `observed=true`).
+- Death frame: between f2620 (health 72, BATTLE) and f2660 (health 0, LOST) — during the
+  round-10 enemy phase. First sampled post-death frame: **f2660**.
+- Verdict: **ALL samples LOST** ⇒ the battle ALREADY ends correctly. The old scan's 8
+  identical "stuck" samples (hp=0, phase=ENEMY_TURN, active=Central Divine) were
+  `end_battle(false)` leaving `phase`/`active_unit_name` unreset — the scan never sampled
+  `current_state`/`end_overlay_text`. **No stuck state was fixed**; the C1 hardening
+  (structural classification + `_check_battle_over()` seam) and the C2 regression are
+  preventive.
+- Losing-line note: the card's shorter "no further input after f650" line does NOT reach
+  HP=0 — the player's turn is event-driven and waits forever, so enemies never act again
+  (scratch probes pinned health at 395, no death). The committed regression therefore
+  replays the FULL losing line (inputs byte-identical to terminal_victory through f2630),
+  after which the round-10 enemy phase kills the passive player — this is the line whose
+  death window the probe sampled.
+
+### Pinned values (consumed by playtest/player_death_ends_battle.yaml)
+- First post-death sample frame: **f2660**
+- Later sample frames (~80 apart, last ≤ 2999): **f2740, f2820, f2999**
+- Pinned `debug_death_target_name`: **"Player"** (tutorial player node's name, pinned from
+  the probe — f2660 observed "Player")
+
+### Final real runs (after C1 + C2 are in place)
+- `player_death_ends_battle`: **24/24 PASS** (4 death samples × 6 asserts). Every death
+  sample observed: health==0, current_state=="LOST",
+  end_overlay_text.contains("战败")==true, empty_round_stalls==0,
+  debug_death_classified_player==true, debug_death_target_name=="Player".
+- `tutorial_loss_restarts_tutorial`: **5/5 PASS**
+- `trait_combat_effects_and_twelve_slots`: **22/22 PASS** (铁布衫 survive-at-1 asserts
+  unaffected — fatal guards fire before death handling)
+- `empty_round_stalls` value at every death sample: **0**
+- Compile errors / runtime errors / freed-object errors in the run output: **none / 0**
+  (hard gate passed: "Playtest ran 3 scenario(s); all assertions passed.")
+
+### Code changes in this task
+1. `scripts/autoload/combat_manager.gd`:
+   - `_handle_death()` classification block: structural
+     `var is_player: bool = target.has_method("is_player") or _is_player(target)` (present
+     from t0, verified byte-correct); observable writes and the player/enemy branches kept
+     byte-identical.
+   - `_check_battle_over()` call sites added (previously dead code — defined but never
+     called): first statement of `_begin_round()` after the re-entry guard, and in
+     `end_current_turn()` immediately before `_next_turn()` after `_player_turn_done = true`.
+     Empty-round-order branch untouched (`empty_round_stalls == 0` protected).
+2. `playtest/player_death_ends_battle.yaml`: T0 skeleton replaced with the permanent
+   probe-pinned regression (full losing line f3..f2630 + 4 six-assert death samples at
+   f2660/f2740/f2820/f2999; no placeholder values; `name:` == file basename).
+3. Deleted all six scratch probe yamls (`playtest/t1_probe_death_window*.yaml`) from the
+   deliverable.
+

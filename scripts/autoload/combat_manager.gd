@@ -431,6 +431,7 @@ func _clear_unit_battle_state(unit: Node) -> void:
 func _begin_round() -> void:
 	if phase == "PLAYER_TURN" or phase == "ENEMY_TURN":
 		return  # A turn is already in progress — re-entry guard.
+	_check_battle_over()
 	debug_round_frame = Engine.get_process_frames()
 	_set_phase("ROUND_END")
 
@@ -637,6 +638,7 @@ func end_current_turn() -> void:
 
 	turn_ended.emit(unit)
 	_player_turn_done = true
+	_check_battle_over()
 	_next_turn()
 
 # ---------------------------------------------------------------------------

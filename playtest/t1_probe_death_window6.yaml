@@ -1,0 +1,210 @@
+# TEMPORARY PROBE #1 (scratch, delete_file'd before delivery).
+# Replays the full terminal_victory losing line (byte-identical inputs f3..f2630,
+# then NO further input — the round-10 enemy phase kills the passive player) and
+# samples the death window. Every assert is an always-false diagnostic whose
+# `observed` value the playtest report prints — that is how the real values of
+# health / current_state / end_overlay_text / current_round / empty_round_stalls /
+# debug_death_target_name / debug_death_classified_player are forced out.
+name: t1_probe_death_window6
+description: 'TEMPORARY PROBE #1 (scratch, deleted before delivery): replay the terminal_victory losing line and sample the death window every ~40 frames for health / current_state / end_overlay_text / current_round / empty_round_stalls / debug_death_*. All asserts are always-false to force observed values into the report.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 46
+  actions:
+  - move_up
+- at: 61
+  actions:
+  - move_up
+- at: 76
+  actions:
+  - move_up
+- at: 91
+  actions:
+  - skill_1
+- at: 106
+  actions:
+  - attack_confirm
+- at: 121
+  actions:
+  - end_turn
+- at: 620
+  actions:
+  - skill_4
+- at: 635
+  actions:
+  - attack_confirm
+- at: 650
+  actions:
+  - end_turn
+- at: 970
+  actions:
+  - skill_3
+- at: 985
+  actions:
+  - attack_confirm
+- at: 1000
+  actions:
+  - end_turn
+- at: 1045
+  actions:
+  - skill_8
+- at: 1060
+  actions:
+  - attack_confirm
+- at: 1075
+  actions:
+  - end_turn
+- at: 1300
+  actions:
+  - skill_1
+- at: 1315
+  actions:
+  - attack_confirm
+- at: 1330
+  actions:
+  - end_turn
+- at: 1560
+  actions:
+  - skill_3
+- at: 1575
+  actions:
+  - attack_confirm
+- at: 1590
+  actions:
+  - end_turn
+- at: 1820
+  actions:
+  - skill_7
+- at: 1835
+  actions:
+  - attack_confirm
+- at: 1850
+  actions:
+  - end_turn
+- at: 2080
+  actions:
+  - skill_4
+- at: 2095
+  actions:
+  - attack_confirm
+- at: 2110
+  actions:
+  - end_turn
+- at: 2340
+  actions:
+  - skill_5
+- at: 2355
+  actions:
+  - attack_confirm
+- at: 2370
+  actions:
+  - end_turn
+- at: 2600
+  actions:
+  - skill_1
+- at: 2615
+  actions:
+  - attack_confirm
+- at: 2630
+  actions:
+  - end_turn
+- at: 2620
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2660
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2700
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2740
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2780
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2820
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2860
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
+- at: 2999
+  actions: []
+  assert:
+    Player.health: health == -1
+    GameManager.current_state: current_state == "PROBE"
+    GameManager.end_overlay_text: end_overlay_text == "PROBE"
+    CombatManager.current_round: current_round == -1
+    CombatManager.empty_round_stalls: empty_round_stalls == -1
+    CombatManager.debug_death_target_name: debug_death_target_name == "PROBE"
+    CombatManager.debug_death_classified_player: debug_death_classified_player == "PROBE"
