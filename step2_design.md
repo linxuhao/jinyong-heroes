@@ -1,305 +1,601 @@
-# step2_design — One Action Per Turn: the `acted` Budget Becomes a Gate
+# Step 2 — Technical Architecture Design
+## Round goal: “全按钮化 — UI that explains itself” (five verified UX defects + movement-range highlight)
+
+This design implements the five defects verified in the Step 1 SOTA report plus the movement-range
+highlight gap, on top of the existing Godot 4.7 repo machinery. Every file path, node name, and
+signal cited below was verified against repo code on the 2026-08-24 baseline (see the "Verified
+baseline" appendix). Nothing in this design changes game logic, combat balance, or any of the
+32 existing playtest scenario files.
+
+---
 
 ## 1. Overview
 
-**Round goal (from the task card):** make the `acted` action budget actually enforce "one action per turn" (design `10_systems.md` §5.1: a turn = move ≤ `moves_left` + **one action**, order free), surface a visible Chinese rejection reason when the player tries a second action, make the playtest scenario `each_unit_acts_once_per_round_initiative_order` true to its name, and probe enemies for the same defect before claiming anything about them.
+### 1.1 Goals (from the round brief, mapped to components)
 
-**Root cause (SOTA, grep-confirmed):** `Player.acted` is a **write-only** flag. It is set `true` on successful execution (`combat_manager.gd` `_execute_basic_attack` L1270-1271 / `_execute_skill` L1403-1404, enemy-turn end L635-636) and reset `false` at turn start (`begin_turn` L691-692) and battle start (`_clear_unit_battle_state` L443-444) — but **nobody reads it to refuse a second action**. The gate must be added on the **read side**.
-
-**Design strategy — complete the pattern that already exists, add nothing new:**
-1. **Player-side funnel gate** (primary, user-visible): `scripts/characters/player.gd` refuses a second action in the same turn and emits the 7th rejection reason 「本回合已行动」 through the existing `action_hint` → HUD `ActionHintLabel` mechanism (the same family as the six shipped reasons in `_skill_reject_reason`).
-2. **Engine-level invariant guard** (belt-and-braces): `CombatManager._execute_action` refuses any `basic_attack`/`skill` from a unit whose `acted == true`, so one-action-per-turn is an invariant of the action entry point, not a courtesy of the player controller. This also gives the enemy probe a definitive, mechanism-level answer.
-3. **Playtest work**: extend `each_unit_acts_once_per_round_initiative_order.yaml` in place with a same-turn double-attack sequence on the player's round-2 turn (all 14 existing assertions byte-identical); fix `central_divine_innate_qi_fatal_guard.yaml` (the one green scenario that **depends** on the multi-attack bug) by splitting its two blows across two player turns.
-4. **Enemy probe** (no repo writes): `godot_playtest_scenario` + `inline_scenario` measures how many damage events the player takes per enemy turn; expected per code reading: exactly one (AI evaluates once, acts once, ends — `combat_manager.gd` `_next_turn` L595-637). Observed values go in the delivery notes either way.
-
-**Non-goals (explicit):** no mouse-path fix (measured untestable this round — see §12), no `click:`-based rejection assert, no RoundIndicator/HUD work, no unit-test wiring, no GUT/gdUnit4 adoption, no changes to `terminal_victory_8_12_rounds_hp_15_40` (deliberately 5/6, stays 5/6).
-
-**Hard constraint:** baseline is 32 scenarios / 31 green. After this round: 31 still green (only `terminal_victory` red at 5/6), 0 runtime errors, and the two touched scenarios tell the truth.
-
-**Language note:** this document's prose is English per pipeline convention; the in-game UI string 「本回合已行动」 is a quoted **Chinese data value** mandated by `design/30_presentation.md` (界面文字一律中文) — it is not translated.
-
-## 2. Design-change declarations (for `5_design`)
-
-The `design/` record is **not edited this run**. One additive note is declared for `5_design`:
-
-| # | Change | Why |
+| # | Defect (SOTA) | Fix (component) |
 |---|---|---|
-| D1 | `design/30_presentation.md` "选了招式之后没法出招" — the rejection-reason example list (「射程不够」「冷却中 N 回合」「须在半血以下」「本回合无法用招」) gains a 7th reason 「本回合已行动」 for the new spent-turn gate. | The list was illustrative, not a closed set; the new gate needs a reason in the same family. No existing listed behavior changes. |
+| 1 | Click-targeting reads the cached pointer (`get_global_mouse_position()`), not the click event → mouse attack untestable/unusable | **C1** event-driven world-coordinate conversion in `player.gd` |
+| 2 | Creation screen buttons: no Back in TRAITS/ATTRS, no Next in ATTRS/TRAITS (keyboard-only) | **C2** four nav buttons delegating to existing handlers |
+| 3 | Skill descriptions exist but are invisible (tooltip-only) and the data is English (violates the archive's Chinese-UI hard rule) | **C5** visible `SkillDescLabel` + Chinese 文案 |
+| 4 | Trait descriptions do not exist in data | **C3** `description` field in `trait_data.gd` + `TraitDescLabel` |
+| 5 | Attribute descriptions do not exist in UI | **C4** static attr-description table + `AttrDescLabel` |
+| 6 | Battle button coverage: no End-Turn button, no attack-execution button (J/Space keyboard-only) | **C7** `EndTurnButton` + `AttackButton` in the HUD |
+| 7 | Movement-range highlight is a fresh gap (only selected-skill reach highlights) | **C6** `MoveRangeHighlight` node, BFS mirroring `_try_move` |
+| — | New observables + coverage for all of the above | **C8** `_common.yaml` surface append + 6 new scenario files |
 
-No numbers in `20_content.md` change. No changes to `10_systems.md` (the turn definition already says one action — this run only **implements** it). The scenario-file edits (C4/C5) are playtest contract files, not `design/`, so they are not declared here but are listed in §8.
+### 1.2 Non-goals / protected invariants (do not touch)
 
-## 3. Architecture diagram (text)
+- The **32 existing scenario files stay byte-identical**. `playtest/_common.yaml` is **append-only**
+  (surface entries + `scenario_order` entries only). New coverage = new scenario files.
+- `project.godot` is **not modified**: no new input actions, no new autoloads, no scene changes.
+  Buttons are driven by real mouse clicks (`pressed` signal) and the existing `click:`/`clicks:`
+  harness — no new debug actions are needed.
+- `move_*` actions stay movement-only in battle; `attack_confirm` (J), `end_turn` (Space) keyboard
+  paths are untouched. Buttons are additive delegates — "keyboard degrades to shortcuts".
+- No combat-engine, AI, balance, or data-value changes. `_try_move` stays the single authority for
+  movement rules; the movement highlight is a read-only mirror.
+- `terminal_victory_8_12_rounds_hp_15_40` stays red (difficulty contract); GDScript unit-suite
+  wiring, art rework, 穿越 演出, and `playtest_spec.yaml` monolith rebuild are all out of scope.
+- `playtest_spec.yaml` must NOT reappear at repo root (the `playtest/` directory is authoritative).
+
+### 1.3 Architecture diagram (text)
 
 ```
-                        INPUT (keyboard J, skill hotkeys, WASD, mouse click)
-                                          │
-                                          ▼
-                      player.gd _unhandled_input (state gate: BATTLE + player turn + not paused)
-                        │                     │
-   movement (WASD)      │                     │  attack_confirm / click on enemy
-                        ▼                     ▼
-        _try_move ── moves_left gate ──► _try_keyboard_attack / _handle_click_targeting
-        (NEVER gated by acted)                  │
-                                                ▼
-                              ★ C1 NEW GATE ── _try_attack_target (single funnel)
-                              if acted: emit 「本回合已行动」, return
-                              (before skill/basic split, before cooldown/range/tutorial)
-                                                │ (acted == false)
-                                                ▼
-                                        _execute_basic_attack / _execute_skill
-                                                │
-                                                ▼
-                          CombatManager.execute_action(unit, action, target, params)
-                                                │
-                                                ▼
-                              ★ C2 NEW GUARD ── _execute_action (engine invariant)
-                              if unit.acted and action != "move": emit hint, return null
-                                                │ (acted == false)
-                                                ▼
-                        _execute_basic_attack / _execute_skill ── sets unit.acted = true
-                              (synchronously, before any await — same-frame double
-                               input is safe: check and set are both synchronous)
-                                                │
-                                                ▼
-                    apply_damage / statuses / cooldown  ──►  action_hint.emit("")
-                                                │
-                                                ▼
-                       HUD ActionHintLabel (existing mechanism, C3: NO change)
-                       surface: ActionHintLabel.text / .visible (already whitelisted)
+                    ┌────────────────────────── GameManager (autoload) ─────────────────────────┐
+                    │ states MENU / CHARACTER_CREATION / TUTORIAL / BATTLE / ...                │
+                    │ enter_menu() ── state_changed ──▶ SceneManager.swap_to("menu")            │
+                    └───────────────────────────────────────────────────────────────────────────┘
 
-Turn lifecycle (unchanged): begin_turn(unit) resets acted=false at the unit's own
-turn start; enemy turns: AI evaluates ONCE → move path → at most one execute_action
-→ acted=true → end_current_turn (combat_manager.gd _next_turn). Player turns:
-event-driven, await Space; the new gates make unbounded re-presses harmless.
+ InputEventMouseButton (harness `clicks:` or real mouse)
+        │
+        ▼
+ ┌──────────────────────────┐        ┌──────────────────────────────────────────────────────────┐
+ │ player.gd                │        │ HUD (CanvasLayer 10, persistent shell)                  │
+ │ _unhandled_input         │        │  ├─ SkillBar: SkillButton1..12 (pressed→_on_skill_selected)│
+ │   click →                 │        │  ├─ ActionHintLabel (rejection reasons, existing)        │
+ │   _handle_click_targeting │        │  ├─ PauseButton (existing)                              │
+ │   (event)                 │        │  ├─ EndTurnButton ──pressed──▶ HUD handler               │
+ │   world =                 │        │  │        └─ gate(is_player_turn, !paused)               │
+ │   canvas_transform⁻¹ ·    │        │  │           └─ CombatManager.end_current_turn()         │
+ │   event.position          │        │  ├─ AttackButton ──pressed──▶ HUD handler                │
+ │   → world_to_grid         │        │  │        └─ gate(…) └─ player._try_keyboard_attack()    │
+ │   → enemy match           │        │  ├─ SkillDescLabel (selected skill.description)          │
+ │   → _try_attack_target    │        │  └─ geometry observables (new_button_overlap etc.)      │
+ └────────────┬─────────────┘        └──────────────────────────────────────────────────────────┘
+              │ (identical gates)
+              ▼
+        CombatManager.execute_action / end_current_turn        (engine — untouched)
+
+ Battlefield (Node2D) world layer
+  ├─ RangeHighlight      (existing: skill reach, blue REACH / red TARGET; NEW: fill_color observable)
+  └─ MoveRangeHighlight  (NEW: movement reach, green; BFS mirroring player._try_move,
+                          reads player.grid_pos / moves_left / acted / traits / GridManager)
+
+ CreationScreen (segment Control; creation.tscn direct-bootable)
+  ├─ MouseBox/AttrBox:   AttrMinus0..4 / AttrPlus0..4 (existing), AttrDescLabel (NEW),
+  │                      NavRow: AttrBackButton → GameManager.enter_menu() (NEW),
+  │                              AttrNextButton → _on_accept (NEW)
+  ├─ MouseBox/TraitBox:  TraitToggle0..12 (existing), TraitDescLabel (NEW, TraitData.description),
+  │                      NavRow: TraitBackButton → _on_move_left (NEW),
+  │                              TraitNextButton → _on_move_right (NEW)
+  └─ MouseBox/ConfirmBox: ConfirmButton / BackButton (existing, unchanged)
 ```
 
-**Data flow of a rejected second action (the acceptance path):**
-`attack_confirm` → `_try_keyboard_attack` → `acted == true` → `action_hint.emit("本回合已行动")` → `ActionHintLabel.text == "本回合已行动"`, `visible == true`; no `execute_action` call → no damage, no cooldown start, `acted` stays true, `selected_skill_index` untouched.
+---
 
-## 4. Component specifications
+## 2. Component list
 
-### C1 — Player action-budget gate — `scripts/characters/player.gd` (MODIFIED)
+### C1 — Click-targeting fix (`scripts/characters/player.gd` only)
 
-**Responsibility:** refuse any second action attempt in the same player turn, with the visible reason; never touch movement or skill **selection**.
+- **Responsibility:** make the world-click attack path driven by the click event's own coordinates
+  instead of the cached pointer position.
+- **Verified baseline:** `_unhandled_input` (L379-383) dispatches
+  `_handle_click_targeting()` with no argument; the method (L462-463) reads
+  `get_global_mouse_position()`. The unified input gate (L299-307: state == BATTLE,
+  `is_player_turn()`, not paused, not `is_moving`) already protects the path — keep it byte-identical.
+- **Change (two lines of code):**
+  1. `L382`: `_handle_click_targeting(event)` — pass the `InputEventMouseButton` that the
+     `elif` branch already narrowed.
+  2. `L463`: replace `var click_world: Vector2 = get_global_mouse_position()` with
+     `var click_world: Vector2 = get_canvas_transform().affine_inverse() * event.position`.
+- **Coordinate contract:** `event.position` is viewport-space. `get_canvas_transform()` on the
+  player node maps viewport → battlefield world. Today that transform is identity
+  (`main.tscn` has a Camera2D at (480,352) — viewport center — with no offset/zoom;
+  `battlefield.tscn` itself has none), so `event.position` equals world coordinates and existing
+  behavior for real mouse users is unchanged; the expression stays correct if a camera moves later.
+  `GridManager.world_to_grid` then maps world → grid cell, exactly as before.
+- **No other change:** enemy matching loop, `_try_attack_target` gates (acted / tutorial /
+  range / HP gate), auto-deselect — all untouched.
+- **Interface for C8:** a new scenario (`click_targeting_fixed.yaml`) must click an enemy node
+  and observe `Player.acted == true` + enemy health loss. This is the re-proof demanded by the
+  brief: the fixed path must be proven harness-drivable, not assumed.
 
-**Changes (three insertion points, ~6 lines total):**
+### C2 — Creation-screen navigation buttons (`scripts/segments/creation.gd` + `scenes/segments/creation.tscn`)
 
-1. **Top of `_try_attack_target(enemy)`** (after the existing null/validity precondition guard, **before** the `selected_skill_index` skill/basic split — this single point covers both keyboard and mouse targeting):
-```gdscript
-if acted:
-    action_hint.emit("本回合已行动")
-    return
-```
-Gate order contract (must be preserved, reason: a spent turn reports the true blocker first):
-`enemy validity` → **acted** → existing skill gates (`_skill_reject_reason`) → range/shape hit test → tutorial check → execute.
+- **Responsibility:** expose every keyboard-only step transition as a mouse button, delegating to
+  the SAME handlers the keyboard uses (convergence pattern, `_wire_mouse_widgets` L85-100).
+- **Verified phase semantics (handler reuse matrix):**
 
-2. **Top of `_try_keyboard_attack()`** (covers the no-target branch, which otherwise emits 射程不够 after acting):
-```gdscript
-if acted:
-    action_hint.emit("本回合已行动")
-    return
-```
-This is equivalent to gating only the no-target branch but simpler and single-emission (it returns before `_try_attack_target` is ever reached).
+  | Phase | `_on_move_left` | `_on_move_right` | `_on_accept` |
+  |---|---|---|---|
+  | ATTRS | **decrements attr** (must NOT be Back) | increments attr | → TRAITS |
+  | TRAITS | → ATTRS (no trait mutation) | → CONFIRM | toggles trait |
+  | CONFIRM | → TRAITS | no-op | confirm+route |
 
-3. **Documentation only:** update the `acted` field doc comment (L69-70) from "True once the unit has performed an action this turn" to note the flag is now **read** by the gates (C1/C2) and written only by the engine.
+- **New nodes** (added to the `.tscn`; visibility is inherited from the parent box's existing
+  per-phase `visible` logic in `_render()`, but the per-leaf `visible` sync pattern must be
+  extended to them so node-level asserts hold):
 
-**Must NOT change:**
-- `_try_move` — movement budget (`moves_left`/`moved`) is a separate gate; a turn may move after acting (design §5.1, order free).
-- `select_skill` / `_skill_reject_reason` — skill **selection** stays allowed after acting (selection is preparation, not an action). The acted check must not be added to `_skill_reject_reason` or every skill-button press after acting would lie about the blocker.
-- The six existing literals in `_skill_reject_reason` and the 射程不够 / 教程尚未解锁 literals in the attack path.
+  | Node path | Handler | Label |
+  |---|---|---|
+  | `MouseBox/AttrBox/AttrNavRow/AttrBackButton` | NEW `_on_creation_back_to_menu()` | `返回菜单` |
+  | `MouseBox/AttrBox/AttrNavRow/AttrNextButton` | `_on_accept` (ATTRS → TRAITS) | `下一步` |
+  | `MouseBox/TraitBox/TraitNavRow/TraitBackButton` | `_on_move_left` (TRAITS → ATTRS, safe reuse) | `上一步` |
+  | `MouseBox/TraitBox/TraitNavRow/TraitNextButton` | `_on_move_right` (TRAITS → CONFIRM) | `下一步` |
 
-**Rejection consumes nothing (automatic):** the gate returns before `CombatManager.execute_action`, so no cooldown starts, no damage is applied, no `action_executed` fires, `acted` stays true. The hint line is overwritten on the next successful action/selection (existing `action_hint.emit("")` sites).
+- **`_on_creation_back_to_menu()` (new, ~5 lines):**
+  `if confirmed or SceneManager.pending_swap: return` → `GameManager.enter_menu()`.
+  `enter_menu()` (game_manager.gd L254) is idempotent and unguarded; it emits
+  `state_changed("MENU")`, and SceneManager's `SCENE_MAP` swaps to the menu scene.
+  Do NOT reuse `_on_move_left` here — in ATTRS it decrements the focused attribute.
+- **`_wire_mouse_widgets()` additions:** connect the four buttons; extend the `pressed_connected`
+  snapshot with keys `AttrBackButton`, `AttrNextButton`, `TraitBackButton`, `TraitNextButton`
+  (same `get_signal_connection_list("pressed").size() > 0` pattern).
+- **Edge cases (from SOTA):** TRAITS Back must not mutate trait state (`_on_move_left` TRAITS arm
+  only changes phase — verified L129-132); the keyboard `move_left` in ATTRS stays
+  "decrement attr" (unchanged); `menu_to_creation_to_tutorial_order` stays keyboard-driven and
+  byte-identical because no keyboard handler is touched.
+- **Important boot caveat:** the back-to-menu walk must run under `main.tscn` (SceneManager needs
+  the persistent shell; a direct `creation.tscn` boot has no `/root/Main` hosts and would log
+  `host_missing`). The direct-boot scenario only exercises TRAITS/CONFIRM/ATTRS phase navigation.
 
-### C2 — Engine-level invariant guard — `scripts/autoload/combat_manager.gd` (MODIFIED)
+### C3 — Trait descriptions in data (`scripts/data/trait_data.gd`) + `TraitDescLabel`
 
-**Responsibility:** make one-action-per-turn an invariant of the action entry point, protecting any future caller (new AI, queued actions) and giving the enemy probe a definitive mechanism-level answer.
+- **Responsibility:** add the authoritative 机制 文案 to the trait registry and render it.
+- **Data change:** add `var description: String = ""` to `TraitDef`; add a `"description"` key to
+  each of the 13 `TABLE` rows; copy it in `_build()`. Additive only — `all()` / `get_def()` /
+  `cost_of()` / `is_flaw()` / `positive_ids()` signatures unchanged, so
+  `tests/test_trait_data.gd` and every consumer keep working.
+- **文案 source (verbatim from `design/40_progression.md` §2.2 机制 column — the only allowed
+  source, no invented numbers):**
 
-**Change:** at the top of `_execute_action(unit, action, target, params) -> Tween` (before the `match action:`):
-```gdscript
-# One-action-per-turn invariant (design 10_systems §5.1). "move" is NOT an
-# action — the movement budget is enforced by execute_move_path/_try_move,
-# and a turn may move after acting (order free).
-if action != "move" and unit != null and is_instance_valid(unit) \
-        and "acted" in unit and bool(unit.acted):
-    if unit.has_signal("action_hint"):
-        unit.action_hint.emit("本回合已行动")
-    return null
-```
-- Placement in `_execute_action` (not `execute_action`) keeps the guard **synchronous** with respect to the set in `_execute_basic_attack`/`_execute_skill` — no `await` window between check and set, so two key presses in one frame cannot both land.
-- Returning `null` before the match means `action_executed` does **not** fire for a rejected attempt — correct semantics (a rejected action is not an executed action).
-- `has_signal("action_hint")` keeps the guard decoupled from the HUD: enemies (which do not emit the signal) and future units are handled uniformly.
-- This guard is **belt-and-braces** — it does not replace the C1 player-side gate, which is the user-visible path (the engine guard cannot know which HUD to address if the unit has no `action_hint`).
+  | id | display_name | description |
+  |---|---|---|
+  | ambidextrous | 左右互搏 | `技能栏可装 3 门外功(12 格),而不是 2 门 8 格` |
+  | self_taught | 无师自通 | `可以在前置不齐时直接学高一级功法(发挥度照旧按缺几门算,依然失常)` |
+  | gifted_bones | 骨骼清奇 | `可同时主修两门内功(常规只能一门)` |
+  | photographic_memory | 过目不忘 | `见过敌人用过的招式,可在无师门的情况下自学该门类的低级功法` |
+  | iron_shirt | 铁布衫 | `每场战斗第一次受到的致命伤转为剩 1 气血` |
+  | swallow_lightness | 身轻如燕 | `战斗中可穿过敌人所在格(不能停留其上)` |
+  | worldly_experience | 江湖阅历 | `大地图多一个行动:打听,揭示相邻节点的内容` |
+  | deep_fortune | 福缘深厚 | `游历事件每年可重掷一次` |
+  | sha_po_lang | 杀破狼 | `永远单人上阵,不能带同伴;同时领杀·破·狼三星` |
+  | old_wound | 旧伤 | `无法使用绝招(每门外功的第 4 招)` |
+  | inner_demon | 心魔 | `气血低于 30% 时,每回合有一次行动失控(随机移动,不攻击)` |
+  | lone_bane | 孤煞 | `门派只教你外功,不教内功;内功得另想办法` |
+  | dull_sinews | 筋骨迟钝 | `学不了轻功门类的任何功法` |
 
-**Safety analysis — who C2 affects, and who it provably cannot (measured, not assumed).** C2 sits at the shared action entry point, so it carries this round's largest blast radius. Its impact boundary is enumerated here so no implementer or reviewer has to re-derive it — or, worse, weaken C2 out of caution:
+- **UI:** new `Label` node `MouseBox/TraitBox/TraitDescLabel` (autowrap, `mouse_filter = 2`).
+  `_render()` sets `TraitDescLabel.text = _traits[trait_index].description` when TRAITS is active
+  (guard `trait_index` in range), and syncs its `visible` with the phase. Surface: `text`, `visible`.
 
-1. **Counter/reflect damage never passes through C2.** `_trigger_counter_reflect` (`combat_manager.gd:880`, invoked from L873 immediately after `apply_damage`) applies damage **directly** and never calls `execute_action`. The passives 弹指神通反击 / 蛤蟆反震 therefore bypass the guard entirely: `trait_combat_effects_and_twelve_slots` (22/22) and `debug_reflect_hits` are outside C2's reach by code path, not by coincidence.
-2. **Enemy turns never trip the guard — by statement order, not by luck.** The enemy branch (`combat_manager.gd` `_next_turn`) is:
-   ```
-   L631   await execute_action(unit, action, target, params)
-   L635   if "acted" in unit: unit.acted = true
-   ```
-   `acted` is set **after** `execute_action` returns, so the enemy enters its own action with `acted == false` and C2 passes; `begin_turn` then resets the flag at the start of the enemy's next turn. This caller-side ordering is also the structural reason enemies never had the player's multi-action defect — their budget is enforced by the caller, exactly the asymmetry C6 probes to confirm.
-3. **Call-site census: exactly three.** `player.gd:635` (basic attack), `player.gd:646` (skill), `combat_manager.gd:631` (enemy AI). No fourth call site exists (grep-audited). Any future caller added by a later run is precisely what C2 exists to protect — and that run's design must carry its own safety analysis for it.
-4. **No duplicate hint on the player path.** C1 intercepts the player at the top of the funnel, so a rejected player attempt never reaches C2; the engine-level emit is silent for the player today. C2's `action_hint` emit exists **only** for future callers that bypass C1. The two emit sites are intentional, not a bug — neither may be deleted.
+### C4 — Attribute descriptions (`scripts/segments/creation.gd`)
 
-### C3 — HUD rejection surfacing — **NO code change**
+- **Responsibility:** show what each attribute derives, from the authoritative formulas.
+- **Change:** a small `const` dictionary in `creation.gd` keyed by `PlayerProfile.ATTR_KEYS`,
+  plus a `_attr_desc(key)` accessor. **文案 from `design/40_progression.md` §7.1 formulas and
+  `design/10_systems.md` §1 meanings (verbatim formulas, no paraphrase):**
 
-The `action_hint` signal → `ActionHintLabel` mechanism already exists (player.gd L36 → HUD label) and is scenario-tested (`skill_rejection_reason_texts` 3/3 green). 「本回合已行动」 joins the existing family; no new signal, node, or surface entry. `playtest/_common.yaml` already whitelists `Player.acted`, `ActionHintLabel.text`, `ActionHintLabel.visible` — **zero harness changes**.
+  | key | label | description |
+  |---|---|---|
+  | bone | 根骨 | `气血 = 根骨 × 5` |
+  | inner | 内力 | `内力值 = 内力 × 2` |
+  | agility | 身法 | `移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法` |
+  | wisdom | 悟性 | `决定学功法的速度(修习查表)` |
+  | fortune | 福缘 | `影响事件与奇遇(游历事件可重掷)` |
 
-### C4 — Scenario extension: `playtest/each_unit_acts_once_per_round_initiative_order.yaml` (MODIFIED)
+- **UI:** new `Label` node `MouseBox/AttrBox/AttrDescLabel` (autowrap, `mouse_filter = 2`).
+  `_render()` sets `AttrDescLabel.text = _attr_desc(ATTR_KEYS[attr_index])` in ATTRS phase and
+  syncs `visible`. Surface: `text`, `visible`.
 
-The scenario's name promises "each unit acts once per round" — today it asserts turn **order** only (14 asserts, green). The appended sequence proves the **budget**: a second `attack_confirm` in the same player turn is rejected with 「本回合已行动」, and the enemy turn still proceeds. Full skeleton in §7.1; guardrails:
+### C5 — Visible skill description in battle (`scripts/battlefield.gd` + `scripts/ui/hud.gd` + `scenes/ui/hud.tscn`)
 
-- The 14 existing assertions stay **byte-identical** at f30 and f1200 with the same input timeline before them. The appended entries start **after** the f1200 entry.
-- Keyboard `attack_confirm` is the **only** input leg asserted (mouse leg untestable this round — §12). No `click:` entries.
-- The first `attack_confirm` must land (assert `Player.acted == true` and the target's health changed) — otherwise the test proves nothing. If no enemy is adjacent at f1200, insert move steps first (mirror `skill_rejection_reason_texts`' 3× move_up pattern, 15-frame spacing). Probe decides (§9).
-- The rejection is pinned by `Player.acted == true` + `ActionHintLabel.visible == true` + `ActionHintLabel.text == "本回合已行动"`, sampled **after** the second (rejected) press. The health-unchanged assert uses an **integer percentage of max_health** (roadmap rule 1: never absolute HP; the harness has no documented `unchanged` keyword — grep found none — so the deterministic damage pipeline makes the post-first-hit percentage a computable constant): `round(100.0 * health / float(max_health)) == <N>`, same `N` asserted after the rejected press.
+- **Responsibility:** make the selected skill's description readable without hovering (the
+  click-only harness cannot hover), and align the description DATA with the archive's Chinese-UI
+  hard rule (`design/30_presentation.md`: 界面文字一律中文; CJK font already global).
+- **Data alignment (declared change):** the `desc` arguments in
+  `battlefield.gd:_create_all_skill_data` are currently English (verified: e.g. "Ranged finger
+  strike that ignores damage reduction…"). They are data (only ever surfaced via tooltips, never
+  asserted), so switching them to Chinese breaks no scenario. The 8 player skills become the
+  exact 文案 below (numbers verbatim from `design/20_content.md` §1 — they ARE the contract, do
+  not paraphrase). Enemy-skill `desc` strings are switched to Chinese from the same tables
+  (`20_content.md` §2.1-2.5) for consistency; they are not asserted.
 
-### C5 — Scenario fix: `playtest/central_divine_innate_qi_fatal_guard.yaml` (MODIFIED)
+  | skill (key unchanged) | Chinese description (visible text) |
+  |---|---|
+  | heavy_edge 重剑无锋 | `单体 45 伤害,击退 1 格。冷却 1 回合。` |
+  | grand_simplicity 大巧不工 | `直线 3 格 38 伤害。冷却 2 回合。` |
+  | thousand_force_cleave 力斩千钧 | `十字 2 格 34 伤害。冷却 3 回合。` |
+  | boundless_seas 绝招·四海无量 | `以自身为心,半径 2 格全体 70 伤害。冷却 6 回合。` |
+  | startle_heart 心惊肉跳 | `单体 38 伤害。冷却 1 回合。` |
+  | mud_drag 拖泥带水 | `单体 25 伤害,目标下一回合移动力 −2。冷却 2 回合。` |
+  | wander_valley 徘徊空谷 | `位移:跳 3 格,落点相邻全体 20 伤害。冷却 3 回合。` |
+  | seventeen_forms 绝招·黯然销魂十七式 | `相邻全体 70 伤害,击退 2 格。需气血低于 50%。冷却 8 回合。` |
 
-This scenario is green **because** of the multi-attack bug: it presses `attack_confirm` at f560 and f610 in the **same** player turn and asserts `Central_Divine.health: changed` after each (f600, f660). After the fix, the f610 press becomes a rejection and the f660 assert goes red. Required change: split the two blows across two player turns. Full timeline in §7.2; guardrails:
+- **UI:** new `Label` node `SkillDescLabel` in `hud.tscn` (anchored top-right, below the new
+  button column: `offset_left -352 / offset_top 140 / offset_right -8 / offset_bottom 320`,
+  autowrap, `mouse_filter = 2`). It sits on HUD layer 10, below the tutorial panel's layer 100 —
+  satisfying the archive rule that HUD never draws ON the tutorial panel.
+  - Default text (no skill selected): `点击招式按钮,查看招式说明` — always visible, so the
+    "no introduction in battle" gap is closed even before a selection.
+  - `hud.gd:_on_skill_selected(index)`: after the existing `select_skill` call, re-read
+    `GameManager.get_player()` and set `SkillDescLabel.text` to `player.skills[index].description`
+    (guarded); if the same index is toggled off (`selected_skill_index < 0`), restore the default.
+  - `setup()` resets the label to the default text; `clear_battle_refs()` resets it too.
+  - Keep `tooltip_text = skill.description` in `skill_button.gd` (hover is a bonus, not the only path).
 
-- All existing assertions stay: f140 `health < max_health`, f550 `current_round == 2`, f600 `changed` (f560 blow lands), and the f660 `changed` assert re-times to the player's **next** turn (its semantic — "health changed after the second blow" — is preserved).
-- 先天罡气 is **once per battle** (`_innate_qi_used`, keyed by unit instance id, never reset — combat_manager.gd L211-212), so the first-lethal→1HP / second-lethal→death contract survives across turns. Spacing the blows across two adjacent player turns keeps that contract intact.
-- The second blow must be **guaranteed to hit Central Divine** (the nearest-target pick has registration-order tie-breaks, and other enemies may be adjacent by round 3) and **guaranteed lethal** (threat model: South Emperor's 先天调息 ally heal, Central Divine's 罡气护体 shield). Probe-first procedure and decision table in §9.2.
-- Frame numbers (the end_turn insertion point and the re-timed press/assert) are **probe-derived** (先取值,再动手), then fixed permanently. Frame cap 3000 leaves ample room.
+### C6 — Movement-range highlight (new `scripts/ui/move_range_highlight.gd` + `scenes/battlefield.tscn`)
 
-### C6 — Enemy probe — **no repo writes** (run + delivery notes)
+- **Responsibility:** show every tile the player could still reach with the remaining movement
+  budget, using the exact `_try_move` rules — the displayed set must never suggest a move
+  `_try_move` would refuse.
+- **Pattern reuse:** a sibling of `RangeHighlight` (`range_highlight.gd` — self-driving
+  `_process`, cheap-diff keys, `_hide()` as the only writer of `visible = false`, observables).
+  Node: `Battlefield/MoveRangeHighlight` (Node2D) with the new script, added to `battlefield.tscn`
+  next to `RangeHighlight`. Dies with the battlefield on scene swap — no teardown.
+- **Reachability model (BFS, display-only, mirrors `player.gd:_try_move` L391-439 exactly):**
+  ```
+  budget   = player.moves_left
+  slide_ok = player.traits.has("swallow_lightness")
+  dist = {grid_pos: 0}; queue = [grid_pos]
+  while queue:
+      v = pop_front(); d = dist[v]
+      for dir in 4 directions:
+          nxt = v + dir
+          if GridManager.is_walkable(nxt) and not GridManager.is_occupied(nxt) and d+1 <= budget:
+              relax(nxt, d+1)                       # normal step, cost 1
+          elif slide_ok and GridManager.is_occupied(nxt) and d+2 <= budget:
+              beyond = nxt + dir
+              if GridManager.is_walkable(beyond) and not GridManager.is_occupied(beyond):
+                  relax(beyond, d+2)                # 身轻如燕 slide-through, cost 2
+  ```
+  The origin tile is included (cost 0). The occupied slide-through tile itself is NOT in the set
+  (it is never a legal landing tile). Border ring is excluded by `is_walkable` automatically.
+- **Visibility rule:** show only while `GameManager.get_state() == BATTLE` **and**
+  `CombatManager.is_player_turn()` **and** `not player.acted` **and** the player is valid.
+  (After acting, the movement budget is spent; the highlight hides — matches semantics, not just
+  presentation.) No tutorial gating: during TUTORIAL state `is_player_turn()` is false → hidden.
+- **Diff keys:** `grid_pos`, `moves_left`, `acted`, and an occupancy signature
+  (sorted join of `GridManager.occupancy.keys()`), mirroring the RangeHighlight cheap-diff so
+  `empty_round_stalls` can never be triggered by this node. Recompute → `queue_redraw()` only on
+  change.
+- **Colors (assertable distinctness — success criterion 5):**
+  - `MOVE_FILL = Color(0.35, 0.85, 0.30, 0.16)`, `MOVE_EDGE = Color(0.35, 0.85, 0.30, 0.45)`
+    (green family) — vs skill REACH blue (0.30,0.65,1.00) and TARGET red (1.00,0.30,0.20).
+  - Observables: `visible`, `tile_count`, `fill_color` (the FILL constant).
+- **Supporting change:** add `var fill_color: Color = REACH_FILL` to `range_highlight.gd`
+  (observable only — zero behavior change), so the new scenario can assert both colors and prove
+  inequality numerically (`green: g > r and g > b` vs `blue: b > r and b > g`).
 
-Probe (protocol in §9.3) answers: do enemies ever act twice in one turn? Code reading says no (`_next_turn`: one `_evaluate_ai` call, at most one `execute_action`, then `acted = true` + `end_current_turn`) — the asymmetry is structural: the **caller** enforces the budget for enemies, while the player turn is event-driven. The probe confirms the observed behavior (damage events per enemy turn, enemy `acted`/`turns_taken` deltas) and the observed values are recorded in the delivery notes. The C2 engine guard makes the invariant true regardless of caller, protecting future callers.
+### C7 — Battle buttons: End Turn + Attack (`scenes/ui/hud.tscn` + `scripts/ui/hud.gd`)
 
-### C7 — Delivery notes (implementer output, not a repo file)
+- **Responsibility:** give every battle action a clickable button; keyboard stays a shortcut.
+  Skills already have buttons (SkillButton1..12); PauseButton exists. Missing: end turn, and the
+  J attack confirmation.
+- **New nodes in `hud.tscn` (authored, so they exist from scene parse — no programmatic
+  instantiation, no `SkillButton`-style naming work):** right column under PauseButton
+  (`anchor preset 3` — top-right; same width as Pause: `offset_left -140 / offset_right -8`):
 
-Must state, explicitly:
-1. The mouse path is **NOT verified** this round (reviewer withdrew the both-legs requirement after the measured inert `click:` probe, SOTA commits a694e81/4696887); the acceptance assertion uses the keyboard `attack_confirm` path only.
-2. Enemy probe observed values (C6) and the mechanism conclusion.
-3. Playtest results: 31 green, `terminal_victory` 5/6 (deliberate), the two touched scenarios' new assert counts.
-4. No claims of `click:`-verified behavior.
+  | Node | Position (offsets) | Text | Wires to |
+  |---|---|---|---|
+  | `EndTurnButton` | top 52 / bottom 88 | `结束回合` | NEW `_on_end_turn_pressed` |
+  | `AttackButton` | top 96 / bottom 132 | `出招 (J)` | NEW `_on_attack_pressed` |
 
-## 5. Interface specification
+  Verified non-overlap: PauseButton y 8..44; RoundIndicator spans x 280..680; tutorial Panel
+  starts at y 152 and x ≤ 780. So y 52..132 at x 820..952 is clear of everything.
+- **Wiring in `hud.gd:setup()`** (idempotent: disconnect-first like `_wire_action_hint`), and a
+  `pressed_connected: Dictionary` snapshot `{"EndTurnButton": true, "AttackButton": true}` after
+  the connects (same proof-of-middle-chain pattern as `creation.gd`).
+- **Handlers (gates live here — `CombatManager.end_current_turn()` has NO internal turn gate;
+  `player._try_keyboard_attack()` expects the battle gate from its caller):**
+  ```
+  func _battle_input_allowed() -> bool:
+      return CombatManager.is_player_turn() and not CombatManager.get_is_paused()
+  func _on_end_turn_pressed():
+      if not _battle_input_allowed(): return
+      CombatManager.end_current_turn()                     # same engine call the Space key makes
+  func _on_attack_pressed():
+      if not _battle_input_allowed(): return
+      var player = GameManager.get_player()                # live lookup — never a stored ref
+      if player != null and is_instance_valid(player) and player.has_method("_try_keyboard_attack"):
+          player._try_keyboard_attack()                    # same call the J key makes
+  ```
+  `AttackButton` mirrors J exactly: fires the selected skill at the nearest valid target, or a
+  basic attack when none is selected (`_try_keyboard_attack`, player.gd L536). The label `出招 (J)`
+  also closes the documented gap "the J key is written nowhere on screen"
+  (design/30_presentation.md).
+- **Per-frame state:** in `hud.gd:_process` (BEFORE the existing `player == null` early-return,
+  next to `_update_geometry_observables`), set
+  `EndTurnButton.disabled = AttackButton.disabled = not _battle_input_allowed()`. A click on a
+  disabled button emits nothing — double protection; the visible disabled state also satisfies
+  the "current action must be visible" readability rule.
+- **Geometry observables (new, computed every frame in `_update_geometry_observables`):**
+  - `hud_button_overlap: bool` — EndTurnButton/AttackButton rects intersect any of
+    (PauseButton, RoundIndicator, SkillBar, ActionHintLabel).
+  - `hud_desc_overlap: bool` — SkillDescLabel rect intersects any of the above or the two new
+    buttons.
+  Both must be `false` whenever the HUD is visible; asserted in the new scenario and left on the
+  surface so any future button added on the HUD is guarded by an existing assert pattern.
 
-| Interface | Signature / literal | Notes |
+### C8 — Playtest contract (append-only) + 6 new scenarios
+
+- **`playtest/_common.yaml` additions** (append-only; the 32 scenario files untouched):
+
+  ```yaml
+  surface:
+    RangeHighlight:
+    - visible
+    - tile_count
+    - target_count
+    - fill_color              # NEW (Color observable on the existing script)
+    MoveRangeHighlight:       # NEW node
+    - visible
+    - tile_count
+    - fill_color
+    HUD:
+    # (existing entries unchanged)
+    - pressed_connected       # NEW (Dictionary)
+    - hud_button_overlap      # NEW (bool)
+    - hud_desc_overlap        # NEW (bool)
+    EndTurnButton:            # NEW node
+    - visible
+    - size
+    - mouse_filter
+    - disabled
+    AttackButton:             # NEW node
+    - visible
+    - size
+    - mouse_filter
+    - disabled
+    SkillDescLabel:           # NEW node
+    - visible
+    - text
+    AttrBackButton:           # NEW node
+    - visible
+    - size
+    - mouse_filter
+    AttrNextButton:           # NEW node
+    - visible
+    - size
+    - mouse_filter
+    TraitBackButton:          # NEW node
+    - visible
+    - size
+    - mouse_filter
+    TraitNextButton:          # NEW node
+    - visible
+    - size
+    - mouse_filter
+    AttrDescLabel:            # NEW node
+    - visible
+    - text
+    TraitDescLabel:           # NEW node
+    - visible
+    - text
+  scenario_order:
+    # (existing 32 entries unchanged; append:)
+    - click_targeting_fixed
+    - creation_traits_back_next_buttons
+    - creation_back_to_menu_walk
+    - skill_description_visible
+    - movement_range_highlight
+    - battle_end_turn_attack_buttons
+  ```
+
+- **New scenario skeletons** (frame numbers and numeric thresholds marked PROBE are estimates to
+  be confirmed with a real run; behavioral asserts are fixed). `clicks:` is the harness key for
+  real `InputEventMouseButton` at the node's rect center.
+
+  1. **`click_targeting_fixed.yaml`** — boots default (main.tscn). 7× `ui_accept` at f3..f15
+     (the proven battle-boot cadence), 3× `tutorial_next` at f20/f25/f30 to complete
+     WELCOME→MOVEMENT→ATTACK (`attack_confirm` becomes allowed; extra presses are no-ops once the
+     tutorial is inactive). `move_up` ×3 at f40/f55/f70 → player at (7,2), adjacent to
+     Central_Divine (7,1). `clicks: [Central_Divine]` at f100. Assert at f140:
+     `Player.acted == true`; `Central_Divine.health: health == max_health - 39` (PROBE —
+     basic attack 30 × fa_hui_du 1.3 → round → 39; Central has no damage reduction; verify via
+     probe, do not soften the assert to `changed` unless the probe proves the number wrong).
+     Click-point safety verified: Central's sprite center (480,96) is above the tutorial Panel
+     (y ≥ 152) and clear of HUD widgets (RoundIndicator ends y 72).
+  2. **`creation_traits_back_next_buttons.yaml`** — `scene: res://scenes/segments/creation.tscn`
+     (direct boot, proven at f30). Asserts at f30: `phase == "ATTRS"`;
+     `pressed_connected` true for all four new buttons; `AttrNextButton.visible/size.x > 0/mouse_filter == 0`;
+     `AttrBackButton.visible == true`; `TraitBackButton.visible == false`; `AttrDescLabel.visible`
+     and `AttrDescLabel.text: text.contains("气血") == true` (bone is focused at index 0).
+     Then: `clicks: [AttrNextButton]` f40 → f60 `phase == "TRAITS"`; `clicks: [TraitBackButton]`
+     f70 → f90 `phase == "ATTRS"` and `attrs["bone"] == 10` (proves the Back button mutated no
+     trait state); `clicks: [AttrNextButton]` f100 → f120 `phase == "TRAITS"` and
+     `TraitDescLabel.visible == true`, `TraitDescLabel.text: text.contains("技能栏") == true`
+     (trait 0 = 左右互搏); `clicks: [TraitNextButton]` f130 → f150 `phase == "CONFIRM"`;
+     `clicks: [BackButton]` f160 → f180 `phase == "TRAITS"`.
+  3. **`creation_back_to_menu_walk.yaml`** — boots default (main.tscn; the menu claims the boot).
+     Assert f30 `MenuPanel.visible == true`. `clicks: [MenuEntry0]` f40 → f100 (PROBE)
+     `GameManager.current_state == "CHARACTER_CREATION"` and `CreationScreen.visible == true`.
+     `clicks: [AttrBackButton]` f110 → f170 (PROBE) `GameManager.current_state == "MENU"` and
+     `MenuPanel.visible == true`. `clicks: [MenuEntry0]` f180 → f240 (PROBE)
+     `CreationScreen.visible == true`, `CreationScreen.phase == "ATTRS"`,
+     `CreationScreen.points_left == 30` (fresh state — the 进入→返回→再进入 walk).
+     Must NOT disturb `menu_to_creation_to_tutorial_order` (keyboard-driven, byte-identical files).
+  4. **`skill_description_visible.yaml`** — 7× `ui_accept` f3..f15. Assert f30:
+     `SkillDescLabel.visible == true`; `SkillDescLabel.text: text != "" and text.contains("点击") == true`
+     (default guidance). `skill_1` f35 → f50: `SkillDescLabel.text: text.contains("击退") == true`
+     (heavy_edge 文案) and `text.contains("点击") == false`. `skill_1` again f55 (toggle-off) →
+     f70: default text restored (`text.contains("点击") == true`).
+  5. **`movement_range_highlight.yaml`** — 7× `ui_accept` f3..f15. Assert f30 (round 1, player
+     turn, moves_left 4): `MoveRangeHighlight.visible == true`; `tile_count > 0` (PROBE: expect
+     40 — the |dx|+|dy| ≤ 4 diamond from (7,5) lies fully inside the border ring and loses only
+     the occupied (7,1)); `MoveRangeHighlight.fill_color: fill_color.g > fill_color.r and fill_color.g > fill_color.b`
+     (green-dominant); `RangeHighlight.fill_color: fill_color.b > fill_color.r and fill_color.b > fill_color.g`
+     (blue-dominant) — together the color-distinctness proof. `move_up` ×3 f40/f55/f70 → f85
+     `Player.moves_left == 1` and `MoveRangeHighlight.tile_count: changed`. `end_turn` f100 →
+     f200 (PROBE) `MoveRangeHighlight.visible == false` and `tile_count == 0` (enemy turn).
+     Optionally at ~f1500 (PROBE) round changed and highlight visible again on the next player turn.
+  6. **`battle_end_turn_attack_buttons.yaml`** — 7× `ui_accept` f3..f15; 3× `tutorial_next`
+     f20/f25/f30. Assert f35: `EndTurnButton.visible == true`, `size.x > 0`,
+     `mouse_filter == 0`, `disabled == false`; `AttackButton` same; `HUD.pressed_connected`
+     both true; `HUD.hud_button_overlap == false`; `HUD.hud_desc_overlap == false`.
+     `clicks: [EndTurnButton]` f40 → f120 (PROBE) `CombatManager.active_unit_name: active_unit_name != "Player"`
+     and `EndTurnButton.disabled == true` (enemy turn). At ~f1500 (PROBE) `current_round: changed`
+     and `EndTurnButton.disabled == false` (player turn again). `move_up` ×3 at f1560/f1575/f1590
+     (PROBE) → `clicks: [AttackButton]` f1660 → f1750: `Player.acted == true`
+     (target-agnostic — the button attacks the NEAREST valid target, like J; if a specific enemy
+     is adjacent in the probe run, add `X.health == max_health - <n>` with the probed value).
+
+---
+
+## 3. Interface contract (implementation-ready summary)
+
+| File | Change | Interface |
 |---|---|---|
-| Rejection literal | `"本回合已行动"` | Exact string, 7th reason, Chinese display data (design 30_presentation). Grep-able acceptance point. |
-| Player gate | `if acted: action_hint.emit("本回合已行动"); return` | Insertion points: `_try_attack_target` top (after validity guard, before skill/basic split) and `_try_keyboard_attack` top. |
-| Engine guard | `_execute_action(unit, action, target, params) -> Tween` early-return `null` when `action != "move" and unit.acted` | Emits through `unit.action_hint` iff the unit has the signal. `action_executed` must NOT fire on rejection. |
-| Unchanged invariants | `select_skill`, `_skill_reject_reason`, `_try_move`, `begin_turn`, `_clear_unit_battle_state`, all six existing literals | Byte/behavior-identical. |
-| Harness surface | `Player.acted`, `ActionHintLabel.text`, `ActionHintLabel.visible` | Already whitelisted in `playtest/_common.yaml` — no edit. |
-| Actions | `attack_confirm`, `end_turn`, `move_*` | Already declared in `playtest/_common.yaml` — no edit. |
+| `scripts/characters/player.gd` | edit | `_handle_click_targeting(event: InputEventMouseButton)`; world = `get_canvas_transform().affine_inverse() * event.position` |
+| `scripts/segments/creation.gd` | edit | +`_on_creation_back_to_menu()`, +`_attr_desc(key)`, +`_ATTR_DESCS` const; wire/snapshot 4 new buttons; `_render()` updates `AttrDescLabel`/`TraitDescLabel` |
+| `scenes/segments/creation.tscn` | edit | +`AttrNavRow(AttrBackButton, AttrNextButton)`, +`TraitNavRow(TraitBackButton, TraitNextButton)`, +`AttrDescLabel`, +`TraitDescLabel` |
+| `scripts/data/trait_data.gd` | edit | `TraitDef.description: String`; TABLE rows + `_build()` copy |
+| `scripts/battlefield.gd` | edit | `desc` args of all skills → Chinese 文案 from `design/20_content.md` (8 player skills exact strings in §C5) |
+| `scenes/ui/hud.tscn` | edit | +`EndTurnButton` (y 52..88), +`AttackButton` (y 96..132), +`SkillDescLabel` (y 140..320) — all top-right column x 820..952 (label x 608..952) |
+| `scripts/ui/hud.gd` | edit | +`_battle_input_allowed()`, +`_on_end_turn_pressed()`, +`_on_attack_pressed()`, +`pressed_connected` snapshot, +desc-label update in `_on_skill_selected`/`setup`/`clear_battle_refs`, +`disabled` refresh in `_process`, +2 geometry observables |
+| `scripts/ui/range_highlight.gd` | edit | +`var fill_color: Color = REACH_FILL` (observable only) |
+| `scripts/ui/move_range_highlight.gd` | NEW | Node2D; BFS per §C6; observables `visible`/`tile_count`/`fill_color`; cheap-diff keys |
+| `scenes/battlefield.tscn` | edit | +`MoveRangeHighlight` node (sibling of `RangeHighlight`) |
+| `playtest/_common.yaml` | append-only | surface + scenario_order per §C8 |
+| `playtest/<6 new files>` | NEW | per §C8 skeletons |
 
-**Determinism guarantees (unchanged by this design):** zero RNG in the damage pipeline; nearest-target picks use registration-order tie-breaks; `acted` is set synchronously before any `await`; the check is synchronous too — no same-frame double-land window.
+Data flow summary: mouse/button input → Button `pressed` → existing handler → existing engine API
+(single source of truth); the only new engine-adjacent paths are the two HUD button handlers,
+both thin delegates with a turn/pause gate. All new per-frame code (`MoveRangeHighlight`,
+HUD geometry/disabled refresh) is read-only observation.
 
-## 6. Task decomposition boundaries (for the PM)
+---
 
-Suggested independent tasks — each lands green on its own, order as listed:
-1. **C1** player gate (one file, ~6 lines) — compile-clean alone.
-2. **C2** engine guard (one file, ~8 lines) — safe alone; no existing caller can reach it.
-3. **C4** each_unit_acts_once extension — depends on C1 (rejection) + C2 (invariant); includes its own probe run to fix frames.
-4. **C5** central_divine fix — depends on C1; includes its own probe run to fix frames.
-5. **C6** enemy probe — independent; run any time; values go into delivery notes.
+## 4. Tech stack
 
-## 7. Scenario skeletons (frames are placeholders — implementer fills from probes)
+- **Godot 4.7** (in use, `config/features=PackedStringArray("4.7")`), **GDScript**, built-in
+  `Button` / `Label` / `Node2D._draw()` / existing autoloads. **Zero new dependencies, zero new
+  autoloads, zero new input actions, no new assets or fonts.** This keeps the 32-scenario
+  contract and the headless gate intact.
+- Reused repo-proven machinery: Button+`pressed` convergence (creation/menu/settings panels),
+  `pressed_connected` snapshot, RangeHighlight cheap-diff highlight pattern, `get_canvas_transform()`
+  coordinate conversion, per-scenario `scene:` direct boot, `clicks:` harness.
 
-### 7.1 `each_unit_acts_once_per_round_initiative_order.yaml` (appended after the f1200 entry)
+## 5. Extension considerations (deliberately minimal)
 
-```
-- at: 1210        # only if probe shows no adjacent enemy: move_* steps, 15-frame spacing
-  actions: [move_up]
-  ...             # repeat until adjacent (mirror skill_rejection_reason_texts pattern)
-- at: <A>
-  actions: [attack_confirm]          # FIRST action of the player's round-2 turn
-- at: <A+40>
-  actions: []
-  assert:
-    Player.acted: acted == true
-    ActionHintLabel.text: text == ""          # hint cleared after a SUCCESSFUL action
-    <Target>.health: round(100.0 * health / float(max_health)) == <N>   # first blow landed
-- at: <B>          # B >= A+55
-  actions: [attack_confirm]          # SECOND attempt, same turn — must be rejected
-- at: <B+40>
-  actions: []
-  assert:
-    Player.acted: acted == true
-    ActionHintLabel.visible: visible == true
-    ActionHintLabel.text: text == "本回合已行动"
-    <Target>.health: round(100.0 * health / float(max_health)) == <N>   # UNCHANGED — nothing consumed
-- at: <C>          # C >= B+55
-  actions: [end_turn]
-- at: <C+~600>     # after the 5 enemy turns + round transition (probe-derived)
-  actions: []
-  assert:
-    CombatManager.current_round: 3
-    CombatManager.active_unit_name: active_unit_name == "Yang Guo"   # init debuff expired; player first again
-    Player.turns_taken: 2
-    CombatManager.empty_round_stalls: empty_round_stalls == 0        # enemy turns proceeded after the rejection
-```
-`<Target>` is the nearest adjacent enemy at frame A (probe-identified; deterministic registration-order tie-break); `<N>` is the post-first-hit integer percentage (deterministic damage: basic 39, skill_1 59, no target DR on the chosen enemy — probe confirms). Frame cap 3000; all entries ≤ 2999.
+- `TraitDef.description` is a plain data field — future screens (companion cards, event UI) read
+  the same rows; no new table needed.
+- `MoveRangeHighlight` mirrors `_try_move`; if movement rules grow (e.g. hazards), the BFS gains
+  the same arm `_try_move` gains — keep them adjacent in review.
+- The two HUD button handlers are the single place future "clickable battle verbs" (wait,
+  cancel-selection) plug in: add a Button + a gate-guarded delegate.
+- No new abstraction layers were introduced — the design intentionally reuses existing patterns
+  instead of generalizing them.
 
-### 7.2 `central_divine_innate_qi_fatal_guard.yaml` (edited timeline)
+## 6. Migration / rollback plan (no destructive operations exist, but the protocol is followed)
 
-```
-f3..f550   — byte-identical (7× ui_accept, 3× move_up, skill_1, attack_confirm at f80,
-             end_turn f150, f140 health<max_health, f550 current_round==2, f560 attack_confirm)
-- at: 600   assert: Central_Divine.health: changed      # f560 blow landed (unchanged entry)
-- at: 620   actions: [end_turn]                          # NEW: end the turn — no second blow
-- at: <P>   actions: [attack_confirm]                    # player's NEXT turn (round 3), probe-derived
-- at: <P+40> assert: Central_Divine.health: changed      # re-timed f660: lethal blow → 先天罡气 → 1 HP
-```
-Existing f610 press and f660 assert are **replaced** by the re-timed pair; their semantics (second blow lands, health changes) are preserved. Description line updated to match the exercised contract ("…the two blows land on two different player turns — one action per turn"). Probe (§9.2) verifies the second blow targets Central Divine (not a tie-break neighbor) and is lethal (not absorbed by shield/heal), choosing skill_1 (重剑无锋 59) over basic attack (39) if the HP math requires it.
+1. **Snapshot first:** commit the current tree as a baseline (git) before any edit.
+2. **Execute** in dependency order C1 → C3/C4 → C2 → C5 → C7 → C6 → C8 (see §7).
+3. **Validate before declaring done:**
+   - Whole-repo GDScript parse gate (sidecar `/compile`) green.
+   - Existing playtest run: the 32 files are byte-identical; compare failures against the
+     baseline snapshot — **zero new failures** allowed (the documented baseline reds like
+     `terminal_victory` 5/6 stay exactly as they are).
+   - The 6 new scenarios green; the two click scenarios specifically must show observed values
+     (damage number, frame numbers) in the delivery notes — asserts must not be relaxed to pass.
+   - `_common.yaml` diff is append-only (surface entries + scenario_order tail only).
+   - `ui_geometry_readability` stays green (new HUD widgets proven non-overlapping by the new
+     `hud_button_overlap`/`hud_desc_overlap` observables + the existing asserts).
+4. **Rollback path:** every change is an additive/line edit to git-tracked text files; revert the
+   touched file set (`git revert`/checkout of the baseline) restores the previous state exactly.
+   Nothing is deleted, renamed, or rewritten in bulk anywhere in this design.
 
-## 9. Probe procedures (先取值,再动手 — measure first, then write)
+## 7. Suggested task decomposition (for PM, 8 tasks)
 
-### 9.1 Re-baseline before finalizing C4 frames
-One `godot_playtest_scenario` run of the touched scenario (or an `inline_scenario` copy) sampling `CombatManager.turn_log/current_round`, `Player.grid_pos/acted`, per-enemy `grid_pos/health` at f1200, then after each step. Record: which enemy is nearest-adjacent at frame A; the post-first-hit health; the frames where `Player.acted` flips; the frame where round 3 begins. Then finalize `<A>/<B>/<C>/<N>`.
-
-### 9.2 central_divine decision table (probe first)
-Sample after f560 and at the start of the player's round-3 turn: `Central_Divine.health`, `shield`, `status_names`; `South_Emperor.health` (who 先天调息 heals). Decide:
-- **Hit target correct?** If another enemy ties as nearest, add move steps to make Central Divine uniquely nearest before pressing.
-- **Lethal?** Need `damage >= health_before_blow` and no active shield absorbing the blow. Basic 39 kills ≤39; skill_1 59 kills ≤59 and survives one 先天调息 heal (worst case 1+46=47). If a 罡气护体 shield is up at press time, wait/plan so the press lands when it is down (shield is cast on Central Divine's own turn; probe the cast frames).
-- **Fallback (only if the probe proves no lethal blow can be arranged within budget):** keep the guard-only contract (f560 non-lethal → round-3 blow lethal → 1 HP) and update the description accordingly — never assert death on a possibly-freed node without probe evidence (dead enemies leave the round order; prefer asserting via `turn_order.has("Central Divine") == false` in the following round if death IS exercised).
-
-### 9.3 Enemy probe (`inline_scenario`, no repo writes)
-Boot the battlefield via a `scene:` override, walk one enemy turn, and sample `Player.health` immediately before and after each enemy's turn plus enemy `acted`/`turns_taken` deltas. Expected per code reading: ≤1 damage event per enemy turn (move + at most one action), `turns_taken` +1, `acted` true at turn end, reset false at next turn start. Record observed values in the delivery notes; if any enemy ever shows two damage events in one turn, report it as a defect finding (it would be an engine-caller bug, exactly what C2 now guards).
-
-## 10. Irreversible-operation safety & rollback
-
-No irreversible operations this round: all changes are tracked text edits to two GDScript files and two playtest YAML files; no save/schema/migration work. Safety protocol:
-1. **Backup by git** — every edit is a diff; `git diff` on each file before finalizing.
-2. **Validate new state** — full playtest suite run (baseline: 32 scenarios, 31 green; only `terminal_victory` red at 5/6) + compile gate (0 errors) + zero runtime errors.
-3. **Confirm before declaring done** — the two touched scenarios' assert counts go up (each_unit_acts_once 14 → 20+; central_divine 4 → 4), and a diff proves the 14 existing each_unit_acts_once assertions and the f140/f550/f600 central_divine assertions are byte-identical.
-4. **Rollback path** — if any previously-green scenario turns red, revert the responsible file edit; the two files are independent, so blast radius is one scenario each.
-
-## 11. Tech stack
-
-- **Godot 4.4 (stable) + GDScript** — no new dependencies, no external libraries (SOTA's recommendation adopted; GUT/gdUnit4 explicitly deferred).
-- **Playtest harness as-is**: `playtest/_common.yaml` + per-scenario YAML; `godot_playtest_scenario` CLI + `inline_scenario` for probes. No `playtest_spec.yaml` (this repo uses the directory form).
-- **Linter manifest**: GDScript is NOT in the manifest (checked by the per-step `gdscript_check` gate with `godot --check-only`); the touched `.yaml` scenario files and `.md` docs map to `basic`. Manifest content unchanged from the repo's current one.
-
-## 12. Extensibility & debts (recorded, NOT implemented)
-
-- **Mouse path fix (debt, downstream):** `_handle_click_targeting()` (player.gd L459-460) should use the `InputEventMouseButton` coordinates it receives instead of re-querying `get_global_mouse_position()` (viewport-cached pointer that synthesized events cannot update — measured inert 0/2 with no error). Fixing it makes the mouse attack leg testable with the harness `click:` capability and removes the silent-failure shape. Deliberately out of scope this round (theme is `acted`; wider regression surface unwanted).
-- **Never ship a mouse-interaction scenario asserting only 'no runtime errors'** — the measured click defect is a silent no-op and such a scenario passes vacuously against it.
-- **RoundIndicator** displays 行动 ✓ vs 结束 from `acted` already — after this fix the display becomes truthful for free. No UI work declared.
-- The engine guard (C2) protects future action callers (new AI, queued actions); the C1 funnel gate can be retired only if such a future caller routes its own hint surfacing — keep both.
-
-## 13. Out of scope (explicit)
-
-Mouse-path coordinate fix; `click:`-based rejection asserts; HUD/RoundIndicator changes; unit-test wiring (GUT/gdUnit4); new action types; movement-budget changes; any `terminal_victory` edits; any numeric rebalance; save-system work.
-
-## 14. Deliverable summary
-
-| Deliverable | Path | Status |
+| Task | Components | Depends on |
 |---|---|---|
-| Player gate (C1) | `scripts/characters/player.gd` | MODIFIED (~6 lines) |
-| Engine guard (C2) | `scripts/autoload/combat_manager.gd` | MODIFIED (~8 lines) |
-| Scenario extension (C4) | `playtest/each_unit_acts_once_per_round_initiative_order.yaml` | MODIFIED (appended entries; 14 existing asserts byte-identical) |
-| Scenario fix (C5) | `playtest/central_divine_innate_qi_fatal_guard.yaml` | MODIFIED (turn split; all existing assertions preserved) |
-| Enemy probe (C6) | none | inline_scenario run; values in delivery notes |
-| linter manifest | `linter_manifest.json` | unchanged content (`basic` for yaml/json/md) |
+| T1 | C1 click fix + `click_targeting_fixed.yaml` (probe) | — |
+| T2 | C3 trait data + C4 attr desc + labels in creation (tscn+gd) | — |
+| T3 | C2 creation nav buttons + `creation_traits_back_next_buttons.yaml` / `creation_back_to_menu_walk.yaml` | T2 |
+| T4 | C5 skill 文案 + SkillDescLabel + `skill_description_visible.yaml` | — |
+| T5 | C7 battle buttons + geometry observables + `battle_end_turn_attack_buttons.yaml` | T4 (same files) |
+| T6 | C6 MoveRangeHighlight + RangeHighlight.fill_color + `movement_range_highlight.yaml` | — |
+| T7 | C8 `_common.yaml` append + scenario_order (can be authored incrementally per scenario) | T1..T6 |
+| T8 | Integration: full-suite regression vs baseline, compile gate, geometry re-check, delivery notes with observed values | all |
 
-## 15. Assumptions (for downstream steps)
+## 8. Design decisions log (rationale for PM/implementer)
 
-- The player's round-2 turn in `each_unit_acts_once` is live at f1200 (turn_log size 11) and the frame cap is 3000 — ample room for the appended sequence; exact frames come from the §9.1 probe before finalizing.
-- 先天罡气 is once-per-battle (combat_manager.gd L211-212, keyed by instance id, never reset) — the central_divine split across two turns keeps the guard contract intact.
-- The mouse leg is untestable this round (measured 0/2, no error; viewport-cached pointer position). Acceptance asserts the rejection through keyboard `attack_confirm` only; delivery notes state the mouse path is NOT verified.
-- Skill selection after acting stays allowed; the acted check lives only in the two execution funnels (C1) and the engine action entry (C2).
+- **D1 (C1):** use the event, not the pointer cache. The harness cannot move a real pointer; the
+  event carries the truth. `get_canvas_transform().affine_inverse()` is identity today
+  (`main.tscn` has a centered Camera2D with zero offset) and correct if a camera ever moves.
+- **D2 (C2):** ATTRS Back must be a NEW handler — `_on_move_left` in ATTRS decrements an
+  attribute, so reusing it for "back to menu" would silently eat a point on every back-press.
+- **D3 (C2):** TRAITS Back/TRAITS Next reuse `_on_move_left`/`_on_move_right` (safe arms),
+  ATTRS Next reuses `_on_accept` — maximal convergence with keyboard, minimal new logic.
+- **D4 (C7):** gates live in the HUD handler because `CombatManager.end_current_turn()` has no
+  turn gate and the player's `_unhandled_input` gate is on the keyboard path. Clicking End Turn
+  during ENEMY_TURN or pause is a silent no-op, mirroring the keyboard behavior exactly.
+- **D5 (C7):** `AttackButton` = J, not "basic attack only": `_try_keyboard_attack` fires the
+  selected skill or falls back to basic attack. Label `出招 (J)` advertises the key.
+- **D6 (C6):** BFS mirrors `_try_move` bit-for-bit (walkable, unoccupied landing, 身轻如燕
+  slide cost 2 with budget ≥ 2); the displayed set is a subset of the executable set.
+- **D7 (C6):** hide the movement highlight once `acted` — after acting the budget is spent.
+- **D8 (C6):** green/blue color distinctness is asserted numerically via `fill_color` observables
+  on both highlight nodes ("just visible" proves nothing).
+- **D9 (C5):** the description label is always visible (default guidance → selected skill's
+  description); tooltips remain as a secondary path.
+- **D10 (C5):** switching skill `desc` data from English to Chinese is code aligning with the
+  archive hard rule (`design/30_presentation.md` 界面文字一律中文, CJK font bundled), not an
+  archive change — declared here so no later run "fixes" it back to English.
+- **D11 (C7):** new HUD widgets are placed in the top-right column (y 52..132 for buttons,
+  y 140..320 for the label) — verified clear of PauseButton (y ≤ 44), RoundIndicator (x ≤ 680),
+  SkillBar (y ≥ 648), ActionHintLabel (y ≥ 618), and the tutorial Panel (y ≥ 152, x ≤ 780); the
+  two new geometry observables make this a running assert instead of a one-time measurement.
+- **D12 (C2):** the back-to-menu walk boots `main.tscn` (SceneManager needs the persistent
+  shell); the direct-boot scenario covers phase navigation only.
+- **D13 (C5):** description text appends `冷却 N 回合` from each skill's own cooldown field
+  (data from `design/20_content.md`'s 冷却 column) — never invented numbers.
+- **D14 (language note):** in-game UI strings are Chinese per the project archive
+  (`design/30_presentation.md` hard requirement + bundled CJK font); node names, signal names,
+  action names, skill ids, and all code identifiers stay English. Design-doc prose is English.
+
+## Appendix — Verified baseline (file:line references, 2026-08-24)
+
+- `scripts/characters/player.gd`: input gate L299-307; click dispatch L379-383; broken click
+  targeting L462-463; `_try_move` L391-439 (walkable, occupied, 身轻如燕 slide cost 2);
+  `_try_keyboard_attack` L536; `_try_attack_target` L490-529; `can_skill_hit` L605-634.
+- `scenes/main.tscn`: Camera2D (480,352) current — identity screen transform; SceneHost;
+  SegmentLayer/SegmentHost; HUDLayer(layer 10)/HUD; TutorialLayer(layer 100)/TutorialOverlay.
+- `scenes/ui/tutorial_overlay.tscn`: Dim full-rect `mouse_filter = 2`; Panel 600×400 centered
+  (x 180..780, y 152..552).
+- `scripts/autoload/tutorial_manager.gd`: `is_input_allowed` L219; `_update_allowed_actions`
+  L330-346 (attack_confirm allowed once STEP_ATTACK is completed).
+- `scripts/segments/creation.gd`: `_wire_mouse_widgets` L85-100; `_on_move_left` L120-137;
+  `_on_move_right` L140-154; `_on_accept` L157-170; `_render` L217-288.
+- `scenes/segments/creation.tscn`: MouseBox/AttrBox/AttrRow0..4/AttrMinus{i}/AttrPlus{i};
+  TraitBox/TraitToggle0..12; ConfirmBox/ConfirmButton+BackButton.
+- `scripts/data/trait_data.gd`: TraitDef fields; 13 TABLE rows.
+- `scripts/ui/hud.gd`: setup L114; clear_battle_refs L162; `_update_geometry_observables` L84;
+  `_process` L335; `_on_skill_selected` L465; `_refresh_skill_button_states` L370.
+- `scenes/ui/hud.tscn`: HUD (mouse_filter 2), SkillBar (y 648..688), ActionHintLabel
+  (y 618..644, hidden), RoundIndicator (x 280..680, y 8..72), EnergyLabel, PauseButton
+  (x 820..952, y 8..44).
+- `scripts/autoload/combat_manager.gd`: `is_player_turn` L301; `get_is_paused` L267;
+  `end_current_turn` L650 (no internal turn gate).
+- `scripts/autoload/grid_manager.gd`: GRID 15×11, TILE 64, GRID_ORIGIN (32,32); `is_in_bounds`
+  L117; `is_walkable` L126 (border ring excluded); `is_occupied` L156.
+- `scripts/autoload/game_manager.gd`: `enter_menu` L254 (unguarded, emits state_changed);
+  `finish_creation` L324; STATE_MENU L59.
+- `scripts/autoload/scene_manager.gd`: SCENE_MAP/SCENE_PATHS L35-60 (MENU → menu panel);
+  `_do_swap` pending_swap guard L143; host resolution needs `/root/Main`.
+- `scripts/ui/range_highlight.gd`: REACH_FILL/TARGET_FILL L24-29; `_hide`/diff-keys L51-107.
+- `scripts/battlefield.gd`: `_skill()` L384-396; English desc data (verified samples L301-375);
+  `_wire_hud` L861.
+- `playtest/_common.yaml`: header rules (append-only, per-scenario `scene:`, direct-boot proof,
+  frame cap 3000); actions list; surface list; scenario_order L511-543.

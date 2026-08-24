@@ -1,5 +1,7 @@
 {
-  ".yaml": "basic",
-  ".json": "basic",
-  ".md": "basic"
+  "basic": [
+    ".json",
+    ".yaml",
+    ".md"
+  ]
 }
