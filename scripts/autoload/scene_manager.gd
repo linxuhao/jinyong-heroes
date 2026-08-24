@@ -21,7 +21,8 @@
 extends Node
 
 ## Surface: key of the currently hosted scene ("battlefield" | "transition" |
-## "creation" | "sect_select" | "cultivation" | "map" | "ending" | "none").
+## "creation" | "sect_select" | "cultivation" | "map" | "ending" | "menu" |
+## "settings" | "none").
 var current_scene: String = "none"
 
 ## Surface: true while a deferred swap is in flight (saves are refused then).
@@ -40,6 +41,8 @@ const SCENE_MAP: Dictionary = {
 	"CULTIVATION": "cultivation",
 	"MAP": "map",
 	"ENDING": "ending",
+	"MENU": "menu",
+	"SETTINGS": "settings",
 }
 
 ## Scene key -> PackedScene path (all preloaded at startup — no cold file loads
@@ -52,6 +55,8 @@ const SCENE_PATHS: Dictionary = {
 	"cultivation": "res://scenes/segments/cultivation.tscn",
 	"map": "res://scenes/segments/map.tscn",
 	"ending": "res://scenes/segments/ending.tscn",
+	"menu": "res://scenes/ui/menu_panel.tscn",
+	"settings": "res://scenes/ui/settings_panel.tscn",
 }
 
 var _host: Node = null
@@ -73,9 +78,28 @@ func _ready() -> void:
 		GameManager.restart_requested.connect(reload_battle)
 	# Autoload _ready runs before Main enters the tree — resolve the host after
 	# one deferred frame so the initial battlefield lands before tutorial step 1.
+	# A boot-claimed scene (menu shell claims via claim_boot() in its own _ready,
+	# which runs before the first process frame) already set current_scene, so
+	# the default battlefield swap is skipped; main.tscn boots keep current_scene
+	# == "none" and swap exactly as before.
 	await get_tree().process_frame
 	_find_host()
-	swap_to("battlefield")
+	if current_scene == "none":
+		swap_to("battlefield")
+
+
+## Boot-claim protocol: a shell scene (menu.tscn) that already hosts its authored
+## content calls this from its own _ready to claim the boot before SceneManager's
+## post-frame default battlefield swap fires. No-op once a scene is already
+## hosted. The claimed node is not re-parented (it is already in the tree) and
+## is freed by the normal _do_swap teardown on swap-away, exactly like any
+## hosted scene.
+func claim_boot(node: Node, scene_key: String) -> void:
+	if current_scene != "none" or _current_node != null:
+		return
+	_current_node = node
+	current_scene = scene_key
+	last_error = ""
 
 
 func _on_state_changed(state: String) -> void:
