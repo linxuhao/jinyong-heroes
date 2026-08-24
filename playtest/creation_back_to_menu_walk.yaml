@@ -1,0 +1,62 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# The 进入->返回->再进入 walk: boots res://scenes/menu.tscn (the menu shell —
+# SceneManager needs the /root/Main hosts; a direct creation.tscn boot has
+# none; main.tscn boots land on the battlefield, not the menu). Real mouse
+# clicks throughout via the harness clicks: key. MenuEntry0 (新的冒险) ->
+# CHARACTER_CREATION (fresh CreationScreen, ATTRS); AttrBackButton (返回菜单,
+# the new _on_creation_back_to_menu handler -> GameManager.enter_menu()) ->
+# back to MENU; MenuEntry0 again -> a FRESH creation — SaveManager.new_profile
+# only fires at CONFIRM, which this walk never reaches, so re-entry is
+# untouched state (phase ATTRS, points_left 30, attrs all 10). Leaves
+# menu_to_creation_to_tutorial_order untouched (keyboard-driven, byte-identical
+# files); this scenario is mouse-only.
+name: creation_back_to_menu_walk
+description: >-
+  menu.tscn shell boot: click MenuEntry0 -> creation ATTRS; click the new
+  AttrBackButton (返回菜单) -> back to MENU (current_state MENU, MenuPanel
+  visible); click MenuEntry0 again -> a FRESH creation (phase ATTRS,
+  points_left 30 — nothing was confirmed, so re-entry state is clean).
+scene: res://scenes/menu.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    SceneManager.current_scene: current_scene == "menu"
+    MenuPanel.visible: true
+- at: 40
+  actions: []
+  clicks:
+  - MenuEntry0
+- at: 100
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    SceneManager.current_scene: current_scene == "creation"
+    CreationScreen.visible: true
+    CreationScreen.phase: phase == "ATTRS"
+- at: 110
+  actions: []
+  clicks:
+  - AttrBackButton
+- at: 170
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+    SceneManager.current_scene: current_scene == "menu"
+    MenuPanel.visible: true
+- at: 180
+  actions: []
+  clicks:
+  - MenuEntry0
+- at: 240
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    SceneManager.current_scene: current_scene == "creation"
+    CreationScreen.visible: true
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.points_left: points_left == 30

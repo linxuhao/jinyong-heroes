@@ -516,6 +516,28 @@ surface:
   SkillDescLabel:
   - visible
   - text
+  AttrBackButton:
+  - visible
+  - size
+  - mouse_filter
+  AttrNextButton:
+  - visible
+  - size
+  - mouse_filter
+  TraitBackButton:
+  - visible
+  - size
+  - mouse_filter
+  TraitNextButton:
+  - visible
+  - size
+  - mouse_filter
+  AttrDescLabel:
+  - visible
+  - text
+  TraitDescLabel:
+  - visible
+  - text
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -551,3 +573,5 @@ scenario_order:
 - settings_panel
 - skill_description_visible
 - movement_range_highlight
+- creation_traits_back_next_buttons
+- creation_back_to_menu_walk

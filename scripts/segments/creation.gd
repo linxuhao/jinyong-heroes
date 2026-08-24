@@ -101,6 +101,14 @@ func _wire_mouse_widgets() -> void:
 		(get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).pressed.connect(_on_trait_toggle_pressed.bind(i))
 	(get_node("MouseBox/ConfirmBox/ConfirmButton") as Button).pressed.connect(_on_accept)
 	(get_node("MouseBox/ConfirmBox/BackButton") as Button).pressed.connect(_on_move_left)
+	# Phase-navigation buttons (defect 2): every keyboard-only transition gets a
+	# mouse button delegating to the SAME handler — keyboard degrades to a
+	# shortcut, the button is the convergence point. AttrBackButton is the one
+	# NEW handler (menu routing); the rest reuse existing keyboard arms.
+	(get_node("MouseBox/AttrBox/AttrNavRow/AttrBackButton") as Button).pressed.connect(_on_creation_back_to_menu)
+	(get_node("MouseBox/AttrBox/AttrNavRow/AttrNextButton") as Button).pressed.connect(_on_accept)
+	(get_node("MouseBox/TraitBox/TraitNavRow/TraitBackButton") as Button).pressed.connect(_on_move_left)
+	(get_node("MouseBox/TraitBox/TraitNavRow/TraitNextButton") as Button).pressed.connect(_on_move_right)
 	pressed_connected.clear()
 	for i in 5:
 		pressed_connected["AttrMinus%d" % i] = (get_node("MouseBox/AttrBox/AttrRow%d/AttrMinus%d" % [i, i]) as Button).get_signal_connection_list("pressed").size() > 0
@@ -109,6 +117,10 @@ func _wire_mouse_widgets() -> void:
 		pressed_connected["TraitToggle%d" % i] = (get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).get_signal_connection_list("pressed").size() > 0
 	pressed_connected["ConfirmButton"] = (get_node("MouseBox/ConfirmBox/ConfirmButton") as Button).get_signal_connection_list("pressed").size() > 0
 	pressed_connected["BackButton"] = (get_node("MouseBox/ConfirmBox/BackButton") as Button).get_signal_connection_list("pressed").size() > 0
+	pressed_connected["AttrBackButton"] = (get_node("MouseBox/AttrBox/AttrNavRow/AttrBackButton") as Button).get_signal_connection_list("pressed").size() > 0
+	pressed_connected["AttrNextButton"] = (get_node("MouseBox/AttrBox/AttrNavRow/AttrNextButton") as Button).get_signal_connection_list("pressed").size() > 0
+	pressed_connected["TraitBackButton"] = (get_node("MouseBox/TraitBox/TraitNavRow/TraitBackButton") as Button).get_signal_connection_list("pressed").size() > 0
+	pressed_connected["TraitNextButton"] = (get_node("MouseBox/TraitBox/TraitNavRow/TraitNextButton") as Button).get_signal_connection_list("pressed").size() > 0
 
 
 ## Cost to raise an attr from `v` to `v + 1` (v in 10..19): 1 for 10..14,
@@ -179,6 +191,18 @@ func _on_accept() -> void:
 				GameManager.finish_creation()
 			return
 	_render()
+
+
+## Mouse AttrBackButton (ATTRS phase): leave creation back to the main menu.
+## Routes through GameManager.enter_menu() — idempotent, emits state_changed
+## ("MENU") and SceneManager swaps to the menu scene (needs the /root/Main
+## shell; a direct creation.tscn boot cannot host the swap). Deliberately NOT
+## _on_move_left: in ATTRS its arm DECREMENTS the focused attribute, which
+## would silently eat a creation point on every back-press.
+func _on_creation_back_to_menu() -> void:
+	if confirmed or SceneManager.pending_swap:
+		return
+	GameManager.enter_menu()
 
 
 ## Toggle a trait/flaw: positive cost spends points; a flaw (negative cost)
@@ -297,6 +321,20 @@ func _render() -> void:
 	var back_button: Button = get_node_or_null("MouseBox/ConfirmBox/BackButton") as Button
 	if back_button != null:
 		back_button.visible = phase == "CONFIRM"
+	# Phase-navigation buttons (defect 2): same per-leaf visible sync so
+	# node-level asserts hold, not just the parent group boxes.
+	var attr_back: Button = get_node_or_null("MouseBox/AttrBox/AttrNavRow/AttrBackButton") as Button
+	if attr_back != null:
+		attr_back.visible = phase == "ATTRS"
+	var attr_next: Button = get_node_or_null("MouseBox/AttrBox/AttrNavRow/AttrNextButton") as Button
+	if attr_next != null:
+		attr_next.visible = phase == "ATTRS"
+	var trait_back: Button = get_node_or_null("MouseBox/TraitBox/TraitNavRow/TraitBackButton") as Button
+	if trait_back != null:
+		trait_back.visible = phase == "TRAITS"
+	var trait_next: Button = get_node_or_null("MouseBox/TraitBox/TraitNavRow/TraitNextButton") as Button
+	if trait_next != null:
+		trait_next.visible = phase == "TRAITS"
 	# Description labels (defects 4/5): each label shows the focused item's
 	# Chinese description and is visible only in its own phase. Uses
 	# get_node_or_null so a missing node can never crash the render path.

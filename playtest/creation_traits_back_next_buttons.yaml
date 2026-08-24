@@ -1,0 +1,85 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct creation.tscn boot (phase asserts hold at f30 — proven scene-path
+# capability, see creation_mouse_interaction): every keyboard-only phase
+# transition now has a mouse button delegating to the SAME handler
+# (convergence pattern). AttrNextButton -> _on_accept (ATTRS->TRAITS);
+# TraitBackButton -> _on_move_left (TRAITS->ATTRS, phase-only arm — attrs
+# and points stay untouched, proving Back mutated no trait/attr state);
+# AttrNextButton again -> TRAITS; TraitNextButton -> _on_move_right
+# (TRAITS->CONFIRM); ConfirmBox BackButton -> TRAITS. The pressed_connected
+# snapshot (all four new keys true) plus visible/size/mouse_filter prove the
+# middle of the mouse chain; AttrDescLabel/TraitDescLabel surface the
+# focused item's Chinese description (气血 for bone, 技能栏 for trait 0
+# 左右互搏). The `phase: changed` at f60 is the contract's differential
+# proof that the click actually moved the phase.
+name: creation_traits_back_next_buttons
+description: >-
+  creation.tscn direct boot: the four new phase-navigation buttons are
+  clickable and wired (pressed_connected all true, AttrNextButton visible
+  with non-empty rect and MOUSE_FILTER_STOP), and real clicks walk
+  ATTRS -> TRAITS (AttrNextButton) -> ATTRS (TraitBackButton; attrs["bone"]
+  still 10 — the phase-only Back arm mutated nothing) -> TRAITS -> CONFIRM
+  (TraitNextButton) -> TRAITS (ConfirmBox BackButton). Description labels
+  show 气血 (bone, ATTRS) and 技能栏 (trait 0 左右互搏, TRAITS).
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.pressed_connected: pressed_connected["AttrBackButton"] == true and pressed_connected["AttrNextButton"] == true and pressed_connected["TraitBackButton"] == true and pressed_connected["TraitNextButton"] == true
+    AttrNextButton.visible: true
+    AttrNextButton.size: size.x > 0 and size.y > 0
+    AttrNextButton.mouse_filter: mouse_filter == 0
+    AttrBackButton.visible: true
+    TraitBackButton.visible: false
+    AttrDescLabel.visible: true
+    AttrDescLabel.text: text.contains("气血") == true
+- at: 40
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 60
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    CreationScreen.phase: changed
+- at: 70
+  actions: []
+  clicks:
+  - TraitBackButton
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attrs: attrs["bone"] == 10
+    CreationScreen.points_left: points_left == 30
+- at: 100
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 120
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    TraitDescLabel.visible: true
+    TraitDescLabel.text: text.contains("技能栏") == true
+- at: 130
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 150
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+- at: 160
+  actions: []
+  clicks:
+  - BackButton
+- at: 180
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"

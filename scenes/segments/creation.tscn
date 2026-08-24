@@ -113,6 +113,14 @@ text = ""
 autowrap_mode = 3
 mouse_filter = 2
 
+[node name="AttrNavRow" type="HBoxContainer" parent="MouseBox/AttrBox"]
+[node name="AttrBackButton" type="Button" parent="MouseBox/AttrBox/AttrNavRow"]
+text = "返回菜单"
+focus_mode = 0
+[node name="AttrNextButton" type="Button" parent="MouseBox/AttrBox/AttrNavRow"]
+text = "下一步"
+focus_mode = 0
+
 [node name="TraitBox" type="VBoxContainer" parent="MouseBox"]
 visible = false
 
@@ -148,6 +156,14 @@ visible = false
 text = ""
 autowrap_mode = 3
 mouse_filter = 2
+
+[node name="TraitNavRow" type="HBoxContainer" parent="MouseBox/TraitBox"]
+[node name="TraitBackButton" type="Button" parent="MouseBox/TraitBox/TraitNavRow"]
+text = "上一步"
+focus_mode = 0
+[node name="TraitNextButton" type="Button" parent="MouseBox/TraitBox/TraitNavRow"]
+text = "下一步"
+focus_mode = 0
 
 [node name="ConfirmBox" type="VBoxContainer" parent="MouseBox"]
 visible = false
