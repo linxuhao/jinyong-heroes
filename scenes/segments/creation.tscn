@@ -44,3 +44,106 @@ offset_right = 200.0
 offset_bottom = -16.0
 horizontal_alignment = 1
 text = "方向键选择 · 回车确认"
+
+[node name="MouseBox" type="VBoxContainer" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -240.0
+offset_right = 280.0
+offset_bottom = 240.0
+
+[node name="AttrBox" type="VBoxContainer" parent="MouseBox"]
+
+[node name="AttrRow0" type="HBoxContainer" parent="MouseBox/AttrBox"]
+[node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow0"]
+custom_minimum_size = Vector2(180, 0)
+[node name="AttrMinus0" type="Button" parent="MouseBox/AttrBox/AttrRow0"]
+text = "-"
+focus_mode = 0
+[node name="AttrPlus0" type="Button" parent="MouseBox/AttrBox/AttrRow0"]
+text = "+"
+focus_mode = 0
+
+[node name="AttrRow1" type="HBoxContainer" parent="MouseBox/AttrBox"]
+[node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow1"]
+custom_minimum_size = Vector2(180, 0)
+[node name="AttrMinus1" type="Button" parent="MouseBox/AttrBox/AttrRow1"]
+text = "-"
+focus_mode = 0
+[node name="AttrPlus1" type="Button" parent="MouseBox/AttrBox/AttrRow1"]
+text = "+"
+focus_mode = 0
+
+[node name="AttrRow2" type="HBoxContainer" parent="MouseBox/AttrBox"]
+[node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow2"]
+custom_minimum_size = Vector2(180, 0)
+[node name="AttrMinus2" type="Button" parent="MouseBox/AttrBox/AttrRow2"]
+text = "-"
+focus_mode = 0
+[node name="AttrPlus2" type="Button" parent="MouseBox/AttrBox/AttrRow2"]
+text = "+"
+focus_mode = 0
+
+[node name="AttrRow3" type="HBoxContainer" parent="MouseBox/AttrBox"]
+[node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow3"]
+custom_minimum_size = Vector2(180, 0)
+[node name="AttrMinus3" type="Button" parent="MouseBox/AttrBox/AttrRow3"]
+text = "-"
+focus_mode = 0
+[node name="AttrPlus3" type="Button" parent="MouseBox/AttrBox/AttrRow3"]
+text = "+"
+focus_mode = 0
+
+[node name="AttrRow4" type="HBoxContainer" parent="MouseBox/AttrBox"]
+[node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow4"]
+custom_minimum_size = Vector2(180, 0)
+[node name="AttrMinus4" type="Button" parent="MouseBox/AttrBox/AttrRow4"]
+text = "-"
+focus_mode = 0
+[node name="AttrPlus4" type="Button" parent="MouseBox/AttrBox/AttrRow4"]
+text = "+"
+focus_mode = 0
+
+[node name="TraitBox" type="VBoxContainer" parent="MouseBox"]
+visible = false
+
+[node name="TraitToggle0" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle1" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle2" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle3" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle4" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle5" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle6" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle7" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle8" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle9" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle10" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle11" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+[node name="TraitToggle12" type="Button" parent="MouseBox/TraitBox"]
+focus_mode = 0
+
+[node name="ConfirmBox" type="VBoxContainer" parent="MouseBox"]
+visible = false
+
+[node name="ConfirmButton" type="Button" parent="MouseBox/ConfirmBox"]
+text = "确认踏上江湖"
+focus_mode = 0
+
+[node name="BackButton" type="Button" parent="MouseBox/ConfirmBox"]
+text = "返回"
+focus_mode = 0

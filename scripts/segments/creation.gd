@@ -1,8 +1,9 @@
 ## CreationScreen — segment 3: 30-point character creation.
 ## Three phases: ATTRS (5 attrs, tiered pricing, clamps 10..20) -> TRAITS
 ## (13 trait/flaw toggles) -> CONFIRM. Leftover points are allowed. Confirm
-## calls SaveManager.new_profile(attrs, trait_ids) exactly once, then routes to
-## SECT_SELECTION.
+## calls SaveManager.new_profile(attrs, trait_ids) exactly once, then routes via
+## GameManager.finish_creation(): MENU entry -> TUTORIAL (new flow); legacy
+## TRANSITION entry (boot default) -> enter_segment("SECT_SELECTION"), byte-identical.
 extends Control
 
 const START_POINTS: int = 30
@@ -29,11 +30,19 @@ var trait_ids: Array[String] = []
 ## Surface: true after confirm routed onward.
 var confirmed: bool = false
 
+## Surface: pressed_connected[widget_name] is true when that mouse widget's
+## pressed signal is wired to its bound handler. The ONLY observable proof of
+## the middle of the mouse chain — debug_click_creation_widget calls the handler
+## directly and deliberately bypasses the signal link. Snapshot AFTER all
+## connects in _ready (before connect() the connection list is empty).
+var pressed_connected: Dictionary = {}
+
 var _traits: Array = []
 
 
 func _ready() -> void:
 	_traits = TraitData.all()
+	_wire_mouse_widgets()
 	_render()
 
 
@@ -55,6 +64,40 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_right"):
 		get_viewport().set_input_as_handled()
 		_on_move_right()
+
+
+func _process(_delta: float) -> void:
+	# Harness-only DEBUG action (defined by project.godot [input]; an absent
+	# action just returns false from is_action_just_pressed — never crashes).
+	# debug_click_creation_widget drives the SAME _on_attr_plus_pressed the
+	# AttrPlus buttons call, proving the handler without coordinate input.
+	# Guarded to the ATTRS phase so a stray press cannot advance TRAITS/CONFIRM.
+	if Input.is_action_just_pressed("debug_click_creation_widget"):
+		if not confirmed and phase == "ATTRS":
+			_on_attr_plus_pressed(attr_index)
+
+
+## Wire every mouse widget's pressed signal to the bound handler — the keyboard
+## handlers stay the only logic, the buttons just delegate (single source of
+## truth). Code wiring (menu_panel/settings_panel precedent) keeps the
+## pressed_connected snapshot adjacent to the connects. Snapshot AFTER all
+## connects: before connect() the signal's connection list is empty.
+func _wire_mouse_widgets() -> void:
+	for i in 5:
+		(get_node("MouseBox/AttrBox/AttrRow%d/AttrMinus%d" % [i, i]) as Button).pressed.connect(_on_attr_minus_pressed.bind(i))
+		(get_node("MouseBox/AttrBox/AttrRow%d/AttrPlus%d" % [i, i]) as Button).pressed.connect(_on_attr_plus_pressed.bind(i))
+	for i in min(_traits.size(), 13):
+		(get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).pressed.connect(_on_trait_toggle_pressed.bind(i))
+	(get_node("MouseBox/ConfirmBox/ConfirmButton") as Button).pressed.connect(_on_accept)
+	(get_node("MouseBox/ConfirmBox/BackButton") as Button).pressed.connect(_on_move_left)
+	pressed_connected.clear()
+	for i in 5:
+		pressed_connected["AttrMinus%d" % i] = (get_node("MouseBox/AttrBox/AttrRow%d/AttrMinus%d" % [i, i]) as Button).get_signal_connection_list("pressed").size() > 0
+		pressed_connected["AttrPlus%d" % i] = (get_node("MouseBox/AttrBox/AttrRow%d/AttrPlus%d" % [i, i]) as Button).get_signal_connection_list("pressed").size() > 0
+	for i in min(_traits.size(), 13):
+		pressed_connected["TraitToggle%d" % i] = (get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).get_signal_connection_list("pressed").size() > 0
+	pressed_connected["ConfirmButton"] = (get_node("MouseBox/ConfirmBox/ConfirmButton") as Button).get_signal_connection_list("pressed").size() > 0
+	pressed_connected["BackButton"] = (get_node("MouseBox/ConfirmBox/BackButton") as Button).get_signal_connection_list("pressed").size() > 0
 
 
 ## Cost to raise an attr from `v` to `v + 1` (v in 10..19): 1 for 10..14,
@@ -122,7 +165,7 @@ func _on_accept() -> void:
 			if not confirmed and not SceneManager.pending_swap:
 				confirmed = true
 				SaveManager.new_profile(attrs, trait_ids)
-				GameManager.enter_segment("SECT_SELECTION")
+				GameManager.finish_creation()
 			return
 	_render()
 
@@ -144,6 +187,31 @@ func _toggle_trait(idx: int) -> void:
 			return
 		trait_ids.append(id)
 		points_left -= cost
+
+
+## Mouse: focus a row without any other side effect — the following minus/plus
+## press acts on the clicked row.
+func _focus_attr(i: int) -> void:
+	attr_index = i
+
+
+## Mouse AttrMinus{i}: delegate to the same handler keyboard move_left uses.
+func _on_attr_minus_pressed(i: int) -> void:
+	_focus_attr(i)
+	_on_move_left()
+
+
+## Mouse AttrPlus{i}: delegate to the same handler keyboard move_right uses.
+func _on_attr_plus_pressed(i: int) -> void:
+	_focus_attr(i)
+	_on_move_right()
+
+
+## Mouse TraitToggle{i}: delegate to the same toggle keyboard ui_accept uses.
+func _on_trait_toggle_pressed(i: int) -> void:
+	trait_index = i
+	_toggle_trait(i)
+	_render()
 
 
 func _render() -> void:
@@ -179,6 +247,45 @@ func _render() -> void:
 				text += (def.display_name if def != null else id) + " "
 			text += "\n\n回车确认，踏上江湖"
 	body.text = text
+	# Mouse widget surface: per-phase group visibility + row/toggle texts. The
+	# keyboard text model above is untouched; the buttons mirror the same state
+	# for the mouse path. Every leaf's `visible` mirrors the phase so node-level
+	# asserts (TraitToggle0.visible == false in ATTRS) hold, not just the group.
+	var attr_box: Control = get_node_or_null("MouseBox/AttrBox") as Control
+	var trait_box: Control = get_node_or_null("MouseBox/TraitBox") as Control
+	var confirm_box: Control = get_node_or_null("MouseBox/ConfirmBox") as Control
+	if attr_box != null:
+		attr_box.visible = phase == "ATTRS"
+	if trait_box != null:
+		trait_box.visible = phase == "TRAITS"
+	if confirm_box != null:
+		confirm_box.visible = phase == "CONFIRM"
+	for i in range(PlayerProfile.ATTR_KEYS.size()):
+		var row: Control = get_node_or_null("MouseBox/AttrBox/AttrRow%d" % i) as Control
+		if row != null:
+			row.visible = phase == "ATTRS"
+		var minus: Button = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrMinus%d" % [i, i]) as Button
+		if minus != null:
+			minus.visible = phase == "ATTRS"
+		var plus: Button = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrPlus%d" % [i, i]) as Button
+		if plus != null:
+			plus.visible = phase == "ATTRS"
+		var row_label: Label = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrLabel" % i) as Label
+		if row_label != null:
+			row_label.text = "%s %2d" % [_attr_label(PlayerProfile.ATTR_KEYS[i]), int(attrs[PlayerProfile.ATTR_KEYS[i]])]
+	for i in range(min(_traits.size(), 13)):
+		var toggle: Button = get_node_or_null("MouseBox/TraitBox/TraitToggle%d" % i) as Button
+		if toggle != null:
+			toggle.visible = phase == "TRAITS"
+			var def = _traits[i]
+			var owned: String = "已选" if trait_ids.has(def.id) else ("+" + str(def.cost) if def.cost > 0 else str(def.cost))
+			toggle.text = def.display_name + " " + owned
+	var confirm_button: Button = get_node_or_null("MouseBox/ConfirmBox/ConfirmButton") as Button
+	if confirm_button != null:
+		confirm_button.visible = phase == "CONFIRM"
+	var back_button: Button = get_node_or_null("MouseBox/ConfirmBox/BackButton") as Button
+	if back_button != null:
+		back_button.visible = phase == "CONFIRM"
 
 
 func _attr_label(key: String) -> String:
