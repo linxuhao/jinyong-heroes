@@ -1,8 +1,5 @@
 {
-  "": "basic",
-  ".json": "basic",
   ".yaml": "basic",
-  ".md": "basic",
-  ".tscn": "basic",
-  ".tres": "basic"
+  ".json": "basic",
+  ".md": "basic"
 }
