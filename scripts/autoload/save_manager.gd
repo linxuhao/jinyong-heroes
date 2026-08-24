@@ -50,6 +50,16 @@ var snapshot_decks_string: String = ""
 var loaded_profile_json: String = ""
 var loaded_rng_state: int = 0
 var loaded_decks_string: String = ""
+## Playtest observability: which save_slot step last failed ("" on success |
+## "stringify" | "open" | "validate_tmp" | "backup" | "rename" | "validate_real").
+var debug_save_fail_step: String = ""
+## Playtest observability: which check inside _apply_save_dict last failed
+## ("" on success | "not_dict" | "version" | "seed_int" | "rng_int" | "segment" | "decks").
+var debug_apply_fail_reason: String = ""
+## Playtest observability: head of the last stringified save dict (diagnosis).
+var debug_save_json_preview: String = ""
+## Playtest observability: "seed=<seed> rng_state=<rng.state>" at the last save.
+var debug_seed_str: String = ""
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 
@@ -147,19 +157,28 @@ func save_slot(s: int) -> bool:
     # file that then fails Step-2 validation opaquely. Guard it into the
     # documented io_error and leave no file behind.
     var json_text := JSON.stringify(_build_save_dict(), "\t")
+    debug_save_json_preview = json_text.right(600)
+    debug_seed_str = "seed=" + str(seed) + " rng_state=" + str(rng.state)
     if json_text == "":
+        debug_save_fail_step = "stringify"
         last_error = "io_error"
         return false
     var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
     if f == null:
+        debug_save_fail_step = "open"
         last_error = "io_error"
         return false
     f.store_string(json_text)
     f.close()
 
     # Step 2: re-read and validate the tmp — never trust the write.
-    if not _apply_save_dict(_read_json(tmp)):
+    var parsed_tmp: Variant = _read_json(tmp)
+    if parsed_tmp is Dictionary:
+        var seed_v0: Variant = (parsed_tmp as Dictionary).get("seed", null)
+        debug_seed_str = "seed=" + str(seed) + " rng_state=" + str(rng.state) + " parsed_seed=" + str(seed_v0) + " type=" + type_string(typeof(seed_v0))
+    if not _apply_save_dict(parsed_tmp):
         _remove_file(tmp)
+        debug_save_fail_step = "validate_tmp"
         last_error = "io_error"
         return false
 
@@ -167,6 +186,7 @@ func save_slot(s: int) -> bool:
     if FileAccess.file_exists(real):
         if DirAccess.copy_absolute(real, bak) != OK:
             _remove_file(tmp)
+            debug_save_fail_step = "backup"
             last_error = "io_error"
             return false
 
@@ -175,12 +195,14 @@ func save_slot(s: int) -> bool:
         DirAccess.remove_absolute(real)
     if DirAccess.rename_absolute(tmp, real) != OK:
         _restore_bak(bak, real)
+        debug_save_fail_step = "rename"
         last_error = "io_error"
         return false
 
     # Step 5: re-read and re-validate the real file, then drop the backup.
     if not _apply_save_dict(_read_json(real)):
         _restore_bak(bak, real)
+        debug_save_fail_step = "validate_real"
         last_error = "io_error"
         return false
     _remove_file(bak)
@@ -196,6 +218,7 @@ func save_slot(s: int) -> bool:
     slot = s
     has_save = true
     last_error = ""
+    debug_save_fail_step = ""
     return true
 
 
@@ -439,20 +462,28 @@ func _join_ids(v: Variant) -> String:
 ## it resets the stream), then state (resumes it).
 func _apply_save_dict(d: Variant) -> bool:
     if not (d is Dictionary):
+        debug_apply_fail_reason = "not_dict"
         return false
     var src: Dictionary = d
     var version: Variant = src.get("version", null)
     if not (version is int) or version as int != SAVE_VERSION:
+        debug_apply_fail_reason = "version"
         return false
     var seed_v: Variant = src.get("seed", null)
     var rng_state_v: Variant = src.get("rng_state", null)
     var segment_v: Variant = src.get("segment", null)
     var decks_v: Variant = src.get("decks", null)
-    if not (seed_v is int) or not (rng_state_v is int):
+    if not (seed_v is int):
+        debug_apply_fail_reason = "seed_int"
+        return false
+    if not (rng_state_v is int):
+        debug_apply_fail_reason = "rng_int"
         return false
     if not (segment_v is String):
+        debug_apply_fail_reason = "segment"
         return false
     if not _validate_decks(decks_v):
+        debug_apply_fail_reason = "decks"
         return false
     profile = PlayerProfile.from_dict(src.get("profile", null))
     seed = seed_v as int
@@ -461,6 +492,7 @@ func _apply_save_dict(d: Variant) -> bool:
     segment = segment_v as String
     _restore_decks(decks_v)
     _refresh_deck_counts()
+    debug_apply_fail_reason = ""
     return true
 
 

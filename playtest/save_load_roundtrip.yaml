@@ -90,6 +90,7 @@ timeline:
   assert:
     SaveManager.has_save: has_save == true
     SaveManager.last_error: last_error == ""
+    SaveManager.snapshot_profile_json: snapshot_profile_json != ""
     CultivationScreen.visible: true
     CultivationScreen.size: size.x > 0 and size.y > 0
     Backdrop.visible: true
@@ -140,6 +141,6 @@ timeline:
     CultivationScreen.month: month == 3
     CultivationScreen.attr_bone: attr_bone == 10
     SaveManager.last_error: last_error == ""
-    SaveManager.loaded_profile_json: loaded_profile_json == snapshot_profile_json
-    SaveManager.loaded_rng_state: loaded_rng_state == snapshot_rng_state
-    SaveManager.loaded_decks_string: loaded_decks_string == snapshot_decks_string
+    SaveManager.loaded_profile_json: snapshot_profile_json != "" and loaded_profile_json == snapshot_profile_json
+    SaveManager.loaded_rng_state: snapshot_profile_json != "" and loaded_rng_state == snapshot_rng_state
+    SaveManager.loaded_decks_string: snapshot_profile_json != "" and loaded_decks_string == snapshot_decks_string
