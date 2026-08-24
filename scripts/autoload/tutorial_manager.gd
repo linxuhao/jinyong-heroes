@@ -349,11 +349,14 @@ func _update_allowed_actions() -> void:
 # Internal — Finish
 # ---------------------------------------------------------------------------
 
-## Finish the tutorial: hide overlay, deactivate, emit tutorial_finished,
-## and call GameManager.start_battle().
+## Finish the tutorial: hide overlay, deactivate, mark the tutorial as done
+## on the profile (D3 flag flip — creation now happens before the tutorial,
+## so tutorial completion is where tutorial_done becomes true), emit
+## tutorial_finished, and call GameManager.start_battle().
 func _finish_tutorial() -> void:
 	_hide_overlay_internal()
 	is_active = false
+	SaveManager.profile.flags["tutorial_done"] = true
 	tutorial_finished.emit()
 	GameManager.start_battle()
 
