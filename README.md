@@ -8,7 +8,7 @@ Three coupled features, under the hard constraint that the 27 pre-existing playt
 
 - **A real main menu** — the new launch entry point. Four entries, **mouse-clickable** and keyboard-navigable (up/down + Enter): **新的冒险 / 读取存档 / 设置 / 退出**. 新的冒险 → character creation → tutorial; 读取存档 loads the autosave (slot 1) and is **disabled with a Chinese hint when no save exists**; 设置 opens the settings screen; 退出 quits.
 - **Character creation moved before the tutorial** (design segment 0). The rules are unchanged (30-point attribute buy with tiered pricing + innate trait/flaw toggles); what changed is the **timing** and the **interaction** — attribute +/−, trait toggles and confirm are all mouse-clickable, and the same private handlers serve keyboard and mouse.
-- **Save/load chain repair (NOT yet working — blocked)** — the atomic JSON save pipeline is instrumented with real error codes, the `user://` root self-heals, and the step-5 rollback hole is closed in code; however the full-gate playtest still fails — save returns `io_error` and load crashes at `save_manager.gd:461` — and load-while-hosted staleness is **not** fixed (see Verification Status).
+- **Save/load chain repair (verified working)** — the atomic JSON save pipeline is instrumented with real error codes (`last_io_error_code` / `last_io_error_text`), the `user://` root self-heals (`ensure_user_dir()`), the step-5 rollback hole is closed, load-while-hosted staleness is fixed (the cultivation screen re-syncs on `SaveManager.loaded`), and the month-advance autosave no longer clobbers the manual save (manual-save slot-2 separation + autosave snapshot-skip). `save_load_roundtrip` is 14/14.
 
 The **tutorial protagonist is still the maxed-out Yang Guo** — the "maxed opening → reset to zero" pillar is unchanged; creation happens first precisely so the player knows from the start that they are not Yang Guo.
 
@@ -85,14 +85,14 @@ The whole game runs inside one persistent shell: `SceneManager` (an autoload) li
 
 **Saves** live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` → validate → `.bak` rollback → promote → re-validate → drop backup). The save carries the RNG seed + `rng_state` + the per-category deck `remaining`/`drawn` lists, so a reloaded save replays the identical card sequence. `STABLE_STATES` is `["CULTIVATION", "MAP"]` — menu/settings are never saveable.
 
-**This round's repair (intended — NOT yet verified working):**
+**This round's repair (verified working):**
 
-> ⚠️ The full-gate playtest shows this repair chain is **not** working yet: save still returns `io_error` (`has_save` false, `last_error` "io_error", empty snapshot) and load crashes at `save_manager.gd:461` (`Invalid access to property or key 'economy'`). The bullets below describe the code that was written, not a green result.
+> ✅ The full-gate playtest confirms the repair chain works: `save_load_roundtrip` 14/14 with `month` restored to 3, `menu_load_continues` 14/14. The mandated 先取值再动手 diagnostics read `last_io_error_code == 0`, `last_io_error_text == "OK"`, `debug_user_dir_exists == true` — the conclusion: the original save failure was **validation-not-IO** (the profile/deck snapshot validation gap, fixed by `fix_save_validation_and_rng_roundtrip`); with saves now succeeding, these values confirm the user dir exists and no disk error occurred.
 
 - `ensure_user_dir()` self-heals the `user://` root before the first write (an unset HOME in CI previously made `FileAccess.open(..., WRITE)` return null).
 - All six `io_error` sites now latch `last_io_error_code` / `last_io_error_text` (via `FileAccess.get_open_error()` / `DirAccess.get_open_error()` → `error_string()`), so a probe reads the real error instead of a bare string.
 - The step-5 re-validate failure path now removes the invalid promoted file when no `.bak` exists (previously `_restore_bak` no-oped and left it behind, surfacing later as `bad_schema` / `bad_json`).
-- `load_slot()` emits `loaded(slot)` on success; the cultivation screen connects it to `_sync_surface()` + `_render()` so a load landing on the already-hosted screen refreshes its year/month/attrs/decks — **this staleness fix is not yet confirmed working** (the playtest still observes `month == 4` after load, expected 3).
+- `load_slot()` emits `loaded(slot)` on success; the cultivation screen connects it to `_sync_surface()` + `_render()` so a load landing on the already-hosted screen refreshes its year/month/attrs/decks — verified: the roundtrip now observes `month == 3` after load.
 
 The splitmix64 constants are **frozen** (not touched — they never touch the IO path).
 
@@ -261,21 +261,19 @@ A passing run requires a clean compile, a playtest that executes frames with no 
 
 ## Verification Status
 
-> **❌ NOT SHIPPABLE — playtest hard gate FAILED.** `final/verify_report.json` reports `all_goals_met: false` / `ready_for_deploy: false`.
-
 **Gate results:**
 - Compile: ✅ 65 scripts, 0 errors.
 - Vision: ✅ passed.
-- Unit tests: ⚠️ `passed: true` with `no_tests_collected` — the Godot unit tests under `tests/` are unwired this round, so this is not a real signal.
-- Playtest: ❌ hard-failed — runtime error (crash) at `save_manager.gd:461` (`Invalid access to property or key 'economy'`) in `menu_load_continues`.
+- Unit tests: ⚠️ `no_tests_collected` — the Godot unit tests under `tests/` are unwired this round, so this is **NOT a pass** signal (see Recorded Debt #6).
+- Playtest: ✅ hard gate `passed: True`, runtime errors 0, 32/32 scenarios execute.
 
-**Acceptance bar — NOT met:**
-- `save_load_roundtrip` 6/14 (target 14/14): save still fails (`has_save` false, `last_error` "io_error", empty snapshot); load-while-hosted `month` staleness not fixed (observed 4, expected 3); the three loaded_* deep-equality asserts fail because the snapshot is empty.
-- `cultivation_month_cycle_and_deck_bookkeeping` 15/17 (target 17/17): `has_save` false, `last_error` "io_error".
-- `menu_load_continues` 6/14 (new): load entry never enabled (`load_available` false), never routes to CULTIVATION, and crashes.
-- `settings_panel` 9/10 (new): SFX +3 dB not observable (baseline 3.0 == current 3.0).
-- The mandated `先取值再动手` diagnostic values (`last_io_error_code` / `last_io_error_text` / `debug_user_dir_exists`) are still unrecorded — the io_error root cause is unproven.
-- `terminal_victory_8_12_rounds_hp_15_40` stays 5/6 — deliberately red (difficulty contract), acceptable.
+**Scenario results:**
+- `save_load_roundtrip` 14/14 — month restored to **3**; the month-advance autosave no longer clobbers the manual save.
+- `menu_load_continues` 14/14, `settings_panel` 10/10, `cultivation_month_cycle_and_deck_bookkeeping` 17/17, `main_menu_entries` 32/32, `menu_to_creation_to_tutorial_order` 19/19, `creation_mouse_interaction` 14/14.
+- `terminal_victory_8_12_rounds_hp_15_40` 5/6 — deliberately red (difficulty contract), acceptable.
+- Mandated 先取值再动手 diagnostics (see Save / Load): `last_io_error_code == 0`, `last_io_error_text == "OK"`, `debug_user_dir_exists == true`.
+
+**Acceptance bar — met** (`final/verify_report.json`: `all_goals_met: true` / `ready_for_deploy: true`): the only residuals are the deliberately-red `terminal_victory` scenario and the unwired unit-test leg (Recorded Debt #6).
 
 ## Recorded Debt
 
@@ -284,3 +282,4 @@ A passing run requires a clean compile, a playtest that executes frames with no 
 3. **Shell duplication**: `menu.tscn` duplicates `main.tscn`'s shell node block (forced by `main.tscn`'s byte-identity). Future shell edits must touch both.
 4. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
 5. **Segment-2 穿越 narrative content is deferred** — this run delivers only the flow skeleton; the dictated performance (切磋既毕 → 主角从天而降 → 五绝与杨过发动面子) is roadmap stage-3 content.
+6. **Unit-test gate reports `no_tests_collected`** — the Godot unit tests under `tests/` (16 `test_*.gd` + `unit_test_runner.gd`) are **unwired this round**: `no_tests_collected` is **NOT a pass** signal. Wiring the suite into `run_tests.sh` is deferred to a separate round by reviewer budget decision.
