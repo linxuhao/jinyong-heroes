@@ -508,6 +508,9 @@ surface:
   - visible
   - size
   - mouse_filter
+  SkillDescLabel:
+  - visible
+  - text
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -541,3 +544,4 @@ scenario_order:
 - creation_mouse_interaction
 - menu_load_continues
 - settings_panel
+- skill_description_visible

@@ -229,36 +229,36 @@ func _create_all_skill_data() -> Dictionary:
 
 	# --- Yang Guo: Profound Iron Sword Art (hotkeys 1-4) ---
 	skills["heavy_edge"] = _skill("重剑无锋",
-		"Single-target heavy strike with knockback. 1 round cooldown.",
+		"单体 45 伤害,击退 1 格。冷却 1 回合。",
 		63, 1, 1, "single", 0, "self", 1)
 	skills["grand_simplicity"] = _skill("大巧不工",
-		"Line attack reaching 3 tiles. 2 round cooldown.",
+		"直线 3 格 38 伤害。冷却 2 回合。",
 		53, 3, 2, "line", 3, "self", 0)
 	skills["thousand_force_cleave"] = _skill("力斩千钧",
-		"Cross strike with 2-tile arms centered on self. 3 round cooldown.",
+		"十字 2 格 34 伤害。冷却 3 回合。",
 		48, 2, 3, "cross", 2, "self", 0)
 	var boundless_seas = _skill("四海无量",
-		"Finisher: shockwave around self with radius 2. 6 round cooldown.",
+		"以自身为心,半径 2 格全体 70 伤害。冷却 6 回合。",
 		98, 2, 6, "square", 2, "self", 0)
 	boundless_seas.is_finisher = true
 	skills["boundless_seas"] = boundless_seas
 
 	# --- Yang Guo: Melancholy Palms (hotkeys 5-8) ---
 	skills["heart_rending_strike"] = _skill("心惊肉跳",
-		"Single-target palm strike. 1 round cooldown.",
+		"单体 38 伤害。冷却 1 回合。",
 		53, 1, 1, "single", 0, "self", 0)
 	var dragging_mire = _skill("拖泥带水",
-		"Single-target palm strike that reduces the target's next move. 2 round cooldown.",
+		"单体 25 伤害,目标下一回合移动力 −2。冷却 2 回合。",
 		35, 1, 2, "single", 0, "self", 0)
 	dragging_mire.status_applied = "move_minus_next_turn"
 	skills["dragging_mire"] = dragging_mire
 	var wandering_valley = _skill("徘徊空谷",
-		"Jump up to 3 tiles and strike all units adjacent to the landing tile. 3 round cooldown.",
+		"位移:跳 3 格,落点相邻全体 20 伤害。冷却 3 回合。",
 		28, 3, 3, "adjacent", 0, "landing", 0)
 	wandering_valley.jump_tiles = 3
 	skills["wandering_valley"] = wandering_valley
 	var seventeen_forms = _skill("黯然销魂十七式",
-		"Finisher: strike all adjacent units with heavy knockback. Usable only below 50% HP. 8 round cooldown.",
+		"相邻全体 70 伤害,击退 2 格。需气血低于 50%。冷却 8 回合。",
 		98, 0, 8, "adjacent", 0, "self", 2)
 	seventeen_forms.hp_gate_below_ratio = 0.5
 	seventeen_forms.is_finisher = true
@@ -266,111 +266,111 @@ func _create_all_skill_data() -> Dictionary:
 
 	# --- East Heretic: Tidal Melody Tune ---
 	skills["falling_petals"] = _skill("Falling Petals",
-		"Ranged 3x3 area centered on the target tile. 2 round cooldown.",
+		"以目标格为中心的 3×3 范围攻击。冷却 2 回合。",
 		14, 3, 2, "square", 1, "target", 0)
 	var jade_flute_acupoint = _skill("Jade Flute Acupoint",
-		"Seal the target's techniques on its next turn. 3 round cooldown.",
+		"封锁目标下一回合的招式。冷却 3 回合。",
 		20, 1, 3, "single", 0, "self", 0)
 	jade_flute_acupoint.status_applied = "no_techniques_next_turn"
 	skills["jade_flute_acupoint"] = jade_flute_acupoint
 	var peach_blossom_maze = _skill("Peach Blossom Maze",
-		"Create a maze zone around self (radius 2) that slows anyone entering. 4 round cooldown.",
+		"在自身周围(半径 2)布下迷阵,进入者减速。冷却 4 回合。",
 		0, 2, 4, "square", 2, "self", 0)
 	peach_blossom_maze.status_applied = "hazard_zone"
 	skills["peach_blossom_maze"] = peach_blossom_maze
 	var tidal_melody = _skill("Tidal Melody",
-		"Global melody that lowers every target's initiative for 2 rounds. 6 round cooldown.",
+		"全场旋律,降低所有目标先攻 2 回合。冷却 6 回合。",
 		18, 0, 6, "global", 0, "self", 0)
 	tidal_melody.status_applied = "init_minus_20"
 	skills["tidal_melody"] = tidal_melody
 
 	# --- West Poison: Spirit Serpent Fist ---
 	var spirit_serpent = _skill("Spirit Serpent",
-		"Poisonous single-target strike. 2 round cooldown.",
+		"带毒的单体攻击。冷却 2 回合。",
 		24, 1, 2, "single", 0, "self", 0)
 	spirit_serpent.status_applied = "poison"
 	spirit_serpent.dot_damage = 8
 	spirit_serpent.dot_rounds = 2
 	skills["spirit_serpent"] = spirit_serpent
 	var toad_squat = _skill("Toad Squat",
-		"Buff self: next round's first technique deals 1.5x damage. 3 round cooldown.",
+		"增益自身:下一回合第一招伤害 ×1.5。冷却 3 回合。",
 		0, 0, 3, "single", 0, "self", 0)
 	toad_squat.status_applied = "toad_charge"
 	skills["toad_squat"] = toad_squat
 	var poison_sand_palm = _skill("Poison Sand Palm",
-		"Cross strike around self that also poisons. 3 round cooldown.",
+		"以自身为中心的十字攻击,附加中毒。冷却 3 回合。",
 		18, 1, 3, "cross", 1, "self", 0)
 	poison_sand_palm.status_applied = "poison"
 	poison_sand_palm.dot_damage = 6
 	poison_sand_palm.dot_rounds = 2
 	skills["poison_sand_palm"] = poison_sand_palm
 	skills["toad_swarm"] = _skill("Toad Swarm",
-		"Line attack reaching 4 tiles with heavy knockback. 5 round cooldown.",
+		"直线 4 格攻击,附带重击退。冷却 5 回合。",
 		40, 4, 5, "line", 4, "self", 2)
 
 	# --- South Emperor: Solar Finger Art ---
 	var solar_finger = _skill("Solar Finger",
-		"Ranged finger strike that ignores damage reduction. 2 round cooldown.",
+		"远程指法,无视减伤。冷却 2 回合。",
 		30, 2, 2, "single", 0, "self", 0)
 	solar_finger.ignore_damage_reduction = true
 	skills["solar_finger"] = solar_finger
 	var acupoint_lock = _skill("Acupoint Lock",
-		"Seal the target's movement on its next turn. 3 round cooldown.",
+		"封锁目标下一回合的移动。冷却 3 回合。",
 		12, 2, 3, "single", 0, "self", 0)
 	acupoint_lock.status_applied = "no_move_next_turn"
 	skills["acupoint_lock"] = acupoint_lock
 	var primal_breath = _skill("Primal Breath",
-		"Heal self or an ally. 4 round cooldown.",
+		"治疗自身或一名友方。冷却 4 回合。",
 		0, 1, 4, "single", 0, "self", 0)
 	primal_breath.heal_amount = 35
 	primal_breath.target_friendly = true
 	skills["primal_breath"] = primal_breath
 	skills["six_pulse_volley"] = _skill("Six-Pulse Volley",
-		"Ranged line of six pulses reaching 3 tiles. 6 round cooldown.",
+		"远程六脉齐发,直线 3 格。冷却 6 回合。",
 		34, 3, 6, "line", 3, "self", 0)
 
 	# --- North Beggar: Twenty-One Dragon Palms ---
 	skills["proud_dragon_regret"] = _skill("Proud Dragon Regret",
-		"Single-target palm strike with knockback. 2 round cooldown.",
+		"带击退的单体掌法。冷却 2 回合。",
 		36, 1, 2, "single", 0, "self", 2)
 	var flying_dragon = _skill("Flying Dragon",
-		"Jump up to 3 tiles and strike a 3x3 area at the landing tile. 3 round cooldown.",
+		"跳 3 格,落点 3×3 范围攻击。冷却 3 回合。",
 		22, 3, 3, "square", 1, "landing", 0)
 	flying_dragon.jump_tiles = 3
 	skills["flying_dragon"] = flying_dragon
 	skills["dragon_in_the_field"] = _skill("Dragon in the Field",
-		"Line attack reaching 3 tiles with knockback. 4 round cooldown.",
+		"直线 3 格攻击,附带击退。冷却 4 回合。",
 		30, 3, 4, "line", 3, "self", 1)
 	skills["hidden_dragon"] = _skill("Hidden Dragon",
-		"Shockwave around self with radius 2 and knockback. 6 round cooldown.",
+		"以自身为中心半径 2 的冲击波,附带击退。冷却 6 回合。",
 		48, 2, 6, "square", 2, "self", 2)
 
 	# --- North Beggar: Dog-Beating Staff ---
 	skills["dog_beating_trip"] = _skill("Dog-Beating Trip",
-		"Ranged staff trip. 2 round cooldown.",
+		"远程打狗棒法绊击。冷却 2 回合。",
 		18, 2, 2, "single", 0, "self", 0)
 	skills["dog_beating_poke"] = _skill("Dog-Beating Poke",
-		"Ranged staff poke. 2 round cooldown.",
+		"远程打狗棒法点戳。冷却 2 回合。",
 		20, 2, 2, "single", 0, "self", 0)
 	skills["dog_beating_seal"] = _skill("Dog-Beating Seal",
-		"Ranged staff seal. 2 round cooldown.",
+		"远程打狗棒法封击。冷却 2 回合。",
 		22, 2, 2, "single", 0, "self", 0)
 
 	# --- Central Divine: Quanzhen Sword Art ---
 	skills["quanzhen_sword"] = _skill("Quanzhen Sword",
-		"Single-target sword strike. 1 round cooldown.",
+		"单体剑击。冷却 1 回合。",
 		32, 1, 1, "single", 0, "self", 0)
 	skills["seven_stars"] = _skill("Seven Stars",
-		"Cross strike with 2-tile arms centered on self. 3 round cooldown.",
+		"以自身为中心的十字 2 格攻击。冷却 3 回合。",
 		26, 2, 3, "cross", 2, "self", 0)
 	var qi_aegis = _skill("Qi Aegis",
-		"Grant self a shield absorbing 50 damage for 3 rounds. 5 round cooldown.",
+		"为自己加持吸收 50 伤害的护盾,持续 3 回合。冷却 5 回合。",
 		0, 0, 5, "single", 0, "self", 0)
 	qi_aegis.shield_amount = 50
 	qi_aegis.shield_rounds = 3
 	skills["qi_aegis"] = qi_aegis
 	var primal_unity = _skill("Primal Unity",
-		"Global strike that also dispels hostile buffs. 7 round cooldown.",
+		"全体攻击,并驱散敌方增益。冷却 7 回合。",
 		30, 0, 7, "global", 0, "self", 0)
 	primal_unity.status_applied = "dispel_hostile_buffs"
 	skills["primal_unity"] = primal_unity

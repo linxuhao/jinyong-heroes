@@ -22,6 +22,12 @@ const _DISPLAY_ALIASES := {
 	"Central Divine": "王重阳",
 }
 
+## Default text of the skill description label — shown whenever no skill is
+## selected, so the "no introduction in battle" gap is closed even before any
+## selection (the label is always visible on the HUD). Must stay in sync with
+## the initial `text` authored on SkillDescLabel in hud.tscn.
+const _DEFAULT_SKILL_DESC_TEXT: String = "点击招式按钮,查看招式说明"
+
 ## Map a canonical character name to its short display alias; unknown names
 ## are returned unchanged (fallback names like "Player"/"Enemy" unaffected).
 func _alias_for(name: String) -> String:
@@ -66,6 +72,7 @@ var _action_hint_player: Node = null
 @onready var _round_indicator: Control = $RoundIndicator
 @onready var _energy_label: Label = $EnergyLabel
 @onready var _action_hint_label: Label = $ActionHintLabel
+@onready var _skill_desc_label: Label = $SkillDescLabel
 
 ## Resolve a skill button by its deterministic name (SkillButton1..SkillButton12).
 ## Buttons live under SkillRow1/SkillRow2 in the two-row layout, so resolve
@@ -153,6 +160,10 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	# disconnects any stale connection first, so repeated setup() calls are safe).
 	_wire_action_hint(player)
 
+	# Skill description label: start every battle from the default guidance
+	# (nothing is selected yet).
+	_refresh_skill_desc_text()
+
 
 ## Battle-exit cleanup: drop every per-battle reference so a scene swap never
 ## touches freed nodes. Frees the floating health bars (they hold the
@@ -163,6 +174,10 @@ func clear_battle_refs() -> void:
 	# Clear the hint line and drop the action_hint connection so a scene swap
 	# never leaves the old battle's hint text (or a freed player ref) behind.
 	hide_hint()
+	# Reset the skill description label to the default guidance. The player ref
+	# may already be freed at this point — the refresh guards with
+	# is_instance_valid and falls back to the default text.
+	_refresh_skill_desc_text()
 	if _action_hint_player != null and is_instance_valid(_action_hint_player):
 		if _action_hint_player.has_signal("action_hint") \
 				and _action_hint_player.action_hint.is_connected(_on_action_hint):
@@ -309,6 +324,36 @@ func hide_hint() -> void:
 	_action_hint_label.text = ""
 
 
+## Refresh the skill description label from the player's CURRENT selection.
+## Reads live state AFTER select_skill() so a rejected press (cooldown / phase
+## lock / HP gate) or a toggle-off keeps the label truthful: default guidance
+## when nothing is selected (index -1 / out of bounds), otherwise the selected
+## skill's Chinese description. Safe pre-battle and during teardown (the player
+## lookup is guarded with is_instance_valid).
+func _refresh_skill_desc_text() -> void:
+	var label: Label = _skill_desc_label
+	if label == null or not is_instance_valid(label):
+		label = get_node_or_null("SkillDescLabel") as Label
+		if label != null:
+			_skill_desc_label = label
+	if label == null or not is_instance_valid(label):
+		return
+
+	var text: String = _DEFAULT_SKILL_DESC_TEXT
+	var player: Node = GameManager.get_player()
+	if player != null and is_instance_valid(player) \
+			and "selected_skill_index" in player and "skills" in player:
+		var idx: int = int(player.selected_skill_index)
+		if idx >= 0 and idx < player.skills.size():
+			var skill = player.skills[idx]
+			if skill != null and "description" in skill:
+				text = str(skill.description)
+	# Cheap-diff: only write when the text actually changed (called every
+	# frame; avoids redundant label property writes and keeps _process cheap).
+	if label.text != text:
+		label.text = text
+
+
 ## Signal handler for the player's action_hint signal — forwards to show_hint.
 func _on_action_hint(text: String) -> void:
 	show_hint(text)
@@ -355,6 +400,11 @@ func _process(_delta: float) -> void:
 	if player == null or not is_instance_valid(player):
 		return
 	_refresh_skill_button_states(player)
+	# Skill description label: keep in sync with the LIVE selection. Hotkeys
+	# 1-12 call player.select_skill() directly (bypassing _on_skill_selected)
+	# and the engine auto-deselects after an attack — refresh every frame from
+	# the actual selected_skill_index (cheap: writes only when the text changes).
+	_refresh_skill_desc_text()
 
 
 ## Per-frame skill button refresh: compute each button's `disabled` from
@@ -469,6 +519,11 @@ func _on_skill_selected(index: int) -> void:
 
 	if player.has_method("select_skill"):
 		player.select_skill(index)
+
+	# Refresh the description label from the LIVE selection — select_skill may
+	# have rejected the press (cooldown / phase lock / HP gate) or toggled the
+	# same index off, so read the actual selected_skill_index afterwards.
+	_refresh_skill_desc_text()
 
 
 ## Called when the player's cooldowns are updated.

@@ -1,0 +1,48 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: skill_description_visible
+description: 'Skill description visibility: the always-visible SkillDescLabel shows the default guidance 点击招式按钮,查看招式说明 before any selection; pressing skill_1 (Heavy Edge) swaps it to the Chinese 文案 (contains 击退, no longer contains 点击); pressing skill_1 again toggles the selection off and restores the default.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    SkillDescLabel.visible: visible == true
+    SkillDescLabel.text: text != "" and text.contains("点击") == true
+- at: 35
+  actions:
+  - skill_1
+- at: 50
+  actions: []
+  assert:
+    Player.selected_skill_index: selected_skill_index == 0
+    SkillDescLabel.text: changed
+    SkillDescLabel.text: text.contains("击退") == true and text.contains("点击") == false
+- at: 55
+  actions:
+  - skill_1
+- at: 60
+  actions: []
+  assert:
+    SkillDescLabel.text: text.contains("点击") == true
