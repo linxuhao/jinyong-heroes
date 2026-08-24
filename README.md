@@ -302,7 +302,7 @@ A passing run requires a clean compile, a playtest that executes frames with no 
 - Playtest: ✅ hard gate `passed: True`, runtime errors 0, 32/32 scenarios execute.
 
 **Scenario results:**
-- `save_load_roundtrip` **13/14** — `CultivationScreen.month` observed **4** (expected 3): the load-while-hosted staleness is NOT fixed.
+- `save_load_roundtrip` **14/14** — fixed by `fix_save_load_roundtrip_autosave_clobber`. The failure was NOT "load-while-hosted staleness" (that refresh was already wired and working): `_after_action()` autosaved slot 1 *after* advancing the month, clobbering the manual month-3 save. See 「存档链:真因」 above.
 - `menu_load_continues` 14/14, `settings_panel` 10/10, `cultivation_month_cycle_and_deck_bookkeeping` 17/17, `main_menu_entries` 32/32, `menu_to_creation_to_tutorial_order` 19/19, `creation_mouse_interaction` 14/14.
 - `terminal_victory_8_12_rounds_hp_15_40` 5/6 — deliberately red (difficulty contract), acceptable.
 - Measure-before-act diagnostics: **recorded** — `last_io_error_code = 0`, `last_io_error_text = "OK"`, `debug_user_dir_exists = true`. See 「存档链:真因」 above.
