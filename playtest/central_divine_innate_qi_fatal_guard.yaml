@@ -2,7 +2,7 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: central_divine_innate_qi_fatal_guard
-description: Central Divine's first lethal blow keeps him at 1 HP (先天罡气); a second lethal blow kills him.
+description: Central Divine's first lethal blow keeps him at 1 HP (先天罡气); the hits land across three separate player turns (rounds 4-6, one action per turn) — round 4's skill breaks his shield, round 5's line strike and round 6's lethal cross strike are guarded to 1 HP.
 timeline:
 - at: 3
   actions:
@@ -58,10 +58,43 @@ timeline:
   actions: []
   assert:
     Central_Divine.health: changed
-- at: 610
+- at: 620
+  actions:
+  - end_turn
+- at: 740
+  actions:
+  - end_turn
+- at: 845
+  actions:
+  - move_right
+- at: 860
+  actions:
+  - move_up
+- at: 875
+  actions:
+  - skill_1
+- at: 890
   actions:
   - attack_confirm
-- at: 660
+- at: 940
+  actions:
+  - end_turn
+- at: 1045
+  actions:
+  - skill_2
+- at: 1060
+  actions:
+  - attack_confirm
+- at: 1120
+  actions:
+  - end_turn
+- at: 1215
+  actions:
+  - skill_3
+- at: 1230
+  actions:
+  - attack_confirm
+- at: 1290
   actions: []
   assert:
-    Central_Divine.health: changed
+    Central_Divine.health: health == 1
