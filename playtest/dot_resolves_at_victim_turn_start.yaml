@@ -2,7 +2,7 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: dot_resolves_at_victim_turn_start
-description: West Poison applies Spirit Serpent poison mid-round 4; the player's round-5 turn start ticks round(8*1.3)=10, masked to a net +16 by the Shen Diao regen (+26).
+description: "TEMPORARY DIAGNOSTIC (to be replaced) — capture round/phase/active/health/status/grid every ~40-60 frames to locate F_a (West Poison applies poison) and F_t (player's next turn start)."
 timeline:
 - at: 3
   actions:
@@ -40,341 +40,249 @@ timeline:
 - at: 80
   actions:
   - attack_confirm
-- at: 95
+- at: 90
   actions:
   - end_turn
-- at: 100
+- at: 120
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
 - at: 200
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
 - at: 250
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 300
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 350
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
 - at: 400
   actions:
   - end_turn
-- at: 450
+- at: 430
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 460
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 500
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 600
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 700
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 780
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
 - at: 800
   actions:
   - end_turn
-- at: 850
+- at: 840
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 880
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 920
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 980
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 1040
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 1100
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 1160
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
 - at: 1200
   actions:
   - end_turn
-- at: 1205
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1210
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1215
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
 - at: 1220
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1225
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
     Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1230
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1235
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1240
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1245
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.skill_cooldowns: skill_cooldowns == []
 - at: 1250
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1255
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
     Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1260
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1265
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1270
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1275
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.skill_cooldowns: skill_cooldowns == []
 - at: 1280
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1285
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
     Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1290
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1295
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1300
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1305
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1310
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1315
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1320
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1325
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1330
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1335
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.skill_cooldowns: skill_cooldowns == []
 - at: 1340
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1345
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
     Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
-- at: 1350
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
-    Player.health: health == -1
-    CombatManager.last_turn_actor: last_turn_actor == "NEVER"
+    Player.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.skill_cooldowns: skill_cooldowns == []
 - at: 1400
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+    Player.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.skill_cooldowns: skill_cooldowns == []
 - at: 1600
   actions: []
   assert:
     CombatManager.current_round: current_round == -1
     CombatManager.phase: phase == "NEVER"
     CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.status_names: status_names.has("poison") == true
     Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+    Player.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
+    West_Poison.skill_cooldowns: skill_cooldowns == []
+- at: 2000
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 2500
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
+- at: 2999
+  actions: []
+  assert:
+    CombatManager.current_round: current_round == -1
+    CombatManager.phase: phase == "NEVER"
+    CombatManager.active_unit_name: active_unit_name == "NEVER"
+    Player.health: health == -1
+    Player.status_names: status_names.has("poison") == true
