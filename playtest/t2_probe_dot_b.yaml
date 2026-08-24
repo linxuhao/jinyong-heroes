@@ -1,0 +1,172 @@
+# SCRATCH PROBE (t2, part B) — DELETE BEFORE DELIVERY.
+# end_turn at f270 (f250+20 per probe A) -> round-2 enemy phase, then sweep to
+# find the NEXT PLAYER_TURN frame (player round-3 turn start, tick #2 point).
+name: t2_probe_dot_b
+description: 'SCRATCH PROBE — temporary diagnostic sweep; DELETE'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_poison_player
+- at: 40
+  actions: []
+  assert:
+    Player.status_names: status_names == ["NEVER"]
+- at: 60
+  actions:
+  - end_turn
+- at: 270
+  actions:
+  - end_turn
+- at: 320
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 370
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 420
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 470
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 520
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 570
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 620
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 670
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 720
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 770
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 820
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 870
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 920
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 970
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1020
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1070
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1120
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1170
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1220
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1270
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1320
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1
+- at: 1370
+  actions: []
+  assert:
+    CombatManager.phase: phase == "NEVER"
+    Player.status_names: status_names == ["NEVER"]
+    Player.health: health == -1

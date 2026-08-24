@@ -202,3 +202,78 @@ delete_file'd from the deliverable after pinning)
 - `godot_playtest_scenario player_death_ends_battle,tutorial_loss_restarts_tutorial,trait_combat_effects_and_twelve_slots` (repo + staged research_notes.md only — the probe yaml is not in the repo, so the sibling scan cannot see it):
   `[PASS] player_death_ends_battle 24/24` · `[PASS] tutorial_loss_restarts_tutorial 5/5` · `[PASS] trait_combat_effects_and_twelve_slots 22/22`; hard gate passed, 0 compile/runtime/freed-object errors, `empty_round_stalls == 0` at every death sample (unchanged from the recorded runs above).
 
+---
+
+# Research Notes — t2_goal2_dot_fixture (implementation run log)
+
+Task: rewrite `playtest/dot_resolves_at_victim_turn_start.yaml` as a fixture-driven DoT
+scenario (goal 2, branch b). The `debug_poison_player` hook already landed in t0; this
+task rewrote the scenario yaml only (plus this run log). **No code file touched** —
+`scripts/ai/*`, `_tick_statuses`, `apply_dot` all untouched.
+
+## Edits applied
+
+1. `playtest/dot_resolves_at_victim_turn_start.yaml` — FULL rewrite. Deleted the entire
+   temporary diagnostic sweep (28 samples × 6 `== -1` / `== "NEVER"` asserts at
+   f560..f740) and the old "West Poison applies poison mid-round 4" premise. New
+   fixture timeline (assert count exactly **6**): 7× `ui_accept` f3..15 →
+   `debug_poison_player` at f20 → assert poison applied at f40 (1) → `end_turn` f60 →
+   first pinned frame f250 (3 asserts: phase==PLAYER_TURN, poison present, health==326)
+   → `end_turn` f270 → second pinned frame f370 (2 asserts: poison removed, health==291).
+   `description` rewritten to fixture semantics. `name:` == file basename.
+2. `research_notes.md` — this log (probe observed-value table + final real run output).
+
+## Probe runs (scratch `playtest/t2_probe_dot_a.yaml` / `_b.yaml`, delete_file'd)
+
+Probe A (inject f20, end_turn f60, sweep f40..f1400 every 50) — observed:
+
+| frame | phase | status_names | health |
+|---|---|---|---|
+| 40 | PLAYER_TURN | ["poison"] | 500 |
+| 100 | ENEMY_TURN | ["poison","init_minus_20"] | 457 |
+| 150 | ENEMY_TURN | ["poison","init_minus_20"] | 426 |
+| 200 | ENEMY_TURN | ["poison","init_minus_20"] | 310 |
+| 250 | **PLAYER_TURN** | ["poison","init_minus_20"] | **326** |
+| 300..1400 | PLAYER_TURN | ["poison","init_minus_20"] | 326 (stable — turn waits) |
+
+Tick #1 verified: health 310 (last ENEMY_TURN sample) → 326 at the first PLAYER_TURN
+sample = −10 (tick, is_melee=false so the melee-only 神雕之力 −50% DR does not apply)
++26 (regen fires AFTER the tick, §5.2 order) → net +16. rounds 2→1, poison still
+present. Injection at f20 confirmed working (`_battle_active()` true — the 7th
+ui_accept at f15 finishes the tutorial → start_battle → round 1 PLAYER_TURN).
+
+Probe B (adds end_turn at f270 = f250+20, sweep f320..f1370 every 50) — observed:
+
+| frame | phase | status_names | health |
+|---|---|---|---|
+| 40 | PLAYER_TURN | ["poison"] | 500 |
+| 320 | ENEMY_TURN | ["poison","init_minus_20","no_move_next_turn"] | 292 |
+| 370 | **PLAYER_TURN** | ["no_move_next_turn"] (**poison gone**) | **291** |
+| 420..1370 | PLAYER_TURN | ["no_move_next_turn"] | 291 (stable) |
+
+Tick #2 verified: at the player's round-3 turn start poison ticks the last 10 (rounds
+1→0) and is removed from `status_names`; observed 291 (round-2 enemy damage between
+f320 and the turn start is deterministic — the HP pin is the probed value, not derived).
+
+## Pinned contract (committed)
+
+- f20 `actions: [debug_poison_player]`; f40 assert `status_names.has("poison") == true`.
+- f60 `actions: [end_turn]` (ends the player's round-1 turn; round-1 enemy phase runs).
+- **f250** — first PLAYER_TURN frame after the round-1 enemy phase (player's round-2
+  turn start, tick #1 point): phase == "PLAYER_TURN", poison present, health == 326.
+- f270 `actions: [end_turn]` (f250+20, still inside the event-driven turn window).
+- **f370** — player's round-3 turn start, tick #2 point: poison removed, health == 291.
+
+## DELIVERY-GATE REAL RUN (last real run, `godot_playtest_scenario dot_resolves_at_victim_turn_start`)
+
+```
+{"scenarios": [{"name": "dot_resolves_at_victim_turn_start", "passed": true, "ok": 6, "total": 6}], "all_passed": true, "hard_passed": true, "staged_files_applied": ["playtest/dot_resolves_at_victim_turn_start.yaml", "playtest/t2_probe_dot_a.yaml", "playtest/t2_probe_dot_b.yaml"], "report": "ran 1 scenario(s) against repo + 3 staged file(s): playtest/dot_resolves_at_victim_turn_start.yaml, playtest/t2_probe_dot_a.yaml, playtest/t2_probe_dot_b.yaml\nspec source: playtest/\nhard gate passed: True — Playtest ran 1 scenario(s); all assertions passed.\n\n[PASS] dot_resolves_at_victim_turn_start  6/6"}
+```
+
+Result: **6/6 PASS, hard gate passed** — no failing asserts, so no `observed` values to
+report. The two scratch probe yamls are delete_file'd (queued at delivery; the sibling
+scan runs only the committed scenario names). Zero compile/runtime/freed-object errors;
+`empty_round_stalls` untouched. Deliverable hygiene: the committed file contains no
+`== -1` / `== "NEVER"` / TEMPORARY / diagnostic scaffolding, exactly 6 asserts, and the
+description states the fixture semantics.
+
