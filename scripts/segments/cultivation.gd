@@ -147,7 +147,7 @@ func _cycle_focus(dir: int) -> void:
 		"EVENT":
 			_event_focus = 0 if dir > 0 else 1
 		"YEAR_END":
-			_year_choice = 0 if dir > 0 else 1
+			_year_choice = 1 if dir > 0 else 0  # down -> 另投他派(1), up -> 留在本门(0)
 		"SECT_SWITCH":
 			_switch_focus = (_switch_focus + dir + 5) % 5
 		_:
