@@ -37,7 +37,7 @@ signal loaded(slot: int)
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()   # never null
 var profile: PlayerProfile = PlayerProfile.new_default()
 var seed: int = 0
-var last_error: String = ""   # "" | "no_save" | "bad_json" | "bad_version" | "bad_schema" | "save_refused" | "io_error"
+var last_error: String = ""   # "" | "no_save" | "bad_json" | "bad_version" | "bad_schema" | "save_refused" | "io_error" | "serialize_failed" | "validate_failed"
 var slot: int = 0             # last used slot 1..3; 0 = none yet
 var has_save: bool = false    # true after a successful save_slot() this session
 # IO-error instrumentation (task plan save_manager_repair): latched on every
@@ -154,9 +154,10 @@ func has_save_file(s: int) -> bool:
     return s in [1, 2, 3] and FileAccess.file_exists("user://save_%d.json" % s)
 
 ## Latch the last IO failure code/text and mark last_error = "io_error".
-## Honest diagnostics: the validation-guard sites (empty-JSON / step-2 /
-## step-5) may record OK(0) because the open itself succeeded — the contract
-## is only last_error == "io_error"; the code is informational.
+## Called ONLY at real file-op failures (open-WRITE null, copy_absolute fail,
+## rename_absolute fail). Non-IO failures (empty-JSON guard, step-2/step-5
+## validation) set serialize_failed / validate_failed directly and do NOT call
+## this — get_open_error() is meaningless on a path that never hit the disk.
 func _record_io_error(code: int) -> void:
     last_io_error_code = code
     last_io_error_text = error_string(code)
@@ -196,11 +197,14 @@ func save_slot(s: int) -> bool:
     # Step 1: write the tmp file (pretty-printed plain JSON). A save dict that
     # JSON.stringify cannot serialize (e.g. a nested Dictionary with a
     # non-String key) stringifies to "" — writing that would create an empty
-    # file that then fails Step-2 validation opaquely. Guard it into the
-    # documented io_error and leave no file behind.
+    # file that then fails Step-2 validation opaquely. Guard it as
+    # serialize_failed (a serialization defect, NOT an IO failure — no file op
+    # ran, so get_open_error() is meaningless here) and leave no file behind.
     var json_text := JSON.stringify(_build_save_dict(), "\t")
     if json_text == "":
-        _record_io_error(FileAccess.get_open_error())
+        last_error = "serialize_failed"
+        last_io_error_code = 0
+        last_io_error_text = "OK"
         return false
     var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
     if f == null:
@@ -209,10 +213,14 @@ func save_slot(s: int) -> bool:
     f.store_string(json_text)
     f.close()
 
-    # Step 2: re-read and validate the tmp — never trust the write.
+    # Step 2: re-read and validate the tmp — never trust the write. A
+    # validation failure is a schema defect, not an IO failure — the file was
+    # read and parsed fine, so record validate_failed without get_open_error().
     if not _apply_save_dict(_read_json(tmp)):
         _remove_file(tmp)
-        _record_io_error(FileAccess.get_open_error())
+        last_error = "validate_failed"
+        last_io_error_code = 0
+        last_io_error_text = "OK"
         return false
 
     # Step 3: back up an existing save before touching it.
@@ -242,17 +250,26 @@ func save_slot(s: int) -> bool:
             _restore_bak(bak, real)
         else:
             _remove_file(real)
-        _record_io_error(FileAccess.get_open_error())
+        last_error = "validate_failed"
+        last_io_error_code = 0
+        last_io_error_text = "OK"
         return false
     _remove_file(bak)
 
-    # Surface snapshots from the exact dict that was written (steps 2/5 of the
-    # atomic write validated this state, so the end-of-function values are
-    # identical to the file contents). Success path only.
-    var saved := _build_save_dict()
-    snapshot_profile_json = JSON.stringify(saved["profile"])
-    snapshot_rng_state = saved["rng_state"] as int
-    snapshot_decks_string = _decks_string(saved["decks"] as Dictionary)
+    # Surface snapshots from the file that was just written (re-read, not the
+    # live dict). The live dict holds ints (JSON.stringify -> "4"), but a later
+    # load parses the file with JSON.parse_string, which yields floats ("4.0")
+    # in this build (player_profile.gd L117-118) — stringifying the live dict
+    # and the parsed dict would render the SAME number as two different
+    # strings, breaking snapshot_* == loaded_* on a roundtrip. Re-reading the
+    # file captures exactly the bytes a load will parse; step 5 just validated
+    # it, so this read cannot fail. Success path only.
+    var saved: Variant = _read_json(real)
+    if saved is Dictionary:
+        var saved_dict: Dictionary = saved
+        snapshot_profile_json = JSON.stringify(saved_dict["profile"])
+        snapshot_rng_state = int(saved_dict["rng_state"])
+        snapshot_decks_string = _decks_string(saved_dict["decks"] as Dictionary)
 
     slot = s
     has_save = true
@@ -280,7 +297,7 @@ func load_slot(s: int) -> bool:
         _fallback_fresh_profile("bad_schema")
         return false
     var version: Variant = (parsed as Dictionary).get("version", null)
-    if not (version is int) or version as int != SAVE_VERSION:
+    if not (version is int or version is float) or int(version) != SAVE_VERSION:
         _fallback_fresh_profile("bad_version")
         return false
     if not _apply_save_dict(parsed):
@@ -290,7 +307,7 @@ func load_slot(s: int) -> bool:
     # bad_json/bad_schema/bad_version fallbacks above leave them untouched).
     var parsed_dict: Dictionary = parsed
     loaded_profile_json = JSON.stringify(parsed_dict["profile"])
-    loaded_rng_state = parsed_dict["rng_state"] as int
+    loaded_rng_state = int(parsed_dict["rng_state"])
     loaded_decks_string = _decks_string(parsed_dict["decks"] as Dictionary)
     slot = s
     last_error = ""
@@ -446,7 +463,7 @@ func _build_save_dict() -> Dictionary:
     return {
         "version": SAVE_VERSION,
         "seed": seed,
-        "rng_state": rng.state,
+        "rng_state": str(rng.state),
         "profile": profile.to_dict(),
         "segment": GameManager.current_state,
         "decks": _decks_snapshot(),
@@ -454,14 +471,21 @@ func _build_save_dict() -> Dictionary:
 
 
 ## Deep copy of the live deck state so later mutation cannot corrupt an
-## in-flight save.
+## in-flight save. A category with no deck entry yet (e.g. debug_seed_save
+## firing before any new_profile) snapshots as an empty deck so the save stays
+## schema-valid and loads cleanly. Never index decks directly here — Godot 4.4
+## raises "Invalid access to property or key" on a missing-key [] lookup.
 func _decks_snapshot() -> Dictionary:
     var out: Dictionary = {}
     for cat in DECK_CATEGORIES:
-        var pool: Dictionary = decks[cat]
+        var pool: Variant = decks.get(cat, null)
+        if not (pool is Dictionary):
+            out[cat] = {"remaining": [], "drawn": []}
+            continue
+        var p: Dictionary = pool
         out[cat] = {
-            "remaining": (pool["remaining"] as Array).duplicate(),
-            "drawn": (pool["drawn"] as Array).duplicate(),
+            "remaining": (p["remaining"] as Array).duplicate(),
+            "drawn": (p["drawn"] as Array).duplicate(),
         }
     return out
 
@@ -505,22 +529,22 @@ func _apply_save_dict(d: Variant) -> bool:
         return false
     var src: Dictionary = d
     var version: Variant = src.get("version", null)
-    if not (version is int) or version as int != SAVE_VERSION:
+    if not (version is int or version is float) or int(version) != SAVE_VERSION:
         return false
     var seed_v: Variant = src.get("seed", null)
     var rng_state_v: Variant = src.get("rng_state", null)
     var segment_v: Variant = src.get("segment", null)
     var decks_v: Variant = src.get("decks", null)
-    if not (seed_v is int) or not (rng_state_v is int):
+    if not (seed_v is int or seed_v is float) or not (rng_state_v is String):
         return false
     if not (segment_v is String):
         return false
     if not _validate_decks(decks_v):
         return false
     profile = PlayerProfile.from_dict(src.get("profile", null))
-    seed = seed_v as int
+    seed = int(seed_v)
     rng.seed = seed
-    rng.state = rng_state_v as int
+    rng.state = int(rng_state_v as String)
     segment = segment_v as String
     _restore_decks(decks_v)
     _refresh_deck_counts()
