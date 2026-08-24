@@ -2,7 +2,7 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: dot_resolves_at_victim_turn_start
-description: "TEMPORARY DIAGNOSTIC (to be replaced) — sweep round/phase/active/health/poison/grid to locate F_a (West Poison applies 灵蛇缠身) and F_t (player's next turn start / poison tick)."
+description: West Poison applies Spirit Serpent poison mid-round 4; the player's round-5 turn start ticks round(8*1.3)=10, masked to a net +16 by the Shen Diao regen (+26).
 timeline:
 - at: 3
   actions:
@@ -25,367 +25,44 @@ timeline:
 - at: 15
   actions:
   - ui_accept
-# The player walks into West Poison's approach lane (right x2, up x2 -> (9,3))
-# in round 1 so WP reaches adjacency in rounds 3-4 and applies 灵蛇缠身 there,
-# before the five enemies can pile damage on. end_turn is IGNORED during enemy
-# turns and the player's turn waits forever, so one press every ~50 frames
-# guarantees every player turn is ended and the battle never stalls.
 - at: 20
   actions:
-  - move_right
-- at: 32
-  actions:
-  - move_right
-- at: 44
+  - move_up
+- at: 35
   actions:
   - move_up
-- at: 56
+- at: 50
   actions:
   - move_up
-- at: 70
+- at: 65
+  actions:
+  - skill_1
+- at: 80
+  actions:
+  - attack_confirm
+- at: 95
   actions:
   - end_turn
-- at: 120
+- at: 400
   actions:
   - end_turn
-- at: 170
+- at: 800
   actions:
   - end_turn
-- at: 220
+- at: 1200
   actions:
   - end_turn
-- at: 270
-  actions:
-  - end_turn
-- at: 320
-  actions:
-  - end_turn
-- at: 370
-  actions:
-  - end_turn
-- at: 420
-  actions:
-  - end_turn
-- at: 470
-  actions:
-  - end_turn
-- at: 520
-  actions:
-  - end_turn
-- at: 570
-  actions:
-  - end_turn
-- at: 620
-  actions:
-  - end_turn
-- at: 670
-  actions:
-  - end_turn
-- at: 720
-  actions:
-  - end_turn
-- at: 770
-  actions:
-  - end_turn
-- at: 820
-  actions:
-  - end_turn
-- at: 870
-  actions:
-  - end_turn
-- at: 920
-  actions:
-  - end_turn
-- at: 970
-  actions:
-  - end_turn
-- at: 1020
-  actions:
-  - end_turn
-# --- temporary diagnostic sweep (every ~40 frames) ---
-- at: 100
+- at: 1430
   actions: []
   assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
+    CombatManager.current_round: 4
+    CombatManager.phase: phase == "ENEMY_TURN"
+    CombatManager.active_unit_name: active_unit_name == "West Poison"
     Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 140
+    Player.health: health == 152
+- at: 2400
   actions: []
   assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 180
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 220
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 260
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 300
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 340
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 380
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 420
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 460
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 500
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 540
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 580
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 620
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 660
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 700
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 740
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 780
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 820
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 860
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 900
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 940
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 980
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 1020
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 1060
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
-- at: 1100
-  actions: []
-  assert:
-    CombatManager.current_round: current_round == -1
-    CombatManager.phase: phase == "NEVER"
-    CombatManager.active_unit_name: active_unit_name == "NEVER"
-    Player.health: health == -1
-    Player.status_names: status_names.has("poison") == true
-    Player.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.grid_pos: grid_pos == Vector2i(-1, -1)
-    West_Poison.skill_cooldowns: skill_cooldowns == []
+    CombatManager.current_round: 5
+    Player.health: health == 168 and health > 0
+    CombatManager.last_turn_actor: changed
