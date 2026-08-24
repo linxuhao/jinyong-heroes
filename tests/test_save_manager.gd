@@ -57,6 +57,10 @@ func _test_all() -> bool:
 	ok = _test_bad_file_fallback(ok)
 	ok = _test_missing_file_no_wipe(ok)
 	ok = _test_delete_idempotent(ok)
+	ok = _test_loaded_signal(ok)
+	ok = _test_has_save_file(ok)
+	ok = _test_ensure_user_dir(ok)
+	ok = _test_io_error_instrumentation(ok)
 	return ok
 
 
@@ -90,7 +94,7 @@ func _test_new_profile(ok: bool) -> bool:
 	for key in ["inner", "agility", "wisdom", "fortune"]:
 		ok = _expect(ok, _sm.profile.get_attr(key) == 10, "new_profile attr " + key + " == 10")
 	ok = _expect(ok, _sm.profile.traits == ["lone_bane"], "new_profile traits == [lone_bane]")
-	ok = _expect(ok, _sm.profile.flags["tutorial_done"] == true, "new_profile tutorial_done true")
+	ok = _expect(ok, _sm.profile.flags["tutorial_done"] == false, "new_profile tutorial_done false (creation precedes tutorial)")
 	ok = _expect(ok, _sm.seed != 0, "new_profile generates a seed")
 	ok = _expect(ok, _sm.eco_left == 12, "eco_left == 12")
 	ok = _expect(ok, _sm.eq_left == 12, "eq_left == 12")
@@ -271,6 +275,79 @@ func _test_delete_idempotent(ok: bool) -> bool:
 	ok = _expect(ok, _sm.delete_slot(1), "delete_slot(1) true")
 	ok = _expect(ok, not FileAccess.file_exists(real), "save_1 gone after delete")
 	ok = _expect(ok, _sm.delete_slot(1), "delete_slot(1) again true")
+	return ok
+
+
+# --- criterion 12: loaded(slot) signal — success path only ---------------------
+
+func _test_loaded_signal(ok: bool) -> bool:
+	var prev_state: String = _gm.current_state
+	var fired: Array[int] = []
+	var cb := func(s: int) -> void:
+		fired.append(s)
+	_sm.loaded.connect(cb)
+	_gm.current_state = "CULTIVATION"
+	_sm.new_profile({}, [])
+	ok = _expect(ok, _sm.save_slot(1), "save for loaded-signal test")
+	fired.clear()
+	ok = _expect(ok, _sm.load_slot(1), "load_slot(1) succeeds")
+	ok = _expect(ok, fired.size() == 1 and fired[0] == 1,
+		"loaded emitted exactly once with slot == 1")
+	ok = _expect(ok, _sm.delete_slot(1), "delete_slot(1) true")
+	fired.clear()
+	ok = _expect(ok, _sm.load_slot(1) == false, "load after delete fails (no_save)")
+	ok = _expect(ok, fired.is_empty(), "loaded NOT emitted on no_save failure")
+	_sm.loaded.disconnect(cb)
+	_gm.current_state = prev_state
+	return ok
+
+
+# --- criterion 13: has_save_file is file existence, never has_save -------------
+
+func _test_has_save_file(ok: bool) -> bool:
+	var prev_state: String = _gm.current_state
+	ok = _expect(ok, _sm.delete_slot(1), "delete_slot(1) true")
+	ok = _expect(ok, _sm.has_save_file(1) == false, "has_save_file(1) false after delete")
+	ok = _expect(ok, _sm.has_save_file(0) == false, "has_save_file(0) false (out of range)")
+	ok = _expect(ok, _sm.has_save_file(4) == false, "has_save_file(4) false (out of range)")
+	_gm.current_state = "CULTIVATION"
+	_sm.new_profile({}, [])
+	ok = _expect(ok, _sm.save_slot(1), "save for has_save_file test")
+	ok = _expect(ok, _sm.has_save_file(1), "has_save_file(1) true after save")
+	ok = _expect(ok, _sm.has_save, "has_save true after successful save")
+	ok = _expect(ok, _sm.delete_slot(1), "delete_slot(1) true")
+	ok = _expect(ok, _sm.has_save_file(1) == false, "has_save_file(1) false after delete")
+	ok = _expect(ok, _sm.has_save,
+		"has_save stays true after delete (session memory, not file state)")
+	_gm.current_state = prev_state
+	return ok
+
+
+# --- criterion 14: ensure_user_dir self-heal -----------------------------------
+
+func _test_ensure_user_dir(ok: bool) -> bool:
+	ok = _expect(ok, _sm.ensure_user_dir(), "ensure_user_dir() returns true")
+	ok = _expect(ok, _sm.debug_user_dir_exists, "debug_user_dir_exists true after ensure")
+	ok = _expect(ok, _sm.debug_user_dir_path != "", "debug_user_dir_path non-empty")
+	ok = _expect(ok, DirAccess.dir_exists_absolute(_sm.debug_user_dir_path),
+		"user dir exists at debug_user_dir_path")
+	return ok
+
+
+# --- criterion 15: io_error instrumentation ------------------------------------
+
+func _test_io_error_instrumentation(ok: bool) -> bool:
+	# Godot does NOT auto-create parent dirs for FileAccess.open WRITE: opening
+	# user://__sm_no_such_dir__/x.json returns null — the recorded error is the
+	# honest diagnostic for the six io_error sites.
+	var f: FileAccess = FileAccess.open("user://__sm_no_such_dir__/x.json", FileAccess.WRITE)
+	ok = _expect(ok, f == null, "FileAccess.open into missing dir returns null")
+	_sm._record_io_error(FileAccess.get_open_error())
+	ok = _expect(ok, _sm.last_error == "io_error", "last_error == io_error after _record_io_error")
+	ok = _expect(ok, _sm.last_io_error_code != 0, "last_io_error_code non-zero")
+	ok = _expect(ok, _sm.last_io_error_text != "", "last_io_error_text non-empty")
+	ok = _expect(ok, _sm.last_io_error_text == error_string(_sm.last_io_error_code),
+		"last_io_error_text == error_string(last_io_error_code)")
 	return ok
 
 

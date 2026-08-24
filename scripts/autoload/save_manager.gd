@@ -23,6 +23,12 @@ const MONTHLY_CATEGORIES: Array[String] = ["economy", "equipment", "growth"]
 const YEARLY_CATEGORIES: Array[String] = ["power", "trait", "artifact"]
 const STABLE_STATES: Array[String] = ["CULTIVATION", "MAP"]
 
+## Emitted on load_slot() success only (slot 1..3), before the function returns
+## true. Failure paths (no_save/bad_json/bad_schema/bad_version) never emit —
+## the cultivation screen connects this to refresh its surface after a load
+## lands on the already-hosted scene.
+signal loaded(slot: int)
+
 # ---------------------------------------------------------------------------
 # State (surface vars have safe defaults so arbitrary-frame assertions never
 # see null: seed/last_error/slot/has_save and the six *_left counts).
@@ -34,6 +40,13 @@ var seed: int = 0
 var last_error: String = ""   # "" | "no_save" | "bad_json" | "bad_version" | "bad_schema" | "save_refused" | "io_error"
 var slot: int = 0             # last used slot 1..3; 0 = none yet
 var has_save: bool = false    # true after a successful save_slot() this session
+# IO-error instrumentation (task plan save_manager_repair): latched on every
+# io_error path so a probe can read the REAL error code/text instead of a bare
+# string. debug_user_dir_* records the resolved user:// root for diagnostics.
+var last_io_error_code: int = 0
+var last_io_error_text: String = ""
+var debug_user_dir_path: String = OS.get_user_data_dir()
+var debug_user_dir_exists: bool = false
 var eco_left: int = 0
 var eq_left: int = 0
 var growth_left: int = 0
@@ -80,8 +93,10 @@ func apply_seed(seed_value: int) -> void:
 # ---------------------------------------------------------------------------
 
 ## Character-creation confirm entry: a fresh profile (attrs/traits applied,
-## tutorial_done set — creation is only reachable after the tutorial), a fresh
-## deck set, and a fresh entropy seed from the system clock (not gameplay RNG).
+## tutorial_done set false — creation now happens BEFORE the tutorial;
+## TutorialManager._finish_tutorial() sets it true on tutorial completion), a
+## fresh deck set, and a fresh entropy seed from the system clock (not gameplay
+## RNG).
 func new_profile(attrs: Dictionary, traits: Array[String]) -> void:
     profile = PlayerProfile.new_default()
     for key in PlayerProfile.ATTR_KEYS:
@@ -91,7 +106,7 @@ func new_profile(attrs: Dictionary, traits: Array[String]) -> void:
     for t in traits:
         if t is String:
             profile.add_trait(t as String)
-    profile.flags["tutorial_done"] = true
+    profile.flags["tutorial_done"] = false
     seed = Time.get_ticks_usec()
     apply_seed(seed)
     _init_decks()
@@ -113,6 +128,41 @@ func draw_cards(monthly: bool) -> Array[Dictionary]:
     return out
 
 # ---------------------------------------------------------------------------
+# User dir / IO diagnostics
+# ---------------------------------------------------------------------------
+
+## Autoload-ready: self-heal the user dir so the very first save cannot fail
+## on a missing user:// root (an unset HOME in CI makes this real). Only
+## touches core classes — no cross-autoload dependency.
+func _ready() -> void:
+    ensure_user_dir()
+
+## Public self-heal: create user:// when absent, then record the observable
+## state. Returns true when the dir exists afterwards. Safe to call any time
+## (save_slot() calls it again at the top so a dir deleted mid-session
+## self-heals before the write).
+func ensure_user_dir() -> bool:
+    var abs := ProjectSettings.globalize_path("user://")
+    DirAccess.make_dir_recursive_absolute(abs)
+    debug_user_dir_exists = DirAccess.dir_exists_absolute(abs)
+    return debug_user_dir_exists
+
+## File-existence check for slot s in 1..3 — the menu/availability surface must
+## use this, never has_save (has_save is session-memory: set only by a
+## successful save_slot() this session, never by load or by file state).
+func has_save_file(s: int) -> bool:
+    return s in [1, 2, 3] and FileAccess.file_exists("user://save_%d.json" % s)
+
+## Latch the last IO failure code/text and mark last_error = "io_error".
+## Honest diagnostics: the validation-guard sites (empty-JSON / step-2 /
+## step-5) may record OK(0) because the open itself succeeded — the contract
+## is only last_error == "io_error"; the code is informational.
+func _record_io_error(code: int) -> void:
+    last_io_error_code = code
+    last_io_error_text = error_string(code)
+    last_error = "io_error"
+
+# ---------------------------------------------------------------------------
 # Save / load / delete
 # ---------------------------------------------------------------------------
 
@@ -131,6 +181,8 @@ func save_slot(s: int) -> bool:
         last_error = "save_refused"
         return false
 
+    ensure_user_dir()
+
     # Stale-file hygiene: a .tmp/.bak left by an interrupted prior save must
     # never poison the next save (copy/rename onto an existing path is
     # platform-dependent). Removing first makes steps 3/4 deterministic.
@@ -148,11 +200,11 @@ func save_slot(s: int) -> bool:
     # documented io_error and leave no file behind.
     var json_text := JSON.stringify(_build_save_dict(), "\t")
     if json_text == "":
-        last_error = "io_error"
+        _record_io_error(FileAccess.get_open_error())
         return false
     var f: FileAccess = FileAccess.open(tmp, FileAccess.WRITE)
     if f == null:
-        last_error = "io_error"
+        _record_io_error(FileAccess.get_open_error())
         return false
     f.store_string(json_text)
     f.close()
@@ -160,28 +212,37 @@ func save_slot(s: int) -> bool:
     # Step 2: re-read and validate the tmp — never trust the write.
     if not _apply_save_dict(_read_json(tmp)):
         _remove_file(tmp)
-        last_error = "io_error"
+        _record_io_error(FileAccess.get_open_error())
         return false
 
     # Step 3: back up an existing save before touching it.
     if FileAccess.file_exists(real):
-        if DirAccess.copy_absolute(real, bak) != OK:
+        var copy_err: Error = DirAccess.copy_absolute(real, bak)
+        if copy_err != OK:
             _remove_file(tmp)
-            last_error = "io_error"
+            _record_io_error(copy_err)
             return false
 
     # Step 4: remove the old file, promote tmp -> real.
     if FileAccess.file_exists(real):
         DirAccess.remove_absolute(real)
-    if DirAccess.rename_absolute(tmp, real) != OK:
+    var rename_err: Error = DirAccess.rename_absolute(tmp, real)
+    if rename_err != OK:
         _restore_bak(bak, real)
-        last_error = "io_error"
+        _record_io_error(rename_err)
         return false
 
     # Step 5: re-read and re-validate the real file, then drop the backup.
+    # Invariant: a failed save never leaves a promoted-but-invalid `real` file —
+    # restore the backup when one exists, otherwise remove the invalid file
+    # (the old _restore_bak no-ops with no .bak and left it behind, which then
+    # surfaced as bad_schema/bad_json on a later load).
     if not _apply_save_dict(_read_json(real)):
-        _restore_bak(bak, real)
-        last_error = "io_error"
+        if FileAccess.file_exists(bak):
+            _restore_bak(bak, real)
+        else:
+            _remove_file(real)
+        _record_io_error(FileAccess.get_open_error())
         return false
     _remove_file(bak)
 
@@ -201,7 +262,8 @@ func save_slot(s: int) -> bool:
 
 ## Load with validation. Missing file -> "no_save" (current profile untouched —
 ## never wipe unsaved data); unparseable/bad-shape/bad-version -> fresh default
-## profile fallback with the matching error code. Never crashes.
+## profile fallback with the matching error code. On success emits loaded(slot)
+## before returning true. Never crashes.
 func load_slot(s: int) -> bool:
     if not (s >= 1 and s <= 3):
         last_error = "bad_schema"
@@ -232,6 +294,7 @@ func load_slot(s: int) -> bool:
     loaded_decks_string = _decks_string(parsed_dict["decks"] as Dictionary)
     slot = s
     last_error = ""
+    loaded.emit(s)
     return true
 
 

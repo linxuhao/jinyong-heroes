@@ -332,8 +332,8 @@ func finish_creation() -> void:
 
 ## Restart from ENDING (or anywhere): drop every battle reference, reset
 ## SaveManager to a fresh default profile, then route to a truly-fresh TUTORIAL.
-## new_profile() alone marks tutorial_done = true (creation is only reachable
-## after the tutorial), so a full restart clears that flag back to false.
+## new_profile() now sets tutorial_done = false (creation happens before the
+## tutorial); the explicit reset below is redundant but kept for clarity.
 ## Emits state_changed("TUTORIAL") BEFORE restart_requested() so SceneManager
 ## routes the scene first, then reloads a fresh battlefield.
 func restart_game() -> void:
