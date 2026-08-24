@@ -1,511 +1,478 @@
-# Technical Architecture Design — Round: 招式打得出去,门派选得对
+# Step 2 — Architecture Design: Clearing the Five Red Lines
 
-> Round theme: make the selected skill actually usable (hint line + six Chinese
-> rejection reasons + range/target highlight + meaningful input action name),
-> fix the sect pick in the cultivation-combat scenario, and give the skill bar a
-> distinct "waiting" presentation on enemy-turn frames.
+> Round goal: "这局游戏要能打赢" — make the five red-line scenarios pass on **observed values**
+> from the headless playtest harness, and close the residual vision-gate gap (Q3) on the skill bar.
+> Inputs: task card (goal definition), `Step_1/step1_sota.md` (SOTA research), `design/` (durable
+> design record — all files read and honored). Every verdict in this design is traceable to an
+> observed value or an audited contract line; no root cause is asserted from source-reading alone.
 
-## 1. Overview
+---
 
-This round implements the four fixes already mandated by `design/30_presentation.md`
-§「选了招式之后没法出招」plus the two presentation gaps the round title names:
+## 1. Overview / 概述
 
-| # | Work item | New/changed surface |
-|---|---|---|
-| W1 | HUD hint line with six specific Chinese rejection reasons | `ActionHintLabel` in `scenes/ui/hud.tscn`; `player.gd` emits `action_hint(text)` |
-| W2 | Skill range/target highlight overlay on the grid | new `scripts/ui/range_highlight.gd` Node2D in `scenes/battlefield.tscn` |
-| W3 | Rename input action `basic_attack` → `attack_confirm` (keycode 74/J unchanged) | `project.godot` [input], `player.gd`, `tutorial_manager.gd`, `playtest_spec.yaml` (29 sites), `README.md` |
-| W4 | "waiting" button state for non-player-turn frames | new `state_palette()` arm in `scripts/ui/skill_button.gd`; override moved out of the `hp_gated` branch in `scripts/ui/hud.gd` |
-| W5 | Sect-select fix in `cultivation_changes_combat` | `playtest_spec.yaml` rows at frames 160/200 only — zero frame renumbering |
-| W6 | Playtest contract: surface additions + 3 scenario skeletons | `playtest_spec.yaml` |
+The game is already built: a **Godot 4.4+** turn-based wuxia tactics game — 15×11 grid tutorial
+battle (Yang Guo vs. the Five Greats), a deterministic zero-RNG battle engine, `SaveManager` with
+atomic IO, a cultivation segment (36 monthly cycles), and a **26-scenario playtest contract**
+(`playtest/` + `playtest/_common.yaml`). This run is **not a feature run**: it is a
+verification-and-correction run that makes the five red-line scenarios pass with honest evidence
+and widens the waiting-vs-ready perceptual gap of the skill bar.
 
-Hard constraints carried from the research step (non-negotiable):
+### The five red lines (from SOTA)
 
-- The **engine action string** `"basic_attack"` (AI decision dicts in
-  `scripts/ai/*.gd`, `CombatManager.execute_action`, `player.gd` line ~591) is a
-  *different thing* from the input action and **stays byte-identical**.
-- Six tutorial battle scenarios stay **green byte-identical**; `spine_to_ending`
-  32/32; `empty_round_stalls == 0`; 0 runtime errors; 0 compile errors.
-- No `randi()`/global RNG, no damage/HP/cooldown numbers change, no art work.
-- GDScript unit suite under `tests/` is NOT wired — this round does not touch it
-  and does not rely on it (`design/30_presentation.md` §闸门的接线).
-- Verification = playtest spec + vision gate + compile gate only.
+| # | Red line | Observed failure mode (from SOTA) | Fix surface |
+|---|----------|-----------------------------------|-------------|
+| 1 | `terminal_victory_8_12_rounds_hp_15_40` | Script plays scattered singles; single-target output **cannot** kill the Five by design (`design/10_systems.md` §5.4); skill-8 HP gate silently wastes a turn at frame ~1060 | Scenario script only |
+| 2 | `each_unit_acts_once_per_round_initiative_order` | Scenario premise is wrong: `init_minus_20` (碧海潮生) legitimately drops Yang Guo's effective initiative 88→68, so round 2 begins with **East Heretic**, not Yang Guo (observed `turn_order` = [East Heretic, Central Divine, South Emperor, North Beggar, West Poison, Yang Guo] at 1200) | Scenario contract only; engine sort **untouchable** |
+| 3 | `dot_resolves_at_victim_turn_start` | Absolute-frame pins (1430/2400) drifted with round pacing; HP pins 152/168 encode a full damage history | Scenario frame re-pin + damage-chain reconciliation |
+| 4 | `save_load_roundtrip` + `cultivation_month_cycle_and_deck_bookkeeping` | Three deep-equality asserts (`loaded_* == snapshot_*`) pass vacuously as `"" == ""` when the save never succeeded; `has_save` is session-memory; `last_error` is sticky | Scenario discriminators + conditional `save_manager.gd` load-side fix |
+| 5 | Vision Q3 (skill bar changes across enemy/player turns) | Waiting palette luma 0.26596 vs ready 0.3874 is a Δ≈0.12 dim that vision models miss (9 bad votes of 19 battle scenarios) | `skill_button.gd` waiting palette + luma window re-pin |
 
-## 2. Architecture diagram (text)
+### Change surface
 
 ```
-                        ┌────────────────────────────────────────────┐
-                        │ Battlefield (Node2D, per-battle scene)      │
-                        │  SummitBackdrop → Grid → GridLines          │
-                        │     → RangeHighlight (NEW) → Characters     │  ← tree order = draw order
-                        └──────────────┬─────────────────────────────┘
-                                       │ setup(player, enemies) / signals
-        ┌──────────────────────────────┼──────────────────────────────┐
-        │ Player (player.gd)           │                              │
-        │  select_skill() ──emit──► action_hint(text) ──► hud.show_hint(text)
-        │  _try_attack_target() ─► action_hint("射程不够") …             │
-        │  _try_keyboard_attack() ─► action_hint(…)                   │
-        │  can_skill_hit(skill, enemy)  ◄── read (zero-duplication) ──┘
-        │
-        │ RangeHighlight (range_highlight.gd, _process polls)
-        │   GameManager.get_player() → selected_skill_index / grid_pos
-        │   per living enemy: player.can_skill_hit() → target tiles
-        │   reachable tiles ← skill shape/range (GridManager reuse)
-        │   queue_redraw() ONLY on change; observables tile_count/target_count
-        │
-        │ HUD (persists in main.tscn HUDLayer, CanvasLayer 10)
-        │   ActionHintLabel (NEW Label, y 618..644, hidden by default)
-        │   _refresh_skill_button_states(): waiting override for EVERY
-        │     visible button when phase != "IDLE" and not is_player_turn()
-        │   clear_battle_refs(): hide hint + disconnect signal
-        └───────────────────────────────────────────────────────────────
+playtest/terminal_victory_8_12_rounds_hp_15_40.yaml          # rewrite script (C5)
+playtest/each_unit_acts_once_per_round_initiative_order.yaml # rewrite contract (C2)
+playtest/dot_resolves_at_victim_turn_start.yaml              # re-pin frames (C3)
+playtest/save_load_roundtrip.yaml                            # add discriminators (C4)
+playtest/cultivation_month_cycle_and_deck_bookkeeping.yaml   # add discriminators (C4)
+playtest/skill_bar_waiting_state.yaml                        # re-pin luma window (C6)
+scripts/ui/skill_button.gd                                   # waiting palette + "等待" tag (C6)
+scripts/autoload/save_manager.gd                             # CONDITIONAL: load-side flags only (C4)
 ```
 
-Key structural decisions:
+**Forbidden this round** (explicit non-goals, with rationale in §10): `scripts/autoload/combat_manager.gd`
+(initiative sort is verified correct), the splitmix64 constants in `save_manager.gd` (deterministic
+two's-complement wrap today — "fixing" them would silently change the RNG stream), any design number
+in `design/20_content.md`, and any new dependency.
 
-1. **Player → HUD coupling is a signal, not a reference.** Player never resolves
-   the HUD; HUD connects `player.action_hint` in `setup()` (same pattern as
-   `cooldowns_updated`). Battle exit is cleaned in `clear_battle_refs()`, which
-   `SceneManager._teardown_battle_refs` already calls on every swap.
-2. **Highlight is self-driving.** It polls `GameManager.get_player()` each frame
-   (the same pattern `hud.gd` uses), so `battlefield.gd` needs **zero** code
-   changes — only the `.tscn` node insertion. It calls the player's
-   `can_skill_hit()` directly, so what is highlighted is exactly what executes
-   (single source of truth, no duplicated shape math).
-3. **Draw order fixes the layering for free.** `RangeHighlight` sits between
-   `GridLines` and `Characters` in `battlefield.tscn`: translucent fills draw
-   above the 35%-alpha grid lines (readability #1 preserved) and below character
-   sprites. Health bars live on CanvasLayer 10 → always on top.
+---
 
-## 3. Design-change declarations (for `5_design`)
+## 2. Architecture / 架构图
 
-Implementers must NOT edit `design/*.md` this round. Two records drift because
-of this run; `5_design` updates them after verification:
-
-- **D1 — input map row.** `design/30_presentation.md` §输入映射 lists the
-  J action as `confirm`, but `project.godot` never defined `confirm` (verified)
-  and the code uses `basic_attack`. This run renames to **`attack_confirm`**
-  (physical_keycode 74 unchanged). `5_design` updates the row
-  `确认 / 出手 | J | confirm` → `attack_confirm` and appends the changelog row.
-- **D2 — no other design change.** The hint text 「按 J 出招 / 点击目标」, the six
-  reasons, the highlight, and the waiting state are implementations of decisions
-  already written in `design/30_presentation.md` (可读性硬要求 #2/#3, §选了招式
-  之后没法出招). No numbers in `design/20_content.md` change.
-
-## 4. Component specifications
-
-### C1. Action hint line (`ActionHintLabel`) — W1
-
-**Files:** `scenes/ui/hud.tscn` (new node), `scripts/ui/hud.gd` (API + wiring),
-`scripts/characters/player.gd` (signal + reject-reason helper + emit sites).
-
-**Node (in `scenes/ui/hud.tscn`, sibling of `SkillBar` under `HUD`):**
+### 2.1 Layers
 
 ```
-[node name="ActionHintLabel" type="Label" parent="."]
-anchors_preset = 7            ; bottom-center
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -240.0
-offset_top = -86.0            ; y 618..644 — above SkillBar (top edge 648)
-offset_right = 240.0
-offset_bottom = -60.0
-mouse_filter = 2
-horizontal_alignment = 1
-clip_text = false
-visible = false               ; hidden before any selection (hard assert)
+┌─────────────────────────────────────────────────────────────────────┐
+│ L3 · Evidence layer (read-only, produced by the gate)                │
+│   playtest_summary.md (observed column = primary diagnostic input)   │
+│   compile_report.json · vision_report.json · final/verify_report.json│
+└─────────────────────────────────────────────────────────────────────┘
+        ▲  observed values              ▲  screenshots (Q3 votes)
+        │                               │
+┌───────┴───────────────────────────────┴─────────────────────────────┐
+│ L1 · Harness layer (existing, UNCHANGED this run)                    │
+│   godot-builder sidecar HTTP: /compile · /playtest · /script         │
+│   run_tests.sh (POSTs to the sidecar — no local godot binary)        │
+│   playtest/_common.yaml (scene/actions/surface + scenario_order)     │
+│   godot_playtest_scenario tool (single-scenario run ≈ 50 s, overlays │
+│   the implementer's pending edits over the repo copy before running) │
+└───────┬──────────────────────────────────────────────────────────────┘
+        │  timeline inputs + assert evaluations (frames ≤ 3000)
+┌───────┴──────────────────────────────────────────────────────────────┐
+│ L2 · Game layer (Godot 4.4+, GDScript)                               │
+│   CombatManager (turn engine — READ-ONLY this run)                   │
+│   HUD → SkillButton (state_text/state_luma observables, palette)     │
+│   SaveManager (atomic IO, last_error vocabulary, snapshot vars)      │
+└──────────────────────────────────────────────────────────────────────┘
+        ▲  rewritten by C5/C2/C3/C4/C6
+┌───────┴──────────────────────────────────────────────────────────────┐
+│ L0 · Contract layer (this run's PRIMARY edit surface)                │
+│   playtest/<scenario>.yaml — one file per scenario (blast radius = 1)│
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-- No theme font override — the global theme (NotoSansSC, CJK-covered) applies.
-- Placement guarantees zero overlap with `SkillBar` (y 648..688), `RoundIndicator`
-  (y 8..72), and `PauseButton` — readability #6. It never covers the skill bar,
-  so vision-gate battle classification is preserved (see §9).
-
-**HUD API (`scripts/ui/hud.gd`):**
-
-- `func show_hint(text: String) -> void` — `""` hides; otherwise sets
-  `text` + `visible = true`.
-- `func hide_hint() -> void` — `visible = false; text = ""`.
-- `setup()` additionally wires: if `player.has_signal("action_hint")`, disconnect
-  any stale connection then `connect` to `_on_action_hint(text)` (mirror
-  `_wire_cooldown_updates`), and stores the player ref for teardown.
-- `clear_battle_refs()` additionally: `hide_hint()` and disconnect
-  `action_hint` (guarded by `is_instance_valid`). HUD persists across battles
-  (main.tscn `HUDLayer`), so this is the battle-exit reset — scene swaps must
-  never leave the old hint text on the next battle's screen.
-
-**Player side (`scripts/characters/player.gd`):**
-
-- New signal: `signal action_hint(text: String)`.
-- New helper replacing the boolean gate (single source of truth for BOTH select
-  and execution re-gate):
+### 2.2 Data flow (one red line, end to end)
 
 ```
-func _skill_reject_reason(index: int) -> String:
-    if index < 0 or index >= skills.size():  return "该招式不存在"
-    if CombatManager.tutorial_battle and index >= 4 and CombatManager.current_round < 4:
-        return "教程尚未解锁"
-    if skill_cooldowns[index] > 0:
-        return "冷却中 %d 回合" % skill_cooldowns[index]   # same number the overlay shows
-    var skill = skills[index]
-    if skill != null and skill.hp_gate_below_ratio > 0.0 \
-            and health >= int(round(float(max_health) * skill.hp_gate_below_ratio)):
-        return "须在半血以下"
-    if _has_restriction_status("no_techniques_next_turn"):
-        return "本回合无法用招"
-    if not TutorialManager.is_input_allowed("skill_%d" % (index + 1)):
-        return "教程尚未解锁"
-    return ""
+edit playtest/<scenario>.yaml (or skill_button.gd)
+   → godot_playtest_scenario (single-scenario run, ~50 s, headless Godot)
+   → observed values per assert land in playtest_summary.md
+   → implementer reads the OBSERVED column FIRST, forms a root cause
+   → minimal edit (contract or code)
+   → re-run until green
+   → one full-suite run (~12 min) + vision gate at the end (C7)
 ```
 
-- `_skill_selectable(index) -> bool` becomes a thin wrapper:
-  `return _skill_reject_reason(index) == ""` (the two existing call sites in
-  `select_skill` / `_try_attack_target` keep compiling; the gate ORDER is
-  byte-identical to today: bounds → phase-lock → cooldown → HP gate →
-  technique seal → tutorial block).
-- `select_skill()`:
-  - reject → `action_hint.emit(reason)` and return (replaces the silent no-op);
-  - toggle-off → `action_hint.emit("")`;
-  - success → `action_hint.emit("按 J 出招 / 点击目标")`.
-- `_try_attack_target()`: every previously-silent return now emits first:
-  - `_skill_reject_reason(skill_index)` non-empty (execution re-gate) →
-    emit that exact reason (more specific than the research assumption's bundled
-    「本回合无法用招」 — strict improvement, still non-empty/specific);
-  - `can_skill_hit` fail → `action_hint.emit("射程不够")`;
-  - basic-attack tutorial block → `action_hint.emit("教程尚未解锁")`;
-  - basic-attack out-of-range → `action_hint.emit("射程不够")`;
-  - after successful skill execution (auto-deselect) and after successful basic
-    attack → `action_hint.emit("")`.
-- `_try_keyboard_attack()`: when `target == null` (J pressed, no valid target —
-  currently a silent dead branch), emit `"射程不够"`.
+### 2.3 Design principles (binding on all components)
 
-**The six reasons (Chinese literals, grep-verifiable mapping):**
+1. **先取值,再动手** — observed value before every edit; a root cause without an observed value
+   is not a root cause.
+2. **Design numbers are authority.** `design/20_content.md` is the arithmetic source of truth.
+   Never adjust numbers to go green. A genuine numeric mismatch is reported as a root cause
+   against the design doc, not silently re-pinned.
+3. **Engine correctness is off-limits.** The initiative sort (`combat_manager.gd` decorate-sort-
+   undecorate stable insertion sort) and the zero-RNG AI priority lists are verified correct.
+4. **Contracts may be fixed; premises may not be smuggled.** When a scenario's premise contradicts
+   observed engine behavior, the contract is the bug (red line 2).
+5. **Minimal change.** No new scenes, autoloads, assets, or dependencies. No new abstraction
+   layers — the harness already provides everything.
 
-| # | Reason literal | Site (file · function) |
-|---|---|---|
-| 1 | `射程不够` | `player.gd` `_try_attack_target` (`can_skill_hit` fail; basic-attack range) + `_try_keyboard_attack` (null target) |
-| 2 | `冷却中 %d 回合` | `player.gd` `_skill_reject_reason` cooldown arm (select + execution re-gate); `%d` = `skill_cooldowns[index]` at reject time |
-| 3 | `须在半血以下` | `player.gd` `_skill_reject_reason` HP-gate arm |
-| 4 | `本回合无法用招` | `player.gd` `_skill_reject_reason` `no_techniques_next_turn` arm |
-| 5 | `教程尚未解锁` | `player.gd` `_skill_reject_reason` phase-lock arm + tutorial-input arm; `_try_attack_target` basic-attack tutorial block |
-| 6 | `该招式不存在` | `player.gd` `_skill_reject_reason` out-of-bounds arm |
+---
 
-Review acceptance: `grep "action_hint.emit"` in `player.gd` must cover every
-`return` in `select_skill` / `_try_attack_target` / `_try_keyboard_attack` that
-is not a success path; no silent `return` may remain in those three functions.
+## 3. Components / 组件列表
 
-### C2. Range/target highlight (`RangeHighlight`) — W2
+### C1 — Playtest contract & harness layer (existing, unchanged)
 
-**Files:** `scripts/ui/range_highlight.gd` (NEW, ~100 lines),
-`scenes/battlefield.tscn` (node insertion).
+- **职责**: run scenarios headlessly, evaluate asserts against live nodes, emit
+  `playtest_summary.md` (name | expr | actual | observed), `compile_report.json`,
+  `vision_report.json`; per-scenario files make edits cheap and auditable.
+- **接口**: `playtest/_common.yaml` (scene `res://scenes/main.tscn`, 26 input actions incl.
+  `attack_confirm` and the `debug_*` set, `surface` whitelist of node→script-vars, frame cap 3000
+  with last assert ≤ 2999). The header declares the schema was audited with zero drift — it is the
+  authoritative name registry for this run.
+- **涉及文件**: none edited. `run_tests.sh` must **not** be touched (it POSTs to the sidecar; the
+  local-`godot`-PATH probe is a documented dead end).
 
-**Node (in `scenes/battlefield.tscn`, between `GridLines` and `Characters`):**
+### C2 — Initiative scenario: fix the CONTRACT, not the engine
 
-```
-[ext_resource type="Script" path="res://scripts/ui/range_highlight.gd" id="4"]
-[node name="RangeHighlight" type="Node2D" parent="."]
-script = ExtResource("4")
-```
+- **职责**: rewrite `playtest/each_unit_acts_once_per_round_initiative_order.yaml` so the scenario
+  asserts the **debuff's effect** instead of a wrong premise. Round 1: Yang Guo (88) first, then
+  the five (85/80/76/74/70). Round 2: East Heretic's 碧海潮生 cast during round 1 applied
+  `init_minus_20` (2 rounds) to Yang Guo, dropping his effective initiative to 68 — **below all
+  five enemies** — so round 2 legitimately begins with East Heretic and Yang Guo acts last.
+- **接口 (target contract)** — preamble unchanged (7× `ui_accept`, `end_turn` at 20); the frame-30
+  asserts stay (they are correct). Replace the frame-1200 block with:
 
-(load_steps 4 → 5.) No other scene change; `battlefield.gd` untouched.
-
-**Behaviour (`range_highlight.gd`, extends Node2D):**
-
-- `_process()` resolves `var player := GameManager.get_player()` with
-  `is_instance_valid` guard (never stores it, never touches freed nodes):
-  - null / `selected_skill_index < 0` / `GameManager.get_state() != "BATTLE"` →
-    hide (self.visible = false, `tile_count = 0`, `target_count = 0`), return;
-  - otherwise recompute **only when** `selected_skill_index` or `grid_pos`
-    changed since the last frame (cheap diff; `queue_redraw()` only then).
-- Reachable tile set per skill shape — mirrors `player.can_skill_hit()` exactly
-  (reuse, not reimplementation):
-  - `aoe_shape == "global"` → no reachable fill; every living enemy is a target
-    (`tile_count = 0`).
-  - `jump_tiles > 0`, `aoe_origin == "target"`, or `aoe_shape == "single"` →
-    Chebyshev ball of radius `skill.range` around the player tile.
-  - `aoe_shape == "line"` → cells in the same row or column within `skill.range`.
-  - `aoe_shape == "adjacent"` → ring at Chebyshev distance 1.
-  - `aoe_shape == "cross"` / `"square"` (self-origin) →
-    `GridManager.get_tiles_in_aoe(player.grid_pos, skill.aoe_shape, max(skill.aoe_size, 1))`
-    — reuse the existing AoE math, zero new shape code.
-  - Unknown shape → radius-`range` ball (same fallback as `can_skill_hit`).
-- Target tiles: for each living enemy in `GameManager.get_enemies_alive()`,
-  if `player.can_skill_hit(skill, enemy)` → its tile joins the target set.
-  Requires promoting `_can_skill_hit` → **public `can_skill_hit`** in `player.gd`
-  (3 in-file call sites updated; GDScript underscore is convention-only, but the
-  public name is the interface contract here). The engine stays authoritative at
-  execution; the highlight is a read-only view.
-- `_draw()`: per reachable tile `draw_rect(Rect2(x*64, y*64, 64, 64),
-  REACH_FILL)` + 1 px `REACH_EDGE` outline; per target tile `TARGET_FILL` +
-  2 px `TARGET_EDGE`. Suggested colors (translucent so grid lines stay visible):
-  `REACH_FILL = Color(0.30, 0.65, 1.00, 0.16)`, `REACH_EDGE = Color(0.30, 0.65, 1.00, 0.45)`,
-  `TARGET_FILL = Color(1.00, 0.30, 0.20, 0.28)`, `TARGET_EDGE = Color(1.00, 0.30, 0.20, 0.75)`.
-  15×11 = at most 121 cells — no allocation concerns.
-- Observables (playtest surface): `visible` (built-in), `tile_count: int`,
-  `target_count: int` (both updated on recompute, zeroed when hidden).
-- Lifecycle: node dies with the battlefield scene on swap (no leak); the
-  per-frame `get_player()` null-guard covers battle exit.
-
-### C3. Input action rename `basic_attack` → `attack_confirm` — W3
-
-**Files and sites (complete inventory, verified this round):**
-
-| File | Sites | Note |
-|---|---|---|
-| `project.godot` `[input]` | line 83: `basic_attack={` → `attack_confirm={` | physical_keycode 74, deadzone 0.5 unchanged |
-| `scripts/characters/player.gd` | line 327 `is_action_pressed("basic_attack")`; line 474 `is_input_allowed("basic_attack")` | add `const ATTACK_ACTION: StringName = &"attack_confirm"` and use it at BOTH sites (compile-time-checked) |
-| `scripts/autoload/tutorial_manager.gd` | line 27 (default `_allowed_actions`) + lines 338/340/342/344/346 (5 lists) | list literals become `"attack_confirm"` |
-| `scripts/autoload/tutorial_manager.gd` | const `STEP_BASIC_ATTACK` (line 16) → `STEP_ATTACK`; identifier uses at lines 93/110/337 | identifier-only rename (compile gate catches misses); the Chinese title `普通攻击` stays byte-identical |
-| `playtest_spec.yaml` | line 27 (`actions:` list) + 28 timeline rows | all are `actions: [basic_attack]`; **no assert expression contains the string** (verified) |
-| `README.md` | line 216 | line 229 (`execute_action` … `"basic_attack"`) is the engine string — **must stay** |
-
-**Must NOT change (engine action string `"basic_attack"`):**
-`scripts/autoload/combat_manager.gd` (resolution at ~line 1118),
-`scripts/ai/ai_base.gd` + the five `ai_*.gd` decision dicts,
-`player.gd` `_execute_basic_attack` (`execute_action(self, "basic_attack", …)`),
-`README.md` line 229.
-
-**Post-rename grep acceptance (run before the compile gate):**
-- `basic_attack` in `*.gd` returns ONLY: `combat_manager.gd`, `ai/*.gd`,
-  `player.gd` execute-action call — engine sites only.
-- `attack_confirm` returns: `project.godot`, `player.gd` (const + 2 sites),
-  `tutorial_manager.gd` (6 list sites), `playtest_spec.yaml` (29 sites),
-  `README.md` (line 216).
-- Keycode 74 unchanged → no scenario renumbers; tutorial timelines keep their
-  exact frame numbers.
-
-### C4. "waiting" button state — W4
-
-**Files:** `scripts/ui/skill_button.gd` (palette + luma), `scripts/ui/hud.gd`
-(override placement).
-
-**hud.gd change (the actual bug fix):** in
-`_refresh_skill_button_states()`, move the waiting override OUT of the
-`elif hp_gated:` branch so it applies to **every visible button**:
-
-```
-var state := "ready"
-if phase_locked: state = "phase_locked"
-elif on_cooldown: state = "cooldown"
-elif hp_gated:   state = "hp_gated"
-# Presentation-only override: on enemy-turn frames EVERY visible button renders
-# "waiting" so the bar visibly changes across player -> enemy -> player turns.
-# Derivation order and `disabled` are untouched; state_text asserts that fire
-# during PLAYER_TURN frames (spec lines 195/482-484/545/553 — all verified
-# player-turn) are green by construction.
-if CombatManager.phase != "IDLE" and not CombatManager.is_player_turn():
-    state = "waiting"
+```yaml
+- at: 1200
+  actions: []
+  assert:
+    CombatManager.current_round: 2
+    CombatManager.turn_order: turn_order.size() == 6 and turn_order[0] == "East Heretic" and turn_order[5] == "Yang Guo"
+    CombatManager.turn_log: turn_log.size() == 11 and turn_log[0] == "Yang Guo" and turn_log[5] == "West Poison" and turn_log[6] == "East Heretic"
+    Player.status_names: status_names.has("init_minus_20") == true
+    Player.turns_taken: 1
+    East_Heretic.turns_taken: 2
+    Central_Divine.turns_taken: 2
+    South_Emperor.turns_taken: 2
+    North_Beggar.turns_taken: 2
+    West_Poison.turns_taken: 2
+    CombatManager.last_turn_actor: changed
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
 ```
 
-**skill_button.gd changes:**
+  `turn_log.size() == 11` = round 1 (6 entries) + round 2's five enemies (5 entries) — Yang Guo's
+  round-2 turn has **not** happened yet, which is the assertion that pins the reordering.
+  A `phase == "ENEMY_TURN"` line at 1200 is optional and must be **pinned from the observed run**,
+  not asserted a priori — drop it if the engine has already advanced the phase there.
+  Description text must be rewritten to state the debuff-reordering premise.
+- **验收标准**: scenario green in a single-scenario run; all values in the observed column match
+  the contract above (frame 1200 was already observed to hold per SOTA — if the re-run disagrees,
+  re-pin the **frame**, never the expectations).
+- **硬约束**: `scripts/autoload/combat_manager.gd` initiative sort MUST NOT be modified. No code
+  edits in this component at all.
 
-1. New `state_palette("waiting")` arm returning a dimmed desaturated blue-gray
-   family: `{ bg_color: <impl-chosen>, border_color: <impl-chosen>,
-   border_width: 1, tag_text: "" }` — no tag, thin border, dimmed (semantically
-   "it is not your turn").
-2. **Luminance rule (hard):** the chosen `bg_color` must satisfy
-   `L_wait ≤ 0.2874` **and** `L_wait ≥ 0.1814` (i.e. ≥ 0.10 below ready
-   0.3874 and ≥ 0.10 above cooldown 0.0814), computed with the engine's
-   `Color.get_luminance()` and the exact value recorded in a comment.
-   **Correction of the research step's arithmetic:** its claim that a luma
-   "near 0.25–0.28 is outside ±0.10 of every other state" is false — the gap
-   between `hp_gated` (0.2020) and `ready` (0.3874) is only **0.1854 < 0.20**,
-   so no luma can be ≥ 0.10 from both. The only all-four-states-compliant value
-   is a BRIGHT luma ≥ 0.6306, which is wrong for a "waiting" presentation. The
-   dimmed zone above keeps ≥ 0.10 from ready/cooldown/phase_locked and reaches
-   up to ~0.085 from hp_gated at the upper edge; remaining separation from
-   `hp_gated` (dark red + 气血 tag) and `cooldown` (near-black + round number)
-   comes from hue + markers, and the playtest asserts the real number.
-   Candidate family for the implementer to verify, not copy blindly:
-   bg ≈ `Color(0.20, 0.30, 0.40)`-class cool blue-gray — compute
-   `get_luminance()` for the exact RGB chosen and adjust until the rule holds.
-3. New observables:
-   - `static func state_luma(state: String) -> float` — cached dict of
-     `state_palette(state)["bg_color"].get_luminance()` per state string;
-   - `var state_luma: float = 0.0` written every frame in `_apply_state`
-     (`state_luma = state_luma(state)`).
-   This turns the visual rule into an assertable rule.
+### C3 — DoT timing: re-pin frames from observed values
 
-**Side effects to accept (documented, not bugs):** during enemy turns the big
-cooldown number hides (`_apply_state` only shows it for `state == "cooldown"`)
-while the round-fill overlay stays — the whole bar reads as dimmed/waiting.
-`selected` gold border still layers on any state (unchanged).
+- **职责**: re-pin the two assert frames of `playtest/dot_resolves_at_victim_turn_start.yaml`.
+  Current pins (1430: round 4, West Poison active, poison applied, HP == 152; 2400: round 5,
+  HP == 168) drifted — round pacing is faster than the old pins assumed.
+- **接口/方法 (mandated sequence)**:
+  1. Single-scenario run; if the existing asserts fire at the wrong rounds, add **temporary**
+     diagnostic asserts every ~50 frames capturing `CombatManager.current_round`,
+     `CombatManager.phase`, `CombatManager.active_unit_name`, `Player.status_names`,
+     `Player.health`; read `playtest_summary.md` observed column.
+  2. Locate frame F_a where West Poison applies 灵蛇缠身 (first frame with
+     `status_names.has("poison")` while `active_unit_name == "West Poison"`) and frame F_t at the
+     player's next turn start (poison tick).
+  3. **Re-pin the input frames too** if the end-turn inputs at 400/800/1200 no longer land on the
+     player's round-2/3/4 turns.
+  4. Replace temporary diagnostics with the real asserts at F_a / F_t; remove the diagnostics from
+     the final file.
+- **HP pin rule**: the pins encode a full damage history — tick = `round(8 × 1.3)` = 10, 神雕之力
+  regen = `round(20 × 1.3)` = 26, net **+16** per poisoned turn start, so 152 → 168. If observed
+  HP ≠ 152/168 at the re-pinned frames, **reconcile the entire damage chain** (every enemy action
+  on Yang Guo across rounds 1–4, attack side ×1.3 → `round()`, defense side −50% melee DR →
+  `round()`, per-turn-start regen) against `design/20_content.md` and write the reconciliation
+  into the plan **before** touching the numbers. Never adjust numbers to go green.
+- **验收标准**: scenario green; the plan documents the observed F_a/F_t and (if changed) the
+  reconciliation that justifies any HP pin difference.
 
-### C5. Sect-select fix — W5 (spec edit only, no code)
+### C4 — Save/load + cultivation: de-vacuate the deep-equality asserts
 
-**File:** `playtest_spec.yaml`, scenario `cultivation_changes_combat`.
+- **职责**: add non-vacuity discriminators so the three `loaded_* == snapshot_*` asserts mean
+  something, and record `last_error` **values** at the failing-gate frames. Conditional code fix
+  in `scripts/autoload/save_manager.gd` — only if observed evidence shows saved-but-broken.
+- **接口 (new asserts)**:
+  - `playtest/save_load_roundtrip.yaml`, frame 310 (post-save):
+    `SaveManager.snapshot_profile_json: snapshot_profile_json.length() > 0`
+    and `SaveManager.slot: slot == 1`. Keep `has_save == true` (session-memory: it is only legal
+    here because the same run performed a successful `save_slot()` at ~285) and
+    `last_error == ""` — the observed column records the VALUE if it fails.
+  - Frame 490 (post-load): add `SaveManager.snapshot_profile_json: snapshot_profile_json.length() > 0`
+    (the discriminator: empty ⇒ the save never succeeded and the deep-equalities are vacuous;
+    non-empty ⇒ the save succeeded and any mismatch is a load-side flag bug). Keep
+    `has_save == true` and the three deep-equalities.
+  - `playtest/cultivation_month_cycle_and_deck_bookkeeping.yaml`, frame 200 (post-autosave): add
+    `SaveManager.snapshot_profile_json: snapshot_profile_json.length() > 0`; keep
+    `has_save == true`, `last_error == ""`.
+- **决策树 (encode SOTA edge cases verbatim)**:
+  1. `snapshot_profile_json` empty at 490 ⇒ the save never succeeded ⇒ read the observed
+     `last_error` VALUE at 285–310: `"save_refused"` = a gate refused (slot 1..3 /
+     `STABLE_STATES` / `SceneManager.pending_swap` in-flight window — never assert inside a swap
+     window); `"io_error"` = stringify/file/validate step failed — hunt which key of
+     `_build_save_dict()` (profile / decks / rng_state / segment) is unserializable (the
+     `json_text == ""` guard maps that to `io_error`); `"no_save"` = file missing at load time.
+     `last_error` is **sticky** — find the frame where it was set before attributing.
+  2. Snapshot non-empty but `loaded_* != snapshot_*` ⇒ load-side flags broken ⇒ fix the load path
+     in `save_manager.gd` only. The atomic 5-step write
+     (tmp → validate → backup → rename → re-validate → drop backup, restore-on-failure) must not
+     be weakened.
+  3. `has_save` is session-memory (set by `save_slot()`, cleared by `new_profile()`, never by
+     `load_slot()`) — never assert it after a cold start.
+- **硬约束**: splitmix64 constants (`save_manager.gd` lines ~65–67) are **not** a blocker this
+  round — they parse as two's-complement wraps and are deterministic; `loaded_rng_state ==
+  snapshot_rng_state` passes. Do **not** "fix" them mid-round (it would silently change the RNG
+  stream). Leave a comment noting the deferred cleanup.
+- **验收标准**: both scenarios green; discriminators non-empty; any `save_manager.gd` edit is
+  justified in the plan by an observed `last_error` value + frame.
 
-| Line today | Change |
-|---|---|
-| 1120-1121 `- at: 160 / actions: []` | `- { at: 160, actions: [move_down] }` |
-| 1123-1124 `- at: 200 / actions: []` | keep `actions: []`, add `assert: CultivationScreen.sect_id: 'sect_id == "wudang"'` |
+### C5 — Terminal victory: rewrite the battle script (lure-cluster + AoE)
 
-Rationale: frame 160 is the sect-select screen with `focus_index` 0 = shaolin;
-`move_down` moves focus to 1 = wudang (order verified against
-`ProgressionGongfaData.SECTS`: shaolin / wudang / gaibang / emei / tangmen);
-frame 170's existing `ui_accept` then picks wudang. No other timeline row moves
-— every later absolute frame number (215/230/…/2999) stays put. Optional (PM
-discretion): an extra assert at frame 165 `SectSelectScreen.focus_index == 1`.
-Wudang is the sword sect, which is what this scenario's sword-ladder asserts
-(0.7 → 21, then 0.85 → 26) actually describe — the current shaolin pick is the
-mismatch this round's title names.
+- **职责**: rewrite `playtest/terminal_victory_8_12_rounds_hp_15_40.yaml` so the script plays the
+  one winnable pattern: **lure the Five into a cluster, then clear them with self-origin AoE**
+  (四海无量 radius-2 ×2 casts, 力斩千钧 cross-2, 徘徊空谷 landing-adjacent, 黯然销魂十七式 adjacent
+  when HP-gated). The current script's singles (重剑无锋/心惊肉跳 singles at 1300–2990) cannot kill
+  560 HP + heals by design (`design/10_systems.md` §5.4).
+- **接口 (target final asserts at 2999)**:
 
-### C6. Playtest contract (observable surface + scenario skeletons) — W6
+```yaml
+- at: 2999
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    CombatManager.current_round: current_round >= 8 and current_round <= 12
+    Player.health: health >= 75 and health <= 200
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    Player.turns_taken: changed
+```
 
-**Contract updates to `playtest_spec.yaml` (PM fills exact thresholds):**
+  `GameManager.current_state == "WON"` is the only win path (`unregister_enemy()` →
+  `end_battle(true)` when `enemies_alive` empties) — if it is not WON at 2999, enemies are alive,
+  by construction.
+- **Script-authoring constraints (binding)**:
+  - Inputs: the confirm key is **`attack_confirm`** (J). `"basic_attack"` exists only as the
+    ENGINE action string inside AI decision dicts / `execute_action` — never as a timeline action.
+  - Tutorial two-phase unlock: skills 5–8 are `phase_locked` until round 4 — do not press them
+    before round 4.
+  - Skill-8 HP gate: 十七式 requires HP < 250 (50% of 500). Before pressing `skill_8`, assert
+    `SkillButton8.hp_gated: hp_gated == false` at that frame; otherwise the press is silently
+    rejected and the turn is wasted.
+  - 四海无量 cooldown 6 decrements at the player's own turn starts: cast on round r ⇒ ready again
+    on the player's round r+6 turn — plan both casts into the 8–12 round window.
+  - Keep the tutorial preamble (7× `ui_accept`) — this is the tutorial battle; the tutorial gates
+    which actions advance it.
+  - Prefer asserts on `current_round` / `phase` / `active_unit_name` / `status_names`; re-pin
+    absolute frames from single-scenario runs (~50 s each).
+  - Recommended mid-battle evidence anchors (assert, don't just hope): after each 四海无量 cast,
+    assert ≥ 3 enemies with `health < max_health` (cluster hit); after the first 十七式 cast,
+    assert its knockback/displacement effect.
+- **决策树 (encode SOTA)**:
+  1. WON fails and all five enemies alive at 2999 ⇒ damage never connected ⇒ cluster/AoE script
+     defect or skill-8 gate rejection ⇒ fix the script (this is the expected failure mode).
+  2. WON fails and 1–2 enemies alive at low HP ⇒ damage shortfall vs. the enemy heal budget
+     (南帝 先天调息 46/use cd 4, 一阳续命 +13/round and +78 once below 40%, 中神通 shield 65/cd 5,
+     北丐 −15% DR, 西毒 reflect) ⇒ tighten clustering; **AI engagement is the ONLY legal balance
+     knob**, and using it requires an explicit design-change declaration + observed evidence.
+  3. Player HP < 75 (or LOST) ⇒ survival pacing broken ⇒ kill early enemies faster / earlier
+     first AoE.
+  4. Budget: player raw output ≈ 698 × 1.3 if everything connects vs. ~560 HP + ~150+ heals —
+     the margin is thin and clustering decides it.
+- **验收标准**: WON with round ∈ [8,12] and player HP ∈ [75,200]; scenario green in the full suite;
+  no engine/design numbers changed.
 
-1. `actions:` list: rename `basic_attack` → `attack_confirm` (line 27).
-2. `surface:` additions:
-   - `ActionHintLabel: [visible, text]`
-   - `RangeHighlight: [visible, tile_count, target_count]`
-   - `state_luma` appended to each `SkillButton1..12` row.
-3. Scenario skeletons (frames suggested below mirror the established cadence;
-   PM finalizes):
+### C6 — Skill-bar waiting perceptibility (vision Q3)
 
-   **S1 `skill_hint_and_range_highlight`** (selection UX):
-   - 3..15 `ui_accept` ×7 (tutorial skip, standard);
-   - at 20 assert: `ActionHintLabel.visible == false`, `RangeHighlight.visible == false`
-     (hidden before any selection);
-   - 25 `skill_1` → at 30 assert: hint `visible == true` and `text != ""`,
-     `RangeHighlight.visible == true`, `tile_count > 0`, `target_count == 0`
-     (player at (7,5); Heavy Edge range 1; all five enemies ≥ 4 tiles away);
-   - 35 `attack_confirm` → at 50 assert: `ActionHintLabel.text == "射程不够"`
-     (out-of-range attempt — non-empty AND specific);
-   - 55 `skill_1` (toggle off) → at 60 assert: hint hidden, highlight hidden,
-     `tile_count == 0`, `target_count == 0`.
+- **职责**: widen the waiting-vs-ready perceptual gap so the vision gate's cross-frame Q3 votes
+  turn good (current: 9 bad of 19 battle scenarios; target ≤ 5). The wiring is already correct —
+  every visible button gets `state = "waiting"` each frame while `phase != "IDLE" and not
+  is_player_turn()` (`scripts/ui/hud.gd` `_refresh_skill_button_states`); the residual problem is
+  **perceptibility + sampling**, not wiring.
+- **接口/改动**: edit **only** the `"waiting"` entry of `state_palette()` in
+  `scripts/ui/skill_button.gd`:
+  - **Rules (all must hold, verified with `Color.get_luminance()`, raw-component BT.709)**:
+    state_text stays exactly `"waiting"` (surface contract stable); `disabled` untouched;
+    presentation-only. Waiting must be pairwise distinguishable from all four player-turn states:
+    Δluma vs ready (0.3874) ≥ 0.10 **and** a hue-family shift (blue-gray → violet/warm);
+    Δluma vs cooldown (0.0814) ≥ 0.15; Δluma vs phase_locked (0.5306) ≥ 0.20; vs hp_gated
+    (0.2020) distinguish on **hue** (violet vs red) in addition to luma. Add `tag_text: "等待"`
+    (w1 tag weight — the mechanism already used by 锁定/气血) so the change is also textual.
+  - **Recommended starting palette**: bg `Color(0.30, 0.20, 0.36)`, border
+    `Color(0.50, 0.38, 0.58)`, border width 1, tag `"等待"` (expected luma ≈ 0.23 — implementer
+    computes the exact value and re-pins the window). If the implementer finds a palette that
+    satisfies the rules better, it wins — the rules are the contract, the palette is a proposal.
+  - **Re-pin the derived asserts**: update the `state_luma` window in
+    `playtest/skill_bar_waiting_state.yaml` (currently `>= 0.18 and <= 0.2874`) to
+    `[luma − 0.02, luma + 0.02]` of the new palette, and update the two palette-table comments in
+    `skill_button.gd` (the state table comment and the `state_luma_value` doc comment). The
+    `state_text == "waiting"` / `state_text == "ready"` asserts stay byte-identical.
+  - **Do NOT** touch the four player-turn palettes (ready/cooldown/phase_locked/hp_gated) — their
+    luma asserts in `skill_button_visual_states.yaml` and the ready assert at frame 500 must stay
+    green.
+- **验收标准**: `skill_bar_waiting_state` and `skill_button_visual_states` green; full-suite
+  vision gate per-scenario Q3 bad votes ≤ 5 of 19 battle scenarios; the Q3 fix is visible in
+  captured frames (hue shift + 等待 tag), not merely a data-state change.
 
-   **S2 `skill_rejection_reason_texts`** (specific reasons):
-   - 3..15 skip; 20 `skill_5` → at 30 assert `text == "教程尚未解锁"`
-     (phase-lock, round < 4);
-   - mirror `skill_button_turn_overlay` frames: `move_up` 20/35/50, `skill_1` 65,
-     `attack_confirm` 80 (cast lands on 王重阳 at (7,1)) → 90 `skill_1` → at 95
-     assert `text == "冷却中 1 回合"`;
-   - NOTE for PM: the HP-gate reason 「须在半血以下」 only becomes reachable at
-     round ≥ 4 (phase-lock has priority in the gate order — deliberate,
-     byte-identical to today's `_skill_selectable` order); PM either appends
-     hint-text asserts to the existing `two_phase_skill_unlock_and_hp_gate`
-     scenario (round-4 frames already scripted) or extends S2 with
-     `end_turn` cycles. The technique-seal reason 「本回合无法用招」 is covered by
-     the existing 玉箫点穴 timeline — PM may attach a hint assert there too.
+### C7 — Final verification & reporting
 
-   **S3 `skill_bar_waiting_state`** (W4 verification):
-   - mirror `skill_button_visual_states`: skip 3..15, `move_up` 20/35/50,
-     `skill_1` 65, `attack_confirm` 80, `end_turn` 130;
-   - at an enemy-turn frame (PM picks mid-phase, e.g. 300) assert:
-     `SkillButton1.state_text == "waiting"`,
-     `SkillButton1.state_luma` in the recorded range — recommended harness-safe
-     form `'state_luma >= 0.18 and state_luma <= 0.2874'` (avoids `abs()`);
-   - at 500 assert (existing): `state_text == "ready"` — unchanged, proves the
-     override is presentation-only.
+- **职责**: one full-suite run (~12 min) + vision gate after C2–C6 are individually green.
+- **验收标准**: all five red-line scenarios green; the other 21 scenarios stay green (no file
+  overlap with C2–C6 edits, engine untouched ⇒ zero expected collateral); `empty_round_stalls`
+  stays 0; `playtest_summary.md` observed column backs every green; `final/verify_report.json`
+  passes. No design file is edited by this run (see §9).
 
-   **S4** = the C5 edit to `cultivation_changes_combat` (frames 160/200).
+---
 
-4. Everything else in the spec stays byte-identical — in particular the six
-   tutorial scenarios, `terminal_victory_8_12_rounds_hp_15_40`,
-   `spine_to_ending`, and the other two encounter scenarios.
+## 4. Interfaces / 接口规范
 
-## 5. Tech stack
+### 4.1 Scenario file schema (authoritative registry: `playtest/_common.yaml`)
 
-- Godot 4.4 / GDScript, `Node2D._draw()` for the highlight (the in-repo
-  `grid_lines.gd` pattern — no TileMapLayer, no shader), `Label` on the global
-  CJK theme for the hint, `StyleBoxFlat` + cached palettes for the waiting state
-  (existing `skill_button.gd` machinery).
-- No new dependencies, no new autoloads, no new art/audio assets, no
-  `tests/` changes, no `run_tests.sh` changes.
+- One file per scenario; basename **must equal** `name:`; `scene`/`actions`/`surface`/
+  `scenario_order` live in `_common.yaml` only.
+- `timeline` entries: `{at: <frame>, press: <action>}` or `{at: <frame>, actions: [...]}`;
+  `press`/`actions` are the only keypress key names (an unknown key hard-fails).
+- `assert` values: `changed` | YAML literal (scalar equality vs. the live node property) |
+  **single-quoted GDScript boolean expression**. Every expression-style assert MUST contain a
+  comparison/logical operator (`== != < > and or …`) or it is treated as a scalar string and
+  silently never fires (`design/30_presentation.md` rule). Frame cap 3000; last assert ≤ 2999.
+- Every scenario keeps ≥ 1 keypress; the terminal scenario ends at a terminal state (WON); the
+  surface already contains progress variables (`current_round`, `phase`, `health`,
+  `turns_taken`, `turn_log`, `status_names`, `state_text`, `state_luma`, …) — **no surface
+  additions are required this round**. If an implementer needs a new observable, it must be added
+  to `_common.yaml` `surface` first (one line, no schema change).
 
-## 6. Vision-gate constraints (battle classification + readability)
+### 4.2 Input action names (project.godot `[input]` is authoritative)
 
-- `cultivation_changes_combat` and `trait_combat_effects_and_twelve_slots`
-  must stay classified as **battle** in sampled frames: bottom skill bar and
-  health bars remain unobstructed. The hint label sits at y 618..644 (above the
-  648..688 skill bar, below the top indicator) and is hidden by default; the
-  highlight is translucent and draws UNDER character sprites. Implementer must
-  re-verify vision classification after landing (frames sampled near the
-  encounter battles now also show selection feedback — that is the fix, not a
-  regression).
-- Readability #1 (grid lines visible): highlight fills use alpha ≤ 0.28.
-- Readability #6 (no UI overlap): hint label rect (618..644 × center ±240)
-  vs SkillBar / RoundIndicator / PauseButton — all disjoint by construction.
+`attack_confirm` (J) is the confirm/fire key. Doc-drift note: `design/30_presentation.md`'s input
+table still names it `confirm` — the audited contract and `project.godot` use `attack_confirm`;
+implementers follow `attack_confirm`. `"basic_attack"` is engine-internal only.
 
-## 7. Determinism & protected scenarios
+### 4.3 `SaveManager.last_error` vocabulary
 
-- No RNG, no new timing, no scene-swap timing changes.
-- The rename changes behavior for no scenario: keycode 74 unchanged, and the
-  harness validates action names against `project.godot` (unknown action = hard
-  failure), so a missed rename cannot pass silently.
-- The waiting override only alters `state_text` on frames where
-  `not is_player_turn()`; every existing `state_text` assert (spec lines 195,
-  482-484, 545, 553) fires on player-turn frames — verified this round.
-- The sect-select edit touches exactly two rows; no frame renumbers, so the
-  downstream absolute-frame asserts stay valid. Implementer must re-run the full
-  scenario and confirm all its asserts (the 0.7/21 and 0.85/26 damage pins
-  included) — the wudang pick is what makes the sword-ladder pins consistent.
+`""` | `"no_save"` | `"bad_json"` | `"bad_version"` | `"bad_schema"` | `"save_refused"` |
+`"io_error"` — sticky; written by the first failing op, cleared only on the next successful
+save/load. Discriminator observables: `snapshot_profile_json` / `snapshot_rng_state` /
+`snapshot_decks_string` (set on the save-success path only), `loaded_profile_json` /
+`loaded_rng_state` / `loaded_decks_string` (set on load-success only), `has_save` (session-memory).
 
-## 8. Irreversible-operation safety (rollback plan)
+### 4.4 SkillButton state contract
 
-No destructive migrations exist; the risk is multi-file string churn. Rules:
+`state_text` ∈ {`ready`, `cooldown`, `phase_locked`, `hp_gated`, `waiting`} (written every frame
+by HUD; `waiting` is the presentation-only override during enemy turns); `state_luma` = the
+applied palette's bg luminance, derived every frame via the cached static `state_luma_value()`;
+`state_tag_text` renders the palette tag (`锁定`/`气血`/`等待`). Any palette edit automatically
+flows into `state_luma` — only the YAML window needs re-pinning.
 
-1. **Rename (W3):** single-task, all-sites-at-once; verification = the §C3 grep
-   acceptance BEFORE the compile gate, then the playtest gate (tutorial
-   scenarios byte-identical). Rollback = revert the string in the seven files —
-   nothing is deleted, keycode never changes, so rollback is a pure revert.
-2. **Spec edits (W5/W6):** surgical row edits on `playtest_spec.yaml`; the
-   harness hard-fails on unknown keys/actions (audited contract header), so a
-   malformed row fails loudly instead of silently skipping. Rollback = git
-   revert of the spec.
-3. **Scene edits (`hud.tscn`, `battlefield.tscn`):** additive node insertions
-   only — no existing node is reordered, renamed, or deleted. Rollback = remove
-   the inserted node block; the rest of the file diffs clean.
-4. **Palette change:** additive `match` arm + cached stylebox; the existing
-   four arms are untouched. Rollback = delete the arm.
-5. **Gate order / `disabled` / cooldowns / damage pipeline:** untouched by
-   construction — the reason helper preserves the exact gate order, the waiting
-   override never writes `disabled`.
+### 4.5 CombatManager observables used this round
 
-## 9. Task decomposition boundaries (for the PM)
+`current_round`, `phase`, `active_unit_name`, `turn_order` (stable-sorted round snapshot),
+`turn_log` (turn-end order), `last_turn_actor`, `empty_round_stalls` (must stay 0).
 
-| Task | Files | Depends on | Risky bits |
-|---|---|---|---|
-| T1 hint + reasons | `player.gd`, `scenes/ui/hud.tscn`, `scripts/ui/hud.gd` | — | every silent return must emit; gate order preserved |
-| T2 highlight | `scripts/ui/range_highlight.gd` (new), `scenes/battlefield.tscn`, `player.gd` (`_can_skill_hit` → `can_skill_hit`) | T1 (player.gd stable) | draw order; zero battlefield.gd changes |
-| T3 rename | `project.godot`, `player.gd`, `tutorial_manager.gd`, `README.md`, `playtest_spec.yaml` (29 sites) | T1 (player.gd stable) | engine string must stay; grep acceptance |
-| T4 waiting state | `scripts/ui/skill_button.gd`, `scripts/ui/hud.gd` | — (independent of T1-T3) | luma rule; override placement |
-| T5 sect fix | `playtest_spec.yaml` (2 rows) | T3 (spec already renamed) | no renumbering |
-| T6 spec contract | `playtest_spec.yaml` (surface + S1-S3) | T1-T5 | threshold values chosen by PM |
+---
 
-`playtest_spec.yaml` is touched by T3, T5, T6 — sequence them (T3 → T5 → T6),
-or fold T5 into T6. T1 and T2 both edit `player.gd` but disjoint regions
-(selection/attack paths vs the `can_skill_hit` signature); sequence T1 → T2.
+## 5. Tech stack / 技术选型
 
-## 10. Extensibility notes
+- **Engine**: Godot 4.4+ (stable), GDScript. All verification runs headless via the
+  **godot-builder sidecar** HTTP endpoints (`/compile`, `/playtest`, `/script`); the pipeline
+  container has no godot binary and never will — `run_tests.sh` stays as-is.
+- **Contracts**: YAML scenario files + `_common.yaml`; **reports**: JSON
+  (`compile_report.json`, `vision_report.json`, `final/verify_report.json`) and Markdown
+  (`playtest_summary.md`).
+- **Tools**: `godot_playtest_scenario` (primary — single-scenario ~50 s, overlays pending edits);
+  full-suite run (~12 min) at the end. `playtest_summary.md`'s observed column is the mandated
+  first read for every red line.
+- **No new libraries/frameworks** (GdUnit4 confirmed non-goal; no local godot PATH probe; no new
+  assets — the 等待 tag reuses the repo's CJK font). Linting: `.gd` is parsed by the
+  `gdscript_check` gate (not in the linter manifest); `.yaml`/`.json`/`.md`/`.tscn`/`.tres` map to
+  `basic` in `linter_manifest.json`.
 
-- New skills get highlights and reasons **for free**: both are data-driven off
-  `SkillData` fields (`range/aoe_shape/aoe_origin/aoe_size/jump_tiles`) and the
-  single `can_skill_hit()` hit test.
-- The input-action const (`ATTACK_ACTION`) makes future action renames
-  compile-checked instead of grep-dependent.
-- `state_palette()` remains a pure static function — new states slot in as one
-  more arm + one cached stylebox; `state_luma` extends the same table.
-- `show_hint(text)` is a generic one-line HUD primitive — future non-battle
-  feedback can reuse it.
+---
 
-## 11. Out of scope (explicit)
+## 6. Rollback & irreversible-operation policy
 
-- No `tests/` wiring or `run_tests.sh` changes (unit suite stays unwired).
-- No art, audio, or `assets/` changes; no `resources.md` changes.
-- No damage/HP/cooldown/initiative numbers change (`design/20_content.md`).
-- No `design/*.md` edits by implementers — see §3 D1/D2 for what `5_design`
-  will update.
-- No changes to `CombatManager`, `GridManager`, `GameManager`, `SceneManager`
-  logic; no new autoloads.
+No irreversible operations exist in this run (no schema migrations, no bulk data rewrites, no
+asset deletions). Standing rules, stated so implementers do not invent risk:
 
-## 12. Deliverable summary
+1. **All edits are text files under git** — revert = `git checkout` of the touched scenario/script.
+   Per-scenario files bound every edit's blast radius to one scenario.
+2. **SaveManager's atomic write protocol is untouchable**: tmp → validate → backup → rename →
+   re-validate → restore-backup-on-failure. Any C4 fix must route through this protocol, never
+   around it.
+3. **Splitmix64 constants are frozen this round** — changing them is a silent RNG-stream change
+   with playtest-wide fallout. Defer to a dedicated future run.
+4. **user:// saves are runtime artifacts**; scenario runs must never delete user data. If a future
+   run ever changes the save format: backup existing `user://save_*.json` → write new format →
+   roundtrip-validate → only then remove backups (documented path, not exercised this round).
+5. **Frame/number re-pins are contract fixes with evidence, not design changes** — every re-pin is
+   recorded in the plan with the observed value that justified it (see §9).
 
-- Code: `scripts/ui/range_highlight.gd` (new); edits to `player.gd`,
-  `scripts/ui/hud.gd`, `scripts/ui/skill_button.gd`,
-  `scripts/autoload/tutorial_manager.gd`, `project.godot`, `scenes/ui/hud.tscn`,
-  `scenes/battlefield.tscn`, `README.md`, `playtest_spec.yaml`.
-- Linter manifest: unchanged (`.gd` excluded by design — `gdscript_check`
-  handles it; `.yaml`/`.tscn`/`.md`/`.json` already mapped to `basic`).
+---
+
+## 7. Extensibility / 扩展性考虑
+
+- **New scenario = new file** (+ optional `scenario_order` line) — the loader picks it up
+  automatically; no other edit needed.
+- **Palette centralization**: `state_palette()` is the single source for button-state visuals;
+  `state_luma` derives automatically, so future state additions cost one palette entry + one
+  luma-window re-pin.
+- **Snapshot discriminators are reusable**: any future save scenario can import the
+  `snapshot_profile_json.length() > 0` pattern to immunize its deep-equality asserts against
+  vacuous passes.
+- **Deliberately NOT built this round** (avoid over-design): no DEBUG "set state to X" injection
+  interfaces (the design/30_presentation.md pyramid direction — future lever, unneeded for these
+  fixes); no per-frame logging harness in the repo (temporary diagnostic asserts in a scenario
+  file suffice); no refactor of `_common.yaml`.
+
+---
+
+## 8. Task decomposition for PM
+
+All five red lines are file-disjoint (no two work packages touch the same file), so C2–C6
+parallelize; C1 is context, C7 is the integration gate.
+
+| # | Task | Files | Depends on | Gate |
+|---|------|-------|-----------|------|
+| T0 | Diagnostic pass: run the five red-line scenarios, record observed values (round/phase/HP/last_error/snapshot/Q3 votes) | — (read `playtest_summary.md`) | — | observed table in plan |
+| T2 | Initiative contract rewrite | `each_unit_acts_once_...yaml` | T0 | single-run green |
+| T3 | DoT re-pin + damage-chain reconciliation | `dot_resolves_at_...yaml` | T0 | single-run green |
+| T4 | Save/load + cultivation discriminators (+ conditional `save_manager.gd` load-side fix) | `save_load_roundtrip.yaml`, `cultivation_month_cycle_and_deck_bookkeeping.yaml`, (`save_manager.gd`) | T0 | both single-run green |
+| T5 | Terminal victory script rewrite (iterate the cluster/AoE plan) | `terminal_victory_8_12_rounds_hp_15_40.yaml` | T0 | single-run green; WON + round + HP pins |
+| T6 | Waiting palette + luma window re-pin | `skill_button.gd`, `skill_bar_waiting_state.yaml` | T0 | single-run green + vision Q3 spot-check |
+| T7 | Full suite + vision gate + report | — | T2–T6 | 26/26 scenarios green, Q3 bad ≤ 5/19, `final/verify_report.json` |
+
+Expected iteration cost: T2/T3/T4 ≈ 1–3 single runs each (~50 s/run); T5 is the long pole (5–15
+runs); T7 ≈ one full run (~12 min).
+
+---
+
+## 9. 设计变更 (design changes)
+
+**No design changes this round.** `design/` files are not edited; `99_changelog.md` gains no row
+from this run. Two boundary notes:
+
+1. **Contract/frame re-pins are test-implementation fixes, not design changes.** They change only
+   `playtest/*.yaml` frame numbers/asserts, each justified by an observed value recorded in the
+   plan. Design numbers (`design/20_content.md`) are authority — any mismatch found in T3/T5 is
+   **reported**, not silently absorbed.
+2. **One conditional design-change path exists**: if T5 proves a genuine damage shortfall against
+   the enemy heal budget, the only legal balance knob is **AI engagement**
+   (`scripts/ai/ai_*.gd` priority dicts). Using it requires an explicit 设计变更 declaration with
+   observed evidence and the exact new decision list, and it is only sanctioned after the script
+   itself is verified to play the lure-cluster pattern. Doc-drift note for `5_design`:
+   `design/30_presentation.md`'s input table names J's action `confirm`; the audited contract and
+   `project.godot` use `attack_confirm`.
+
+---
+
+## 10. Risks & non-goals
+
+- **Risks**: (a) T5's thin margin (698×1.3 raw vs 560 + ~150 heal/shield) means the script may
+  need many iterations — budget accordingly; (b) upstream timing changes can drift frames again —
+  the C3 method (assert on round/phase/status, pin frames from observed runs) is the defense;
+  (c) vision Q3 votes carry sampling bias — the C6 fix attacks perceptibility so quiet samples
+  still show the change; (d) `last_error` stickiness can misattribute — always record the VALUE
+  and the frame it was set.
+- **Non-goals**: `combat_manager.gd` edits (sort verified correct); splitmix64 constant changes;
+  any design-number change; new scenes/autoloads/assets; new dependencies; GDScript unit-suite
+  wiring (a separate, already-documented debt, not this round's theme); local godot PATH probing
+  in `run_tests.sh`.
