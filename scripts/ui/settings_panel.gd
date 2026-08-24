@@ -1,0 +1,144 @@
+## SettingsPanel (step2_design C8 / task plan settings_panel_ui).
+##
+## The settings screen: four rows (音效音量 / 音乐音量 / 全屏 / 返回), keyboard +
+## mouse hybrid, mirroring the MenuPanel pattern. Single activation path:
+## Button.pressed (mouse), ui_accept (keyboard) and the harness
+## debug_click_settings_row action all converge on _activate_row(i).
+##
+## Keyboard adjust: move_up/move_down cycle focus_index (0..3); move_left /
+## move_right step the focused row (volume rows +/-3 dB, 全屏 toggles, 返回 no-op);
+## ui_accept activates the focused row (返回 -> GameManager.menu_close_settings()).
+##
+## Buttons use focus_mode = 0 so button-native ui_accept never fires — this
+## panel's _unhandled_input is the single keyboard consumer, avoiding double
+## activation and focus fights with GameManager's global listeners.
+##
+## All rendering reads SettingsManager.* mirrors ONLY — never AudioManager
+## player state, never window state (headless has no window). Values are
+## asserted on SettingsManager/AudioManager surface vars, not window state.
+##
+## NO boot-claim here: the panel only reacts to GameManager.current_state ==
+## "SETTINGS". SceneManager routed us in via swap_to("settings") because
+## GameManager emitted SETTINGS; the swap protocol already hid the HUD for a
+## non-battle scene. This panel never claims the boot, never emits state,
+## never touches the HUD.
+extends Control
+
+const ROW_COUNT: int = 4
+const STEP_DB: float = 3.0
+
+## Surface: currently focused row index (0..3) — keyboard/debug activation
+## target.
+var focus_index: int = 0
+
+## Surface: pressed_connected[i] is true when Button{i}'s pressed signal is
+## wired to _activate_row(i). This is the ONLY observable proof of the middle
+## of the mouse chain — debug_click_settings_row calls _activate_row directly
+## and deliberately bypasses the signal link.
+var pressed_connected: Array[bool] = []
+
+
+func _ready() -> void:
+	# No boot-claim / HUD / state-emission code: the swap protocol already hid
+	# the HUD and SceneManager hosted this panel under SegmentHost because
+	# GameManager emitted SETTINGS. Wire the mouse path: every row's pressed
+	# signal converges on the same _activate_row the keyboard and debug paths
+	# use.
+	for i in ROW_COUNT:
+		(get_node("SettingsBox/Button%d" % i) as Button).pressed.connect(_activate_row.bind(i))
+	# Snapshot the wiring AFTER connecting (before connect() it is empty).
+	pressed_connected.clear()
+	for i in ROW_COUNT:
+		pressed_connected.append(
+			(get_node("SettingsBox/Button%d" % i) as Button).get_signal_connection_list("pressed").size() > 0
+		)
+	# First render from the current SettingsManager mirrors (never cached).
+	_render()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if GameManager.current_state != GameManager.STATE_SETTINGS:
+		return
+	if event.is_action_pressed("move_up"):
+		focus_index = (focus_index + ROW_COUNT - 1) % ROW_COUNT
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_down"):
+		focus_index = (focus_index + 1) % ROW_COUNT
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("move_left"):
+		get_viewport().set_input_as_handled()
+		_adjust_focused(-1)
+	elif event.is_action_pressed("move_right"):
+		get_viewport().set_input_as_handled()
+		_adjust_focused(1)
+	elif event.is_action_pressed("ui_accept"):
+		get_viewport().set_input_as_handled()
+		_activate_row(focus_index)
+
+
+func _process(_delta: float) -> void:
+	# Harness-only actions (unbound empty-event lists in project.godot [input];
+	# an absent action just returns false from is_action_just_pressed, never
+	# crashes). debug_click_settings_row drives the SAME _activate_row the
+	# buttons call, so a headless scenario proves the handler without coordinate
+	# input. Guarded to SETTINGS so a stray press cannot fire mid-swap.
+	# debug_reset_settings is executed by SettingsManager's autoload _process
+	# (tree order runs autoloads first, so the reset already landed); this panel
+	# only re-renders the fresh values afterwards.
+	if GameManager.current_state == GameManager.STATE_SETTINGS and Input.is_action_just_pressed("debug_click_settings_row"):
+		_activate_row(focus_index)
+	if Input.is_action_just_pressed("debug_reset_settings"):
+		_render()
+
+
+## Keyboard/debug adjustment for the focused row: 0 sfx volume, 1 music volume,
+## 2 fullscreen toggle, 3 返回 no-op.
+func _adjust_focused(dir: int) -> void:
+	match focus_index:
+		0:
+			_step_sfx(dir)
+		1:
+			_step_music(dir)
+		2:
+			SettingsManager.set_fullscreen(not SettingsManager.fullscreen)
+			_render()
+		3:
+			pass
+
+
+## Single activation path: 0 sfx volume, 1 music volume, 2 fullscreen toggle,
+## 3 back to the menu.
+func _activate_row(i: int) -> void:
+	match i:
+		0:
+			_step_sfx(1)
+		1:
+			_step_music(1)
+		2:
+			SettingsManager.set_fullscreen(not SettingsManager.fullscreen)
+			_render()
+		3:
+			GameManager.menu_close_settings()
+
+
+## Step the SFX volume by dir * STEP_DB. Clamping to [-40.0, 6.0] is
+## SettingsManager's job — each press computes from the current mirror, so
+## repeated presses self-correct; no panel-side clamp needed.
+func _step_sfx(dir: int) -> void:
+	SettingsManager.set_sfx_volume_db(SettingsManager.sfx_volume_db + dir * STEP_DB)
+	_render()
+
+
+## Step the music volume by dir * STEP_DB (same clamp delegation as _step_sfx).
+func _step_music(dir: int) -> void:
+	SettingsManager.set_music_volume_db(SettingsManager.music_volume_db + dir * STEP_DB)
+	_render()
+
+
+## Render row texts from SettingsManager mirrors ONLY. dB text uses
+## int(round(v)) so -10.0 renders "-10" deterministically (playtest-friendly).
+func _render() -> void:
+	(get_node("SettingsBox/Button0") as Button).text = "音效音量: %d dB" % int(round(SettingsManager.sfx_volume_db))
+	(get_node("SettingsBox/Button1") as Button).text = "音乐音量: %d dB" % int(round(SettingsManager.music_volume_db))
+	(get_node("SettingsBox/Button2") as Button).text = "全屏: 开" if SettingsManager.fullscreen else "全屏: 关"
+	(get_node("SettingsBox/Button3") as Button).text = "返回"
