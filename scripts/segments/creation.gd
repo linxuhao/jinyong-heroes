@@ -10,6 +10,17 @@ const START_POINTS: int = 30
 const ATTR_MIN: int = 10
 const ATTR_MAX: int = 20
 
+## Chinese descriptions per attribute, keyed by PlayerProfile.ATTR_KEYS.
+## Formulas verbatim from design/40_progression.md §7.1, meanings from
+## design/10_systems.md §1 — never paraphrased (numbers are the contract).
+const _ATTR_DESCS: Dictionary = {
+	"bone": "气血 = 根骨 × 5",
+	"inner": "内力值 = 内力 × 2",
+	"agility": "移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法",
+	"wisdom": "决定学功法的速度(修习查表)",
+	"fortune": "影响事件与奇遇(游历事件可重掷)",
+}
+
 ## Surface: "ATTRS" | "TRAITS" | "CONFIRM".
 var phase: String = "ATTRS"
 
@@ -286,6 +297,19 @@ func _render() -> void:
 	var back_button: Button = get_node_or_null("MouseBox/ConfirmBox/BackButton") as Button
 	if back_button != null:
 		back_button.visible = phase == "CONFIRM"
+	# Description labels (defects 4/5): each label shows the focused item's
+	# Chinese description and is visible only in its own phase. Uses
+	# get_node_or_null so a missing node can never crash the render path.
+	var attr_desc_label: Label = get_node_or_null("MouseBox/AttrBox/AttrDescLabel") as Label
+	if attr_desc_label != null:
+		attr_desc_label.visible = phase == "ATTRS"
+		if phase == "ATTRS":
+			attr_desc_label.text = _attr_desc(PlayerProfile.ATTR_KEYS[attr_index])
+	var trait_desc_label: Label = get_node_or_null("MouseBox/TraitBox/TraitDescLabel") as Label
+	if trait_desc_label != null:
+		trait_desc_label.visible = phase == "TRAITS"
+		if phase == "TRAITS" and trait_index >= 0 and trait_index < _traits.size():
+			trait_desc_label.text = _traits[trait_index].description
 
 
 func _attr_label(key: String) -> String:
@@ -301,3 +325,8 @@ func _attr_label(key: String) -> String:
 		"fortune":
 			return "福缘"
 	return key
+
+
+## Chinese description for an attribute key; "" for unknown keys (never throws).
+func _attr_desc(key: String) -> String:
+	return _ATTR_DESCS.get(key, "")

@@ -107,6 +107,12 @@ focus_mode = 0
 text = "+"
 focus_mode = 0
 
+[node name="AttrDescLabel" type="Label" parent="MouseBox/AttrBox"]
+visible = false
+text = ""
+autowrap_mode = 3
+mouse_filter = 2
+
 [node name="TraitBox" type="VBoxContainer" parent="MouseBox"]
 visible = false
 
@@ -136,6 +142,12 @@ focus_mode = 0
 focus_mode = 0
 [node name="TraitToggle12" type="Button" parent="MouseBox/TraitBox"]
 focus_mode = 0
+
+[node name="TraitDescLabel" type="Label" parent="MouseBox/TraitBox"]
+visible = false
+text = ""
+autowrap_mode = 3
+mouse_filter = 2
 
 [node name="ConfirmBox" type="VBoxContainer" parent="MouseBox"]
 visible = false
