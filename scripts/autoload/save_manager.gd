@@ -171,7 +171,10 @@ func _record_io_error(code: int) -> void:
 ## SceneManager swap in flight. Atomic 5-step write (.tmp -> validate -> backup
 ## old -> rename -> re-validate -> drop backup); any failure restores the backup
 ## and sets last_error="io_error".
-func save_slot(s: int) -> bool:
+## update_snapshot := false (autosaves only) skips the snapshot_* re-read block
+## so a background autosave can never clobber the manual save->load roundtrip
+## surface; slot/has_save/last_error and the file write still happen.
+func save_slot(s: int, update_snapshot: bool = true) -> bool:
     if not (s >= 1 and s <= 3):
         last_error = "save_refused"
         return false
@@ -263,13 +266,17 @@ func save_slot(s: int) -> bool:
     # and the parsed dict would render the SAME number as two different
     # strings, breaking snapshot_* == loaded_* on a roundtrip. Re-reading the
     # file captures exactly the bytes a load will parse; step 5 just validated
-    # it, so this read cannot fail. Success path only.
-    var saved: Variant = _read_json(real)
-    if saved is Dictionary:
-        var saved_dict: Dictionary = saved
-        snapshot_profile_json = JSON.stringify(saved_dict["profile"])
-        snapshot_rng_state = int(saved_dict["rng_state"])
-        snapshot_decks_string = _decks_string(saved_dict["decks"] as Dictionary)
+    # it, so this read cannot fail. Success path only. Skipped for autosaves
+    # (update_snapshot == false) — the snapshot surface is for MANUAL save->load
+    # roundtrip asserts; a month-advance autosave must never overwrite it with a
+    # newer profile (that is exactly the clobber this guard prevents).
+    if update_snapshot:
+        var saved: Variant = _read_json(real)
+        if saved is Dictionary:
+            var saved_dict: Dictionary = saved
+            snapshot_profile_json = JSON.stringify(saved_dict["profile"])
+            snapshot_rng_state = int(saved_dict["rng_state"])
+            snapshot_decks_string = _decks_string(saved_dict["decks"] as Dictionary)
 
     slot = s
     has_save = true
@@ -329,9 +336,12 @@ func delete_slot(s: int) -> bool:
     return not any_error
 
 
-## Design: autosave is fixed to slot 1.
+## Design: autosave is fixed to slot 1. update_snapshot=false so background
+## autosaves write the file and set slot/has_save/last_error but never touch
+## the snapshot_*/loaded_* roundtrip surface (the manual 存盘 slot-2 save owns
+## that surface).
 func autosave() -> bool:
-    return save_slot(1)
+    return save_slot(1, false)
 
 # ---------------------------------------------------------------------------
 # Private — decks

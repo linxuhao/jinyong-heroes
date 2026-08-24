@@ -459,18 +459,20 @@ func _apply_event_option(opt_index: int) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Save / load / delete menu (slot 1; 删档 is a two-step confirm)
+# Save / load / delete menu (slot 2 — manual user checkpoint; slot 1 is the
+# month-advance autosave and must never be clobbered by 存盘; 删档 is a
+# two-step confirm)
 # ---------------------------------------------------------------------------
 
 func _on_save() -> void:
-	SaveManager.save_slot(1)
+	SaveManager.save_slot(2)
 	phase = "ACTION_PICK"
 	_action_focus = 4
 	_render()
 
 
 func _on_load() -> void:
-	if SaveManager.load_slot(1):
+	if SaveManager.load_slot(2):
 		_sync_surface()
 		if SaveManager.segment == "MAP":
 			if not SceneManager.pending_swap:
@@ -492,7 +494,7 @@ func _on_delete() -> void:
 		_delete_armed = true
 		_render()
 		return
-	SaveManager.delete_slot(1)
+	SaveManager.delete_slot(2)
 	_delete_armed = false
 	phase = "ACTION_PICK"
 	_action_focus = 6
