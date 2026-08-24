@@ -127,9 +127,20 @@ if action != "move" and unit != null and is_instance_valid(unit) \
 ```
 - Placement in `_execute_action` (not `execute_action`) keeps the guard **synchronous** with respect to the set in `_execute_basic_attack`/`_execute_skill` — no `await` window between check and set, so two key presses in one frame cannot both land.
 - Returning `null` before the match means `action_executed` does **not** fire for a rejected attempt — correct semantics (a rejected action is not an executed action).
-- `has_signal("action_hint")` keeps the guard decoupled from the HUD: enemies (which do not emit the signal) and future units are handled uniformly. Enemy turns never hit this guard today — their `acted` is reset in `begin_turn` and the AI acts at most once per turn (see C6 probe to confirm, not assume).
-- Callers audited (grep): only `player.gd` (`_execute_basic_attack` L635, `_execute_skill` L646) and `combat_manager.gd` `_next_turn` L631 (enemy AI). No other callers exist; debug injection (`debug_damage_player` etc.) and counter/reflect passives (弹指神通反击 / 蛤蟆反震) call `apply_damage` directly and are unaffected.
+- `has_signal("action_hint")` keeps the guard decoupled from the HUD: enemies (which do not emit the signal) and future units are handled uniformly.
 - This guard is **belt-and-braces** — it does not replace the C1 player-side gate, which is the user-visible path (the engine guard cannot know which HUD to address if the unit has no `action_hint`).
+
+**Safety analysis — who C2 affects, and who it provably cannot (measured, not assumed).** C2 sits at the shared action entry point, so it carries this round's largest blast radius. Its impact boundary is enumerated here so no implementer or reviewer has to re-derive it — or, worse, weaken C2 out of caution:
+
+1. **Counter/reflect damage never passes through C2.** `_trigger_counter_reflect` (`combat_manager.gd:880`, invoked from L873 immediately after `apply_damage`) applies damage **directly** and never calls `execute_action`. The passives 弹指神通反击 / 蛤蟆反震 therefore bypass the guard entirely: `trait_combat_effects_and_twelve_slots` (22/22) and `debug_reflect_hits` are outside C2's reach by code path, not by coincidence.
+2. **Enemy turns never trip the guard — by statement order, not by luck.** The enemy branch (`combat_manager.gd` `_next_turn`) is:
+   ```
+   L631   await execute_action(unit, action, target, params)
+   L635   if "acted" in unit: unit.acted = true
+   ```
+   `acted` is set **after** `execute_action` returns, so the enemy enters its own action with `acted == false` and C2 passes; `begin_turn` then resets the flag at the start of the enemy's next turn. This caller-side ordering is also the structural reason enemies never had the player's multi-action defect — their budget is enforced by the caller, exactly the asymmetry C6 probes to confirm.
+3. **Call-site census: exactly three.** `player.gd:635` (basic attack), `player.gd:646` (skill), `combat_manager.gd:631` (enemy AI). No fourth call site exists (grep-audited). Any future caller added by a later run is precisely what C2 exists to protect — and that run's design must carry its own safety analysis for it.
+4. **No duplicate hint on the player path.** C1 intercepts the player at the top of the funnel, so a rejected player attempt never reaches C2; the engine-level emit is silent for the player today. C2's `action_hint` emit exists **only** for future callers that bypass C1. The two emit sites are intentional, not a bug — neither may be deleted.
 
 ### C3 — HUD rejection surfacing — **NO code change**
 
