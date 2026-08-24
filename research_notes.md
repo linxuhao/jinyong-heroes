@@ -192,6 +192,13 @@ delete_file'd from the deliverable after pinning)
 2. `playtest/player_death_ends_battle.yaml`: T0 skeleton replaced with the permanent
    probe-pinned regression (full losing line f3..f2630 + 4 six-assert death samples at
    f2660/f2740/f2820/f2999; no placeholder values; `name:` == file basename).
-3. Deleted all six scratch probe yamls (`playtest/t1_probe_death_window*.yaml`) from the
-   deliverable.
+3. Scratch probe cleanup: five `playtest/t1_probe_death_window*.yaml` probes were
+   cleaned up during development; one (`t1_probe_death_window6.yaml`) remained in the
+   prior step output and was delete_file'd in the review-fix pass. Zero probe files
+   remain in the deliverable (verified: `list` of `playtest/*.yaml` shows no
+   `t1_probe_death_window*` in the repo or the step output).
+
+### Review-fix confirmation re-run (after delete_file + notes cleanup)
+- `godot_playtest_scenario player_death_ends_battle,tutorial_loss_restarts_tutorial,trait_combat_effects_and_twelve_slots` (repo + staged research_notes.md only — the probe yaml is not in the repo, so the sibling scan cannot see it):
+  `[PASS] player_death_ends_battle 24/24` · `[PASS] tutorial_loss_restarts_tutorial 5/5` · `[PASS] trait_combat_effects_and_twelve_slots 22/22`; hard gate passed, 0 compile/runtime/freed-object errors, `empty_round_stalls == 0` at every death sample (unchanged from the recorded runs above).
 
