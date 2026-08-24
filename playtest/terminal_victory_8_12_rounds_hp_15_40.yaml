@@ -2,7 +2,16 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: terminal_victory_8_12_rounds_hp_15_40
-description: 'Full scripted battle: lure the Five Greats into a cluster around the player, clear them with self-origin AoE (Boundless Seas / Thousand-Force Cleave / Seventeen Melancholy Forms), and reach WON within 8-12 rounds with the player at 15%-40% HP (75-200 of 500).'
+description: >-
+  Full scripted battle: lure the Five Greats into a cluster around the player, clear
+  them with self-origin AoE (Boundless Seas / Thousand-Force Cleave / Seventeen
+  Melancholy Forms), and reach WON within 8-12 rounds with the player at 15%-40% HP.
+  The HP window is a DIFFICULTY SPEC and is therefore written as a RATIO of
+  max_health, not as absolute HP: it used to read 75-200, which silently also pinned
+  max_health to 500, so a rebalance moved the goalposts without anyone editing the
+  spec. Unlike the other scenarios, this one is ALLOWED to go red on a balance change
+  — that is what it is for. It is red today at ~78%: the fight is too easy after the
+  Yang Guo buff. Do not widen the window to make it pass; tune the encounter.
 timeline:
 - at: 3
   actions:
@@ -29,7 +38,7 @@ timeline:
   actions: []
   assert:
     Player.turns_taken: 0
-    Player.health: 500
+    Player.health: health == max_health
 - at: 46
   actions:
   - move_up
@@ -152,5 +161,5 @@ timeline:
   assert:
     GameManager.current_state: current_state == "WON"
     CombatManager.current_round: current_round >= 8 and current_round <= 12
-    Player.health: health >= 75 and health <= 200
+    Player.health: health >= max_health * 0.15 and health <= max_health * 0.40
     Player.turns_taken: changed
