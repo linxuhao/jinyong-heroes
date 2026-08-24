@@ -18,6 +18,31 @@
 # ones — so adding a scenario is "drop in a file", and listing it is only about
 # where it lands in the report.
 #
+# PER-SCENARIO `scene:` (2026-08-24). The `scene:` below is the DEFAULT. Any
+# scenario file may override it with its own `scene:` line and boot straight
+# into that scene instead of main.tscn. Every scenario already runs in its own
+# fresh Godot process, so this costs nothing and buys two things:
+#
+#   * UNIT-LEVEL TESTS. A scenario about the creation screen can boot
+#     `res://scenes/segments/creation.tscn` and assert at frame 30, instead of
+#     replaying the whole boot (7x ui_accept, then ~110 frames) to get there.
+#     Measured: CreationScreen.visible holds at f30 on a direct boot.
+#   * INDEPENDENCE FROM THE BOOT FLOW. A scenario that boots its own scene does
+#     not shift when something is inserted ahead of the tutorial. Scenarios that
+#     boot main.tscn all carry ABSOLUTE frame numbers, so changing the boot flow
+#     moves every one of them — that is a 27-file rewrite, and a 27-file rewrite
+#     is how this contract lost assertions before (see the note above).
+#
+# Autoloads DO load in scene-path mode — verified, not assumed (GameManager and
+# SceneManager both read fine from a direct creation.tscn boot). The `-s` caveat
+# recorded in design/90_decisions.md is about SceneTree SCRIPT mode, which is a
+# different thing. What a direct boot does NOT give you is any state an earlier
+# segment would have set up: use the DEBUG injection actions for that.
+#
+# Prefer a direct scene boot for anything that is really about ONE screen.
+# Keep main.tscn for scenarios that are about the game hanging together
+# (spine_to_ending is the whole point of that shape).
+#
 # The loader (aitelier/tools/godot_playtest/impl.py:_read_spec) prefers this
 # directory when it exists and falls back to a root `playtest_spec.yaml` for
 # projects that still carry the monolith. Do not keep both: if a
