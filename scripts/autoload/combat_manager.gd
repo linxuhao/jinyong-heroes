@@ -1169,6 +1169,15 @@ func execute_action(unit: Node, action: String, target: Node,
 ##   "skill"         — params.skill_index (int): use skill at that index
 func _execute_action(unit: Node, action: String, target: Node,
 		params: Dictionary) -> Tween:
+	# One-action-per-turn invariant (design/10_systems.md §5.1). "move" is NOT an
+	# action — the movement budget is enforced by execute_move_path/_try_move, and
+	# a turn may move after acting (order free).
+	if action != "move" and unit != null and is_instance_valid(unit) \
+			and "acted" in unit and bool(unit.acted):
+		if unit.has_signal("action_hint"):
+			unit.action_hint.emit("本回合已行动")
+		return null
+
 	var tween: Tween = null
 
 	match action:
