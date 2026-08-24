@@ -158,8 +158,7 @@ func save_slot(s: int) -> bool:
     f.close()
 
     # Step 2: re-read and validate the tmp — never trust the write.
-    var parsed_tmp: Variant = _read_json(tmp)
-    if not _apply_save_dict(parsed_tmp):
+    if not _apply_save_dict(_read_json(tmp)):
         _remove_file(tmp)
         last_error = "io_error"
         return false
@@ -189,10 +188,10 @@ func save_slot(s: int) -> bool:
     # Surface snapshots from the exact dict that was written (steps 2/5 of the
     # atomic write validated this state, so the end-of-function values are
     # identical to the file contents). Success path only.
-    var file_dict: Dictionary = parsed_tmp as Dictionary
-    snapshot_profile_json = JSON.stringify(file_dict["profile"])
-    snapshot_rng_state = int(file_dict["rng_state"])
-    snapshot_decks_string = _decks_string(file_dict["decks"] as Dictionary)
+    var saved := _build_save_dict()
+    snapshot_profile_json = JSON.stringify(saved["profile"])
+    snapshot_rng_state = saved["rng_state"] as int
+    snapshot_decks_string = _decks_string(saved["decks"] as Dictionary)
 
     slot = s
     has_save = true
@@ -219,7 +218,7 @@ func load_slot(s: int) -> bool:
         _fallback_fresh_profile("bad_schema")
         return false
     var version: Variant = (parsed as Dictionary).get("version", null)
-    if not _is_int_or_float(version) or int(version) != SAVE_VERSION:
+    if not (version is int) or version as int != SAVE_VERSION:
         _fallback_fresh_profile("bad_version")
         return false
     if not _apply_save_dict(parsed):
@@ -443,37 +442,26 @@ func _apply_save_dict(d: Variant) -> bool:
         return false
     var src: Dictionary = d
     var version: Variant = src.get("version", null)
-    if not _is_int_or_float(version) or int(version) != SAVE_VERSION:
+    if not (version is int) or version as int != SAVE_VERSION:
         return false
     var seed_v: Variant = src.get("seed", null)
     var rng_state_v: Variant = src.get("rng_state", null)
     var segment_v: Variant = src.get("segment", null)
     var decks_v: Variant = src.get("decks", null)
-    if not _is_int_or_float(seed_v):
-        return false
-    if not _is_int_or_float(rng_state_v):
+    if not (seed_v is int) or not (rng_state_v is int):
         return false
     if not (segment_v is String):
         return false
     if not _validate_decks(decks_v):
         return false
     profile = PlayerProfile.from_dict(src.get("profile", null))
-    seed = int(seed_v)
+    seed = seed_v as int
     rng.seed = seed
-    rng.state = int(rng_state_v)
+    rng.state = rng_state_v as int
     segment = segment_v as String
     _restore_decks(decks_v)
     _refresh_deck_counts()
     return true
-
-
-## JSON has one numeric type (per spec); Godot's int/float split does not
-## survive a JSON.stringify/parse_string roundtrip deterministically, so a
-## validated save may present version/seed/rng_state as int OR float. Accept
-## either and coerce — strings/bools/null are still rejected, so a hostile
-## hand-edited save can never pass a non-number here.
-func _is_int_or_float(v: Variant) -> bool:
-    return v is int or v is float
 
 
 ## Schema check for the decks subtree (all six categories, remaining/drawn are
