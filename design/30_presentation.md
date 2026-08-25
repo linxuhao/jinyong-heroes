@@ -251,6 +251,23 @@ PM 每一轮都派一个实现者去「修 PATH」——**去找一个根本不�
 而每一轮 5_review 都在读一句「godot binary not found」,以为问题出在 PATH。
 接线之前先修这五处,否则闸门一接上就是红的,而那一轮的主题会被它劫持。
 
+### 接线完成(2026-08-24,fix_unit_test_gate_signal)
+
+五项欠账全部修复,`run_tests.sh` **默认运行** GDScript 单元套件:
+
+| 欠账 | 修复 |
+|---|---|
+| `run_tests.sh` 无 `GODOT_UNIT_SUITE` 时打印 SKIPPED 并以 0 退出 | 删除跳过分支;**空发现 / 空结果集硬失败**(no_tests_collected 永远不可能是绿灯),任一脚本失败即整体非零退出并打印该脚本输出尾部 |
+| `test_gongfa_cascade` | 测试自身缺陷:同属性子用例把「刚 A + 柔 前置」当「柔 A + 柔 前置」算 1.3,而实现按设计(`10_systems.md` §4,同属性 = 与**被算功法自身**属性相同)正确给出 1.0。修测试(该子用例改用柔 A),不动实现 |
+| `test_health_bar` | 场景几何漂移:`health_bar.tscn` 是 68×21,设计与测试都是 68×20。修场景(68×20、名称标签 9px、条 y=12),标签 9 + 条 8 = 17 ≤ 20 |
+| `test_player_profile` | 现码与全部断言一致(防御性 from_dict 已就位),无改动 |
+| `test_skill_button_states` | Q4 假玩家改为**带声明属性**的脚本化节点:`in` 运算符对 Object 只能看见声明过的属性,裸 Node 上 `set()` 的动态值对它不可见,于是渲染成「移动 0」。修测试机制,断言意图不变 |
+| `test_game_manager_fsm` rc=124 | 加**脚本挂接守卫**(`get_script() == null` 时手动 `set_script`,不再在光板 Node 上硬错误跳 quit())+ **看门狗计时器**(`_run()` 即使中途炸掉,150 秒内强制退出,rc=124 不可能重现)。quit() 在所有路径可达 |
+
+修完的实测状态:`unit_test_runner` 打印 `UNIT TESTS: 12 passed, 0 failed` 且退出 0;
+`test_game_manager_fsm` / `test_save_manager` / `test_cultivation` / `test_encounter`
+均在各自超时内终止且通过。
+
 ## 选了招式之后没法出招(2026-08-23,真人试玩发现)
 
 **现象:**玩家点了技能按钮,按钮亮了,然后就卡住了——不知道怎么把这一招打出去。

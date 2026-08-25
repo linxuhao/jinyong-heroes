@@ -172,11 +172,21 @@ static func run() -> bool:
 	# move_pips observable mirrors moves_left. _active_text reads the live
 	# GameManager autoload's player node — a minimal fake player carrying the two
 	# properties is injected directly (the first-call-wins guard is bypassed via
-	# set("_player", ...)) and restored to null afterwards.
+	# set("_player", ...)) and restored to null afterwards. The fake must carry
+	# DECLARED properties: round_indicator.gd probes them with the `in` operator
+	# ("moves_left" in player), and `in` on an Object only sees properties the
+	# object actually declares — dynamic set()-only values on a bare Node are
+	# invisible to it, which renders "移动 0" and fails the pips assert. A tiny
+	# scripted fake (compiled at runtime, no extra repo file) represents the
+	# real player node the code is designed for.
 	var ri = RoundIndicatorScript.new()
+	var fake_script := GDScript.new()
+	fake_script.source_code = "extends Node\nvar moves_left: int = 0\nvar acted: bool = false\n"
+	fake_script.reload()
 	var fake_player := Node.new()
-	fake_player.set("moves_left", 4)
-	fake_player.set("acted", false)
+	fake_player.set_script(fake_script)
+	fake_player.moves_left = 4
+	fake_player.acted = false
 	var gm: Node = null
 	var main_loop: MainLoop = Engine.get_main_loop()
 	if main_loop is SceneTree:

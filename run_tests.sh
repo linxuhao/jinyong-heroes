@@ -58,23 +58,21 @@ try:
                   file=sys.stderr)
         die("play-test gate FAILED")
 
-    # The GDScript unit suite is NOT wired into any gate yet, and it is not
-    # clean: `unit_test_runner` is 8-pass/4-fail and `test_game_manager_fsm`
-    # does not terminate (rc=124 at 120s). Running it here by default makes this
-    # script take ~20 minutes and end red for reasons that have nothing to do
-    # with the change under test — and the acceptance step of every task card
-    # says "re-run ./run_tests.sh". Off unless asked for; see
-    # design/30_presentation.md 「闸门的接线」.
-    if os.environ.get("GODOT_UNIT_SUITE", "") not in ("1", "true", "yes"):
-        print("\n=== Godot unit suite: SKIPPED ===")
-        print("(unwired + 5 known failures; set GODOT_UNIT_SUITE=1 to run it)")
-        print("\nCompile and play-test gates passed.")
-        sys.exit(0)
-
+    # GDScript unit suite — wired into this gate BY DEFAULT (design
+    # 30_presentation.md 「闸门的接线」, fixed 2026-08-24). no_tests_collected
+    # is NOT a pass signal: an empty discovery or empty result set is a hard
+    # failure, and any discovered script that fails makes the whole gate exit
+    # non-zero with that script's stdout/stderr tail printed.
     print("\n=== Godot unit suite ===")
     sc = post("/script", {"project_dir": proj, "timeout": 180}, 1800)
-    print("discovered: %s" % ", ".join(sc.get("discovered") or ["(none)"]))
-    for r in sc.get("results") or []:
+    discovered = sc.get("discovered") or []
+    results = sc.get("results") or []
+    print("discovered: %s" % (", ".join(discovered) if discovered else "(none)"))
+    if not discovered or not results:
+        print("no tests collected — the GDScript unit suite ran nothing.",
+              file=sys.stderr)
+        die("unit suite FAILED: no tests collected (no_tests_collected is not a pass)")
+    for r in results:
         print("  %-42s %s" % (r["script"], "ok" if r["passed"] else "FAILED"))
         if not r["passed"]:
             sys.stderr.write((r.get("stdout") or "")[-2000:])

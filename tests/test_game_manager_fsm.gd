@@ -34,6 +34,27 @@ var _state_log: Array[String] = []
 func _initialize() -> void:
 	# Defer so the root tree (and every autoload) is fully up before touching it.
 	call_deferred("_run")
+	# Structural guarantee (design/30_presentation.md 「那个 120 秒不退出的测试,死在哪」):
+	# quit() must be reachable on EVERY path. A hard runtime error aborts _run
+	# before its trailing quit(), leaving the SceneTree to idle until the sidecar
+	# timeout (rc=124). The watchdog outlives the whole run, so termination is
+	# unconditional — this suite can never hang the gate again.
+	call_deferred("_arm_watchdog")
+
+
+## Fails the run with exit code 2 if _run() never reaches its own quit() —
+## the historical rc=124 mode. Fires well inside the sidecar's 180 s per-script
+## timeout, so the gate gets a hard failure instead of a hang.
+func _arm_watchdog() -> void:
+	var watchdog := Timer.new()
+	watchdog.name = "Watchdog"
+	watchdog.wait_time = 150.0
+	watchdog.one_shot = true
+	watchdog.timeout.connect(func() -> void:
+		push_error("test_game_manager_fsm: watchdog fired — _run() never reached quit()")
+		quit(2))
+	root.add_child(watchdog)
+	watchdog.start()
 
 
 func _run() -> void:
@@ -43,6 +64,17 @@ func _run() -> void:
 		push_error("test_game_manager_fsm: GameManager/SaveManager autoloads not found (run with -s from the repo root)")
 		quit(1)
 		return
+	# The 2026-08-23 hang: in -s mode an autoload NODE can exist while its SCRIPT
+	# is not attached, so `_gm.state_changed` on the bare node hard-errors and
+	# skips the trailing quit(). Guard the real failure mode: script attachment,
+	# not mere presence. If a script is missing, attach it manually (both scripts
+	# are preloaded at the top of the file); the FSM logic is node-free, so a
+	# scripted instance drives identically to the autoload. With the scripts
+	# attached (the normal -s mode), this is a no-op.
+	if _gm.get_script() == null:
+		_gm.set_script(GameManagerScript)
+	if _sm.get_script() == null:
+		_sm.set_script(SaveManagerScript)
 	_gm.state_changed.connect(_on_state_changed)
 	_gm.continue_requested.connect(_on_continue)
 	_gm.retry_requested.connect(_on_retry)

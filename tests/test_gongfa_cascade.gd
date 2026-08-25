@@ -87,14 +87,19 @@ static func _test_a_ladder(ok: bool) -> bool:
 	var d_yin = _gongfa("D", "sword", "yin", "external", 1.3)
 	d_yin.mastered = true
 	ok = _expect(ok, art.get_fa_hui_du(_unit([], [b_m, c_yang, d_yin])) == 1.0, "A with B+C+D mastered different attrs -> 1.0")
-	# same-attr 3: B+C+D mastered all 柔 -> 1.3
+	# same-attr 3: a 柔 A art with B+C+D mastered all 柔 -> 1.3. The evaluated
+	# art must ITSELF be 柔: same_attr counts mastered arts whose attribute
+	# EQUALS the evaluated art's attribute (design/10_systems.md §4), so a 刚 A
+	# with 柔 prereqs is base 1.0 (same_attr 0), never 1.3. The `art` built above
+	# for the 缺2/缺1/齐 ladder cases is 刚; this sub-case needs its own 柔 A.
+	var art_soft = _gongfa("A", "sword", "soft", "external", 1.3)
 	var b_soft = _gongfa("B", "sword", "soft", "external", 1.3)
 	b_soft.mastered = true
 	var c_soft = _gongfa("C", "sword", "soft", "external", 1.3)
 	c_soft.mastered = true
 	var d_soft = _gongfa("D", "sword", "soft", "external", 1.3)
 	d_soft.mastered = true
-	ok = _expect(ok, art.get_fa_hui_du(_unit([], [b_soft, c_soft, d_soft])) == 1.3, "A with B+C+D mastered all 柔 -> 1.3")
+	ok = _expect(ok, art_soft.get_fa_hui_du(_unit([], [b_soft, c_soft, d_soft])) == 1.3, "A 柔 with B+C+D mastered all 柔 -> 1.3")
 	return ok
 
 
