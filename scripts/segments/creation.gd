@@ -186,14 +186,35 @@ func _update_geometry_observables() -> void:
 					or label.size_flags_horizontal != 3:
 				attr_label_alignment_ok = false
 				break
-	# 3. points_attrs_gap_ok (always): PointsLabel bottom .. current visible phase
-	#    box top ∈ [4, 24] px AND the two x-centers within 4px.
-	if points_label != null and phase_box != null:
-		var p_rect: Rect2 = points_label.get_global_rect()
-		var b_rect: Rect2 = phase_box.get_global_rect()
-		var gap: float = b_rect.position.y - p_rect.end.y
-		points_attrs_gap_ok = gap >= 4.0 and gap <= 24.0 \
-				and absf(p_rect.get_center().x - b_rect.get_center().x) <= 4.0
+	# 3. points_attrs_gap_ok (always): PointsLabel TEXT rect bottom .. current
+	#    phase's FIRST-ROW ink cluster top ∈ [4, 24] px AND the two x-centers
+	#    within 4px. Round-3 rework: the MEASURED QUANTITIES changed — from
+	#    container rects (PointsLabel full rect vs phase box rect: both center
+	#    at 480 by construction, so the old fact could never go red) to INK
+	#    (PointsLabel text rect via _label_text_rect vs the phase's first-row
+	#    cluster). Same var name, same yaml assert lines — only what is measured
+	#    differs. TRAITS/CONFIRM clusters are BUTTON rects (shrink-centered, no
+	#    expand-fill slack — rect == ink there); ATTRS uses the row ink union.
+	if points_label != null:
+		var p_rect: Rect2 = _label_text_rect(points_label)
+		var cluster: Rect2 = Rect2()
+		match phase:
+			"ATTRS":
+				cluster = _row_ink_union(0)
+			"TRAITS":
+				var gap_toggle0: Button = get_node_or_null("MouseBox/TraitBox/TraitToggle0") as Button
+				if gap_toggle0 != null:
+					cluster = gap_toggle0.get_global_rect()
+			"CONFIRM":
+				var gap_confirm: Button = get_node_or_null("MouseBox/ConfirmBox/ConfirmButton") as Button
+				if gap_confirm != null:
+					cluster = gap_confirm.get_global_rect()
+		# Zero-size cluster = missing node: keep the previous value (do not
+		# force true/false) so a transient lookup gap never fakes a verdict.
+		if cluster.size != Vector2.ZERO:
+			var gap: float = cluster.position.y - p_rect.end.y
+			points_attrs_gap_ok = gap >= 4.0 and gap <= 24.0 \
+					and absf(cluster.get_center().x - p_rect.get_center().x) <= 4.0
 	# 4. phase_skeleton_same: record the AttrBox top on the first ATTRS frame;
 	#    TRAITS/CONFIRM compare the visible box top against it (±2px). ATTRS is
 	#    the reference itself, so the fact reads true by construction.
@@ -212,6 +233,137 @@ func _update_geometry_observables() -> void:
 	#    stays 8px clear of the MouseBox bottom.
 	if mouse_box != null and phase_box != null:
 		creation_box_fits = phase_box.get_global_rect().end.y <= mouse_box.get_global_rect().end.y - 8.0
+	# ---- Round-3 leaf-ink layout facts (surface, append-only). Measured on
+	# INK (label TEXT rects via _label_text_rect and button rects), never
+	# container rects — the expand-fill AttrLabel's full rect centers at 480 by
+	# construction while its text sits at the right edge (the container-rect lie
+	# this round removes). Phase-gated facts keep their last value outside their
+	# phase (existing convention). Every node lookup is get_node_or_null +
+	# cast: a missing node must never crash the frame.
+	var vcx: float = get_viewport().get_visible_rect().size.x * 0.5
+	# 7. attr_cluster_center_ok (ATTRS only): every attr row's ink union is
+	#    non-empty and its x-center is within ±6px of the viewport center.
+	if phase == "ATTRS":
+		attr_cluster_center_ok = true
+		for i in 5:
+			var u: Rect2 = _row_ink_union(i)
+			if u.size == Vector2.ZERO or absf(u.get_center().x - vcx) > 6.0:
+				attr_cluster_center_ok = false
+				break
+	# 8. attr_cluster_width_ok (ATTRS only, B-class guard): every row's ink
+	#    union stays within 340px (no cluster re-expansion).
+	if phase == "ATTRS":
+		attr_cluster_width_ok = true
+		for i in 5:
+			var u: Rect2 = _row_ink_union(i)
+			if u.size == Vector2.ZERO or u.size.x > 340.0:
+				attr_cluster_width_ok = false
+				break
+	# 9. nav_cluster_center_ok (every phase): the phase's two nav buttons'
+	#    rects union is centered on vcx (±6px) AND at most 240px wide. Missing
+	#    node -> false. ATTRS/TRAITS pre-fix buttons are FILL-stretched across
+	#    the 560px box, so the width conjunct is what makes this robustly red.
+	nav_cluster_center_ok = true
+	var nav_union: Rect2 = Rect2()
+	var nav_paths: Array[String] = []
+	match phase:
+		"ATTRS":
+			nav_paths = ["MouseBox/AttrBox/AttrNavRow/AttrBackButton", "MouseBox/AttrBox/AttrNavRow/AttrNextButton"]
+		"TRAITS":
+			nav_paths = ["MouseBox/TraitBox/TraitNavRow/TraitBackButton", "MouseBox/TraitBox/TraitNavRow/TraitNextButton"]
+		"CONFIRM":
+			nav_paths = ["MouseBox/ConfirmBox/ConfirmButton", "MouseBox/ConfirmBox/BackButton"]
+	for nav_path in nav_paths:
+		var nav_button: Button = get_node_or_null(nav_path) as Button
+		if nav_button == null:
+			nav_union = Rect2()
+			break
+		if nav_union.size == Vector2.ZERO:
+			nav_union = nav_button.get_global_rect()
+		else:
+			nav_union = nav_union.merge(nav_button.get_global_rect())
+	if nav_union.size == Vector2.ZERO \
+			or absf(nav_union.get_center().x - vcx) > 6.0 \
+			or nav_union.size.x > 240.0:
+		nav_cluster_center_ok = false
+	# 10. trait_cluster_center_ok (TRAITS only): the union of every visible
+	#     trait toggle rect is centered on vcx (±6px) AND at most 340px wide.
+	if phase == "TRAITS":
+		trait_cluster_center_ok = true
+		var trait_union: Rect2 = Rect2()
+		for i in 13:
+			var toggle: Button = get_node_or_null("MouseBox/TraitBox/TraitToggle%d" % i) as Button
+			if toggle == null or not toggle.visible:
+				trait_cluster_center_ok = false
+				break
+			if trait_union.size == Vector2.ZERO:
+				trait_union = toggle.get_global_rect()
+			else:
+				trait_union = trait_union.merge(toggle.get_global_rect())
+		if trait_union.size == Vector2.ZERO \
+				or absf(trait_union.get_center().x - vcx) > 6.0 \
+				or trait_union.size.x > 340.0:
+			trait_cluster_center_ok = false
+	# 11. desc_center_ok (ATTRS only): the AttrDescLabel TEXT rect is centered
+	#     on vcx (±6px). The TRAITS desc is wrapped multi-line and is NOT
+	#     measured here (its centering is pinned by the desc_alignment_ok
+	#     property check instead — get_string_size is not exact for wrapping).
+	if phase == "ATTRS":
+		var desc_label: Label = get_node_or_null("MouseBox/AttrBox/AttrDescLabel") as Label
+		if desc_label == null:
+			desc_center_ok = false
+		else:
+			var desc_rect: Rect2 = _label_text_rect(desc_label)
+			desc_center_ok = desc_rect.size != Vector2.ZERO \
+					and absf(desc_rect.get_center().x - vcx) <= 6.0
+	# 12. desc_alignment_ok (every phase): both phase description labels carry
+	#     horizontal_alignment == CENTER (1) — the property pin that keeps the
+	#     wrapped TRAITS description on the same axis as the nav buttons.
+	desc_alignment_ok = true
+	var desc_attr: Label = get_node_or_null("MouseBox/AttrBox/AttrDescLabel") as Label
+	var desc_trait: Label = get_node_or_null("MouseBox/TraitBox/TraitDescLabel") as Label
+	if desc_attr == null or desc_trait == null \
+			or int(desc_attr.horizontal_alignment) != 1 \
+			or int(desc_trait.horizontal_alignment) != 1:
+		desc_alignment_ok = false
+
+
+## Text sub-rect of a Label inside its global rect, honoring its
+## horizontal_alignment (LEFT 0 / CENTER 1 / RIGHT 2). The label's FULL rect is
+## not ink: an expand-fill AttrLabel's rect spans the whole row while its text
+## hugs the right edge — the container-rect lie this round removes. Returns the
+## text's pixel rect via Font.get_string_size (exact for the single-line labels
+## measured here).
+func _label_text_rect(l: Label) -> Rect2:
+	var f: Font = l.get_theme_font("font")
+	var fs: int = l.get_theme_font_size("font_size")
+	var sz: Vector2 = f.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+	var lr: Rect2 = l.get_global_rect()
+	match int(l.horizontal_alignment):
+		2:  # RIGHT: text hugs the label's right edge.
+			return Rect2(lr.end.x - sz.x, lr.position.y + (lr.size.y - sz.y) * 0.5, sz.x, sz.y)
+		1:  # CENTER: text is centered inside the label rect.
+			return Rect2(lr.position.x + (lr.size.x - sz.x) * 0.5, lr.position.y + (lr.size.y - sz.y) * 0.5, sz.x, sz.y)
+		_:  # LEFT (0) and anything unknown: text starts at the rect origin.
+			return Rect2(lr.position, sz)
+
+
+## Ink union of attr row i: label TEXT rect ∪ AttrMinus{i} rect ∪ AttrPlus{i}
+## rect. Returns Rect2() (zero size — the missing/invalid sentinel every
+## consumer checks) if any of the three nodes is missing or not visible.
+## The minus/plus node names carry the same index twice (AttrMinus%d / AttrPlus%d),
+## per _wire_mouse_widgets.
+func _row_ink_union(i: int) -> Rect2:
+	var label: Label = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrLabel" % i) as Label
+	var minus: Button = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrMinus%d" % [i, i]) as Button
+	var plus: Button = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrPlus%d" % [i, i]) as Button
+	if label == null or minus == null or plus == null \
+			or not label.visible or not minus.visible or not plus.visible:
+		return Rect2()
+	var union: Rect2 = _label_text_rect(label)
+	union = union.merge(minus.get_global_rect())
+	union = union.merge(plus.get_global_rect())
+	return union
 
 
 ## Wire every mouse widget's pressed signal to the bound handler — the keyboard
