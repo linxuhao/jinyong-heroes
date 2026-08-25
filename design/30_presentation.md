@@ -65,7 +65,7 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 | 血条 + 名字 | 悬浮于角色上方,名字在血条**之上**(有半透明底),不叠压;血条顶边夹在顶栏之下(`top ≥ 94`) |
 | 教程面板 | 屏幕居中,**不透明底色** |
 | 捏人屏 | 三阶段(捏人 / 特质 / 确认)内容整组在 **x=480 轴上居中**;每行 shrink-center(AttrLabel 最小宽贴文字;AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`);描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`) |
-| 移动提示 (MoveHintLabel) | 跟随玩家所在格,在脚下 +44 px 处,中文状态跟随文案(左键点格移动 · 右键退回 / 右键退回起点 · 出手即确认 / 已出手 · 移动已确认),`mouse_filter = 2`(不拦截点击) |
+| 移动提示 (MoveHintLabel) | 跟随玩家所在格,在脚下 +44 px 处,中文状态跟随文案(左键点格移动 · 右键退回 / 右键退回起点 · 出手即确认 / 已出手 · 移动已确认),`mouse_filter = 2`(不拦截点击)。状态机 idle / undo_ready / committed / hidden 是既有引擎字段的纯函数;文案必须在锁定移动的**同一个转移**里换掉,不许留一条已经不成立的承诺。`move_target_affordance.yaml` 把 idle / undo_ready / committed(含退回后回 idle)三态文案钉住 |
 
 **技能按钮必须显示该招式的发挥度**(失常 / 正常 / 超常 + 乘数)——见
 `10_systems.md` §6。
@@ -117,6 +117,17 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 
 六层全部通过,立绘才算「看得见」。`playtest/portrait_visibility.yaml`
 断言了全部六个单位的 `portrait_visible == true`。
+
+**为什么要六层(2026-08-25,jinyong-affordance)。** UX-01 报告「王重阳与杨过立绘不在画面上」,
+而 `visible` / `sprite_top` 等既有断言一直是绿的——`visible == true` 看不见裁剪、看不见
+零尺寸、看不见出屏、看不见被后绘制的 Control 盖住,也看不见纹理为空。六层谓词把
+「在渲染帧上可见」变成可判定的事实,红的时候报的是**哪一层**(`portrait_fail_layer`),
+不只是「否」。
+
+**实测结果(2026-08-25 闸门)。** 六个单位全部六层通过——「两个单位不可见」是人工读帧误判
+(`portrait_visibility.yaml` 10/10,六单位 `portrait_visible == true`、`portrait_fail_layer == ""`)。
+探针本身(godot-builder HTTP 500 ×9,后是本轮自身的 `Canvas` 编译错)从未落下修前实测值;
+按「先查明再修、不许猜」规则修集为空,判读的实测依据是修后闸门运行,不是探针读数。
 
 ### 这些怎么被检验
 

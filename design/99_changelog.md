@@ -72,10 +72,11 @@
 | (人工) | 2026-08-25 | 记一条测试纪律:**容器的 `get_global_rect()` 量的是「槽位」,不是「墨迹」**。任何用 Container 矩形做的几何断言,都可以被「内容贴在槽位一角」的版面满足。要量内容真正在哪,就去量真正在画的叶子控件(Label 的文字矩形、Button 的矩形),或者取可见子节点矩形的并集。 | 本轮 `points_attrs_gap_ok` 断言「`PointsLabel` 与当前阶段框的 x 中心相差 ≤ 4px」并报绿,而真帧上五行属性整组贴在屏幕最右、导航按钮孤零零在最左——**分居两端**。原因是 `AttrBox` 作为 `VBoxContainer` 的子节点会撑满整个容器宽度,它的矩形中心恒等于 480,和 `PointsLabel` 天然重合。同一个失效模式在架构评审时被抓到过一次(「190px 的空当在 `AttrLabel` 矩形内部」),当时只在叶子那一层修掉了,没有想到它在容器那一层还会再来一次。配套教训:`AttrLabel` 同时设 `horizontal_alignment=2` 与 `size_flags_horizontal=3`,在行内是把标签推向按钮(正确),在整屏是把整组推向右缘(副作用)。 |
 | jinyong-layout-r2 | 2026-08-25 | **捏人屏行级 shrink-center 排版返工 + 血条原生尺寸可读**:捏人屏三阶段(捏人 / 特质 / 确认)内容整组居中在 **x=480 轴**上——每行 shrink-center(AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`,AttrLabel 最小宽贴文字),描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`);新增六个叶子墨迹观测量(attr_cluster_center_ok / attr_cluster_width_ok / nav_cluster_center_ok / trait_cluster_center_ok / desc_center_ok / desc_alignment_ok)。血条改到原生 960×704 尺寸可读:条高 8→12、部件 68×20→**68×24**、**空尾** 6→10(空槽面积 48→120 px²)、槽体光环 4→6、悬浮偏移 −28→−32(悬空 8 px 不变);新增观测量 bar_height / empty_area_px / empty_cap_px;test_health_bar 几何同步。 | 上一轮 `points_attrs_gap_ok` 比**容器矩形**所以永绿,真帧整组贴右缘——**容器矩形≠墨迹**;血条旧数字(细条 ≤ 8 / 总高 ≤ 20 / cap 6 / 光环 4)在对比放大尺度推出,960×704 原生帧上 48 px² 空尾被视觉闸门读成 solid green(Q5 17/26),本轮按原生尺寸重验改数字。 |
 | (人工) | 2026-08-25 | 记下血条 `EMPTY_CAP_PX = 10` 的**代价**(此前只记了收益):盖片画在填充之上,遮住 64px 里的最后 10px,**满血读起来约 84%,而 85%~100% 长得完全一样**。实测 960×704 真帧:满血时 58px 绿 + 14px 槽。 | 取舍接受,理由是每条都盖同样的 10px(单位之间的相对比较不受影响),而被压平的那一段(85%~100%)恰是精确值最不重要的区间——血量门槛技能在 50% 以下才开。但代价必须写下来:只写收益的注释会让下一个人以为这是纯赚。顺带记一条更硬的:探针实测 `empty_area_px` 修前是 **132**,而 `.tscn` 授权值是 **48**,`bar_height` 运行时 **22.0** 而授权 8.0/12.0 —— **推导值和运行值差了 2.75 倍**,此前(包括我)一直在拿授权值当实测值说话。 |
+| jinyong-affordance | 2026-08-25 | **表现层可观测性落地,零新机制**:立绘「在渲染帧上可见」从 `visible == true` 升级为六层可判定谓词(`VisibilityProbe`:hidden_in_tree / null_texture / zero_rect / off_viewport / clipped / occluded),六个战斗单位逐帧发布 `portrait_visible` / `portrait_fail_layer`;新增状态跟随的移动提示 `MoveHintLabel`(玩家脚下 +44 px,中文文案随 idle / undo_ready / committed 三态更换,`mouse_filter = 2` 不拦截点击)。新增 playtest 场景 `portrait_visibility` / `move_target_affordance`,44 -> 46。UX-01 判 WONTFIX、UX-02 关闭。 | 「断言为真而玩家看不见」这次出现了反向:既有断言(`visible` / `sprite_top`)说不出「像素在不在帧上」,而 UX-01 的人工读帧本身误判了。六层谓词把前者补齐--红的时候报**哪一层**,不只是「否」;MoveHintLabel 把「右键退回」这个闸门全绿、真人不知道的功能变成屏幕上的中文承诺,且承诺随状态机失效即换文案。实测:`portrait_visibility` **10/10**(六单位全可见)、`move_target_affordance` **18/18**。 |
 
 ### jinyong-affordance (2026-08-25)
 
-**UX-01 (角色立绘不可见):** 探针实测六个单位立绘全部可见——「两个单位不可见」是人工读帧误判,
+**UX-01 (角色立绘不可见):** 判读 WONTFIX(实测六个单位均可见,人工读帧误判)。探针运行本身从未落地实测值(godot-builder 9/9 HTTP 500,后是本轮自身的 `Canvas` 编译错),按「不许猜」规则修集为空;「六单位均可见」的实测依据是**修后闸门**:`portrait_visibility.yaml` **10/10**(六单位 `portrait_visible == true`)。原报告所称——「两个单位不可见」经修后闸门证实为误判。
 `VisibilityProbe` 六层可见性断言作为预防性观测层保留。见 `final/portrait_probe_notes.md`。
 
 **UX-02 (移动目标框无提示):** 新增 `MoveHintLabel`——状态跟随的中文提示,
@@ -84,5 +85,5 @@
 
 **新增:** `VisibilityProbe` 六层可见性断言类,`MoveHintLabel` 自驱动轮询节点,
 `portrait_visibility.yaml` / `move_target_affordance.yaml` 两个 playtest 场景。
-44 → 46 场景,43 绿(terminal_victory 仍为唯一允许的红)。
-- **jinyong-affordance**: VisibilityProbe 6-layer on-frame predicate, MoveHintLabel state-following affordance. UX-01 WONTFIX (probe: all six portraits on-frame, human frame-reading artifact), UX-02 CLOSED. Playtest 45/46 green (terminal_victory deliberately red).
+44 → 46 场景;实测(`5_compile` 的 `playtest_summary.md`,2026-08-25)**45 绿 + 1 红**:`terminal_victory` 唯一允许的红(`Player.health` 观测 783,在 `max_health` 的 15%~40% 窗外;平衡数值按 `00_roadmap.md`「数值最后调」延后),新场景 `portrait_visibility` **10/10**、`move_target_affordance` **18/18**。
+视觉闸门同轮 **passed: true**(Q1~Q6 零失败,46 场景 184 帧);编译 69/69 零错误。
