@@ -7,12 +7,18 @@ statically verifies the integrity of the playtest contract in
 
 Scope (deliberately narrow):
   * scenario_order <-> scenario-file completeness
-  * the six scenarios of this round present on disk AND listed in order
+  * the five scenarios of this round present on disk AND listed in order
   * the success-criterion-1 click-targeting surface contract (Player's
     debug_click_events / debug_last_click_grid observables, the Central_Divine
     block, and the actual node named in click_targeting_fixed.yaml's ``clicks:``
     list — parsed from the file, never hardcoded, because the dependency may
     land either branch)
+  * the click-move round's surface contract (Player.turn_start_grid /
+    turn_start_moves_left / undo_available, MoveRangeHighlight.start_tile /
+    undo_available, and CreationScreen.cursor_markers_visible whitelisted on
+    the surface; every clicks: target in the five round scenario files belongs
+    to a whitelisted surface block — offset specs parsed by first whitespace
+    token, trailing ``_ClickTarget`` stripped)
 
 It uses ONLY the Python standard library (pathlib, re) — no PyYAML, no
 requests, no subprocess, no network, no Godot process — so it runs in
