@@ -109,6 +109,7 @@ offset_left = -140.0
 offset_top = 8.0
 offset_right = -8.0
 offset_bottom = 44.0
+focus_mode = 0
 text = "暂停"
 script = ExtResource("2")
 
@@ -120,6 +121,7 @@ offset_left = -140.0
 offset_top = 52.0
 offset_right = -8.0
 offset_bottom = 88.0
+focus_mode = 0
 text = "结束回合"
 
 [node name="AttackButton" type="Button" parent="."]
@@ -130,6 +132,7 @@ offset_left = -140.0
 offset_top = 96.0
 offset_right = -8.0
 offset_bottom = 132.0
+focus_mode = 0
 text = "出招 (J)"
 
 [node name="SkillDescLabel" type="Label" parent="."]

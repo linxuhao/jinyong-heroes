@@ -58,8 +58,10 @@ offset_bottom = -16.0
 
 [node name="Next" type="Button" parent="Panel/Buttons"]
 size = Vector2(160, 36)
+focus_mode = 0
 text = "继续 ▶"
 
 [node name="SkipTutorial" type="Button" parent="Panel/Buttons"]
 size = Vector2(160, 36)
+focus_mode = 0
 text = "跳过教程"
