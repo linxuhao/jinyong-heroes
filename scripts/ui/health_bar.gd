@@ -299,8 +299,8 @@ func follow_character() -> void:
 	# pass (re-assigned on every frame follow_character() executes).
 	total_height = size.y
 	# Clamp so the bar never clips off the viewport edges. The y LOWER bound is
-	# STRIP_BOTTOM + 2 (= 82): no floating bar ever enters the top strip zone
-	# (the full-width backed band, hud.tscn TopStrip offsets 0..80). The x
+	# STRIP_BOTTOM + 2 (= 94): no floating bar ever enters the top strip zone
+	# (the full-width backed band, hud.tscn TopStrip offsets 0..92). The x
 	# clamp and the y upper bound stay viewport-edge based. Follow_delta above
 	# stays computed BEFORE this clamp, so its semantics are unchanged.
 	var vp: Vector2 = get_viewport_rect().size
