@@ -1,508 +1,603 @@
-# Technical Architecture Design - Portrait Visibility Observability (UX-01) + Move-Target Affordance (UX-02)
+# Technical Architecture Design - Portrait Visibility Predicate Hole (UX-01a/01b) + Event Pool 4 -> 16
 
-Round: **jinyong-affordance**. Baseline HEAD `5bf8fb8`: playtest 44 scenarios / 43 green
-(only `terminal_victory_8_12_rounds_hp_15_40` deliberately red), pytest 7 passed, vision
-gate 6/6. This round adds **no new mechanics**. It adds two things the design archive
-demands and the gates could not express:
+Round: **jinyong-events** (working name). Baseline: 46 playtest scenarios / 45 green
+(`terminal_victory_8_12_rounds_hp_15_40` is the single deliberate red), pytest 9 passed,
+GDScript unit suite 12 passed, vision gate Q1-Q6 pass. This round adds **no new
+mechanisms, no new effect types, no number changes, no map/topology/art changes**. It
+does three things, all inside the existing additive discipline:
 
-1. **UX-01** - 王重阳 (`Central_Divine`) and 杨过 (`Player`) render **no portrait ink** on
-   the battle frame (name + health bar only; the other four Greats render fine). Today
-   nothing can *prove* that from a test: `visible` flags and `sprite_top` are green while
-   the pixels are absent. We need a **layered on-frame visibility predicate** that turns
-   "the portrait is visible on the rendered frame" into a decidable, assertable fact -
-   **probed per unit first (查明 before 修), never assumed**.
-2. **UX-02** - right-click undo works (44-scenario gate proves it) but the move-target box
-   has **zero affordance**: the player is never told 左键移动 / 右键退回 / 出手即确认.
-   We need a **state-following hint** whose copy tracks the move state machine (pending ->
-   undo-available -> committed), in Chinese, mouse-transparent, additive.
+1. **Close the two holes in the `VisibilityProbe` predicate** so it genuinely decides
+   "ink is on the 960x704 frame": a **partial-occlusion** layer (a portrait 72% hidden
+   under the 0..92 top strip currently passes because `occluded` demands *full*
+   enclosure) and a **blank-texture** layer (a spot where *nothing is drawn* currently
+   passes all six layers). Publish the **3-number probe** (sprite `global_position` +
+   `texture.get_size()` + health-bar `global_position`) the brief mandates, then fix
+   **only what a measured fail-layer id points at**.
+2. **Events 4 -> 16** - pure data in `EventData.TABLE`, two real trade-off options per
+   row, Chinese Jin Yong flavor, only the 5 implemented effect types
+   (`silver`/`attr`/`item`/`practice`/`none`), only real item ids.
+3. **Prove the no-repeat bag** - `_draw_event()` already excludes `events_seen` and
+   resets on pool exhaustion; this round makes that **observable and tested** (unit
+   test + playtest scenario), not rewritten.
 
-Per `step1_sota.md`, everything is built from engine-native APIs
-(`is_visible_in_tree`, `get_global_rect`, `Rect2.intersection`, `get_visible_rect`,
-ancestor `clip_contents` scan, draw-order comparison) plus the repo's proven probe /
-playtest / append-only-contract idioms. **No new libraries, no node renames, no
-reparents, no gameplay-logic changes.**
+Per `step1_sota.md` everything is engine-native Godot 4 APIs extended in place; no new
+dependencies, no external content files, no procedural generation.
 
 ---
 
 ## 1. Overview
 
-Two defect classes, one shared observability layer:
-
-| Goal | Defect | Fix idiom | Red-before-fix proof |
+| Goal | Current defect | Fix idiom | Red-before-fix proof (A-class) |
 |---|---|---|---|
-| UX-01 | Two units' portraits never render; cause **suspected** (`_refresh_sprite_clamp` / `clamp_sprite_offset`), **not concluded** | Probe matrix per unit -> targeted fix -> layered `portrait_visible` predicate | `Player.portrait_visible == false` and `Central_Divine.portrait_visible == false` **observed** at baseline (A-class); the other four units observed `true` (B-class guards) |
-| UX-02 | Move-target box has no affordance; right-click undo is an invisible feature | New self-driving `MoveHintLabel` polling existing move-state fields | Scenario `move_target_affordance` fails at baseline (node absent -> surface target unresolved = hard red); post-fix asserts the hint's **text/state in both states** (pending vs committed) |
+| UX-01b (王重阳) | Portrait drawn but ~72% covered by the opaque panels inside the 0..92 top strip; `sprite_top == 0.0`; predicate passes because `occluded` requires full enclosure | New layer `covered` (partial occlusion by a later-drawn opaque host) -> measured `covered` id unlocks a clamp top-margin fix in `GridManager.clamp_sprite_offset` | Pre-fix `Central_Divine.portrait_visible == false` with `portrait_fail_layer == "covered"` and `portrait_covered_frac >= 0.25`, observed at f40 |
+| UX-01a (杨过) | `sprite_top == 224.0` says ink is mid-board, the raw frame shows scenery there; all six layers pass | New layer `blank_texture` (asset-level alpha scan) + the 3-number probe; fix locus chosen ONLY from the measured failing layer | Pre-fix `Player.portrait_visible == false` with a non-empty measured fail-layer id, observed at f40; if every layer measures green with consistent numbers, UX-01a is recorded as a frame-reading divergence and NOT "fixed" (no-guess rule) |
+| Events 4 -> 16 | Pool exhausts after 4 travels; 4 rows are near-isomorphic "cost vs gain" | 12 new hand-written rows in `EventData.TABLE` (verbatim below), additive test extensions | `tests/test_event_data.gd` size check `all_defs.size() >= 16` fails at baseline (observed 4) |
+| No-repeat bag | Exclusion + reset implemented but unproven | Additive observables (`events_seen_count`) + deterministic unit tests (15-of-16 forced draw; all-16 reset) + one interactive playtest scenario | New unit tests fail at baseline only in the sense of not existing; the interactive scenario's `events_seen_count == k` ladder is the B-class regression guard |
 
-**Probe-first is a hard ordering**: the UX-01 fix task may not start until the probe task
-has written `final/portrait_probe_notes.md` with per-unit observed values (runtime-measured,
-never derived from `.tscn` - the health-bar round found a 2.75x authored-vs-runtime gap).
-王重阳 and 杨过 are probed **independently and never merged** - they may fail for
-different reasons (different parents, different textures, different clamps).
+**Probe-first is a hard ordering** (repo rule 先查明再修，不许猜): the visibility fix
+task may not start until the extended probe has written measured per-unit values (the
+3 numbers + per-layer verdict + `portrait_covered_frac`) into
+`final/portrait_cover_probe_notes.md`. A fix PR without probe evidence is rejected at
+review. The two units are probed and fixed **independently** - they may fail for
+different reasons.
 
 ---
 
 ## 2. Architecture Diagram (text)
 
 ```
-                    ┌──────────────────────────────────────────────┐
-                    │ NEW  scripts/ui/visibility_probe.gd          │
-                    │ class_name VisibilityProbe (static, no node) │
-                    │  leaf_rect(node) -> Rect2                    │
-                    │  first_fail_layer(unit_root) -> String       │
-                    │    "" | "hidden_in_tree" | "null_texture"    │
-                    │    | "zero_rect" | "off_viewport"            │
-                    │    | "clipped" | "occluded"                  │
-                    │  portrait_visible(unit_root) -> bool         │
-                    └──────────────┬───────────────────────────────┘
-                                   │ called (cheap, per frame)
-        ┌──────────────────────────┴───────────────────────────┐
-        │ player.gd / enemy.gd  (ADDITIVE, ~6 lines each)      │
-        │  _process(): after _refresh_sprite_clamp():          │
-        │    portrait_fail_layer = VisibilityProbe             │
-        │        .first_fail_layer(self)                       │
-        │    portrait_visible = portrait_fail_layer == ""      │
-        └──────────────────────────┬───────────────────────────┘
-                                   │ surface (append-only)
-    playtest/_common.yaml  Player.{portrait_visible, portrait_fail_layer}
-                          East_Heretic / West_Poison / South_Emperor /
-                          North_Beggar / Central_Divine .{same two}
-                          NEW NODE MoveHintLabel.{state, text, visible,
-                          tile, center, in_viewport, bar_overlap}
+scripts/ui/visibility_probe.gd  (EXTEND IN PLACE - the single source of truth)
+    VisibilityProbe.first_fail_layer(unit_root) -> String
+        "" | hidden_in_tree | null_texture | blank_texture(NEW)
+          | zero_rect | off_viewport | clipped | occluded | covered(NEW)
+    VisibilityProbe.covered_fraction(unit_root) -> float   (NEW, max single-coverer frac)
+    Layer order stays cheap-to-expensive; `occluded` (full enclosure) is checked
+    BEFORE `covered` (>= COVERED_AREA_FRAC) so a fully-hidden portrait still reports
+    the precise id "occluded".
+                    │ called per frame (cheap; tree walk already exists for layer 6)
+                    ▼
+scripts/characters/player.gd + enemy.gd   (ADDITIVE, ~8 lines each)
+    _process(): after _refresh_sprite_clamp(), before the undo_available recompute:
+        portrait_fail_layer   = VisibilityProbe.first_fail_layer(self)
+        portrait_visible      = portrait_fail_layer == ""
+        portrait_covered_frac = VisibilityProbe.covered_fraction(self)
+        portrait_sprite_pos   = <Sprite child>.global_position   (3-number probe)
+        portrait_tex_size     = <Sprite child>.texture.get_size()
+        portrait_bar_pos      = <HealthBar child>.global_position or (-1,-1)
+                    │ surface (append-only)
+                    ▼
+playtest/_common.yaml  six unit blocks += the six vars above
+        CultivationScreen   += events_seen_count
+                    │
+scripts/autoload/grid_manager.gd  (GATED FIX, unlocked by measured "covered")
+    clamp_sprite_offset(): y lower bound 0 -> BOARD_TOP_MARGIN_Y (= 92, the existing
+    top-strip bottom; a presentation-consistency constant, not a new gameplay number)
+                    ▼
+scripts/data/event_data.gd   TABLE: 4 -> 16 rows (pure data, verbatim in §5)
+scripts/segments/cultivation.gd
+    _draw_event() / _apply_event_option(): UNCHANGED logic
+    _sync_surface(): += events_seen_count (int, len of sanitized events_seen)
 
-    ┌────────────────────────────────────────────────────────────┐
-    │ NEW  scripts/ui/move_hint_label.gd + MoveHintLabel (Label) │
-    │ in scenes/ui/hud.tscn - self-driving poller (the proven    │
-    │ MoveRangeHighlight pattern): polls GameManager.get_player(),│
-    │ CombatManager.is_player_turn(), player.moves_left /        │
-    │ undo_available / acted / grid_pos EVERY FRAME, never       │
-    │ stores the ref; recomputes text + position. mouse_filter=2 │
-    │ (IGNORE - it must never eat the click-move events).        │
-    │   state: "hidden" | "idle" | "undo_ready" | "committed"    │
-    │   idle:      「左键点格移动 · 右键退回」                      │
-    │   undo_ready:「右键退回起点 · 出手即确认」                    │
-    │   committed: 「已出手 · 移动已确认」                          │
-    │   position: player tile world center + (0, +44), clamped   │
-    │   into the viewport, in the same layer-10 / scale-1 space  │
-    │   the HealthBars live in (no Node2D<->Control conversion)  │
-    └────────────────────────────────────────────────────────────┘
-
-    GATES (append-only / new files):
-      playtest/portrait_visibility.yaml      NEW scenario (A-class UX-01)
-      playtest/move_target_affordance.yaml   NEW scenario (A-class UX-02)
-      _common.yaml scenario_order            += both (append at end)
-      tests/test_playtest_contract_smoke.py  ROUND_SCENARIOS += both (same order)
-                                            + ONE additive test function
-      44 scenarios -> 46 scenarios; terminal_victory stays the only allowed red
+GATES (append-only / in-place append / one new file):
+    playtest/portrait_visibility.yaml    extend IN PLACE (appended asserts only)
+    playtest/event_travel_effects.yaml   NEW scenario (draw -> option -> seen-count ladder)
+    tests/test_event_data.gd             extend additively (>= 16, new-row pins, target schema)
+    tests/test_cultivation.gd            extend additively (no-repeat + pool-reset unit tests)
+    tests/test_playtest_contract_smoke.py ROUND_SCENARIOS += event_travel_effects
+                                         + ONE additive test function
+    _common.yaml scenario_order          += event_travel_effects (append at end)
+    46 scenarios -> 47; terminal_victory stays the only allowed red
 ```
 
-Data flow is one-directional: game state (engine-owned fields `grid_pos`, `moves_left`,
-`acted`, `undo_available`, `turn_start_grid`) -> read-only observers
-(`VisibilityProbe`, `MoveHintLabel`) -> surface vars -> yaml asserts. **Observers never
-write game state.**
+No `project.godot` change (no new input actions - the new scenario uses only
+`ui_accept` / `move_down` / `debug_win_tutorial`). No `.tscn` change. No art change.
 
 ---
 
 ## 3. Component List
 
-### 3.1 `scripts/ui/visibility_probe.gd` - NEW layered visibility predicate
+### 3.1 `scripts/ui/visibility_probe.gd` - extend the predicate (the round's core)
 
-**Responsibility:** answer "does this unit's portrait put ink on the rendered frame" as a
-decidable fact, reusing one implementation for probes, red-before-fix assertions, and
-future rounds. Pure static functions; no node, no state, no scene change.
+**Responsibility:** make "the portrait puts ink on the rendered frame" decidable for
+the two hole classes: partial occlusion and nothing-drawn.
 
-**Interface (exact names - PM/PM thresholds and implementers match verbatim):**
+**New layer `blank_texture`** (checked immediately after `null_texture`):
 
-```gdscript
-class_name VisibilityProbe
+- Fires when the leaf's texture resource contains **no pixel with alpha > 0**
+  (a fully transparent asset renders nothing no matter how correct the geometry is).
+- Implementation: one-time scan per texture via `texture.get_image()` walking the
+  alpha channel, cached in a `static var _alpha_scan_cache: Dictionary` keyed by
+  `texture.resource_path`. Per-frame cost is a dictionary lookup (6 textures total).
+- **Fail-open rule:** if `get_image()` returns null (headless/compressed edge),
+  the layer PASSES and the probe notes record "scan unavailable" - never a
+  fabricated red.
+- This is an **asset-level** measurement, not a frame-pixel verdict: the repo ban is
+  on deriving gate verdicts from rendered-frame pixels (the 2.75x
+  authored-vs-runtime lesson); scanning the texture resource reports a layer id from
+  the resource itself.
 
-## Global rect of the node that actually draws the ink. Sprite2D uses
-## position + offset +/- texture half-size under the node's global transform;
-## Control uses get_global_rect(). Containers are NOT leaves - callers must
-## pass the ink node (the unit's "Sprite" child), which this helper resolves
-## from the unit root.
-static func leaf_rect(unit_root: Node2D) -> Rect2
+**New layer `covered`** (checked after `occluded`):
 
-## First failing layer, "" when fully visible on-frame. Layer order is the
-## cheap-to-expensive order from step1_sota.md:
-##  1 "hidden_in_tree"  leaf.visible == false OR not is_visible_in_tree()
-##  2 "null_texture"    Sprite2D.texture == null OR texture size == 0
-##  3 "zero_rect"       leaf rect has zero area, scale == Vector2.ZERO,
-##                       or combined modulate alpha < 0.01 (self x ancestors)
-##  4 "off_viewport"    leaf rect intersection with
-##                       get_viewport().get_visible_rect() is empty
-##                       (intersection must be NON-empty - touching edges
-##                       does not count)
-##  5 "clipped"         an ancestor Control with clip_contents == true does
-##                       not enclose the leaf rect
-##  6 "occluded"        a later-drawn / higher-z Control whose rect fully
-##                       covers the leaf rect AND mouse_filter != IGNORE
-##                       (the repo's opaque-host convention)
-static func first_fail_layer(unit_root: Node2D) -> String
+- Fires when a **later-drawn, `mouse_filter != IGNORE`, visible Control** overlaps the
+  ink rect by **>= 25% of the ink rect's area** (and >= 64 px² absolute, to stay above
+  antialias/rounding noise on tiny rects).
+- Constants (pinned by this design, the one new numeric decision):
+  `COVERED_AREA_FRAC := 0.25`, `COVERED_MIN_PX := 64.0`.
+- Discrimination check (why 0.25): the brief's real case is a texture ~128 px tall
+  with `sprite_top == 0.0` under a 92 px strip -> ~72% of the ink area sits under the
+  band, far above the threshold; a unit merely *near* the bar overlaps 0%.
+  Semi-transparent hosts are excluded by construction: the repo's opaque-host
+  convention is `mouse_filter != IGNORE`, and `TopStrip` itself declares
+  `mouse_filter = 2`, so only the opaque children inside the strip (the yellow
+  action-bar / turn-order panels) count as coverers.
+- **Max-single-coverer semantics:** the measured fraction is the *worst single*
+  qualifying coverer, not a union sum (overlapping panels would double-count). Simple,
+  deterministic, monotone. The probe notes record per-candidate fractions.
+- Reuses the existing candidate machinery (`_draws_after`, `_canvas_layer`,
+  `_effective_z`, `_tree_index`, `_is_ancestor_of`) - the same walk `_is_occluded`
+  already does; only the geometric test changes from `encloses(rect)` to
+  `intersection(rect).get_area() / rect.get_area()`.
 
-## Convenience: first_fail_layer(unit_root) == "".
-static func portrait_visible(unit_root: Node2D) -> bool
-```
+**New public helper:** `static func covered_fraction(unit_root: Node2D) -> float` -
+the max single-coverer fraction in `[0, 1]`, `0.0` when nothing qualifies. Same
+candidates as the `covered` layer. Published per frame so the probe and the
+`portrait_covered_frac < 0.25` guards read ONE number, never re-derived math.
 
-**Layer-6 simplification (declared):** full occlusion via `gui_get_hovered_control()` is
-mouse-dependent and therefore out of scope for a pure visibility test; the check is the
-SOTA's draw-order comparison (tree order + `z_index` / `show_behind_parent` +
-`CanvasLayer`) restricted to intersecting `Control`s. In the battle scene the only
-candidates are the TopStrip and the tutorial overlay, both already
-`mouse_filter`-declared - so the predicate stays cheap and deterministic.
+**Interface (unchanged):** `leaf_rect`, `first_fail_layer`, `portrait_visible` keep
+their signatures and existing layer ids; the doc comment's layer list gains the two
+ids. Existing callers (player.gd/enemy.gd `_process`, `portrait_visibility.yaml`
+asserts, `tests/test_visibility_probe_canvas_layer.gd`) are unaffected.
 
-**Why a shared helper instead of asserts in yaml:** the same predicate must serve (a) the
-probe matrix (print every layer's inputs per unit), (b) the A-class assertions, and (c)
-the B-class guards. One implementation, one place to be wrong.
+### 3.2 `scripts/characters/player.gd` + `scripts/characters/enemy.gd` - additive observables
 
-### 3.2 `scripts/characters/player.gd` + `scripts/characters/enemy.gd` - ADDITIVE observables
+Identical shape in both files, **no existing line touched**:
 
-**Responsibility:** publish the predicate per frame so the harness can read it like any
-other surface var.
+- Six new declared vars (documented, playtest surface):
+  - `var portrait_covered_frac: float = 0.0`
+  - `var portrait_sprite_pos: Vector2 = Vector2.ZERO` - the `Sprite` child's
+    `global_position` (canvas space)
+  - `var portrait_tex_size: Vector2 = Vector2.ZERO` - `texture.get_size()`
+  - `var portrait_bar_pos: Vector2 = Vector2(-1, -1)` - the unit's health-bar node's
+    `global_position`; `(-1, -1)` sentinel when no bar node resolves (implementer
+    verifies the bar node name/path on `player.tscn` / `enemy.tscn`; if the bars are
+    HUD-side, resolve through the existing `follow_character()` pairing and record the
+    resolution in the probe notes)
+- In `_process()`, immediately after the existing `_refresh_sprite_clamp()` /
+  `portrait_fail_layer` / `portrait_visible` block and **before** the
+  `undo_available` recompute (the proven ordering - the dead-probe abort class cannot
+  recur through this path): assign the four new vars.
 
-**Changes (identical shape in both files, no existing line touched):**
+**The 3-number probe is mandatory before any fix:** the brief forbids resolving the
+Yang Guo contradiction (`sprite_top = 224.0` vs scenery on the raw frame) from pixels
+or inference. Only `portrait_sprite_pos` + `portrait_tex_size` +
+`portrait_bar_pos` read together decide (texture actually blank, leaf not a
+`Sprite2D`/`Control`, wrong node targeted by the clamp, or the ink truly elsewhere).
+They are published per frame on all six units and recorded in
+`final/portrait_cover_probe_notes.md`.
 
-- Two new declared vars (documented, playtest surface):
-  - `var portrait_visible: bool = false`
-  - `var portrait_fail_layer: String = ""`
-- In `_process()`, immediately after the existing `_refresh_sprite_clamp()` call (so the
-  reading happens after the clamp has settled this frame):
-  `portrait_fail_layer = VisibilityProbe.first_fail_layer(self)` and
-  `portrait_visible = portrait_fail_layer == ""`.
+### 3.3 UX-01 fix - `scripts/autoload/grid_manager.gd` + character scripts (GATED ON PROBE)
 
-**Interface:** surface vars `portrait_visible` / `portrait_fail_layer` on `Player`,
-`East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`, `Central_Divine`. No
-method signatures change; `_refresh_sprite_clamp` and `clamp_sprite_offset` are **not**
-modified by this component (any change to them belongs to the 3.3 fix task and must be
-justified by probe evidence).
+**Responsibility:** make the measured-red units pass all layers, changing only what
+the probe identified.
 
-### 3.3 UX-01 fix - `scripts/autoload/grid_manager.gd` / character scripts (GATED ON PROBE)
+**Probe task (runs first, writes `final/portrait_cover_probe_notes.md`):** an inline
+`godot_playtest_scenario` probe (never staged in `playtest/`, per the established
+pattern in `final/portrait_probe_notes.md`) that boots the tutorial battle
+(7x `ui_accept` f3..f15, 3x `tutorial_next` f20/25/30, sample f40) with
+always-false contradiction asserts forcing the harness to print each unit's
+`observed` values: `portrait_visible`, `portrait_fail_layer`,
+`portrait_covered_frac`, `portrait_sprite_pos`, `portrait_tex_size`,
+`portrait_bar_pos`, `sprite_top`. The notes file records the per-unit table plus the
+per-candidate coverer fractions for the `covered` units.
 
-**Responsibility:** make the two invisible units pass layer 1-6, changing **only what the
-probe identified**.
+**Fix-loci table (fix chosen ONLY from the measured failing layer):**
 
-**This component intentionally has no fixed diff.** The brief's rule is
-先查明再修，不许猜 ("find out first, no guessing"). The probe (task A1) writes
-`final/portrait_probe_notes.md` with, per unit: `visible`, `is_visible_in_tree()`,
-`texture` resource path + size, `scale`, `modulate` chain alpha, `offset` before/after
-clamp, leaf rect, viewport intersection, failing layer. The fix is then chosen from the
-observed failing layer:
-
-| Observed failing layer | Likely fix locus (verify against probe numbers) |
+| Observed failing layer | Fix locus (verify against the probe's measured numbers first) |
 |---|---|
-| `null_texture` | `enemy.gd TEXTURE_PATHS` key mismatch for the unit's `character_name`, or player-side texture path - assign the texture, keep the null-safe fallback |
-| `off_viewport` / `zero_rect` from a bad offset | `GridManager.clamp_sprite_offset` bounds math or `_refresh_sprite_clamp`'s use of it - correct the math so the clamped rect stays on-board; the current suspicion (offset pushed fully off the board for the top row / center column) is **a suspicion, not a conclusion** |
+| `covered` (expected for Central_Divine: `sprite_top == 0.0`, covered_frac ~0.7) | `GridManager.clamp_sprite_offset`: the y lower bound currently clamps the texture center into `[half.y, board.y - half.y]`, i.e. the *board* top = 0. Add `const BOARD_TOP_MARGIN_Y := 92.0` (the existing top-strip bottom) so the lower bound becomes `BOARD_TOP_MARGIN_Y + half.y`. One constant + one line; the guard for textures taller than the board is unchanged. This is the round-protected clamp, unlocked by the measured `covered` id exactly as the protection rule allows |
+| `blank_texture` | Texture assignment: the unit's texture path/asset (assign the correct `assets/characters/<unit>.png`, keep the null-safe fallback). If the asset itself is fine but the *player's* leaf differs (e.g. `leaf_rect()` resolving a different child than the clamp writes), correct the resolution, never the clamp |
+| `zero_rect` / `off_viewport` from a bad offset | `clamp_sprite_offset` bounds math or `_refresh_sprite_clamp`'s use of it - correct the math so the clamped rect stays on-board **and** below the strip |
 | `clipped` | remove/relax `clip_contents` on the offending ancestor |
-| `occluded` | draw order / `z_index` of a covering host |
+| `occluded` (full enclosure) | draw order / `z_index` of the covering host |
+| All layers green AND the 3 numbers geometrically consistent | **Record the divergence and do NOT fix that unit** (no-guess rule). UX-01a is then a frame-reading artifact on the 960x704 frame and gets dispositioned from the measurement, mirroring the prior round's honest handling |
 
-**Constraint:** whatever the fix, it must keep the other four units' `portrait_visible`
-true (B-class guards) and keep `sprite_top` semantics unchanged (existing surface asserts
-read it). Numbers are read at **runtime**, not from `.tscn`.
+**Constraints on whatever fix lands:**
 
-### 3.4 `scripts/ui/move_hint_label.gd` + `MoveHintLabel` node - NEW (UX-02)
+- The other units' `portrait_visible` must stay `true` (B-class guards) and the
+  existing `sprite_top >= 0.0` asserts keep passing (a 92 px margin keeps them true).
+- The clamp change affects every top-row unit uniformly (rows 1-2 get pushed down so
+  their ink starts at y >= 92). Bottom-row units are untouched (their tops are far
+  below 92). Grid positions, movement, click-targeting, health-bar geometry are all
+  untouched - the clamp only moves the sprite's *offset within the tile*, and the
+  health-bar clamp (`top >= 94`) already agrees with the 92 px strip.
+- `_refresh_sprite_clamp` / `clamp_sprite_offset` are otherwise byte-identical; no
+  click-move / undo / commit / focus / top-bar / creation-layout code changes.
 
-**Responsibility:** a self-evident, state-following affordance for click-move + right-click
-undo, whose copy changes **in the same transition** that locks the move - never showing a
-promise that no longer holds (the deleted "右键确认" creation-screen mistake must not
-reappear).
+### 3.4 `scripts/data/event_data.gd` - TABLE 4 -> 16 rows (pure data)
 
-**Node:** `MoveHintLabel` (type `Label`) added to `scenes/ui/hud.tscn` as a **new sibling
-at a path nothing pins** (the TopStrip precedent), in the same layer-10 / scale-1
-coordinate space as the floating `HealthBar`s. Properties: `mouse_filter = 2` (IGNORE -
-hard requirement, it must never eat the click-move events), font = global theme (CJK),
-font size 14, `modulate` with outline/contrast readable over the board, NO `focus_mode`
-concern (Label is not focusable; the clickable discipline `focus_mode = 0` applies to
-clickables only).
+**Responsibility:** supply the travel-event pool. Pure data layer - resolution (RNG
+draw, no-repeat bag, consequence application) stays in `cultivation.gd` untouched.
 
-**Driver script (self-driving poller, the proven `MoveRangeHighlight` pattern - polls
-every frame, never stores the player ref, hides itself when the battle ends; the node
-dies with the scene swap):**
+**Hard contract (from `cultivation.gd:_apply_event_option` - anything outside
+silently no-ops = dead content):**
+
+- Effect `type` in exactly `{silver, attr, item, practice, none}`.
+- `attr.target` in `{bone, inner, agility, wisdom, fortune}`.
+- `item.target` in the real CardData equipment ids:
+  `eq_sword_1..4`, `eq_armor_1..4`, `eq_boots_1..4` (the only real inventory ids;
+  inventory is data-only this round).
+- `silver` clamps at 0 (`maxi(silver + value, 0)`) - every cost below is sized to be a
+  real cost at typical early holdings, never a free discount.
+- `item` is dedup'd (`not inventory.has(target)`) - no new row offers an item the
+  player may already own from another row (each new row uses a distinct item id).
+- `practice` is a no-op when everything is mastered - accepted; rows mixing practice
+  with other effect types keep the *other* option meaningful.
+- `battle_id == null` (reserved stub), unique `id`, non-empty title, 2-3-line Chinese
+  text (> 10 chars), both options non-empty labels and non-empty effects arrays.
+- **No new randomness anywhere.** Resolution stays in `_apply_event_option`; the draw
+  stays one `SaveManager.rng.randi_range` per travel (op-count unchanged vs the 4-row
+  pool, so the seeded stream's interleaving with deck draws is preserved).
+- **No two rows interchangeable:** the 16 rows between them cover item-with-cost,
+  item-vs-item, item-vs-attr, paid-attr-vs-free-attr, attr-A-vs-attr-B (different
+  pairs AND different magnitudes), silver-now-vs-growth, growth-vs-money, and the
+  moral silver-vs-fortune shape. The four baseline rows are byte-identical.
+
+The 12 new rows, verbatim (lore from `design/20_content.md` and the crossover
+setting of `design/00_overview.md`):
 
 ```gdscript
-extends Label
-
-# Observables (playtest surface contract)
-var state: String = "hidden"      # "hidden" | "idle" | "undo_ready" | "committed"
-var tile: Vector2i = Vector2i(-1, -1)
-var center: Vector2 = Vector2.ZERO
-var in_viewport: bool = false
-var bar_overlap: bool = false     # vs the player's HealthBar (1px-inset convention)
-
-func _process(_delta: float) -> void:
-    # state = f(existing engine-owned fields only - zero new game state):
-    #   hidden   <- no player / not battle / not player's turn / moves_left <= 0
-    #   idle     <- player's turn, undo_available == false, acted == false
-    #   undo_ready <- undo_available == true (moved, not yet committed)
-    #   committed  <- acted == true (undo locked by the commit rule)
-    # text:   idle -> "左键点格移动 · 右键退回"
-    #         undo_ready -> "右键退回起点 · 出手即确认"
-    #         committed  -> "已出手 · 移动已确认"
-    # position: grid_to_world(player.grid_pos) + (0, +44)  (below the feet,
-    #           above the tile edge), then clamped so the label rect stays
-    #           inside the 960x704 viewport; center/in_viewport/bar_overlap
-    #           recomputed from the final rect.
+{ "id": "tomb_bed", "title": "古墓寒玉",
+  "text": "荒山之中藏着一座古墓，\n石室中央横着一张寒玉床。",
+  "option_a": {"label": "卧床练气", "effects": [{"type": "attr", "value": 2, "target": "inner"}]},
+  "option_b": {"label": "床畔拾剑", "effects": [{"type": "item", "value": 0, "target": "eq_sword_2"}]} },
+{ "id": "wounded_eagle", "title": "神雕负伤",
+  "text": "一只巨雕伏在崖边，\n翅上箭伤未愈，目光如炬。",
+  "option_a": {"label": "施药疗伤", "effects": [{"type": "silver", "value": -8, "target": ""}, {"type": "practice", "value": 2, "target": ""}]},
+  "option_b": {"label": "静观其变", "effects": [{"type": "attr", "value": 1, "target": "wisdom"}]} },
+{ "id": "peach_maze", "title": "桃花迷阵",
+  "text": "海岛风送来桃花香，\n花影错落，隐成阵势。",
+  "option_a": {"label": "循隙闯阵", "effects": [{"type": "attr", "value": 2, "target": "agility"}]},
+  "option_b": {"label": "阵外观潮", "effects": [{"type": "attr", "value": 1, "target": "wisdom"}]} },
+{ "id": "snake_bile", "title": "蛇胆奇效",
+  "text": "白驼山弟子叫卖蛇胆，\n称其大补真元，价钱不菲。",
+  "option_a": {"label": "重金购之", "effects": [{"type": "silver", "value": -15, "target": ""}, {"type": "attr", "value": 2, "target": "bone"}]},
+  "option_b": {"label": "掉头就走", "effects": [{"type": "attr", "value": 1, "target": "fortune"}]} },
+{ "id": "dragon_scrap", "title": "降龙残谱",
+  "text": "书摊上一册残破掌谱，\n隐见「降龙」二字，纸色发黄。",
+  "option_a": {"label": "强记于心", "effects": [{"type": "practice", "value": 4, "target": ""}]},
+  "option_b": {"label": "卖与书贾", "effects": [{"type": "silver", "value": 25, "target": ""}]} },
+{ "id": "flood_ferry", "title": "渡口风波",
+  "text": "河水暴涨，渡口只余一舟，\n艄公索价甚高，爱搭不理。",
+  "option_a": {"label": "付钱渡河", "effects": [{"type": "silver", "value": -10, "target": ""}]},
+  "option_b": {"label": "泅水而过", "effects": [{"type": "attr", "value": 1, "target": "inner"}]} },
+{ "id": "escort_job", "title": "镖行招募",
+  "text": "镖头缺人手，见你身手，\n便邀你押一趟去南边的镖。",
+  "option_a": {"label": "接下镖单", "effects": [{"type": "silver", "value": 22, "target": ""}]},
+  "option_b": {"label": "婉拒独行", "effects": [{"type": "attr", "value": 1, "target": "wisdom"}]} },
+{ "id": "dali_market", "title": "大理市集",
+  "text": "市集上皮甲快靴俱全，\n掌柜的拍着胸脯称分量十足。",
+  "option_a": {"label": "购皮甲", "effects": [{"type": "silver", "value": -18, "target": ""}, {"type": "item", "value": 0, "target": "eq_armor_2"}]},
+  "option_b": {"label": "购快靴", "effects": [{"type": "silver", "value": -14, "target": ""}, {"type": "item", "value": 0, "target": "eq_boots_2"}]} },
+{ "id": "night_rain", "title": "破庙夜雨",
+  "text": "夜雨滂沱，破庙漏得厉害，\n老僧独坐，就着灯火补屋檐。",
+  "option_a": {"label": "帮工换宿", "effects": [{"type": "silver", "value": -6, "target": ""}, {"type": "attr", "value": 1, "target": "bone"}]},
+  "option_b": {"label": "檐下练剑", "effects": [{"type": "practice", "value": 2, "target": ""}]} },
+{ "id": "gambling_den", "title": "赌坊喧嚣",
+  "text": "镇上赌坊彻夜喧闹，\n有人一夜输光了全部盘缠。",
+  "option_a": {"label": "入局三把", "effects": [{"type": "silver", "value": 30, "target": ""}]},
+  "option_b": {"label": "袖手旁观", "effects": [{"type": "attr", "value": 2, "target": "fortune"}]} },
+{ "id": "quanzhen_scripture", "title": "全真抄经",
+  "text": "全真宫外老道伏案抄经，\n见你驻足，递来一卷道德经。",
+  "option_a": {"label": "随他抄经", "effects": [{"type": "attr", "value": 2, "target": "wisdom"}]},
+  "option_b": {"label": "求教剑理", "effects": [{"type": "silver", "value": -5, "target": ""}, {"type": "practice", "value": 3, "target": ""}]} },
+{ "id": "lost_purse", "title": "遗落的褡裢",
+  "text": "路旁褡裢里散着银两，\n四下无人，只有风声掠过草叶。",
+  "option_a": {"label": "送还失主", "effects": [{"type": "attr", "value": 2, "target": "fortune"}]},
+  "option_b": {"label": "收起走人", "effects": [{"type": "silver", "value": 20, "target": ""}]} },
 ```
 
-**Why follow the tile instead of a fixed dock:** the UX complaint is "the move-target box
-has no affordance" - the promise must sit **where the action is** (the yellow box /
-turn-start marker), not in a corner the eye is not on. The below-the-feet slot is empty
-today (name + health bar float **above** the sprite), so the hint adds no occlusion; the
-`bar_overlap` observable proves it per frame.
+Variety audit (why no two rows are interchangeable): item-with-cost
+(`dali_market`), item-vs-item (`dali_market` A/B), item-vs-attr (`tomb_bed`),
+practice-with-cost (`wounded_eagle`, `quanzhen_scripture` B), paid-attr-vs-free-attr
+(`snake_bile`), attr-2-vs-attr-1 (`peach_maze`, `lost_purse` is attr-2-vs-silver),
+growth-vs-money (`dragon_scrap`), pay-vs-swim (`flood_ferry`), silver-now-vs-wisdom
+(`escort_job`), silver-vs-bone (`night_rain`), silver-vs-fortune (`gambling_den`).
+All five attr targets are used by at least two rows; the three new item grants
+(`eq_sword_2`, `eq_armor_2`, `eq_boots_2`) are distinct from each other, from the
+baseline `eq_sword_3`, and from every CardData deck draw the player may already hold.
 
-**Why keep the label visible in `committed` (with swapped text) rather than hiding:** the
-archive rule is the copy must **follow state**; swapping text is strictly more assertable
-than toggling visibility (a `visible` flip and a `text` swap can both be pinned, but the
-swap also proves the *promise* changed, not just that something disappeared).
+### 3.5 `scripts/segments/cultivation.gd` - verify + observe, do NOT rewrite
 
-### 3.5 `playtest/_common.yaml` - surface + order (append-only)
+**Responsibility:** keep the existing bag semantics; make them observable.
 
-- `surface:` appends `portrait_visible`, `portrait_fail_layer` under `Player`,
-  `East_Heretic`, `West_Poison`, `South_Emiror` -> **`South_Emiror` is a typo in this
-  design doc only - use the existing key `South_Emperor`**, `North_Beggar`,
-  `Central_Divine` (existing blocks, append at the end of each list; no line reordered).
-- `surface:` adds a NEW top-level block `MoveHintLabel: [state, text, visible, tile,
-  center, in_viewport, bar_overlap]` (the harness resolves nodes by bare name, like
-  `TopStrip` / `ActionHintLabel`).
-- `scenario_order:` appends `portrait_visibility` then `move_target_affordance` (both at
-  the end, matching `ROUND_SCENARIOS`).
+- `_draw_event()` (L424) and `_apply_event_option()` (L438): **logic unchanged**.
+  The exclusion (`pool` = TABLE ids not in `events_seen`) and the pool-exhausted
+  reset (clear `events_seen`, refill the pool - never an empty draw, never a stall)
+  are already correct per direct read. Stale/duplicate ids in `events_seen` from
+  hostile saves are harmless to the `has()` filter and already sanitized to
+  non-empty Strings by `PlayerProfile.from_dict`.
+- `_sync_surface()` (additive): `events_seen_count: int =
+    (SaveManager.profile.flags.get("events_seen", []) as Array).size()` - declared as
+  a surface var, refreshed wherever `_sync_surface()` already runs. This is the ONE
+  code addition in this file.
+- **RNG/determinism audit (implementer verifies, design flags it):** the draw stays
+  exactly one `randi_range` per travel, so the seeded stream's op order is unchanged;
+  the *pool size* changing 4 -> 16 alters which id a given seed picks, which is
+  intended. Verify no existing scenario pins a specific `event_id` value or a
+  downstream rng-dependent value reached *through* an event draw (grep
+  `playtest/*.yaml` for `event_id` and `debug_step_month` paths that travel). If a
+  fast-forward path consumes event draws, re-baseline the affected scenario
+  explicitly and record it in the Design Changes section - never silently.
 
-### 3.6 `playtest/portrait_visibility.yaml` - NEW scenario (A-class UX-01)
+### 3.6 `tests/test_event_data.gd` - additive extension
 
-Boot shape copies the proven `ui_geometry_readability` / `click_move_*` prologue
-(7x `ui_accept` f3..f15 -> 3x `tutorial_next` f20/f25/f30 -> assert f40; every assert
-value carries a comparison operator - the repo's `== true` discipline):
+- `ROW_EFFECTS` and `ROW_TITLES` gain the 12 new ids with their verbatim effects
+  (the four existing entries byte-identical).
+- The size check changes from `all_defs.size() == 4` to `all_defs.size() >= 16`
+  (the one permitted modification - the SOTA report explicitly authorizes extending
+  the size check rather than deleting assertions).
+- ONE new test function `_test_effect_targets` (additive): for every row, every
+  effect with `type == "attr"` has `target` in the five attr keys; every effect with
+  `type == "item"` has `target` in the 12 real equipment ids; every effect `type` is
+  one of the five; no duplicate `item.target` across rows offering items without a
+  paired cost; both options' labels non-empty. This pins the dead-content contract
+  statically so a future typo'd target fails at unit time, not as a silent no-op.
+
+### 3.7 `tests/test_cultivation.gd` - no-repeat + pool-reset unit tests (additive)
+
+Deterministic, no RNG dependence:
+
+1. **Exclusion + forced draw:** with a stubbed profile whose `events_seen` holds 15
+   of the 16 TABLE ids, `_draw_event()` returns exactly the missing id (pool size 1 -
+   the single `randi_range` is forced regardless of seed).
+2. **Pool-exhausted reset:** with `events_seen` holding all 16 ids, `_draw_event()`
+   returns a non-empty id AND `flags["events_seen"]` is empty immediately after the
+   draw (the reset branch) - never `""`, never a stall.
+3. **Effects really land (A-class for goal 2):** for each of the 16 defs x both
+   options, apply `_apply_event_option` against a fresh stubbed profile and assert
+   the expected field moved: silver delta (clamped at 0), attr delta,
+   `inventory.has(target)`, or the first unmastered gongfa's practice delta. 32
+   deterministic cases - this is the proof that no new row is dead content.
+   Follow the file's existing instantiation pattern for the segment; if the segment
+   cannot be instantiated headlessly from that file's harness, fall back to the
+   inline-probe path (below) and record the values in `final/event_probe_notes.md`.
+
+### 3.8 `playtest/portrait_visibility.yaml` - extend IN PLACE (appended asserts only)
+
+The existing 10 asserts stay byte-identical (including the two `sprite_top >= 0.0`
+lines - a 92 px margin keeps them true, and duplicate YAML keys would silently drop
+asserts, so nothing is rewritten). Appended to the same f40 assert block:
 
 ```yaml
-name: portrait_visibility
-timeline:
-- {at: 3..15, actions: [ui_accept]}          # 7 presses (proven boot)
-- {at: 20/25/30, actions: [tutorial_next]}   # skip tutorial cards
-- at: 40
-  assert:
-    Player.portrait_visible: portrait_visible == true            # A-class
-    Player.portrait_fail_layer: portrait_fail_layer == ""         # A-class
-    Central_Divine.portrait_visible: portrait_visible == true     # A-class
-    Central_Divine.portrait_fail_layer: portrait_fail_layer == "" # A-class
-    East_Heretic.portrait_visible: portrait_visible == true       # B-class guard
-    West_Poison.portrait_visible: portrait_visible == true        # B-class guard
-    South_Emperor.portrait_visible: portrait_visible == true      # B-class guard
-    North_Beggar.portrait_visible: portrait_visible == true       # B-class guard
-    Player.sprite_top: sprite_top >= 0.0                          # B-class (on-board)
-    Central_Divine.sprite_top: sprite_top >= 0.0                  # B-class (on-board)
+    East_Heretic.portrait_fail_layer: portrait_fail_layer == ""
+    West_Poison.portrait_fail_layer: portrait_fail_layer == ""
+    South_Emperor.portrait_fail_layer: portrait_fail_layer == ""
+    North_Beggar.portrait_fail_layer: portrait_fail_layer == ""
+    Player.portrait_covered_frac: portrait_covered_frac < 0.25
+    Central_Divine.portrait_covered_frac: portrait_covered_frac < 0.25
+    East_Heretic.portrait_covered_frac: portrait_covered_frac < 0.25
+    West_Poison.portrait_covered_frac: portrait_covered_frac < 0.25
+    South_Emperor.portrait_covered_frac: portrait_covered_frac < 0.25
+    North_Beggar.portrait_covered_frac: portrait_covered_frac < 0.25
+    Player.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
+    Central_Divine.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
 ```
 
-At baseline the four A-class lines are **red by construction** (observed, per the probe
-notes) and the B-class lines green - exactly the SOTA A/B split: A proves the defect, B
-guards the four healthy units against regression by the fix.
+Pre-fix, the four `covered_frac` lines for the top-row units and the fail-layer
+lines are the A-class reds (with the measured values printed by the harness); the
+`portrait_tex_size` lines are the 3-number-probe B-class sanity guards. Post-fix all
+green.
 
-### 3.7 `playtest/move_target_affordance.yaml` - NEW scenario (A-class UX-02)
+### 3.9 `playtest/event_travel_effects.yaml` - NEW scenario (one file, 46 -> 47)
 
-Frames reuse the click-move scenarios' proven timings (`click_move_undo_right`: move
-f70->settled f130, undo f135->f170). Real mouse events only (`clicks:`), no DEBUG
-stand-ins:
+Skeleton (PM calibrates exact frame spacing against the proven
+`cultivation_month_cycle_and_deck_bookkeeping.yaml` preamble; all `at:` values are
+single integers; every assert value carries a comparison operator):
 
-```yaml
-name: move_target_affordance
-timeline:
-- {at: 3..15, actions: [ui_accept]}            # 7 presses
-- {at: 20/25/30, actions: [tutorial_next]}
-- at: 45                                        # turn start, nothing moved
-  assert:
-    MoveHintLabel.state: state == "idle"
-    MoveHintLabel.text: text.contains("左键") == true
-    MoveHintLabel.visible: visible == true
-    MoveHintLabel.in_viewport: in_viewport == true
-- at: 70
-  clicks: [Player +0,-192]                     # walk 3 tiles up to (7,2)
-- at: 130
-  assert:
-    Player.grid_pos: grid_pos == Vector2i(7, 2)
-    MoveHintLabel.state: state == "undo_ready"
-    MoveHintLabel.text: text.contains("右键") == true
-    MoveHintLabel.bar_overlap: bar_overlap == false
-    MoveHintLabel.in_viewport: in_viewport == true
-- at: 135
-  clicks: [Player +0,0 right]                  # undo -> back to (7,5)
-- at: 170
-  assert:
-    Player.grid_pos: grid_pos == Vector2i(7, 5)
-    MoveHintLabel.state: state == "idle"       # promise follows state back
-- at: 175
-  clicks: [Central_Divine_ClickTarget]         # click-attack from (7,2)... see note
-- at: 230
-  assert:
-    Player.acted: acted == true
-    Player.undo_available: undo_available == false
-    MoveHintLabel.state: state == "committed"
-    MoveHintLabel.text: text.contains("已出手") == true
-    MoveHintLabel.visible: visible == true
-```
+- Preamble (proven timings, byte-equivalent shape): f3..f15 7x `ui_accept`; f20
+  `debug_win_tutorial`; f40/60/70/80 `ui_accept`; f90 `move_right`; f100/110
+  `ui_accept`; f130 assert `GameManager.current_state == "CULTIVATION"` and
+  `CultivationScreen.phase == "CARD_PICK"` and `CultivationScreen.events_seen_count == 0`.
+- Travel 1: `ui_accept` (card 0) -> 3x `move_down` (ACTION_PICK focus 0 -> 3 = 游历) ->
+  `ui_accept` -> assert `phase == "EVENT"`, `event_id != ""`,
+  `events_seen_count == 0` (drawn, not yet resolved) -> `ui_accept` (option A) ->
+  assert `events_seen_count == 1`, `phase == "CARD_PICK"`, `month == 2`.
+- Travel 2 and 3: same cycle, asserting `events_seen_count == 2` then `== 3` and
+  `event_id != ""` each time. The count ladder IS the no-repeat proof:
+  `events_seen` only appends ids it does not already hold, so count == k after k
+  travels proves k distinct draws.
+- Registration (two-place sync rule): appended to `scenario_order` in
+  `playtest/_common.yaml` AND to `ROUND_SCENARIOS` in
+  `tests/test_playtest_contract_smoke.py`, in the same order, both at the end.
 
-**Note for the implementer (re-baseline before finalizing):** the commit arm needs the
-player adjacent to a target. Two proven options: (a) walk to (7,2) again then click
-`Central_Divine_ClickTarget` (click-to-attack, proven in `click_targeting_fixed`), or
-(b) `skill_1` + `attack_confirm` after moving adjacent (keyboard path, proven in
-`skill_rejection_reason_texts`). Pick one, probe the frames once, then freeze them - the
-asserts above (state/text in **both** the pending and the committed state) are the
-contract; the exact frames are placeholders for the probe.
+### 3.10 `playtest/_common.yaml` - surface append (append-only)
 
-### 3.8 `tests/test_playtest_contract_smoke.py` - additive contract pin
+- The six unit blocks (`Player`, `East_Heretic`, `West_Poison`, `South_Emperor`,
+  `North_Beggar`, `Central_Divine`) each append: `portrait_covered_frac`,
+  `portrait_sprite_pos`, `portrait_tex_size`, `portrait_bar_pos`.
+- `CultivationScreen` appends: `events_seen_count`.
+- `scenario_order` appends `event_travel_effects` (end). `actions:` is unchanged -
+  the new scenario uses only already-declared actions.
 
-- `ROUND_SCENARIOS` appends `portrait_visibility`, `move_target_affordance` **in the same
-  order** as `scenario_order` (the two-place sync rule). Existing entries untouched.
-- ONE new test function, e.g. `test_affordance_surface_contract`, asserting statically:
-  the six units' surface blocks contain `portrait_visible` / `portrait_fail_layer`;
-  `MoveHintLabel` block exists with its seven vars; both new scenario files exist, their
-  `name:` equals the basename, and every assert value in them contains a comparison
-  operator (guards the "no bare-scalar silent-false" rule for the new files).
+### 3.11 `tests/test_playtest_contract_smoke.py` - additive contract pin
 
-### 3.9 Probe + evidence artifacts (task outputs, not gate files)
-
-- `final/portrait_probe_notes.md` (NEW) - the A/B probe table for all six units:
-  per-unit layer inputs and observed failing layer **before** the fix, with the A/B class
-  column (format copies `final/creation_probe_notes.md`). Probe method: inline scenario
-  via `godot_playtest_scenario` (YAML passed as CLI text, never staged), always-false
-  contradiction asserts forcing the harness to print `observed` values.
-- `final/move_hint_probe_notes.md` (NEW) - pre-fix confirmation that `MoveHintLabel` is
-  absent (surface target unresolved -> hard red) and post-fix state/text readings at the
-  four states.
-- Raw-frame captures at native 960x704 (the 5_compile frames) are the human/vision-gate
-  evidence that all **six** portraits now render; no zoomed evidence (hard rule).
-
-### 3.10 Documentation (declared for the `5_design` step - not written by implementers)
-
-See section 7 (Design Changes).
+- `ROUND_SCENARIOS` appends `event_travel_effects` (same order as
+  `scenario_order`; existing entries untouched).
+- ONE new test function `test_event_content_surface_contract`, asserting statically
+  (stdlib only, following the existing regex helpers): the six unit blocks contain
+  the four new portrait vars; the `CultivationScreen` block contains
+  `events_seen_count`; `event_travel_effects.yaml` exists with `name:` equal to the
+  basename, single-integer `at:` values, and a comparison operator in every assert
+  value; `portrait_visibility.yaml` contains the `covered_frac` assert lines.
 
 ---
 
-## 4. Observable Contract (interface spec - names are verbatim)
+## 4. Observable Contract (interface spec - names are exact)
 
-| Surface var | Type | Writer | Meaning |
-|---|---|---|---|
-| `<Unit>.portrait_visible` | bool | per-frame predicate | all six visibility layers pass for that unit's ink leaf |
-| `<Unit>.portrait_fail_layer` | String | per-frame predicate | first failing layer id, "" when visible |
-| `MoveHintLabel.state` | String | per-frame poller | "hidden" / "idle" / "undo_ready" / "committed" |
-| `MoveHintLabel.text` | String | per-frame poller | the current Chinese hint copy |
-| `MoveHintLabel.visible` | bool | poller (sole writer) | label on-frame |
-| `MoveHintLabel.tile` | Vector2i | per-frame poller | tile the hint is docked to (player's tile) |
-| `MoveHintLabel.center` | Vector2 | per-frame poller | final clamped label center (viewport space) |
-| `MoveHintLabel.in_viewport` | bool | per-frame poller | label rect fully inside 960x704 |
-| `MoveHintLabel.bar_overlap` | bool | per-frame poller | 1px-inset overlap vs the player's `HealthBar` |
+| Node | Var | Type | Meaning | Class |
+|---|---|---|---|---|
+| all six battle units | `portrait_visible` | bool | all layers pass (existing) | gate |
+| all six battle units | `portrait_fail_layer` | String | first failing layer id; `""` when visible; now 8 possible ids | gate |
+| all six battle units | `portrait_covered_frac` | float | worst single later-drawn opaque-host cover fraction of the ink rect | gate (`< 0.25`) + probe |
+| all six battle units | `portrait_sprite_pos` | Vector2 | Sprite child `global_position` (3-number probe #1) | probe |
+| all six battle units | `portrait_tex_size` | Vector2 | Sprite texture size (3-number probe #2) | probe + sanity gate (`> 0`) |
+| all six battle units | `portrait_bar_pos` | Vector2 | health-bar `global_position`, `(-1,-1)` sentinel (3-number probe #3) | probe only (never a gate this round) |
+| `CultivationScreen` | `events_seen_count` | int | size of the sanitized `events_seen` bag | gate (ladder `== k`) |
 
-`<Unit>` ∈ {`Player`, `East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`,
-`Central_Divine`}. All values assertable with comparison operators only.
+Layer id set (order = check order):
+`hidden_in_tree`, `null_texture`, `blank_texture` (NEW), `zero_rect`, `off_viewport`,
+`clipped`, `occluded`, `covered` (NEW).
 
----
-
-## 5. Edge Cases (from `step1_sota.md`) and how this design handles them
-
-- **`visible == true` but ancestor hidden / zero-size / off-screen / clipped /
-  occluded** - each is its own named layer in `first_fail_layer`; the predicate cannot
-  pass while any of them fails, and the *failing layer id* is itself observable, so the
-  red assertion says **why**, not just "no".
-- **Leaf-rect discipline** - `leaf_rect()` measures the unit's `Sprite` (the ink), never
-  the unit root (a slot); containers are never summed.
-- **Two invisible units, two causes** - the probe records each unit separately; the
-  scenario asserts each unit's own line; nothing merges them.
-- **A-class must be red at baseline, measured at runtime** - `portrait_visible` is read
-  from a live headless run (probe notes record the observed values), not derived from
-  `.tscn`; the health-bar round's authored-vs-runtime 2.75x gap is the recorded reason.
-- **Affordance copy must follow state** - the hint's `text`/`state` is a pure function of
-  the engine-owned fields; the scenario pins the copy in `idle`, `undo_ready`, **and**
-  `committed`, plus the return to `idle` after undo.
-- **RMB conflict** - the hint is display-only (`mouse_filter = 2`); it introduces no
-  input mapping, so it cannot collide with `click_move` / right-click undo / targeting.
-- **Protected geometry** - TopStrip, creation centering, health-bar geometry, and the five
-  protected click-move scenarios are untouched: no renames, no reparents, no edits to
-  their yamls (the two new scenarios are new files; `_common.yaml` is append-only).
-- **No mouse dependence in the visibility test** - layer 6 uses the draw-order/rect
-  comparison, never hover APIs.
+Dead-probe invariant (kept from the prior round): `portrait_visible == false` with
+`portrait_fail_layer == ""` is a CONTRADICTION (probe dead) - never a pass signal,
+never defect evidence.
 
 ---
 
-## 6. Technology Stack
+## 5. Event pool content
 
-- **Godot 4.4 engine APIs only** (per SOTA): `CanvasItem.is_visible_in_tree()`,
-  `Control.get_global_rect()`, `Rect2.intersection()/intersects()/encloses()`,
-  `Viewport.get_visible_rect()`, ancestor `clip_contents` scan, `z_index` /
-  `show_behind_parent` / `CanvasLayer` ordering. Zero new dependencies.
-- **Existing harness**: `playtest/` per-scenario yaml + `_common.yaml` contract,
-  `godot_playtest_scenario` inline probes, `tests/test_playtest_contract_smoke.py`
-  static contract, `run_tests.sh` (sidecar HTTP; unchanged).
-- **GDScript for all new code**; no `.gd` entries in `linter_manifest.json` (the
-  `gdscript_check` gate parses them host-side).
+Specified verbatim in §3.4 (16 rows total: `bandits`, `merchant`, `ruins`, `beggar`
+unchanged + the 12 new rows). `EventData.all()` / `EventData.def(id)` /
+`_build` / `_build_option` are unchanged - fresh `EventDef`/`EventOption` instances
+per call, deep-duplicated effect dictionaries (the existing
+`_test_fresh_instances` contract keeps holding).
 
 ---
 
-## 7. Design Changes (declared for `5_design` to apply - the implementer does NOT edit `design/`)
+## 6. Edge Cases (from `step1_sota.md`) -> how this design handles them
 
-1. `design/40_ux_backlog.md`: UX-01 and UX-02 rows change to `CLOSED(jinyong-affordance)`
-   with one-line evidence pointers (`final/portrait_probe_notes.md`,
-   `playtest/portrait_visibility.yaml`, `playtest/move_target_affordance.yaml`). Closure
-   is an explicit action in the fixing commit (backlog rule 2) - it must not be inferred
-   from the findings disappearing.
-2. `design/30_presentation.md`: add the **layered portrait-visibility predicate** to the
-   readability hard-requirements section ("visible == true is necessary but not
-   sufficient; on-frame visibility = 6 layers, see `VisibilityProbe`") and a UI-layout
-   row for `MoveHintLabel` (below-the-feet, follows the player's tile, Chinese
-   state-following copy, `mouse_filter = 2`).
-3. `design/99_changelog.md`: one row for the round (probe findings summary + the two
-   CLOSED ids).
-4. If the UX-01 probe overturns the `_refresh_sprite_clamp` suspicion, the probe notes -
-   not this design - are the record of the real cause; `5_design` cites them.
+- **Partial occlusion vs full enclosure:** `covered` (>= 25%, max-single-coverer)
+  is checked *after* `occluded` (full enclosure), so the precise id survives and the
+  Central Divine case (72% under the strip band) goes RED while a unit merely near
+  the bar (0%) stays GREEN. The threshold is above antialias noise (>= 64 px²
+  absolute floor) and below any "meaningfully hidden" fraction.
+- **Yang Guo resolved by 3 numbers, never pixels:** `portrait_sprite_pos` +
+  `portrait_tex_size` + `portrait_bar_pos` are published per frame and recorded in
+  the probe notes before any fix; the fix-loci table keys strictly off the measured
+  failing layer id. If every layer measures green with consistent geometry, the
+  honest disposition is "frame-reading divergence, no fix" - recorded, not guessed.
+- **Both units must genuinely go red (A-class), not one:** the probe records both
+  units' pre-fix values; the A-class evidence is `portrait_visible == false` with a
+  non-empty fail-layer id for each; post-fix all six GREEN with the four healthy
+  units guarded. The dead-probe invariant guards against a false pass.
+- **Leaf-type assumption:** `leaf_rect()` handles `Control` and `Sprite2D`; if a
+  unit's ink leaf is another type, `zero_rect`/`hidden_in_tree` fires and the probe
+  notes record the actual node class - extending leaf support only then.
+- **Protected code:** `_refresh_sprite_clamp` / `clamp_sprite_offset` change ONLY
+  behind a measured `covered` id, as a one-constant margin (92 = the existing strip
+  bottom, not a new gameplay number). Click-move / undo / commit / focus / creation
+  layout / top-bar / health-bar geometry are untouched.
+- **960x704 native frame only:** all visibility evidence is judged on the un-zoomed
+  original frame; the raw frame remains the human cross-check, never the gate input.
+- **Effect vocabulary is a hard contract:** pinned statically by the new
+  `_test_effect_targets` and dynamically by the 32-case effects-land unit test -
+  a typo'd target fails loudly instead of silently no-opping.
+- **`silver` clamps at 0 / `item` dedups / `practice` no-ops when mastered:** every
+  cost is sized to be a real cost; item targets are unique per row; every practice
+  option is paired so the row's other option stays meaningful.
+- **Pool-exhausted behavior stays defined:** reset + refill -> `event_id != ""`
+  always; proven deterministically by the unit tests (forced 1-id pool and the
+  all-16 reset branch).
+- **RNG/determinism:** no new randomness; one rng op per travel regardless of pool
+  size; new rows add no rolls. Existing-scenario dependence on event outcomes is
+  audited and any re-baseline is declared in Design Changes.
+- **YAML duplicate keys:** appended asserts never repeat an existing
+  `Node.var:` key in the same assert block (a duplicate would silently drop one).
 
-**No conflicts with the archive otherwise.** No numbers from `20_content.md` change; no
-system rules from `10_systems.md` change; the hint copy is Chinese per the hard
-requirement; no `90_decisions.md` Out-of-scope idea is reintroduced.
+---
+
+## 7. Design Changes (declared for `5_design` - design/ is NOT edited this round)
+
+1. `design/30_presentation.md` - the portrait-visibility section's six-layer list
+   becomes **eight** layers (`blank_texture` after `null_texture`; `covered` after
+   `occluded`), with the 25% / 64 px² threshold and the max-single-coverer
+   semantics; note that `TopStrip` (semi-transparent, `mouse_filter = 2`) is
+   excluded by the opaque-host convention while its opaque children count.
+2. `design/40_ux_backlog.md` - UX-01a / UX-01b move to CLOSED only in the fixing
+   commit and only from measured gate evidence (backlog rule 2: closure is an
+   action, not an inference). If either unit measures all-green, its disposition is
+   recorded from the measurement instead.
+3. `design/99_changelog.md` - one row for the round (predicate extension + clamp
+   margin + 16-row event pool + the new scenario, 46 -> 47).
+4. `design/40_progression.md` §4 - no rule change; the travel-event pool growing
+   4 -> 16 is content volume, recorded in the changelog only.
+5. If the RNG audit forces a scenario re-baseline, list each re-baselined assert
+   here explicitly.
+
+No numbers from `20_content.md` change; no `10_systems.md` rule changes; no
+`90_decisions.md` Out-of-scope idea is reintroduced (no hover-based visibility, no
+frame-pixel verdicts, no speculative clamp edits without probe evidence, no external
+JSON content, no procedural events).
 
 ---
 
 ## 8. Safety, Baseline Protection, Rollback
 
-- **No irreversible operations anywhere.** All edits are additive or property-level; no
-  file is deleted, no schema migrated, no data rewritten. The only "replacing" write is
-  `step2_design.md` itself (archived automatically).
-- **Baseline protection (hard constraints):**
-  - The 43 green scenarios stay green; `terminal_victory` stays the **only** allowed red.
-  - The five protected click-move scenarios (`click_move_to_tile`, `click_move_undo_right`,
-    `click_move_commit_lock`, `click_targeting_fixed`, `movement_range_highlight`) are
-    byte-untouched; the new scenario reuses their proven frame timings instead of
-    re-baselining them.
-  - Pinned node paths unchanged; `MoveHintLabel` is a new sibling at an unpinned path
-    (TopStrip precedent); `TopStrip` / creation / health-bar geometry untouched.
-  - The UX-01 fix must keep the four healthy units' `portrait_visible` true (B-class
-    guards) and `sprite_top` semantics unchanged.
-- **Rollback path:** every component is one commit-sized revert (helper file, two var
-  additions, one Label + driver, two yaml files, smoke-test function). If the fix
-  regresses a protected scenario, revert the fix commit alone - the observables and the
-  probe notes remain valid evidence either way.
+- **Baseline protection:** the 45 green scenarios stay green;
+  `terminal_victory_8_12_rounds_hp_15_40` stays the only allowed red. The five
+  protected click-move scenarios are byte-untouched. No node renames/reparents; no
+  `.tscn` or `project.godot` changes at all.
+- **No irreversible operations:** everything is additive source/contract edits; no
+  data migration, no file deletion, no save-schema change (`events_seen` shape is
+  unchanged; old saves with 4-row-era seen lists simply draw from the 16-row pool).
+- **Rollback path:** every component is one commit-sized revert (probe extension,
+  two var blocks, one clamp constant, one data table, one observable, two test
+  files, one extended scenario, one new scenario, one smoke function). Reverting the
+  clamp constant alone restores the old sprite layout while leaving the predicate
+  and observables valid - the probe evidence survives either way.
 - **Probe-first gating:** the 3.3 fix task is blocked until
-  `final/portrait_probe_notes.md` exists with per-unit observed values. A fix PR without
-  probe evidence is rejected at review.
+  `final/portrait_cover_probe_notes.md` exists with per-unit measured values. A fix
+  without probe evidence is rejected at review.
+- **Delivery hygiene:** new scenario registered in `scenario_order` AND
+  `ROUND_SCENARIOS` (same order) and actually run via `godot_playtest_scenario`
+  before delivery; all numbers in delivery notes are probe-measured; observables
+  classified A (defect-proof, red before fix) vs B (regression guard); unproduced
+  gate reports are never claimed as passed.
 
 ---
 
-## 9. Suggested Task Decomposition (for the PM)
+## 9. Suggested Task Decomposition (for PM)
 
-| # | Task | Files | Depends on |
-|---|---|---|---|
-| A1 | Visibility predicate + per-unit observables + probe run + `final/portrait_probe_notes.md` | `scripts/ui/visibility_probe.gd` (NEW), `player.gd`/`enemy.gd` (additive), probe notes (NEW) | - |
-| A2 | UX-01 fix from probe evidence (locus per 3.3 table) + `portrait_visibility.yaml` + surface/order/smoke wiring | `grid_manager.gd` or character scripts (per probe), `playtest/portrait_visibility.yaml` (NEW), `_common.yaml` (append), `test_playtest_contract_smoke.py` (additive) | A1 |
-| B1 | `MoveHintLabel` node + driver + `move_target_affordance.yaml` + surface/order/smoke wiring + `final/move_hint_probe_notes.md` | `scenes/ui/hud.tscn` (new sibling), `scripts/ui/move_hint_label.gd` (NEW), `playtest/move_target_affordance.yaml` (NEW), `_common.yaml` (append), `test_playtest_contract_smoke.py` (additive) | - (parallel with A1/A2; the two-place `_common.yaml` sync must be serialized - one task lands its surface append, the other rebases) |
-| C1 | Docs + README round-state rewrite (declared changes of section 7 applied only if 5_design defers) | `README.md` | A2, B1 |
-
-Suggested order: A1 -> A2 -> B1 -> C1, with B1 allowed to start after A1 (never in
-parallel with A2 on `_common.yaml`).
+1. **A1 - Predicate extension + observables** (3.1, 3.2, 3.10 surface part): the two
+   new layers + `covered_fraction` + the six new vars on both character scripts +
+   `_common.yaml` surface append. No behavior change yet.
+2. **A2 - Probe run + notes** (3.3 probe task): inline probe, record the per-unit
+   table (3 numbers, per-layer verdicts, covered fractions) in
+   `final/portrait_cover_probe_notes.md`. Gate for A3.
+3. **A3 - Visibility fix** (3.3 fix loci, keyed off A2's measured layer ids) +
+   `portrait_visibility.yaml` in-place assert append (3.8).
+4. **B1 - Event content** (3.4 + 3.6): 12 new rows + test extensions. Independent of
+   A1-A3; can run in parallel.
+5. **B2 - Cultivation observables + tests** (3.5 + 3.7): `events_seen_count` +
+   no-repeat / pool-reset / effects-land unit tests. Depends on B1's rows.
+6. **C1 - Scenario + contract wiring** (3.9, 3.10 order part, 3.11): the new
+   `event_travel_effects.yaml`, `scenario_order` + `ROUND_SCENARIOS` + the smoke
+   test function. Depends on B2.
+7. **C2 - Full gate run + delivery notes**: 47 scenarios, only `terminal_victory`
+   red; A/B classification table in the delivery notes.
 
 ---
 
 ## 10. Out of Scope / Not This Round
 
-- UX-03..UX-08 in the backlog (skill descriptions, lock reasons, HP numbers, creation
-  attr effects) - next rounds' candidates, not this round's contract.
-- Any change to damage / cooldown / turn-order numbers; any AI change; any art asset
-  regeneration (if the probe shows a **missing texture file**, the fix is wiring the
-  existing asset, not generating new art).
-- Replacing the yellow move-target box visuals themselves (the START_EDGE marker stays
-  as-is; the hint label adds the affordance around it).
-- Occlusion via hover/GUI mouse queries (mouse-dependent, rejected in SOTA).
-- Any new input action or rebind; RMB stays exactly as wired.
+- No new effect types, no battle-triggering events (`battle_id` stays null), no
+  inventory UI (items remain data-only), no event illustrations or art of any kind.
+- No hover/mouse-query visibility checks, no rendered-frame pixel diffing, no
+  snapshot comparison gates.
+- No balance/number changes (no damage, HP, cooldown, deck-count, or
+  difficulty-window edits) - `terminal_victory` stays deliberately red.
+- No map/topology changes, no new input actions, no `.tscn`/`project.godot` edits.
+- No rewrites of `_draw_event` / `_apply_event_option` / the card-deck machinery.
+
+---
+
+## 11. Tech Stack
+
+Godot 4.4+ (`config/features` records 4.7) + GDScript only; engine-native APIs
+(`Rect2.intersection/get_area`, `Control.get_global_rect`, `mouse_filter`,
+`CanvasLayer`/`z_index`/tree-order draw comparison, `Texture2D.get_image`). Gates:
+the existing godot-builder sidecar (`/compile`, `/playtest`), the static pytest
+contract smoke, the GDScript unit suite via `run_tests.sh`, and the vision gate for
+the human cross-check on native 960x704 frames. Lint: `.py` -> ruff, `.yaml` /
+`.json` / `.md` -> basic (`.gd` deliberately absent - the `gdscript_check` gate owns
+it, per the addon guidance).
