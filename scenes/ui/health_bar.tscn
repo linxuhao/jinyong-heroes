@@ -15,6 +15,10 @@ max_value = 100
 value = 100
 show_percentage = false
 
+[node name="EmptyCap" type="ColorRect" parent="Bar"]
+position = Vector2(58, 0)
+size = Vector2(6, 8)
+
 [node name="NameLabel" type="Label" parent="."]
 anchors_preset = 0
 position = Vector2(2, 0)

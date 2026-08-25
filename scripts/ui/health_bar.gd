@@ -21,6 +21,11 @@ const _TRACK_BG := Color(0.62, 0.62, 0.65)
 ## Dark 1px border around the track so the light track stays visible against
 ## the light summit backdrop.
 const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
+## Empty-cap width in pixels: the fixed-width sliver of track color kept at the
+## RIGHT end of the bar at every fill level, including 100%. At full HP the
+## fill covers the whole bar rect and the widget would read as a solid block
+## (5_vision Q5) — the cap keeps the "empty slot" of the bar always visible.
+const EMPTY_CAP_PX: float = 6.0
 
 # ---------------------------------------------------------------------------
 # State
@@ -63,6 +68,11 @@ var follow_delta: float = 0.0
 ## the fill is bright green at full HP (e.g. 'fill_color.g > 0.5 and
 ## fill_color.g > fill_color.r') — Color members are readable in the harness.
 var fill_color: Color = _FILL_GREEN
+
+## The EmptyCap width in pixels (= EMPTY_CAP_PX). Exposed so the playtest
+## surface / unit test can assert the end-cap geometry without reaching into
+## the ColorRect node directly.
+var empty_cap_px: float = EMPTY_CAP_PX
 
 ## The dedicated "fill" stylebox of the bar. Created once in setup(); its
 ## bg_color is the only thing update_health() recolors. Null until setup runs
@@ -107,12 +117,12 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		# 1px border to separate it from the light backdrop.
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = _TRACK_BG
-		sb.border_width_left = 1
-		sb.border_width_top = 1
-		sb.border_width_right = 1
-		sb.border_width_bottom = 1
+		sb.border_width_left = 2
+		sb.border_width_top = 2
+		sb.border_width_right = 2
+		sb.border_width_bottom = 2
 		sb.border_color = _TRACK_BORDER
-		# Draw the track 3px larger than the control rect on every side. At
+		# Draw the track 4px larger than the control rect on every side. At
 		# 100% HP the fill covers the whole rect, so without this the widget is
 		# a solid coloured block and reads as a platform, not a bar — the
 		# readability gate reported exactly that 11/11 ("solid green
@@ -126,7 +136,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		#
 		# bar.size stays 64x6, so the `HealthBar.bar_width <= 64` geometric
 		# assert is untouched — this is drawing, not layout.
-		sb.set_expand_margin_all(3.0)
+		sb.set_expand_margin_all(4.0)
 		bar.add_theme_stylebox_override("background", sb)
 		# Dedicated fill stylebox: recolored by update_health() per HP band.
 		# No border widths on the fill (a border around only the filled
@@ -135,6 +145,16 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		_fill_sb.bg_color = _FILL_GREEN
 		bar.add_theme_stylebox_override("fill", _fill_sb)
 		fill_color = _FILL_GREEN
+		# Pin the EmptyCap (the constant track-color end cap) to the bar's
+		# right end. Done here — outside the char_node guard — so the
+		# headless null-char path still pins it; update_health() re-pins it
+		# on every call so the cap never drifts from the live bar width.
+		var cap: ColorRect = bar.get_node_or_null("EmptyCap") as ColorRect
+		if cap != null:
+			cap.position.x = bar.size.x - EMPTY_CAP_PX
+			cap.size = Vector2(EMPTY_CAP_PX, bar.size.y)
+			cap.color = _TRACK_BG
+			cap.visible = true
 
 	var label: Label = _name_label
 	if label == null:
@@ -180,6 +200,16 @@ func update_health(current: int, max_hp: int) -> void:
 		return
 
 	_bar.value = current
+
+	# Re-pin the EmptyCap to the bar's right end on every update so the cap
+	# stays the visible "empty slot" at ANY fill level, including 100%. The
+	# ColorRect child draws over the ProgressBar fill (never affects value).
+	var cap: ColorRect = _bar.get_node_or_null("EmptyCap") as ColorRect
+	if cap != null:
+		cap.position.x = _bar.size.x - EMPTY_CAP_PX
+		cap.size = Vector2(EMPTY_CAP_PX, _bar.size.y)
+		cap.color = _TRACK_BG
+		cap.visible = true
 
 	var ratio: float = float(current) / float(max_hp) if max_hp > 0 else 0.0
 	_last_ratio = ratio

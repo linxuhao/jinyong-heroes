@@ -46,7 +46,7 @@ static func run() -> bool:
 	ok = _expect(ok, bar.fill_color.is_equal_approx(Color(0.9, 0.25, 0.2)),
 			"update_health(20,100) fill_color == red")
 
-	# The track draws 3px larger than the control rect on every side via
+	# The track draws 4px larger than the control rect on every side via
 	# expand margins (never content margins), and a dedicated fill stylebox
 	# must exist for the per-band recoloring — its bg_color is a distinct,
 	# dedicated fill, never the track color.
@@ -54,13 +54,37 @@ static func run() -> bool:
 	var bg = bar_node.get_theme_stylebox("background")
 	ok = _expect(ok, bg is StyleBoxFlat, "background stylebox is StyleBoxFlat")
 	if bg is StyleBoxFlat:
-		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 3.0),
-				"background expand_margin_all == 3.0")
+		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 4.0),
+				"background expand_margin_all == 4.0")
+		ok = _expect(ok, bg.border_width_left == 2 and bg.border_width_top == 2
+				and bg.border_width_right == 2 and bg.border_width_bottom == 2,
+				"background border_width == 2 on all four sides")
 	ok = _expect(ok, bar_node.get_theme_stylebox("fill") != null, "fill stylebox non-null")
 	var fill_sb = bar_node.get_theme_stylebox("fill")
 	if fill_sb is StyleBoxFlat:
 		ok = _expect(ok, not fill_sb.bg_color.is_equal_approx(bar.track_bg),
 				"fill stylebox bg differs from track bg")
+
+	# EmptyCap: the constant track-color end cap pinned to the bar's right end
+	# (5_vision Q5 — a visible empty slot at ANY fill level, incl. 100%).
+	var cap = bar_node.get_node("EmptyCap")
+	ok = _expect(ok, cap is ColorRect, "Bar/EmptyCap exists and is a ColorRect")
+	ok = _expect(ok, bar.empty_cap_px > 0, "empty_cap_px > 0")
+	ok = _expect(ok, is_equal_approx(cap.size.x, bar.empty_cap_px),
+			"EmptyCap.size.x == empty_cap_px")
+	ok = _expect(ok, cap.color.is_equal_approx(bar.track_bg),
+			"EmptyCap.color == track_bg")
+	ok = _expect(ok, abs(cap.position.x + cap.size.x - bar_node.size.x) < 0.01,
+			"EmptyCap right-aligned with Bar (position.x + size.x == Bar.size.x)")
+
+	# At full HP (ratio 1.0) the cap must STILL be pinned and visible — the
+	# fill covers the whole bar rect, so the cap is the only empty-track hint.
+	bar.update_health(100, 100)
+	ok = _expect(ok, cap is ColorRect and is_equal_approx(cap.size.x, bar.empty_cap_px)
+			and cap.color.is_equal_approx(bar.track_bg)
+			and abs(cap.position.x + cap.size.x - bar_node.size.x) < 0.01
+			and cap.visible,
+			"EmptyCap still pinned & visible at full HP (ratio 1.0)")
 
 	# Name-label no-clip (5_vision Q6): the 9px label rect cannot hold the full
 	# CJK glyph box (font 10 em ≈ 15px) — that is by design. The no-clip
