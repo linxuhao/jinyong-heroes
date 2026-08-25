@@ -190,6 +190,10 @@ surface:
   - debug_last_raw_event_pos
   - debug_click_events
   - debug_last_click_grid
+  - turn_start_grid
+  - turn_start_moves_left
+  - turn_start_moved
+  - undo_available
   East_Heretic:
   - health
   - max_health
@@ -271,6 +275,7 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - focus_mode
   SkillButton2:
   - visible
   - text
@@ -415,16 +420,19 @@ surface:
   PauseButton:
   - visible
   - global_position
+  - focus_mode
   EndTurnButton:
   - visible
   - size
   - mouse_filter
   - disabled
+  - focus_mode
   AttackButton:
   - visible
   - size
   - mouse_filter
   - disabled
+  - focus_mode
   HealthBar:
   - visible
   - global_position
@@ -447,6 +455,8 @@ surface:
   - visible
   - tile_count
   - fill_color
+  - start_tile
+  - undo_available
   SceneManager:
   - current_scene
   - pending_swap
@@ -466,6 +476,7 @@ surface:
   - visible
   - size
   - pressed_connected
+  - cursor_markers_visible
   SectSelectScreen:
   - focus_index
   - selected_sect_id
@@ -580,6 +591,9 @@ surface:
   TraitDescLabel:
   - visible
   - text
+  PointsLabel:
+  - visible
+  - text
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -619,3 +633,8 @@ scenario_order:
 - skill_description_visible
 - movement_range_highlight
 - battle_end_turn_attack_buttons
+- battle_focus_arrow_keys
+- click_move_to_tile
+- click_move_undo_right
+- click_move_commit_lock
+- creation_single_ui

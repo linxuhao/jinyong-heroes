@@ -1,0 +1,88 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# PROVES the focus-mode fix for the reported "sometimes arrow keys don't move"
+# defect: battle HUD buttons default to focus_mode FOCUS_ALL, so a clicked
+# button holds keyboard focus and Godot's GUI focus navigation swallows the
+# ui_up/ui_down actions (which move_up binds to) BEFORE _unhandled_input ever
+# sees the key. The fix is static: focus_mode = 0 (FOCUS_NONE) on every battle
+# clickable, so no battle Control can ever hold focus. f35 asserts that static
+# contract directly (EndTurnButton / AttackButton / SkillButton1 / PauseButton
+# all focus_mode == 0). Then the behavioral differential: a real click on
+# AttackButton (its gate-guarded handler rejects with 射程不够 — no enemy is
+# adjacent to the (7,5) start — and does NOT end the turn), then move_up, and
+# Player.grid_pos: changed proves the arrow still reaches _unhandled_input
+# after a button click. Acceptance is judged by the playtest gate (the
+# focus_mode == 0 asserts + the grid_pos changed differential), NOT by a .tscn
+# diff; the static asserts cannot be vacuous even if the harness synthesizes
+# actions rather than raw keys.
+name: battle_focus_arrow_keys
+description: >-
+  The focus-mode fix for intermittent arrow-key death: every battle clickable
+  is focus_mode == 0 (static asserts at f35 on EndTurnButton / AttackButton /
+  SkillButton1 / PauseButton), then a real click on AttackButton is
+  gate-rejected (射程不够 — nothing adjacent to (7,5); Player.acted stays
+  false and CombatManager.phase stays PLAYER_TURN, so the click did not end
+  the turn), and the following move_up still reaches player._unhandled_input
+  (Player.grid_pos: changed at f70, equality at f95 — the hard differential
+  proof that GUI focus navigation no longer eats the arrow).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 35
+  actions: []
+  assert:
+    EndTurnButton.focus_mode: focus_mode == 0
+    AttackButton.focus_mode: focus_mode == 0
+    SkillButton1.focus_mode: focus_mode == 0
+    PauseButton.focus_mode: focus_mode == 0
+- at: 40
+  actions: []
+  clicks:
+  - AttackButton
+- at: 60
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    Player.acted: acted == false
+- at: 65
+  actions:
+  - move_up
+- at: 70
+  actions: []
+  assert:
+    Player.grid_pos: changed
+- at: 95
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 4)
+    Player.moves_left: moves_left == 3

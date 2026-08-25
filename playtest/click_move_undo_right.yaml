@@ -1,0 +1,97 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Right-click undo: the `right` token in a clicks: entry posts a REAL
+# InputEventMouseButton with button_index == MOUSE_BUTTON_RIGHT into the same
+# _unhandled_input branch a human right-click enters (no DEBUG action, no
+# test-only path). The turn-start snapshot (grid_pos / moves_left / moved,
+# engine-written at begin_turn) is restored ANIMATED via GridManager.move_unit.
+#   * Control probe FIRST: Player +0,0 right with nothing moved is a benign
+#     no-op (already at the turn-start tile with the full budget) — grid_pos
+#     (7,5) / moves_left 4 unchanged.
+#   * Player +0,-192 walks up three tiles to (7,2) (budget 4->1, moved true,
+#     undo_available true).
+#   * Player +0,0 right again: the whole turn's movement is undone — back to
+#     (7,5), budget refunded to 4, moved false, undo_available false. The
+#     Player.grid_pos: changed differential at f140 is the proof the `right`
+#     token selected the real right-button branch (a left-click at the same
+#     point would have been the own-tile no-op).
+name: click_move_undo_right
+description: >-
+  Right-click undo via a real right-button event: control probe first
+  (Player +0,0 right with nothing moved is a benign no-op — grid_pos (7,5) /
+  moves_left 4 unchanged), then walk up three tiles to (7,2) (moves_left 1,
+  undo_available true), then right-click the player's own tile again and the
+  whole turn's movement is undone: back to (7,5), budget refunded to 4, moved
+  false, undo_available false (full snapshot restore — the differential proof
+  that the right token truly selects the right button).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 40
+  actions: []
+  clicks:
+  - Player +0,0 right
+- at: 65
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
+    Player.moves_left: moves_left == 4
+- at: 70
+  actions: []
+  clicks:
+  - Player +0,-192
+- at: 75
+  actions: []
+  assert:
+    Player.grid_pos: changed
+- at: 130
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 2)
+    Player.moves_left: moves_left == 1
+    Player.undo_available: undo_available == true
+- at: 135
+  actions: []
+  clicks:
+  - Player +0,0 right
+- at: 140
+  actions: []
+  assert:
+    Player.grid_pos: changed
+- at: 170
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
+    Player.moves_left: moves_left == 4
+    Player.moved: moved == false
+    Player.undo_available: undo_available == false

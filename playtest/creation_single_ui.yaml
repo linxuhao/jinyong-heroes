@@ -1,0 +1,78 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Creation screen single operation surface: the two parallel UIs of the old
+# screen (a keyboard-driven ▶ cursor text model in BodyLabel PLUS the MouseBox
+# button set) are collapsed into ONE surface — the buttons. Keyboard input
+# survives as a pure shortcut layer acting on that surface (row focus + +/- /
+# toggle / accept), pinned by creation_budget_clamp_and_traits (11/11) and
+# menu_to_creation_to_tutorial_order (19/19).
+#
+# Direct creation.tscn boot (asserts hold at f30 — proven scene-path
+# capability, see creation_mouse_interaction). f30 proves the single-surface
+# shape: ATTRS phase, the points display on the new PointsLabel (剩余点数 30),
+# the button surface visible (AttrPlus0), trait toggles phase-hidden
+# (TraitToggle0.visible false), wiring intact (pressed_connected.size() > 0),
+# and the keyboard-cursor surface GONE (cursor_markers_visible == false).
+# Keyboard shortcuts still act on the button surface: move_right (bone 10->11,
+# points 30->29 — points_left: changed at f45, equality at f70), move_left
+# back (30 / 10), ui_accept -> TRAITS (TraitToggle0.visible true and
+# cursor_markers_visible still false — the ▶-scan runs at the end of every
+# _render, so each phase's rendered text is covered).
+#
+# NOTE (acceptance): the creation single-surface acceptance is judged by the
+# playtest gate (CreationScreen.cursor_markers_visible == false — no U+25B6 ▶
+# cursor marker in any rendered label), NOT by a .tscn diff (BodyLabel node
+# removal) and NOT by the vision gate — a diff is a review aid, not a gate.
+name: creation_single_ui
+description: >-
+  creation.tscn direct boot: one operation surface — the MouseBox button set —
+  with the points display on the new PointsLabel (剩余点数 30) and the old
+  keyboard-cursor text model gone (cursor_markers_visible == false, the
+  playtest-gate acceptance). Keyboard remains a working shortcut layer on the
+  button surface: move_right (bone 10->11, points 30->29), move_left back to
+  30 / 10, ui_accept -> TRAITS (TraitToggle0.visible true, cursor_markers_visible
+  still false).
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.visible: visible == true
+    CreationScreen.phase: phase == "ATTRS"
+    PointsLabel.visible: visible == true
+    PointsLabel.text: text.contains("剩余点数") == true
+    AttrPlus0.visible: visible == true
+    TraitToggle0.visible: visible == false
+    CreationScreen.pressed_connected: pressed_connected.size() > 0
+    CreationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 40
+  actions:
+  - move_right
+- at: 45
+  actions: []
+  assert:
+    CreationScreen.points_left: changed
+- at: 70
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 29
+    CreationScreen.attrs: attrs["bone"] == 11
+- at: 80
+  actions:
+  - move_left
+- at: 105
+  actions: []
+  assert:
+    CreationScreen.points_left: points_left == 30
+    CreationScreen.attrs: attrs["bone"] == 10
+- at: 115
+  actions:
+  - ui_accept
+- at: 140
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    TraitToggle0.visible: visible == true
+    CreationScreen.cursor_markers_visible: cursor_markers_visible == false

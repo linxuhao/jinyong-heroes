@@ -1,0 +1,94 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Click-driven battle movement: left-click an empty walkable tile and the
+# player walks there, resolved into a cardinal step sequence and executed one
+# _try_move call per step (the SAME budget/occupancy/tween rules as the arrow
+# keys — no forked movement logic). Round 1 start: player (7,5), moves_left 4.
+#   * Player +64,0 — one tile RIGHT of the player (offset anchored on the live
+#     node centre) -> (8,5): moves_left 4->3, moved true, undo_available true,
+#     and MoveRangeHighlight.start_tile still marks the turn-start tile (7,5).
+#     debug_click_events: changed at f45 is the click-arrival differential
+#     (equality asserts land >=25 frames after the click).
+#   * Player +0,-192 — 3 tiles UP from the NEW centre (8,5) -> (8,2), a
+#     multi-step path drained one step per 0.15s tween (~9 frames each, done
+#     ~f102), moves_left 3->0. Equality asserts at f135 (60 after the click).
+#   * Player +0,0 — click on the player's OWN tile: silent no-op, grid_pos
+#     still (8,2) and moves_left still 0 (the control group; undo_available is
+#     deliberately NOT asserted here — the player has moved but not acted, so
+#     it is true).
+name: click_move_to_tile
+description: >-
+  Left-click-to-move: click Player +64,0 -> player walks (7,5)->(8,5)
+  (moves_left 4->3, moved true, undo_available true, MoveRangeHighlight.start_tile
+  still (7,5) — the turn-start marker); click Player +0,-192 (offset re-anchored
+  on the player's NEW centre) -> three steps up to (8,2), moves_left 0; click
+  Player +0,0 (own tile) -> silent no-op, grid_pos still (8,2) and moves_left
+  still 0. Click-move reuses _try_move per step, so budget bookkeeping is
+  byte-identical to the keyboard path.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 40
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 45
+  actions: []
+  assert:
+    Player.debug_click_events: changed
+- at: 70
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(8, 5)
+    Player.moves_left: moves_left == 3
+    Player.moved: moved == true
+    Player.undo_available: undo_available == true
+    MoveRangeHighlight.start_tile: start_tile == Vector2i(7, 5)
+- at: 75
+  actions: []
+  clicks:
+  - Player +0,-192
+- at: 135
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(8, 2)
+    Player.moves_left: moves_left == 0
+- at: 145
+  actions: []
+  clicks:
+  - Player +0,0
+- at: 175
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(8, 2)
+    Player.moves_left: moves_left == 0

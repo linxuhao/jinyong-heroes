@@ -27,12 +27,11 @@ COMMON: Path = REPO_ROOT / "playtest" / "_common.yaml"
 PLAYTEST_DIR: Path = REPO_ROOT / "playtest"
 
 ROUND_SCENARIOS: list[str] = [
-    "click_targeting_fixed",
-    "creation_traits_back_next_buttons",
-    "creation_back_to_menu_walk",
-    "skill_description_visible",
-    "movement_range_highlight",
-    "battle_end_turn_attack_buttons",
+    "battle_focus_arrow_keys",
+    "click_move_to_tile",
+    "click_move_undo_right",
+    "click_move_commit_lock",
+    "creation_single_ui",
 ]
 
 
@@ -177,3 +176,48 @@ def test_click_targeting_surface_contract() -> None:
         "clicks: target %r belongs to no whitelisted surface block "
         "(looked for %r)" % (target, owner)
     )
+
+
+def test_click_move_surface_contract() -> None:
+    """Surface whitelist + clicks-owner contract for the click-move round.
+
+    The five round scenarios assert observables the previous rounds never
+    whitelisted (Player.turn_start_grid / turn_start_moves_left /
+    undo_available, MoveRangeHighlight.start_tile / undo_available,
+    CreationScreen.cursor_markers_visible) and click OFFSET targets (the
+    ``"<Node> +dx,dy [right]"`` spec) that the old single-target owner check
+    did not parse. This test pins both sides of the contract:
+      1. every new observable is whitelisted on the surface;
+      2. every clicks: target in the five new scenario files belongs to a
+         whitelisted surface block — the FIRST whitespace token of the spec
+         string (offsets like "Player +64,0" keep only "Player"), with a
+         trailing "_ClickTarget" stripped (the hit-surface Control itself is
+         deliberately not a surface block, exactly like click_targeting_fixed).
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    player_items = blocks.get("Player", [])
+    for var in ("turn_start_grid", "turn_start_moves_left", "undo_available"):
+        assert var in player_items, "Player.%s not whitelisted on the surface" % (var,)
+    highlight_items = blocks.get("MoveRangeHighlight", [])
+    for var in ("start_tile", "undo_available"):
+        assert var in highlight_items, (
+            "MoveRangeHighlight.%s not whitelisted on the surface" % (var,)
+        )
+    creation_items = blocks.get("CreationScreen", [])
+    assert "cursor_markers_visible" in creation_items, (
+        "CreationScreen.cursor_markers_visible not whitelisted on the surface"
+    )
+    for name in ROUND_SCENARIOS:
+        click_text = (PLAYTEST_DIR / (name + ".yaml")).read_text(encoding="utf-8")
+        for item in _items_under(click_text, "clicks"):
+            target = item.split()[0]
+            owner = (
+                target[: -len("_ClickTarget")]
+                if target.endswith("_ClickTarget")
+                else target
+            )
+            assert owner in blocks, (
+                "clicks: target %r in %s belongs to no whitelisted surface block "
+                "(looked for %r)" % (item, name, owner)
+            )
