@@ -49,6 +49,12 @@ timeline:
     SkillButton6.text: text.contains("…") == false
     SkillButton7.text: text.contains("…") == false
     SkillButton8.text: text.contains("…") == false
+    HUD.top_text_pairwise_overlap: top_text_pairwise_overlap == false
+    HUD.top_text_in_strip: top_text_in_strip == true
+    HUD.top_strip_alpha: top_strip_alpha >= 0.55
+    HUD.hpbar_strip_overlap: hpbar_strip_overlap == false
+    TopStrip.visible: visible == true
+    HealthBar.name_backing_alpha: name_backing_alpha > 0.3
 - at: 40
   actions:
   - move_up
@@ -67,3 +73,11 @@ timeline:
   assert:
     HealthBar.follow_delta: follow_delta <= 24
     HealthBar.global_position: changed
+- at: 100
+  actions:
+  - skill_1
+- at: 115
+  actions: []
+  assert:
+    ActionHintLabel.visible: visible == true
+    HUD.hint_hpbar_overlap: hint_hpbar_overlap == false

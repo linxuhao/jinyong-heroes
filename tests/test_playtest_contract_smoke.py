@@ -38,6 +38,7 @@ ROUND_SCENARIOS: list[str] = [
     "click_move_undo_right",
     "click_move_commit_lock",
     "creation_single_ui",
+    "creation_layout_readability",
 ]
 
 
@@ -227,3 +228,64 @@ def test_click_move_surface_contract() -> None:
                 "clicks: target %r in %s belongs to no whitelisted surface block "
                 "(looked for %r)" % (item, name, owner)
             )
+
+
+def test_topbar_layout_surface_contract() -> None:
+    """Surface whitelist + clicks-owner contract for the layout round.
+
+    The round's battle-top-strip and creation-layout observables
+    (HUD.top_text_* / hint_hpbar_overlap / hpbar_strip_overlap,
+    TopStrip.visible/size, HealthBar.name_backing_alpha,
+    CreationScreen.attr_*/points_*/phase_*/creation_*) must be whitelisted on
+    the surface, and the new creation_layout_readability scenario's clicks
+    targets must parse non-vacuously AND belong to whitelisted surface blocks
+    (same owner logic as test_click_move_surface_contract — first whitespace
+    token, trailing _ClickTarget stripped). Pinning the click parsing inside
+    this test closes the vacuum-coverage gap: an inline ``clicks: [X]`` list
+    never matches ``_items_under``'s exact ``clicks:`` header match, so an
+    unparseable scenario would silently skip the owner check.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "TopStrip" in blocks, "surface has no TopStrip block"
+    hud_items = blocks.get("HUD", [])
+    for var in (
+        "top_text_pairwise_overlap",
+        "top_text_in_strip",
+        "top_strip_alpha",
+        "hint_hpbar_overlap",
+        "hpbar_strip_overlap",
+    ):
+        assert var in hud_items, "HUD.%s not whitelisted on the surface" % (var,)
+    creation_items = blocks.get("CreationScreen", [])
+    for var in (
+        "attr_rows_uniform",
+        "attr_label_alignment_ok",
+        "points_attrs_gap_ok",
+        "phase_skeleton_same",
+        "creation_in_viewport",
+        "creation_box_fits",
+    ):
+        assert (
+            var in creation_items
+        ), "CreationScreen.%s not whitelisted on the surface" % (var,)
+    health_items = blocks.get("HealthBar", [])
+    assert "name_backing_alpha" in health_items, (
+        "HealthBar.name_backing_alpha not whitelisted on the surface"
+    )
+    click_text = (PLAYTEST_DIR / "creation_layout_readability.yaml").read_text(
+        encoding="utf-8"
+    )
+    clicks_items = _items_under(click_text, "clicks")
+    assert clicks_items, "creation_layout_readability.yaml has no clicks: items"
+    for item in clicks_items:
+        target = item.split()[0]
+        owner = (
+            target[: -len("_ClickTarget")]
+            if target.endswith("_ClickTarget")
+            else target
+        )
+        assert owner in blocks, (
+            "clicks: target %r in creation_layout_readability belongs to no "
+            "whitelisted surface block (looked for %r)" % (item, owner)
+        )

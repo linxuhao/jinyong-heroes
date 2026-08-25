@@ -259,6 +259,14 @@ surface:
   - pressed_connected
   - hud_button_overlap
   - hud_desc_overlap
+  - top_text_pairwise_overlap
+  - top_text_in_strip
+  - top_strip_alpha
+  - hint_hpbar_overlap
+  - hpbar_strip_overlap
+  TopStrip:
+  - visible
+  - size
   RoundIndicator:
   - visible
   - current_round
@@ -452,6 +460,7 @@ surface:
   - fill_color
   - total_height
   - track_bg
+  - name_backing_alpha
   Battlefield:
   - board_aligned
   - grid_lines_visible
@@ -486,6 +495,12 @@ surface:
   - size
   - pressed_connected
   - cursor_markers_visible
+  - attr_rows_uniform
+  - attr_label_alignment_ok
+  - points_attrs_gap_ok
+  - phase_skeleton_same
+  - creation_in_viewport
+  - creation_box_fits
   SectSelectScreen:
   - focus_index
   - selected_sect_id
@@ -647,3 +662,4 @@ scenario_order:
 - click_move_undo_right
 - click_move_commit_lock
 - creation_single_ui
+- creation_layout_readability

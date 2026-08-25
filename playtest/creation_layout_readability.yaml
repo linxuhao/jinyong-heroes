@@ -1,0 +1,51 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct creation.tscn boot (proven scene-path capability, see
+# creation_mouse_interaction / creation_traits_back_next_buttons): the three
+# phases share one vertical skeleton — uniform attr rows with the value label
+# hugging its -/+ cluster, the points label attached to the block, everything
+# inside the viewport, and no phase overflows its box. Real clicks walk
+# ATTRS -> TRAITS (AttrNextButton) -> CONFIRM (TraitNextButton); the 20-frame
+# phase-transition latency is the proven pattern from
+# creation_traits_back_next_buttons (f40 click -> f60 TRAITS).
+name: creation_layout_readability
+description: >-
+  creation.tscn direct boot: layout rhythm is uniform across the three phases —
+  attr rows uniform height with the value label right-aligned against its -/+
+  cluster, the points label attached above the block, the visible phase box
+  top matching the ATTRS skeleton, and every phase fitting inside the MouseBox
+  inside the viewport. Clicks walk ATTRS -> TRAITS -> CONFIRM.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attr_rows_uniform: attr_rows_uniform == true
+    CreationScreen.attr_label_alignment_ok: attr_label_alignment_ok == true
+    CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
+    CreationScreen.creation_in_viewport: creation_in_viewport == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+- at: 40
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    CreationScreen.phase_skeleton_same: phase_skeleton_same == true
+    CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+- at: 100
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 150
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+    CreationScreen.phase_skeleton_same: phase_skeleton_same == true
+    CreationScreen.creation_box_fits: creation_box_fits == true

@@ -27,10 +27,10 @@ const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
 ## (5_vision Q5) — the cap keeps the "empty slot" of the bar always visible.
 const EMPTY_CAP_PX: float = 6.0
 ## Bottom edge of the battle top strip, in viewport px. This is the PAIR of
-## hud.tscn's TopStrip offsets (0..80, full-width band drawn behind the top
+## hud.tscn's TopStrip offsets (0..92, full-width band drawn behind the top
 ## HUD widgets): floating health bars clamp their top edge to STRIP_BOTTOM + 2
 ## so no bar ever enters the strip zone. Keep in sync with hud.tscn.
-const STRIP_BOTTOM: float = 80.0
+const STRIP_BOTTOM: float = 92.0
 
 # ---------------------------------------------------------------------------
 # State
@@ -201,7 +201,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		_name_backing_sb.corner_radius_top_right = 2
 		_name_backing_sb.corner_radius_bottom_right = 2
 		_name_backing_sb.corner_radius_bottom_left = 2
-		_name_backing_sb.content_margin_all(2.0)
+		_name_backing_sb.set_content_margin_all(2.0)
 		label.add_theme_stylebox_override("normal", _name_backing_sb)
 		name_backing_alpha = 0.7
 
