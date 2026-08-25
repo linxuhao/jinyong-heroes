@@ -28,6 +28,11 @@ timeline:
     CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
     CreationScreen.creation_in_viewport: creation_in_viewport == true
     CreationScreen.creation_box_fits: creation_box_fits == true
+    CreationScreen.attr_cluster_center_ok: attr_cluster_center_ok == true
+    CreationScreen.attr_cluster_width_ok: attr_cluster_width_ok == true
+    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
+    CreationScreen.desc_center_ok: desc_center_ok == true
+    CreationScreen.desc_alignment_ok: desc_alignment_ok == true
 - at: 40
   actions: []
   clicks:
@@ -39,6 +44,9 @@ timeline:
     CreationScreen.phase_skeleton_same: phase_skeleton_same == true
     CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
     CreationScreen.creation_box_fits: creation_box_fits == true
+    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
+    CreationScreen.trait_cluster_center_ok: trait_cluster_center_ok == true
+    CreationScreen.desc_alignment_ok: desc_alignment_ok == true
 - at: 100
   actions: []
   clicks:
@@ -49,3 +57,4 @@ timeline:
     CreationScreen.phase: phase == "CONFIRM"
     CreationScreen.phase_skeleton_same: phase_skeleton_same == true
     CreationScreen.creation_box_fits: creation_box_fits == true
+    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true

@@ -289,3 +289,24 @@ def test_topbar_layout_surface_contract() -> None:
             "clicks: target %r in creation_layout_readability belongs to no "
             "whitelisted surface block (looked for %r)" % (item, owner)
         )
+
+
+def test_creation_rework_and_bar_surface_contract() -> None:
+    """Surface whitelist contract for the creation rework + health-bar round.
+
+    The round's new observables (HealthBar.bar_height / empty_area_px /
+    empty_cap_px and CreationScreen.attr_cluster_center_ok /
+    attr_cluster_width_ok / nav_cluster_center_ok / trait_cluster_center_ok /
+    desc_center_ok / desc_alignment_ok) must be whitelisted on the surface, or
+    the playtest gate refuses to evaluate them.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    health_items = blocks.get("HealthBar", [])
+    for var in ("bar_height", "empty_area_px", "empty_cap_px"):
+        assert var in health_items, "HealthBar.%s not whitelisted on the surface" % (var,)
+    creation_items = blocks.get("CreationScreen", [])
+    for var in ("attr_cluster_center_ok", "attr_cluster_width_ok",
+                "nav_cluster_center_ok", "trait_cluster_center_ok",
+                "desc_center_ok", "desc_alignment_ok"):
+        assert var in creation_items, "CreationScreen.%s not whitelisted on the surface" % (var,)
