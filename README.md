@@ -2,18 +2,16 @@
 
 A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. You boot into a **main menu** (mouse-first), create your own character **before** the tutorial, fight a keyboard-completable tutorial duel as the orchestrated Yang Guo, and then walk the six-segment line: **tutorial win -> transition -> sect selection -> cultivation (36 months) -> map -> ending**.
 
-> ⚠️ **Verification status: not yet deployable - downstream gates pending.** This round's deliverable (creation-screen re-layout pass 2 + native-size health-bar readability) is fully implemented and integration-verified at the code level, with pre-fix probe evidence recorded, but the objective gates (compile, vision, unit tests, full playtest) run **after** the Final Verifier and their report files do not exist at this step. `final/verify_report.json` records `all_goals_met: false` / `ready_for_deploy: false` for that reason. See [Verification Status](#verification-status).
+> ⚠️ **Verification status: not yet deployable - downstream gates pending.** This round's deliverable (on-frame portrait-visibility predicate + state-following move-target affordance) is fully implemented and integration-verified at the code level, with pre-fix probe evidence recorded, but the objective gates (compile, vision, unit tests, full playtest) run **after** the Final Verifier and their report files do not exist at this step. `final/verify_report.json` records `all_goals_met: false` / `ready_for_deploy: false` for that reason. See [Verification Status](#verification-status).
 
-## What this round delivers - 捏人屏排版返工 + 血条真实尺寸可读 (jinyong-layout-r2)
+## What this round delivers - 立绘可见性可断言 + 移动目标提示 (jinyong-affordance)
 
-The previous layout round fixed the creation screen's **row-internal** rhythm (value label right-aligned against its `-`/`+` cluster - correct, kept) but left the **whole-screen** layer broken: the five attribute rows filled the full 560px container, flinging the label + `-`/`+` clusters to the far right edge (ink ≈ x 608..760) while the nav buttons and description text sat far left - and the then-current `points_attrs_gap_ok` stayed green through all of it because it compared **container** rects (both nominally centered at 480). Independently, the floating health bar read as a solid green rectangle at the native 960×704 size (vision gate Q5 17/26). This round:
+This round adds **no new mechanics** - it turns two things the gates previously could not express into decidable, assertable facts, with the existing assets and Chinese UI copy untouched:
 
-1. **Creation screen re-layout, pass 2 (row-level shrink-center).** `scenes/segments/creation.tscn` gives every row `size_flags_horizontal = 4` (SHRINK_CENTER): `AttrRow0..4`, `AttrNavRow`, `TraitNavRow`, and each of `TraitToggle0..12`; `AttrLabel`'s minimum width now hugs its text (its `horizontal_alignment = 2` + expand-fill pair is untouched - the row-internal half that was already correct); the phase description labels (`AttrDescLabel` / `TraitDescLabel`) become center-aligned (`horizontal_alignment = 1`). Every visible leaf's ink now lands on the **x=480 axis** in all three phases. **Property-only edits: no node renames, no reparents, no new nodes** - the five creation scenarios' pinned paths are untouched. The battle top bar (`TopStrip`, strip clamping, top-text layout) is correct from last round and deliberately untouched.
-2. **Health bar readable at the native 960×704 size.** Same nodes, same types (`ProgressBar` + `EmptyCap` ColorRect + `StyleBoxFlat`), geometry/contrast only: bar **8→12 px tall**, widget **68×20→68×24**, empty cap **6→10 px** (empty-slot area 48→120 px² authored, ×2.5), track halo **4→6 px**, hover offset −28→−32 (unchanged 8 px hover gap). The cap is a **constant design element** (like a border) - the fill stays truthfully driven by `value / max_value`; no faked HP. No zoomed evidence: acceptance is on native frames.
-3. **"Where is the visible content" made decidable - measured on INK.** `scripts/segments/creation.gd` adds six leaf-ink observables (`attr_cluster_center_ok` / `attr_cluster_width_ok` / `nav_cluster_center_ok` / `trait_cluster_center_ok` / `desc_center_ok` / `desc_alignment_ok`) computed per frame from label **text** rects (`Font.get_string_size`, honoring alignment) and button rects - never container rects - and reworks `points_attrs_gap_ok`'s internals to compare PointsLabel's text rect against the phase's first-row ink cluster (same var name, same yaml assert lines). Pre-fix probe values are recorded with A/B labels in `final/creation_probe_notes.md` and `final/health_bar_probe_notes.md`: every A-class fact was **observed red on the un-fixed layout** (e.g. `attr_cluster_center_ok == false` @f30 - the "split across the screen" defect this round kills), so a recurrence of that layout turns the gate red immediately.
-4. **Contract wiring (append-only / in-place).** `playtest/_common.yaml` surface gains `HealthBar.bar_height / empty_area_px / empty_cap_px` and the six `CreationScreen` cluster vars; `creation_layout_readability.yaml` and `ui_geometry_readability.yaml` are extended in place (existing asserts byte-identical); `tests/test_playtest_contract_smoke.py` gains `test_creation_rework_and_bar_surface_contract`; `tests/test_health_bar.gd` is geometry-synced (68×24 / 12 px / expand 6 / cap 10). **No new scenario files** - `scenario_order` and `ROUND_SCENARIOS` are unchanged (44 scenarios).
-
-**Runtime note (probed, not derived):** Godot clamps a `ProgressBar`'s `size.y` to its theme minimum (~22 px) once it enters the scene tree, so the battle gate reads `bar_height ≈ 22` and `empty_area_px` 132→220 px² across the fix; the authored 12 px / 120 px² contract is pinned on the tscn + headless unit-test path, and the runtime A-class proof is `empty_cap_px` 6→10 (see `final/health_bar_probe_notes.md`). Both paths are green post-fix.
+1. **On-frame portrait visibility made assertable (`VisibilityProbe`).** `scripts/ui/visibility_probe.gd` implements a six-layer predicate (`hidden_in_tree` / `null_texture` / `zero_rect` / `off_viewport` / `clipped` / `occluded`) - `visible == true` is necessary but not sufficient for a portrait to put ink on the rendered frame. Every battle unit (`Player`, `East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`, `Central_Divine`) publishes `portrait_visible` / `portrait_fail_layer` per frame. Probe evidence (`final/portrait_probe_notes.md`): the A2 fix set was **empty** - no unit measured `portrait_visible == false`, so UX-01 was a human frame-reading artifact, not a defect; `playtest/portrait_visibility.yaml` pins all six units at `portrait_visible == true`.
+2. **State-following move-target affordance (`MoveHintLabel`).** A new `Label` below the player's feet whose Chinese copy follows the move state machine (左键点格移动 · 右键退回 -> 右键退回起点 · 出手即确认 -> 已出手 · 移动已确认), `mouse_filter = 2` so it never eats click-move / right-click undo / targeting. `playtest/move_target_affordance.yaml` pins the copy in the idle, undo-ready and committed states (and the return to idle after an undo).
+3. **Two new playtest scenarios** - `portrait_visibility.yaml` and `move_target_affordance.yaml` - appended to `scenario_order` and `ROUND_SCENARIOS`; `playtest/_common.yaml` surface gains the six units' `portrait_visible` / `portrait_fail_layer` plus a `MoveHintLabel` block (`state` / `text` / `visible` / `tile` / `center` / `in_viewport` / `bar_overlap`); `tests/test_playtest_contract_smoke.py` gains `test_affordance_surface_contract`.
+4. **44 → 46 scenarios**, the 43-green baseline preserved (`terminal_victory_8_12_rounds_hp_15_40` stays the only allowed red).
 
 ## Quick Start
 
@@ -130,7 +128,7 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ```
 ├── project.godot                 # Engine config, autoloads, input map, theme, run/main_scene -> menu.tscn
-├── playtest/                     # Headless playtest contract, one file per scenario (44)
+├── playtest/                     # Headless playtest contract, one file per scenario (46)
 │   ├── _common.yaml              #   shared scene / actions / surface + scenario_order
 │   └── <scenario>.yaml           #   basename == name:
 ├── run_tests.sh                  # CLI gate: compile + headless playtest + unit tests
@@ -207,7 +205,7 @@ The playtest harness posts **real** `InputEventMouseButton` events. The `clicks:
 ./run_tests.sh
 ```
 
-Runs a compile check, a headless playtest against the `playtest/` contract (44 scenarios), then the Godot unit tests under `tests/`. A passing run requires a clean compile, zero runtime errors, `empty_round_stalls == 0`, and every assertion green (except the deliberately-red `terminal_victory_8_12_rounds_hp_15_40` difficulty window).
+Runs a compile check, a headless playtest against the `playtest/` contract (46 scenarios), then the Godot unit tests under `tests/`. A passing run requires a clean compile, zero runtime errors, `empty_round_stalls == 0`, and every assertion green (except the deliberately-red `terminal_victory_8_12_rounds_hp_15_40` difficulty window).
 
 Additionally, the static pytest gate (`tests/test_playtest_contract_smoke.py`, standard-library only, no Godot) verifies the contract integrity: `scenario_order` ↔ scenario-file completeness, the round scenarios present on disk and ordered, the surface whitelist + `clicks:`-owner contract, `test_topbar_layout_surface_contract` (previous round's top-bar/creation observables), and **`test_creation_rework_and_bar_surface_contract`** (this round's `HealthBar.bar_height` / `empty_area_px` / `empty_cap_px` + the six `CreationScreen` leaf-ink vars).
 
@@ -220,7 +218,7 @@ The implementation is complete and integration-verified at the code level (per-c
 **However, the objective gates run AFTER this step and their evidence does not exist yet:**
 
 - Compile (`compile_report.json`): **not yet produced** - cannot confirm 0 errors.
-- Playtest hard gate, 44 scenarios / 43-green baseline + the new asserts (`playtest_report.json` / `playtest_summary.md`): **not yet produced**. The implementer's delivery notes record a green chain, but per the constraints the authoritative source is the report files themselves.
+- Playtest hard gate, 46 scenarios / 43-green baseline + the new asserts (`playtest_report.json` / `playtest_summary.md`): **not yet produced**. The implementer's delivery notes record a green chain, but per the constraints the authoritative source is the report files themselves.
 - Vision gate six questions incl. Q5 native-size health-bar readability, 17/26 -> pass (`vision_report.json`): **not yet produced**.
 - Unit tests / pytest incl. `test_creation_rework_and_bar_surface_contract` and the synced `test_health_bar` (`test_report.json`): **not yet produced**.
 
@@ -228,7 +226,7 @@ Per the no-guessing rule, `all_goals_met` and `ready_for_deploy` stay `false` un
 
 Do not ship until:
 
-- the full 44-scenario playtest is green with the 43-green baseline preserved (only `terminal_victory` 5/6 red), the extended `creation_layout_readability` asserts green (13 old + 9 new), and the extended `ui_geometry_readability` asserts green (29 old + 3 new);
+- the full 46-scenario playtest is green with the 43-green baseline preserved (only `terminal_victory` 5/6 red), the extended `creation_layout_readability` asserts green (13 old + 9 new), and the extended `ui_geometry_readability` asserts green (29 old + 3 new);
 - `empty_round_stalls == 0` and runtime errors 0;
 - pytest is green (including `test_creation_rework_and_bar_surface_contract`);
 - the vision gate six questions all pass on **native 960×704 frames** (Q5 must show the health bar's filled + empty portions without zoom);

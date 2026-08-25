@@ -65,6 +65,7 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 | 血条 + 名字 | 悬浮于角色上方,名字在血条**之上**(有半透明底),不叠压;血条顶边夹在顶栏之下(`top ≥ 94`) |
 | 教程面板 | 屏幕居中,**不透明底色** |
 | 捏人屏 | 三阶段(捏人 / 特质 / 确认)内容整组在 **x=480 轴上居中**;每行 shrink-center(AttrLabel 最小宽贴文字;AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`);描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`) |
+| 移动提示 (MoveHintLabel) | 跟随玩家所在格,在脚下 +44 px 处,中文状态跟随文案(左键点格移动 · 右键退回 / 右键退回起点 · 出手即确认 / 已出手 · 移动已确认),`mouse_filter = 2`(不拦截点击) |
 
 **技能按钮必须显示该招式的发挥度**(失常 / 正常 / 超常 + 乘数)——见
 `10_systems.md` §6。
@@ -101,6 +102,21 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
    `Seventeen Mela…` 被右边缘切掉。放不下就换更短的名字或换排版,不要用省略号。
 6. **UI 元素不得互相压盖。** 回合指示当前压在顶栏和暂停按钮上。
 7. **角色不得视觉重叠。** 两个单位站得近时,精灵和名字标签都要仍然可分辨。
+
+### 角色立绘可见性断言（2026-08-25, jinyong-affordance 轮次）
+
+`visible == true` 是必要条件,不是充分条件。立绘的「在渲染帧上可见」=
+六层检查,见 `scripts/ui/visibility_probe.gd` 的 `VisibilityProbe` 类:
+
+1. `hidden_in_tree` — `visible` 标志链
+2. `null_texture` — 纹理资源存在且非空
+3. `zero_rect` — 几何区域面积 > 0
+4. `off_viewport` — 与视口相交
+5. `clipped` — 不被祖先 `clip_contents` 裁剪
+6. `occluded` — 不被后绘制的 Control 遮挡
+
+六层全部通过,立绘才算「看得见」。`playtest/portrait_visibility.yaml`
+断言了全部六个单位的 `portrait_visible == true`。
 
 ### 这些怎么被检验
 
