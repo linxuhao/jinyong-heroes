@@ -106,6 +106,13 @@ var ai_controller = null
 
 @onready var _sprite: Sprite2D = $Sprite
 
+## The authored Control hit-surface (child of this Node2D) that the playtest
+## harness can click. Resolved in _ready() — never in setup(), because setup()
+## runs BEFORE battlefield names the node (the name is still "Enemy" there), and
+## the rename to "<EnemyNodeName>_ClickTarget" needs the FINAL node name to be
+## unique across the tree.
+var _click_target: Control = null
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -202,6 +209,21 @@ func _ready() -> void:
 		grid_pos = GridManager.world_to_grid(position)
 	position = GridManager.grid_to_world(grid_pos)
 
+	# Click hit-surface wiring. The external `clicks:` harness targets CONTROL
+	# nodes only (get_global_rect + mouse_filter), so a bare Node2D enemy is
+	# unclickable. Rename the authored ClickTarget child to
+	# "<EnemyNodeName>_ClickTarget" — the harness resolves targets by recursive
+	# bare-name search, so the name must be unique across the tree — and relay
+	# left-presses into the player's shared world-click handler.
+	# NOTE: this MUST live here, not in setup(): setup() runs BEFORE battlefield
+	# names the node (the name is still "Enemy" at that point), so a setup()-time
+	# rename would give every enemy the same "Enemy_ClickTarget".
+	_click_target = get_node_or_null("ClickTarget") as Control
+	if _click_target != null:
+		_click_target.name = "%s_ClickTarget" % name
+		if not _click_target.gui_input.is_connected(_on_click_target_gui_input):
+			_click_target.gui_input.connect(_on_click_target_gui_input)
+
 
 func _process(_delta: float) -> void:
 	# Clamp the sprite into the artwork rect every frame (before the state gate
@@ -209,6 +231,59 @@ func _process(_delta: float) -> void:
 	# NOTE: cooldowns are int ROUNDS, decremented only by the turn engine at
 	# the unit's own turn start — no per-frame ticking, no timer-driven AI.
 	_refresh_sprite_clamp()
+
+
+## Catch left-clicks on this enemy's tile directly from the input pipeline.
+## The external `clicks:` harness pushes real InputEventMouseButton events, but
+## Godot's GUI picker does NOT route them to a Control whose ancestor is a
+## Node2D (measured: the ClickTarget's gui_input never fires), so the authored
+## hit-surface alone leaves the enemy unclickable. `_input` runs on EVERY node
+## BEFORE the GUI system, so it is the reliable relay: it filters left-presses,
+## converts the event's own viewport coordinates to world space (identical
+## formula to player._handle_click_targeting), matches the clicked tile against
+## this enemy's grid_pos, and forwards into the player's shared, self-gated
+## handle_world_click. The event is marked handled so the player's
+## _unhandled_input mouse branch (the same handle_world_click) cannot
+## double-process it — the `acted` gate in _try_attack_target is the backstop
+## even if both paths ever run.
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	var world: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
+	var click_grid: Vector2i = GridManager.world_to_grid(world)
+	if click_grid != grid_pos:
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	if not player.has_method("handle_world_click"):
+		return
+	get_viewport().set_input_as_handled()
+	player.handle_world_click(world)
+
+
+# ---------------------------------------------------------------------------
+# Click hit-surface relay
+# ---------------------------------------------------------------------------
+
+## Relay a left-press on this enemy's hit-surface into the player's shared
+## world-click handler. gui_input's event.position is LOCAL to the control's
+## rect — never use it for world math; the world point is the rect center in
+## global canvas coordinates (canvas coords == world coords under the identity
+## canvas transform, the same assumption _handle_click_targeting documents).
+func _on_click_target_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	if not player.has_method("handle_world_click"):
+		return
+	player.handle_world_click(_click_target.get_global_rect().get_center())
 
 
 # ---------------------------------------------------------------------------

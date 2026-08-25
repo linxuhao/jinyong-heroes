@@ -457,8 +457,8 @@ func _on_move_completed() -> void:
 # Targeting (left-click)
 # ---------------------------------------------------------------------------
 
-## Handle a left mouse click: find which enemy (if any) was clicked on the grid
-## and execute the appropriate action.
+## Handle a left mouse click: convert the click event's own viewport coordinates
+## to battlefield world space and delegate to the shared handle_world_click.
 func _handle_click_targeting(event: InputEventMouseButton) -> void:
 	# Use the click event's own viewport coordinates, converted to battlefield
 	# world space, instead of the viewport-cached pointer position. The canvas
@@ -466,8 +466,28 @@ func _handle_click_targeting(event: InputEventMouseButton) -> void:
 	# main camera is centered with zero offset), so event.position already equals
 	# world coordinates; the affine inverse keeps the path correct if a camera
 	# ever moves or zooms.
-	var click_world: Vector2 = get_canvas_transform().affine_inverse() * event.position
-	var click_grid: Vector2i = GridManager.world_to_grid(click_world)
+	handle_world_click(get_canvas_transform().affine_inverse() * event.position)
+
+
+## Shared world-click entry point (PUBLIC — called by the mouse path above and by
+## the enemy hit-surface relay in enemy.gd, which bypasses _unhandled_input).
+## Carries the same 4-condition gate as _unhandled_input so the relay path is as
+## safe as the keyboard/mouse path: battle active, player turn live, not paused,
+## not mid-animation. Then: world → grid → living-enemy match → _try_attack_target;
+## only the first matched enemy is acted on. A click during ENEMY_TURN / pause /
+## mid-move is a silent no-op, identical to the keyboard path.
+func handle_world_click(world_pos: Vector2) -> void:
+	var state: String = GameManager.get_state()
+	if state != "BATTLE":
+		return
+	if not CombatManager.is_player_turn():
+		return
+	if CombatManager.get_is_paused():
+		return
+	if is_moving:
+		return
+
+	var click_grid: Vector2i = GridManager.world_to_grid(world_pos)
 
 	# Iterate living enemies to see if one occupies the clicked tile.
 	var enemies: Array[Node] = GameManager.get_enemies_alive()

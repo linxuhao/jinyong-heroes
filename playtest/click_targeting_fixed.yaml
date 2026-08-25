@@ -62,7 +62,7 @@ timeline:
 - at: 100
   actions: []
   clicks:
-  - Central_Divine
+  - Central_Divine_ClickTarget
 - at: 140
   actions: []
   assert:
