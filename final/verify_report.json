@@ -1,23 +1,57 @@
 {
-  "all_goals_met": true,
-  "ready_for_deploy": true,
+  "all_goals_met": false,
+  "ready_for_deploy": false,
   "verified_subtasks": [
-    "compile: 65 scripts, 0 errors",
-    "vision: passed",
-    "playtest hard gate: passed (runtime errors 0)",
-    "save_load_roundtrip 14/14",
-    "menu_load_continues 14/14",
-    "settings_panel 10/10",
-    "cultivation_month_cycle_and_deck_bookkeeping 17/17",
-    "main_menu_entries 32/32",
-    "menu_to_creation_to_tutorial_order 19/19",
-    "creation_mouse_interaction 14/14"
+    {
+      "id": "probe_portrait_visibility",
+      "description": "Per-unit A/B portrait probe; final/portrait_probe_notes.md",
+      "passed": true,
+      "evidence": "final/portrait_probe_notes.md present (20kb), per-unit probe table"
+    },
+    {
+      "id": "fix_portrait_visibility",
+      "description": "visibility_probe.gd + player.gd/enemy.gd observables + portrait_visibility.yaml",
+      "passed": false,
+      "evidence": "visibility_probe.gd:183 Parse Error 'Could not find type \"Canvas\" in the current scope' -> enemy.gd/player.gd fail to compile -> 'first_fail_layer' nonexistent; portrait_visibility 4/10, all six units' portrait_visible observed false"
+    },
+    {
+      "id": "add_move_affordance",
+      "description": "MoveHintLabel + move_target_affordance.yaml + final/move_hint_probe_notes.md",
+      "passed": false,
+      "evidence": "move_target_affordance 3/18: MoveHintLabel.state 'hidden', text '', visible false, Player.grid_pos (7,5); timeline entry 0 non-numeric at '3..15' is the playtest HARD-FAIL cause"
+    },
+    {
+      "id": "regression_run",
+      "description": "Final full-suite regression (46 scenarios) + playtest_summary",
+      "passed": false,
+      "evidence": "hard gate passed: False; runtime errors 114961; 46/46 advisory FAIL; only terminal_victory 5/6 genuine single-assert red (Player.health 783, deliberate)"
+    }
   ],
   "issues": [
-    "terminal_victory_8_12_rounds_hp_15_40 5/6 — deliberately red (difficulty contract), not a defect",
-    "unit-test leg reports no_tests_collected — the tests/ Godot unit tests are unwired this round; NOT a pass signal; wiring them into run_tests.sh is deferred to a separate round"
+    "terminal_victory_8_12_rounds_hp_15_40 5/6 - Player.health observed 783 (outside 15-40% window) - deliberately red balance target (design/10_systems.md 5.3 / design/00_roadmap.md '数值最后调'), not a defect",
+    "Playtest HARD gate FAILED: 2 malformed timeline entries in move_target_affordance.yaml - timeline entry 0 has non-numeric at: '3..15' (frames must be single integers)",
+    "visibility_probe.gd:183 Parse Error: Could not find type \"Canvas\" in the current scope - compile cascade: enemy.gd/player.gd fail to compile, 'first_fail_layer' nonexistent; portrait_visibility 4/10 with all six units' portrait_visible observed false",
+    "move_target_affordance 3/18 - MoveHintLabel.state observed 'hidden', text '', visible false, in_viewport false; Player.grid_pos stays (7,5), acted false",
+    "Baseline click-move not green: click_move_to_tile 9/10 and click_move_undo_right 9/10 - Player.undo_available observed false (expected true with a pending move)",
+    "vision/test/compile gates unverifiable at this step: no vision_report.json / test_report.json / compile_report.json reachable on disk; counts must not be fabricated"
   ],
-  "evidence": {
-    "playtest_summary": "hard gate passed: True; frames 180; runtime errors 0; only remaining advisory failure is terminal_victory 5/6 (deliberate); save_load_roundtrip 13/14 (month 4 vs 3) resolved to 14/14 by fix_save_load_roundtrip_autosave_clobber"
+  "regression_summary": {
+    "playtest": {
+      "scenarios_run": 46,
+      "hard_gate": "FAILED",
+      "frames": 180,
+      "runtime_errors": 114961,
+      "deliberately_red": [
+        "terminal_victory_8_12_rounds_hp_15_40 5/6 (Player.health 783)"
+      ],
+      "hard_fail_causes": [
+        "move_target_affordance.yaml timeline entry 0 non-numeric at '3..15'",
+        "visibility_probe.gd:183 'Canvas' type not in scope (compile cascade)"
+      ],
+      "advisory": "46/46 scenarios have failing assertions this run; genuine observed failures are only the 5 with recorded observed values (terminal_victory, click_move_to_tile, click_move_undo_right, portrait_visibility, move_target_affordance); the rest are masked by the compile cascade"
+    },
+    "vision_gate": "not available at this step (no vision_report.json on disk)",
+    "unit_tests": "not available at this step (no test_report.json on disk)",
+    "baseline_43": "NOT confirmed green - click_move_to_tile 9/10 and click_move_undo_right 9/10 (Player.undo_available false); remaining scenarios masked by the compile cascade"
   }
 }
