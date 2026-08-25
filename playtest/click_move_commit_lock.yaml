@@ -5,8 +5,9 @@
 # Commit lock (出手即锁定): a successful action locks the turn's movement — no
 # more undo. Walk up three tiles to (7,2) (adjacent to Central_Divine at
 # (7,1)), then click Central_Divine_ClickTarget -> basic attack 30 x fa_hui_du
-# 1.3 = 39 damage. Player.acted false->true at f110 is the changed differential
-# (the click executed the action); the equality + health assert land at f140.
+# 1.3 = 39 damage. Player.acted false->true at f145 is the changed differential
+# (the click executed the action; execute_action latency is 40 frames, proven
+# by click_targeting_fixed); the equality + health assert land at f150.
 # Central_Divine.health == max_health - 39 is a PROBE number (same convention
 # as click_targeting_fixed — recalibrate the 39 to observed if a run
 # disagrees, but do not change the assert structure). Then Player +0,0 right:
@@ -67,20 +68,20 @@ timeline:
   actions: []
   clicks:
   - Central_Divine_ClickTarget
-- at: 110
+- at: 145
   actions: []
   assert:
     Player.acted: changed
-- at: 140
+- at: 150
   actions: []
   assert:
     Player.acted: acted == true
     Central_Divine.health: health == max_health - 39  # PROBE
-- at: 145
+- at: 155
   actions: []
   clicks:
   - Player +0,0 right
-- at: 175
+- at: 185
   actions: []
   assert:
     Player.grid_pos: grid_pos == Vector2i(7, 2)

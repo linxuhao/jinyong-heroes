@@ -28,6 +28,7 @@ follow_viewport_enabled = false
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+mouse_filter = 2
 
 [node name="HUDLayer" type="CanvasLayer" parent="."]
 layer = 10
