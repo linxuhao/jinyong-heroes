@@ -13,6 +13,7 @@ extends Node2D
 
 const CharacterData = preload("res://scripts/data/character_data.gd")
 const SkillData = preload("res://scripts/data/skill_data.gd")
+const VisibilityProbe = preload("res://scripts/ui/visibility_probe.gd")
 
 ## Input action for confirming / executing an attack (physical key J, keycode
 ## 74). This is the INPUT action; the engine action string used by
@@ -133,6 +134,11 @@ var selected_skill_index: int = -1
 ## World-px top edge of the sprite texture rect, updated every frame by
 ## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
 var sprite_top: float = 0.0
+
+## On-frame portrait visibility (all 6 layers pass). Computed each frame.
+var portrait_visible: bool = false
+## First failing visibility layer id, "" when fully visible on-frame.
+var portrait_fail_layer: String = ""
 
 # ---------------------------------------------------------------------------
 # Click-path diagnostics (playtest observables — measurement only, never gates)
@@ -337,6 +343,8 @@ func _process(_delta: float) -> void:
 	# NOTE: cooldowns are int ROUNDS, decremented only by the turn engine at
 	# the unit's own turn start — no per-frame ticking here.
 	_refresh_sprite_clamp()
+	portrait_fail_layer = VisibilityProbe.first_fail_layer(self)
+	portrait_visible = portrait_fail_layer == ""
 
 	# Undo availability — recomputed EVERY frame (never event-written), so it is
 	# always in sync no matter which writer changed acted / grid_pos / moves_left.

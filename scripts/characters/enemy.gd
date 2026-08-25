@@ -9,6 +9,7 @@ extends Node2D
 
 const CharacterData = preload("res://scripts/data/character_data.gd")
 const SkillData = preload("res://scripts/data/skill_data.gd")
+const VisibilityProbe = preload("res://scripts/ui/visibility_probe.gd")
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -91,6 +92,11 @@ var is_moving: bool = false
 ## World-px top edge of the sprite texture rect, updated every frame by
 ## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
 var sprite_top: float = 0.0
+
+## On-frame portrait visibility (all 6 layers pass). Computed each frame.
+var portrait_visible: bool = false
+## First failing visibility layer id, "" when fully visible on-frame.
+var portrait_fail_layer: String = ""
 
 ## Current FSM state label. One of: "IDLE", "APPROACH", "ATTACK",
 ## "SKILL", "RETREAT". Updated from the AI evaluation result.
@@ -231,6 +237,8 @@ func _process(_delta: float) -> void:
 	# NOTE: cooldowns are int ROUNDS, decremented only by the turn engine at
 	# the unit's own turn start — no per-frame ticking, no timer-driven AI.
 	_refresh_sprite_clamp()
+	portrait_fail_layer = VisibilityProbe.first_fail_layer(self)
+	portrait_visible = portrait_fail_layer == ""
 
 
 ## Catch left-clicks on this enemy's tile directly from the input pipeline.
