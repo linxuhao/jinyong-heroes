@@ -1,485 +1,508 @@
-# Technical Architecture Design — 捏人屏排版返工 (row-level shrink-center) + 血条真实尺寸可读 (health bar at native 960×704)
+# Technical Architecture Design - Portrait Visibility Observability (UX-01) + Move-Target Affordance (UX-02)
 
-Round goal (from `step1_sota.md`, baseline HEAD 21851a1): playtest 44 scenarios / 43 green
-(`terminal_victory` stays deliberately red); vision gate Q5 is red at 17/26 — floating health
-bars read as "solid green rectangles" at the native 960×704 size. Two defect classes, one
-shared fix idiom:
+Round: **jinyong-affordance**. Baseline HEAD `5bf8fb8`: playtest 44 scenarios / 43 green
+(only `terminal_victory_8_12_rounds_hp_15_40` deliberately red), pytest 7 passed, vision
+gate 6/6. This round adds **no new mechanics**. It adds two things the design archive
+demands and the gates could not express:
 
-1. **Creation screen re-layout (second pass).** The previous round fixed row-internal rhythm
-   (right-aligned value label hugging its `-`/`+` cluster — that half is correct and stays),
-   but the *whole-screen* layer is still broken: `AttrRow*` fills the full 560 px `MouseBox`,
-   so the cluster is flung to the right edge (ink ≈ x 608..760) while nav buttons sit far left.
-   The existing `points_attrs_gap_ok` stayed green through all of it because it compared
-   *container* rects (both nominally centered at 480) — see `design/99_changelog.md` last row
-   (容器矩形 ≠ 墨迹). Fix: **row-level `SHRINK_CENTER`** so each row shrinks to its ink and
-   centers on the 480 axis; observables must measure **leaf ink** (label *text* rects via
-   `Font.get_string_size`, button rects), never container rects.
-2. **Health bar at real size.** Current: 64×8 bar, 6×8 px empty cap = 48 px², 4 px expand
-   halo → invisible at native size; the "empty slot" is an *area* problem, not an existence
-   problem. Fix: bar height 8→12, `EMPTY_CAP_PX` 6→10 (cap area 120 px², ×2.5), expand halo
-   4→6, hover offset −28→−32 (keeps the 8 px hover gap). Same node types (`ProgressBar` +
-   `EmptyCap` `ColorRect` + `StyleBoxFlat`), no art, no renames.
+1. **UX-01** - 王重阳 (`Central_Divine`) and 杨过 (`Player`) render **no portrait ink** on
+   the battle frame (name + health bar only; the other four Greats render fine). Today
+   nothing can *prove* that from a test: `visible` flags and `sprite_top` are green while
+   the pixels are absent. We need a **layered on-frame visibility predicate** that turns
+   "the portrait is visible on the rendered frame" into a decidable, assertable fact -
+   **probed per unit first (查明 before 修), never assumed**.
+2. **UX-02** - right-click undo works (44-scenario gate proves it) but the move-target box
+   has **zero affordance**: the player is never told 左键移动 / 右键退回 / 出手即确认.
+   We need a **state-following hint** whose copy tracks the move state machine (pending ->
+   undo-available -> committed), in Chinese, mouse-transparent, additive.
 
-Both halves follow the repository's established idiom (previous round `jinyong-layout`):
-property-only `.tscn` edits + additive per-frame geometry observables + append-only playtest
-surface + in-place yaml extensions. **No new scene files, no node renames, no gameplay
-changes.**
+Per `step1_sota.md`, everything is built from engine-native APIs
+(`is_visible_in_tree`, `get_global_rect`, `Rect2.intersection`, `get_visible_rect`,
+ancestor `clip_contents` scan, draw-order comparison) plus the repo's proven probe /
+playtest / append-only-contract idioms. **No new libraries, no node renames, no
+reparents, no gameplay-logic changes.**
 
 ---
 
-## 1. Architecture Diagram (text)
+## 1. Overview
 
-```
-CREATION SCREEN (scenes/segments/creation.tscn, viewport 960×704)
-  CreationScreen (full-viewport Control)
-  └── MouseBox (VBoxContainer, 560 px wide, centered at x=480 — UNCHANGED)
-      ├── AttrBox (VBox, fills 560 — UNCHANGED)
-      │   ├── AttrRow0..4  [size_flags_horizontal = 4  NEW: shrink-center]
-      │   │     ├── AttrLabel    alignment=2 + expand-fill=3  (UNCHANGED pair)
-      │   │     │                custom_minimum_size.x: 180 -> 0   (NEW: hugs its text)
-      │   │     └── AttrMinus{i} / AttrPlus{i}  44×34 (UNCHANGED)
-      │   ├── AttrDescLabel   horizontal_alignment = 1  (NEW: center)
-      │   └── AttrNavRow      size_flags_horizontal = 4  (NEW: shrink-center)
-      │         └── AttrBackButton / AttrNextButton (UNCHANGED nodes)
-      ├── TraitBox (VBox, fills 560)
-      │   ├── TraitToggle0..12   size_flags_horizontal = 4  (NEW: shrink-center, each toggle)
-      │   ├── TraitDescLabel     horizontal_alignment = 1  (NEW)
-      │   └── TraitNavRow        size_flags_horizontal = 4  (NEW)
-      └── ConfirmBox  (ConfirmButton/BackButton already shrink-center — UNCHANGED)
-  -> every visible leaf's ink center lands on the x=480 axis in all three phases.
+Two defect classes, one shared observability layer:
 
-creation.gd _update_geometry_observables() (every _process frame, additive):
-  _label_text_rect(l)  = Font.get_string_size(text) -> text sub-rect inside label rect,
-                         honoring the label's horizontal_alignment (RIGHT/CENTER/LEFT)
-  _row_ink_union(i)    = label text rect ∪ AttrMinus{i} rect ∪ AttrPlus{i} rect
-  NEW observables: attr_cluster_center_ok / attr_cluster_width_ok /
-                   nav_cluster_center_ok / trait_cluster_center_ok /
-                   desc_center_ok / desc_alignment_ok
-  points_attrs_gap_ok  = SAME name, internal rework: PointsLabel TEXT rect vs the
-                         current phase's FIRST-ROW cluster (ink, not container rect)
-
-HEALTH BAR (scenes/ui/health_bar.tscn + scripts/ui/health_bar.gd)
-  HealthBar root 68×20 -> 68×24      (total_height 24 <= 26, pinned cap OK)
-  ├── NameLabel 64×9 @ (2,0)         (UNCHANGED)
-  └── Bar (ProgressBar) 64×8 -> 64×12 @ (2,12)
-      └── EmptyCap (ColorRect) 6×8 -> 10×12 @ (54,0)   (pinned to right end in code)
-  health_bar.gd constants: EMPTY_CAP_PX 6 -> 10, expand_margin_all 4 -> 6,
-                           hover offset (-34,-28) -> (-34,-32)   [32 - 24 = 8 px hover]
-  NEW observables: bar_height (= Bar.size.y), empty_area_px (= cap × bar height = 120)
-
-GATES (append-only / in-place):
-  playtest/_common.yaml        surface += HealthBar.{bar_height, empty_area_px, empty_cap_px}
-                                        + CreationScreen.{attr_cluster_center_ok,
-                                        attr_cluster_width_ok, nav_cluster_center_ok,
-                                        trait_cluster_center_ok, desc_center_ok,
-                                        desc_alignment_ok}
-  ui_geometry_readability.yaml  IN-PLACE append to the f30 assert block
-  creation_layout_readability.yaml  IN-PLACE append to f30 / f90 / f150 assert blocks
-  tests/test_playtest_contract_smoke.py  ONE NEW additive test function
-  tests/test_health_bar.gd      geometry sync (68×24 / 12 px / expand 6 / cap 10)
-  No new scenario files -> scenario_order and ROUND_SCENARIOS UNCHANGED
-```
-
----
-
-## 2. Component List
-
-### 3.1 `scenes/segments/creation.tscn` — row-level shrink-center (property-only)
-
-**Responsibility:** make each row / leaf shrink to its own ink and center on the x=480 axis,
-in all three phases, while the row-internal rhythm fixed last round (label hugging `-`/`+`)
-stays byte-identical.
-
-**Changes (all properties — zero renames, zero reparents, zero node additions):**
-
-| Node | Property | Old | New |
+| Goal | Defect | Fix idiom | Red-before-fix proof |
 |---|---|---|---|
-| `AttrRow0..4` | `size_flags_horizontal` | *(absent = FILL)* | `4` (SHRINK_CENTER) |
-| `AttrRow0..4/AttrLabel` | `custom_minimum_size` | `Vector2(180, 0)` | `Vector2(0, 0)` |
-| `AttrRow0..4/AttrLabel` | `horizontal_alignment` / `size_flags_horizontal` | `2` / `3` | **unchanged** (pinned by `attr_label_alignment_ok`) |
-| `AttrNavRow`, `TraitNavRow` | `size_flags_horizontal` | *(absent)* | `4` |
-| `TraitToggle0..12` | `size_flags_horizontal` | *(absent)* | `4` |
-| `AttrDescLabel`, `TraitDescLabel` | `horizontal_alignment` | *(absent = LEFT)* | `1` (CENTER) |
+| UX-01 | Two units' portraits never render; cause **suspected** (`_refresh_sprite_clamp` / `clamp_sprite_offset`), **not concluded** | Probe matrix per unit -> targeted fix -> layered `portrait_visible` predicate | `Player.portrait_visible == false` and `Central_Divine.portrait_visible == false` **observed** at baseline (A-class); the other four units observed `true` (B-class guards) |
+| UX-02 | Move-target box has no affordance; right-click undo is an invisible feature | New self-driving `MoveHintLabel` polling existing move-state fields | Scenario `move_target_affordance` fails at baseline (node absent -> surface target unresolved = hard red); post-fix asserts the hint's **text/state in both states** (pending vs committed) |
 
-**Resulting geometry (derived; implementer re-measures):** each attr row min-width =
-text width ("根骨 10" ≈ 52 px) + 6 + 44 + 6 + 44 ≈ 152 px → row centered at 480 → the row
-*is* the ink (label rect == text rect, no slack) → cluster center = 480, width ≈ 152 ≤ 340.
-All five rows have identical text shape (`2 CJK + space + 2 digits`, values 10..20) → rows
-share left/right edges → `attr_rows_uniform` stays green. Nav pair ≈ 180 px centered;
-CONFIRM pair already centered. Box tops unchanged → `phase_skeleton_same` /
-`creation_box_fits` / `creation_in_viewport` unaffected.
+**Probe-first is a hard ordering**: the UX-01 fix task may not start until the probe task
+has written `final/portrait_probe_notes.md` with per-unit observed values (runtime-measured,
+never derived from `.tscn` - the health-bar round found a 2.75x authored-vs-runtime gap).
+王重阳 and 杨过 are probed **independently and never merged** - they may fail for
+different reasons (different parents, different textures, different clamps).
 
-**Why not the SOTA's alternative ("fixed-width ~280 column"):** a fixed-width column keeps
-the ink right-heavy inside the column and forces observables to assert on the *column frame*
-instead of the ink — the exact container-rect lie this round is reworking. Row-level
-shrink-center makes ink and frame coincide, so ink-based assertions stay simple and true.
+---
 
-### 3.2 `scripts/segments/creation.gd` — leaf-ink observables + `points_attrs_gap_ok` rework
+## 2. Architecture Diagram (text)
 
-**Responsibility:** compute per-frame, decidable creation-layout facts measured on *ink*
-(leaf text rects and button rects), in the existing `_update_geometry_observables()` shape.
-Additive: the existing six observables' code is untouched except `points_attrs_gap_ok`'s
-internal implementation (its *assert lines* in yaml stay untouched).
+```
+                    ┌──────────────────────────────────────────────┐
+                    │ NEW  scripts/ui/visibility_probe.gd          │
+                    │ class_name VisibilityProbe (static, no node) │
+                    │  leaf_rect(node) -> Rect2                    │
+                    │  first_fail_layer(unit_root) -> String       │
+                    │    "" | "hidden_in_tree" | "null_texture"    │
+                    │    | "zero_rect" | "off_viewport"            │
+                    │    | "clipped" | "occluded"                  │
+                    │  portrait_visible(unit_root) -> bool         │
+                    └──────────────┬───────────────────────────────┘
+                                   │ called (cheap, per frame)
+        ┌──────────────────────────┴───────────────────────────┐
+        │ player.gd / enemy.gd  (ADDITIVE, ~6 lines each)      │
+        │  _process(): after _refresh_sprite_clamp():          │
+        │    portrait_fail_layer = VisibilityProbe             │
+        │        .first_fail_layer(self)                       │
+        │    portrait_visible = portrait_fail_layer == ""      │
+        └──────────────────────────┬───────────────────────────┘
+                                   │ surface (append-only)
+    playtest/_common.yaml  Player.{portrait_visible, portrait_fail_layer}
+                          East_Heretic / West_Poison / South_Emperor /
+                          North_Beggar / Central_Divine .{same two}
+                          NEW NODE MoveHintLabel.{state, text, visible,
+                          tile, center, in_viewport, bar_overlap}
 
-**New helper (private):**
+    ┌────────────────────────────────────────────────────────────┐
+    │ NEW  scripts/ui/move_hint_label.gd + MoveHintLabel (Label) │
+    │ in scenes/ui/hud.tscn - self-driving poller (the proven    │
+    │ MoveRangeHighlight pattern): polls GameManager.get_player(),│
+    │ CombatManager.is_player_turn(), player.moves_left /        │
+    │ undo_available / acted / grid_pos EVERY FRAME, never       │
+    │ stores the ref; recomputes text + position. mouse_filter=2 │
+    │ (IGNORE - it must never eat the click-move events).        │
+    │   state: "hidden" | "idle" | "undo_ready" | "committed"    │
+    │   idle:      「左键点格移动 · 右键退回」                      │
+    │   undo_ready:「右键退回起点 · 出手即确认」                    │
+    │   committed: 「已出手 · 移动已确认」                          │
+    │   position: player tile world center + (0, +44), clamped   │
+    │   into the viewport, in the same layer-10 / scale-1 space  │
+    │   the HealthBars live in (no Node2D<->Control conversion)  │
+    └────────────────────────────────────────────────────────────┘
+
+    GATES (append-only / new files):
+      playtest/portrait_visibility.yaml      NEW scenario (A-class UX-01)
+      playtest/move_target_affordance.yaml   NEW scenario (A-class UX-02)
+      _common.yaml scenario_order            += both (append at end)
+      tests/test_playtest_contract_smoke.py  ROUND_SCENARIOS += both (same order)
+                                            + ONE additive test function
+      44 scenarios -> 46 scenarios; terminal_victory stays the only allowed red
+```
+
+Data flow is one-directional: game state (engine-owned fields `grid_pos`, `moves_left`,
+`acted`, `undo_available`, `turn_start_grid`) -> read-only observers
+(`VisibilityProbe`, `MoveHintLabel`) -> surface vars -> yaml asserts. **Observers never
+write game state.**
+
+---
+
+## 3. Component List
+
+### 3.1 `scripts/ui/visibility_probe.gd` - NEW layered visibility predicate
+
+**Responsibility:** answer "does this unit's portrait put ink on the rendered frame" as a
+decidable fact, reusing one implementation for probes, red-before-fix assertions, and
+future rounds. Pure static functions; no node, no state, no scene change.
+
+**Interface (exact names - PM/PM thresholds and implementers match verbatim):**
 
 ```gdscript
-## Text sub-rect of a Label inside its global rect, honoring horizontal_alignment.
-func _label_text_rect(l: Label) -> Rect2:
-    var f: Font = l.get_theme_font("font")
-    var fs: int = l.get_theme_font_size("font_size")
-    var sz: Vector2 = f.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
-    var lr: Rect2 = l.get_global_rect()
-    match int(l.horizontal_alignment):
-        HORIZONTAL_ALIGNMENT_RIGHT:   # 2
-            return Rect2(lr.end.x - sz.x, lr.position.y + (lr.size.y - sz.y) * 0.5, sz.x, sz.y)
-        HORIZONTAL_ALIGNMENT_CENTER:  # 1
-            return Rect2(lr.position.x + (lr.size.x - sz.x) * 0.5, lr.position.y + (lr.size.y - sz.y) * 0.5, sz.x, sz.y)
-        _:                            # 0 (LEFT)
-            return Rect2(lr.position, sz)
+class_name VisibilityProbe
 
-## Ink union of attr row i: label text rect + minus rect + plus rect.
-func _row_ink_union(i: int) -> Rect2: ...
-#   label = MouseBox/AttrBox/AttrRow{i}/AttrLabel  (text rect via _label_text_rect)
-#   minus = MouseBox/AttrBox/AttrRow{i}/AttrMinus{i}, plus = .../AttrPlus{i}
-#   return text.merge(minus.get_global_rect()).merge(plus.get_global_rect())
+## Global rect of the node that actually draws the ink. Sprite2D uses
+## position + offset +/- texture half-size under the node's global transform;
+## Control uses get_global_rect(). Containers are NOT leaves - callers must
+## pass the ink node (the unit's "Sprite" child), which this helper resolves
+## from the unit root.
+static func leaf_rect(unit_root: Node2D) -> Rect2
+
+## First failing layer, "" when fully visible on-frame. Layer order is the
+## cheap-to-expensive order from step1_sota.md:
+##  1 "hidden_in_tree"  leaf.visible == false OR not is_visible_in_tree()
+##  2 "null_texture"    Sprite2D.texture == null OR texture size == 0
+##  3 "zero_rect"       leaf rect has zero area, scale == Vector2.ZERO,
+##                       or combined modulate alpha < 0.01 (self x ancestors)
+##  4 "off_viewport"    leaf rect intersection with
+##                       get_viewport().get_visible_rect() is empty
+##                       (intersection must be NON-empty - touching edges
+##                       does not count)
+##  5 "clipped"         an ancestor Control with clip_contents == true does
+##                       not enclose the leaf rect
+##  6 "occluded"        a later-drawn / higher-z Control whose rect fully
+##                       covers the leaf rect AND mouse_filter != IGNORE
+##                       (the repo's opaque-host convention)
+static func first_fail_layer(unit_root: Node2D) -> String
+
+## Convenience: first_fail_layer(unit_root) == "".
+static func portrait_visible(unit_root: Node2D) -> bool
 ```
 
-**New surface vars (declared `var`, so the playtest Expression sees them):**
+**Layer-6 simplification (declared):** full occlusion via `gui_get_hovered_control()` is
+mouse-dependent and therefore out of scope for a pure visibility test; the check is the
+SOTA's draw-order comparison (tree order + `z_index` / `show_behind_parent` +
+`CanvasLayer`) restricted to intersecting `Control`s. In the battle scene the only
+candidates are the TopStrip and the tutorial overlay, both already
+`mouse_filter`-declared - so the predicate stays cheap and deterministic.
+
+**Why a shared helper instead of asserts in yaml:** the same predicate must serve (a) the
+probe matrix (print every layer's inputs per unit), (b) the A-class assertions, and (c)
+the B-class guards. One implementation, one place to be wrong.
+
+### 3.2 `scripts/characters/player.gd` + `scripts/characters/enemy.gd` - ADDITIVE observables
+
+**Responsibility:** publish the predicate per frame so the harness can read it like any
+other surface var.
+
+**Changes (identical shape in both files, no existing line touched):**
+
+- Two new declared vars (documented, playtest surface):
+  - `var portrait_visible: bool = false`
+  - `var portrait_fail_layer: String = ""`
+- In `_process()`, immediately after the existing `_refresh_sprite_clamp()` call (so the
+  reading happens after the clamp has settled this frame):
+  `portrait_fail_layer = VisibilityProbe.first_fail_layer(self)` and
+  `portrait_visible = portrait_fail_layer == ""`.
+
+**Interface:** surface vars `portrait_visible` / `portrait_fail_layer` on `Player`,
+`East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`, `Central_Divine`. No
+method signatures change; `_refresh_sprite_clamp` and `clamp_sprite_offset` are **not**
+modified by this component (any change to them belongs to the 3.3 fix task and must be
+justified by probe evidence).
+
+### 3.3 UX-01 fix - `scripts/autoload/grid_manager.gd` / character scripts (GATED ON PROBE)
+
+**Responsibility:** make the two invisible units pass layer 1-6, changing **only what the
+probe identified**.
+
+**This component intentionally has no fixed diff.** The brief's rule is
+先查明再修，不许猜 ("find out first, no guessing"). The probe (task A1) writes
+`final/portrait_probe_notes.md` with, per unit: `visible`, `is_visible_in_tree()`,
+`texture` resource path + size, `scale`, `modulate` chain alpha, `offset` before/after
+clamp, leaf rect, viewport intersection, failing layer. The fix is then chosen from the
+observed failing layer:
+
+| Observed failing layer | Likely fix locus (verify against probe numbers) |
+|---|---|
+| `null_texture` | `enemy.gd TEXTURE_PATHS` key mismatch for the unit's `character_name`, or player-side texture path - assign the texture, keep the null-safe fallback |
+| `off_viewport` / `zero_rect` from a bad offset | `GridManager.clamp_sprite_offset` bounds math or `_refresh_sprite_clamp`'s use of it - correct the math so the clamped rect stays on-board; the current suspicion (offset pushed fully off the board for the top row / center column) is **a suspicion, not a conclusion** |
+| `clipped` | remove/relax `clip_contents` on the offending ancestor |
+| `occluded` | draw order / `z_index` of a covering host |
+
+**Constraint:** whatever the fix, it must keep the other four units' `portrait_visible`
+true (B-class guards) and keep `sprite_top` semantics unchanged (existing surface asserts
+read it). Numbers are read at **runtime**, not from `.tscn`.
+
+### 3.4 `scripts/ui/move_hint_label.gd` + `MoveHintLabel` node - NEW (UX-02)
+
+**Responsibility:** a self-evident, state-following affordance for click-move + right-click
+undo, whose copy changes **in the same transition** that locks the move - never showing a
+promise that no longer holds (the deleted "右键确认" creation-screen mistake must not
+reappear).
+
+**Node:** `MoveHintLabel` (type `Label`) added to `scenes/ui/hud.tscn` as a **new sibling
+at a path nothing pins** (the TopStrip precedent), in the same layer-10 / scale-1
+coordinate space as the floating `HealthBar`s. Properties: `mouse_filter = 2` (IGNORE -
+hard requirement, it must never eat the click-move events), font = global theme (CJK),
+font size 14, `modulate` with outline/contrast readable over the board, NO `focus_mode`
+concern (Label is not focusable; the clickable discipline `focus_mode = 0` applies to
+clickables only).
+
+**Driver script (self-driving poller, the proven `MoveRangeHighlight` pattern - polls
+every frame, never stores the player ref, hides itself when the battle ends; the node
+dies with the scene swap):**
 
 ```gdscript
-var attr_cluster_center_ok: bool = true   # ATTRS only (keeps last value otherwise)
-var attr_cluster_width_ok: bool = true    # ATTRS only (B-class guard)
-var nav_cluster_center_ok: bool = true    # current phase's nav pair (all three phases)
-var trait_cluster_center_ok: bool = true  # TRAITS only (keeps last value otherwise)
-var desc_center_ok: bool = true           # ATTRS only (keeps last value otherwise)
-var desc_alignment_ok: bool = true        # always: both desc labels alignment == 1
+extends Label
+
+# Observables (playtest surface contract)
+var state: String = "hidden"      # "hidden" | "idle" | "undo_ready" | "committed"
+var tile: Vector2i = Vector2i(-1, -1)
+var center: Vector2 = Vector2.ZERO
+var in_viewport: bool = false
+var bar_overlap: bool = false     # vs the player's HealthBar (1px-inset convention)
+
+func _process(_delta: float) -> void:
+    # state = f(existing engine-owned fields only - zero new game state):
+    #   hidden   <- no player / not battle / not player's turn / moves_left <= 0
+    #   idle     <- player's turn, undo_available == false, acted == false
+    #   undo_ready <- undo_available == true (moved, not yet committed)
+    #   committed  <- acted == true (undo locked by the commit rule)
+    # text:   idle -> "左键点格移动 · 右键退回"
+    #         undo_ready -> "右键退回起点 · 出手即确认"
+    #         committed  -> "已出手 · 移动已确认"
+    # position: grid_to_world(player.grid_pos) + (0, +44)  (below the feet,
+    #           above the tile edge), then clamped so the label rect stays
+    #           inside the 960x704 viewport; center/in_viewport/bar_overlap
+    #           recomputed from the final rect.
 ```
 
-Computation (inside `_update_geometry_observables`, after the existing six; viewport center
-`var vcx: float = get_viewport().get_visible_rect().size.x * 0.5`):
+**Why follow the tile instead of a fixed dock:** the UX complaint is "the move-target box
+has no affordance" - the promise must sit **where the action is** (the yellow box /
+turn-start marker), not in a corner the eye is not on. The below-the-feet slot is empty
+today (name + health bar float **above** the sprite), so the hint adds no occlusion; the
+`bar_overlap` observable proves it per frame.
 
-1. **`attr_cluster_center_ok` (ATTRS):** for each `i` in 0..4, `u = _row_ink_union(i)`;
-   all five satisfy `absf(u.get_center().x - vcx) <= 6.0`. Any missing/invisible node → false.
-   *(Pre-fix ≈ 684 → red; post-fix 480 → green. A-class.)*
-2. **`attr_cluster_width_ok` (ATTRS):** each `u.size.x <= 340.0`.
-   *(Pre-fix 152 ≤ 340 → true; B-class guard against cluster re-expansion.)*
-3. **`nav_cluster_center_ok` (always, per phase):** pair =
-   ATTRS `AttrBackButton ∪ AttrNextButton`, TRAITS `TraitBackButton ∪ TraitNextButton`,
-   CONFIRM `ConfirmButton ∪ BackButton` (button **rects**); `u = a.merge(b)`;
-   `absf(u.get_center().x - vcx) <= 6.0 and u.size.x <= 240.0`.
-   *(Pre-fix ATTRS/TRAITS: two FILL-stretched buttons span 200..760 → width 560 → false.
-   CONFIRM was already correct → true. The width conjunct is what makes this robustly red
-   pre-fix regardless of which pre-fix nav geometry the probe records.)*
-4. **`trait_cluster_center_ok` (TRAITS):** union of all visible `TraitToggle*` rects;
-   center ±6 of vcx AND width ≤ 340.
-   *(Pre-fix: toggles fill 560 → false on width. Post-fix: widest toggle ≈ 120 centered → true.)*
-5. **`desc_center_ok` (ATTRS):** `AttrDescLabel` text rect via `_label_text_rect`;
-   `absf(text_rect.get_center().x - vcx) <= 6.0`. ATTRS desc texts are short single-line
-   formulas → `get_string_size` is exact. (Wrapped TRAITS descriptions are deliberately
-   NOT measured here — covered by the property pin below.)
-   *(Pre-fix: left-aligned at 200 → center ≈ 260 → red; post-fix 480.)*
-6. **`desc_alignment_ok` (always):** both `AttrDescLabel` and `TraitDescLabel` have
-   `int(horizontal_alignment) == 1`.
-   *(Pre-fix: both 0 → false. A-class property pin of the fix.)*
+**Why keep the label visible in `committed` (with swapped text) rather than hiding:** the
+archive rule is the copy must **follow state**; swapping text is strictly more assertable
+than toggling visibility (a `visible` flip and a `text` swap can both be pinned, but the
+swap also proves the *promise* changed, not just that something disappeared).
 
-**`points_attrs_gap_ok` semantic rework (same var, same name, yaml asserts unchanged):**
+### 3.5 `playtest/_common.yaml` - surface + order (append-only)
 
-```gdscript
-# OLD (the never-red defect): compared PointsLabel.get_global_rect() center vs the
-# phase BOX rect center — both are container rects centered at 480 by construction.
-# NEW: measure PointsLabel's TEXT rect vs the current phase's FIRST-ROW cluster (ink).
-if points_label != null:
-    var cluster: Rect2
-    match phase:
-        "ATTRS":   cluster = _row_ink_union(0)
-        "TRAITS":  cluster = (get_node_or_null("MouseBox/TraitBox/TraitToggle0") as Button).get_global_rect()
-        "CONFIRM": cluster = (get_node_or_null("MouseBox/ConfirmBox/ConfirmButton") as Button).get_global_rect()
-        _:         cluster = Rect2()
-    if cluster.size != Vector2.ZERO:
-        var p_rect: Rect2 = _label_text_rect(points_label)   # PointsLabel alignment == 1
-        var gap: float = cluster.position.y - p_rect.end.y
-        points_attrs_gap_ok = gap >= 4.0 and gap <= 24.0 \
-                and absf(cluster.get_center().x - p_rect.get_center().x) <= 4.0
-```
+- `surface:` appends `portrait_visible`, `portrait_fail_layer` under `Player`,
+  `East_Heretic`, `West_Poison`, `South_Emiror` -> **`South_Emiror` is a typo in this
+  design doc only - use the existing key `South_Emperor`**, `North_Beggar`,
+  `Central_Divine` (existing blocks, append at the end of each list; no line reordered).
+- `surface:` adds a NEW top-level block `MoveHintLabel: [state, text, visible, tile,
+  center, in_viewport, bar_overlap]` (the harness resolves nodes by bare name, like
+  `TopStrip` / `ActionHintLabel`).
+- `scenario_order:` appends `portrait_visibility` then `move_target_affordance` (both at
+  the end, matching `ROUND_SCENARIOS`).
 
-Post-fix all three phases give center 480 vs 480 and gap ≈ 8..13 px → `== true` holds at
-f30 / f90 as asserted today. Pre-fix ATTRS gives cluster ≈ 684 vs 480 → false (the
-reproducible red the old implementation could never produce).
+### 3.6 `playtest/portrait_visibility.yaml` - NEW scenario (A-class UX-01)
 
-### 3.3 `scenes/ui/health_bar.tscn` + `scripts/ui/health_bar.gd` — size + contrast trio
-
-**Responsibility:** make the filled/empty split readable on a 960×704 native frame. Same
-nodes, same types, same paths; only geometry and contrast.
-
-**tscn edits:**
-
-```
-[node name="HealthBar"]   size = Vector2(68, 20) -> Vector2(68, 24)
-[node name="Bar"]         position (2,12) UNCHANGED; size Vector2(64, 8) -> Vector2(64, 12)
-[node name="EmptyCap"]    position Vector2(58, 0) -> Vector2(54, 0); size Vector2(6, 8) -> Vector2(10, 12)
-[node name="NameLabel"]   UNCHANGED (2,0 / 64×9 / font 10 / clip_text false)
-```
-
-Label 9 + bar 12 = 21 ≤ 24 → no overlap (unit test asserts this sum).
-
-**gd edits (constants + hover + observables + stale comments):**
-
-| Line / item | Old | New |
-|---|---|---|
-| `EMPTY_CAP_PX` | `6.0` | `10.0` (cap area 10×12 = **120 px²**, ×2.5 vs 48) |
-| `sb.set_expand_margin_all(...)` | `4.0` | `6.0` (track halo more visible) |
-| hover offset in `follow_character()` | `Vector2(-34, -28)` | `Vector2(-34, -32)` (32 − 24 = 8 px hover, same gap as before) |
-| stale comment "bar.size stays 64x6" | — | 64x12 |
-| stale comment "STRIP_BOTTOM + 2 (= 82)" / "TopStrip offsets 0..80" | — | `(= 94)` / `0..92` (constant itself is correct at 92.0 — comment only) |
-| `_TRACK_BG` / borders / fill bands / `STRIP_BOTTOM` / clamp | unchanged | unchanged (all existing playtest pins stay green) |
-
-**New observables (declared vars, written in `setup()` and refreshed in `follow_character()`):**
-
-```gdscript
-## Bar height in px (= Bar.size.y). 12.0 after this round.
-var bar_height: float = 0.0
-## Visible empty-slot area at the right end (EMPTY_CAP_PX × bar height).
-## The area argument behind Q5: 48 px² was invisible at native size; >= 120 px² is not.
-var empty_area_px: float = 0.0
-```
-
-- `setup()`: inside the existing bar guard — `bar_height = bar.size.y`,
-  `empty_area_px = EMPTY_CAP_PX * bar_height`.
-- `follow_character()`: alongside the existing `bar_width` refresh —
-  `bar_height = _bar.size.y; empty_area_px = EMPTY_CAP_PX * bar_height`.
-- `empty_cap_px` already exists on the surface-var list; no change to its semantics
-  (constant design element — fill remains value-driven, cap never fakes HP).
-
-**Compatibility with existing pins (verified against current asserts):**
-`bar_width <= 64` (64 ✓), `total_height <= 26` (24 ✓), `track_bg luminance > 0.30` (✓),
-`fill_color.g > 0.5 and g > r` (✓), `follow_delta <= 24` (player bar mid-board, clamp not
-engaged, pre-clamp computation unchanged ✓), `top >= STRIP_BOTTOM + 2 = 94` (clamp
-unchanged ✓), `hint_hpbar_overlap == false` (hint sits in the 0..92 strip, bars clamped
-below ✓), `hpbar_strip_overlap == false` (✓).
-
-**Hover height is the one coupling to remember:** widget height grows 20→24, so the −28
-offset *must* move to −32 or the bar bottom sits 4 px off the character's feet.
-
-### 3.4 `tests/test_health_bar.gd` — geometry sync (keep the suite green)
-
-The unit test pins the old geometry; sync it (this is "keep existing suites green", not
-gate-wiring — explicitly allowed by the SOTA):
-
-- `bar.size == Vector2(68, 20)` → `Vector2(68, 24)`
-- `bar.total_height == 20.0` → `24.0`
-- `background expand_margin_all == 4.0` → `6.0`
-- **Add:** `bar.bar_height == 12.0`, `bar.empty_area_px == 120.0`
-  (is_equal_approx), `EmptyCap.size.y == bar.bar_height`
-- Comment block "68x20 widget, 64x8 bar" → "68x24 widget, 64x12 bar"
-- Everything else (cap right-alignment, cap visible at full HP, track ≠ fill, band colors,
-  label clip behavior) is geometry-independent and stays green as-is.
-
-### 3.5 `playtest/_common.yaml` — surface append (append-only)
-
-```
-  HealthBar:                      # append to the EXISTING block
-  - bar_height
-  - empty_area_px
-  - empty_cap_px
-  CreationScreen:                 # append to the EXISTING block
-  - attr_cluster_center_ok
-  - attr_cluster_width_ok
-  - nav_cluster_center_ok
-  - trait_cluster_center_ok
-  - desc_center_ok
-  - desc_alignment_ok
-```
-
-`scenario_order` untouched (no new scenario files).
-
-### 3.6 `playtest/ui_geometry_readability.yaml` — IN-PLACE append
-
-Append to the existing f30 assert block (after the current `HealthBar.*` lines; every
-existing line stays byte-identical):
+Boot shape copies the proven `ui_geometry_readability` / `click_move_*` prologue
+(7x `ui_accept` f3..f15 -> 3x `tutorial_next` f20/f25/f30 -> assert f40; every assert
+value carries a comparison operator - the repo's `== true` discipline):
 
 ```yaml
-    HealthBar.bar_height: bar_height >= 12
-    HealthBar.empty_cap_px: empty_cap_px >= 10
-    HealthBar.empty_area_px: empty_area_px >= 120
+name: portrait_visibility
+timeline:
+- {at: 3..15, actions: [ui_accept]}          # 7 presses (proven boot)
+- {at: 20/25/30, actions: [tutorial_next]}   # skip tutorial cards
+- at: 40
+  assert:
+    Player.portrait_visible: portrait_visible == true            # A-class
+    Player.portrait_fail_layer: portrait_fail_layer == ""         # A-class
+    Central_Divine.portrait_visible: portrait_visible == true     # A-class
+    Central_Divine.portrait_fail_layer: portrait_fail_layer == "" # A-class
+    East_Heretic.portrait_visible: portrait_visible == true       # B-class guard
+    West_Poison.portrait_visible: portrait_visible == true        # B-class guard
+    South_Emperor.portrait_visible: portrait_visible == true      # B-class guard
+    North_Beggar.portrait_visible: portrait_visible == true       # B-class guard
+    Player.sprite_top: sprite_top >= 0.0                          # B-class (on-board)
+    Central_Divine.sprite_top: sprite_top >= 0.0                  # B-class (on-board)
 ```
 
-All three are red pre-fix (8 / 6 / 48) and green post-fix (12 / 10 / 120) — they pin the
-fix itself. Every value contains a comparison operator (hard rule). The existing
-`total_height <= 26` / `bar_width <= 64` / `top >= 94` family remains the B-guard envelope.
+At baseline the four A-class lines are **red by construction** (observed, per the probe
+notes) and the B-class lines green - exactly the SOTA A/B split: A proves the defect, B
+guards the four healthy units against regression by the fix.
 
-### 3.7 `playtest/creation_layout_readability.yaml` — IN-PLACE append
+### 3.7 `playtest/move_target_affordance.yaml` - NEW scenario (A-class UX-02)
 
-Append to the existing assert blocks (existing lines byte-identical):
+Frames reuse the click-move scenarios' proven timings (`click_move_undo_right`: move
+f70->settled f130, undo f135->f170). Real mouse events only (`clicks:`), no DEBUG
+stand-ins:
 
 ```yaml
-# f30 block (ATTRS), after the existing six asserts:
-    CreationScreen.attr_cluster_center_ok: attr_cluster_center_ok == true
-    CreationScreen.attr_cluster_width_ok: attr_cluster_width_ok == true
-    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
-    CreationScreen.desc_center_ok: desc_center_ok == true
-    CreationScreen.desc_alignment_ok: desc_alignment_ok == true
-# f90 block (TRAITS):
-    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
-    CreationScreen.trait_cluster_center_ok: trait_cluster_center_ok == true
-    CreationScreen.desc_alignment_ok: desc_alignment_ok == true
-# f150 block (CONFIRM):
-    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
+name: move_target_affordance
+timeline:
+- {at: 3..15, actions: [ui_accept]}            # 7 presses
+- {at: 20/25/30, actions: [tutorial_next]}
+- at: 45                                        # turn start, nothing moved
+  assert:
+    MoveHintLabel.state: state == "idle"
+    MoveHintLabel.text: text.contains("左键") == true
+    MoveHintLabel.visible: visible == true
+    MoveHintLabel.in_viewport: in_viewport == true
+- at: 70
+  clicks: [Player +0,-192]                     # walk 3 tiles up to (7,2)
+- at: 130
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 2)
+    MoveHintLabel.state: state == "undo_ready"
+    MoveHintLabel.text: text.contains("右键") == true
+    MoveHintLabel.bar_overlap: bar_overlap == false
+    MoveHintLabel.in_viewport: in_viewport == true
+- at: 135
+  clicks: [Player +0,0 right]                  # undo -> back to (7,5)
+- at: 170
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
+    MoveHintLabel.state: state == "idle"       # promise follows state back
+- at: 175
+  clicks: [Central_Divine_ClickTarget]         # click-attack from (7,2)... see note
+- at: 230
+  assert:
+    Player.acted: acted == true
+    Player.undo_available: undo_available == false
+    MoveHintLabel.state: state == "committed"
+    MoveHintLabel.text: text.contains("已出手") == true
+    MoveHintLabel.visible: visible == true
 ```
 
-### 3.8 `tests/test_playtest_contract_smoke.py` — ONE additive test function
+**Note for the implementer (re-baseline before finalizing):** the commit arm needs the
+player adjacent to a target. Two proven options: (a) walk to (7,2) again then click
+`Central_Divine_ClickTarget` (click-to-attack, proven in `click_targeting_fixed`), or
+(b) `skill_1` + `attack_confirm` after moving adjacent (keyboard path, proven in
+`skill_rejection_reason_texts`). Pick one, probe the frames once, then freeze them - the
+asserts above (state/text in **both** the pending and the committed state) are the
+contract; the exact frames are placeholders for the probe.
 
-New function (existing functions untouched; `ROUND_SCENARIOS` untouched):
+### 3.8 `tests/test_playtest_contract_smoke.py` - additive contract pin
 
-```python
-def test_creation_rework_and_bar_surface_contract() -> None:
-    text = COMMON.read_text(encoding="utf-8")
-    blocks = _surface_blocks(text)
-    health_items = blocks.get("HealthBar", [])
-    for var in ("bar_height", "empty_area_px", "empty_cap_px"):
-        assert var in health_items, "HealthBar.%s not whitelisted on the surface" % (var,)
-    creation_items = blocks.get("CreationScreen", [])
-    for var in ("attr_cluster_center_ok", "attr_cluster_width_ok",
-                "nav_cluster_center_ok", "trait_cluster_center_ok",
-                "desc_center_ok", "desc_alignment_ok"):
-        assert var in creation_items, "CreationScreen.%s not whitelisted on the surface" % (var,)
-```
+- `ROUND_SCENARIOS` appends `portrait_visibility`, `move_target_affordance` **in the same
+  order** as `scenario_order` (the two-place sync rule). Existing entries untouched.
+- ONE new test function, e.g. `test_affordance_surface_contract`, asserting statically:
+  the six units' surface blocks contain `portrait_visible` / `portrait_fail_layer`;
+  `MoveHintLabel` block exists with its seven vars; both new scenario files exist, their
+  `name:` equals the basename, and every assert value in them contains a comparison
+  operator (guards the "no bare-scalar silent-false" rule for the new files).
 
-### 3.9 Documentation
+### 3.9 Probe + evidence artifacts (task outputs, not gate files)
 
-- `README.md`: update the health-bar line (64 px wide, **12 px tall**, fixed 10 px empty
-  cap, 6 px track halo) and the creation-layout observables paragraph (add the six new vars).
-- `design/30_presentation.md`: amend the 血条 section (see §5 Design Changes — the old
-  "高 ≤ 8 / 整体 ≤ 20" conclusion is superseded by native-size evidence) and add one row to
-  the 顶栏/捏人屏 layout description (rows shrink-centered on the 480 axis).
-- `design/99_changelog.md`: one new row for this round.
-- `final/delivery_notes.md`: pre-fix probe table (A/B class per observable) + evidence
-  chain summary.
+- `final/portrait_probe_notes.md` (NEW) - the A/B probe table for all six units:
+  per-unit layer inputs and observed failing layer **before** the fix, with the A/B class
+  column (format copies `final/creation_probe_notes.md`). Probe method: inline scenario
+  via `godot_playtest_scenario` (YAML passed as CLI text, never staged), always-false
+  contradiction asserts forcing the harness to print `observed` values.
+- `final/move_hint_probe_notes.md` (NEW) - pre-fix confirmation that `MoveHintLabel` is
+  absent (surface target unresolved -> hard red) and post-fix state/text readings at the
+  four states.
+- Raw-frame captures at native 960x704 (the 5_compile frames) are the human/vision-gate
+  evidence that all **six** portraits now render; no zoomed evidence (hard rule).
 
----
+### 3.10 Documentation (declared for the `5_design` step - not written by implementers)
 
-## 3. Observable Contract (interface spec — implementers match names exactly, PM fills thresholds)
-
-| Node.var | Type | Formula (per frame) | A/B | Pre-fix (derived) | Post-fix |
-|---|---|---|---|---|---|
-| `CreationScreen.attr_cluster_center_ok` | bool | 5× `_row_ink_union(i)` centers all within ±6 px of vcx=480 | **A** | ≈ 684 → false | 480 → true |
-| `CreationScreen.attr_cluster_width_ok` | bool | each row ink union width ≤ 340 px | B | true (152) | true (152) |
-| `CreationScreen.nav_cluster_center_ok` | bool | phase nav pair union: center ±6 of 480 AND width ≤ 240 | **A** | ATTRS/TRAITS false (width 560) | true (~180) |
-| `CreationScreen.trait_cluster_center_ok` | bool | visible toggles union: center ±6 of 480 AND width ≤ 340 | **A** | false (width 560) | true (~120) |
-| `CreationScreen.desc_center_ok` | bool | AttrDescLabel text rect center ±6 of 480 (ATTRS only) | **A** | ≈ 260 → false | true |
-| `CreationScreen.desc_alignment_ok` | bool | both desc labels `horizontal_alignment == 1` | **A** | false (both 0) | true |
-| `CreationScreen.points_attrs_gap_ok` | bool | (reworked internals) PointsLabel text rect vs phase first-row cluster: gap ∈ [4,24] ∧ center Δ ≤ 4 | **A** (rework) | false (684 vs 480) | true (480 vs 480) |
-| `CreationScreen.attr_rows_uniform` … `creation_box_fits` | — | existing six: **byte-identical code** | B (keep green) | — | green |
-| `HealthBar.bar_height` | float | `Bar.size.y` | pin | 8 | 12 |
-| `HealthBar.empty_cap_px` | float | `EMPTY_CAP_PX` | pin | 6 | 10 |
-| `HealthBar.empty_area_px` | float | `EMPTY_CAP_PX × bar_height` | **A** | 48 → red | 120 → green |
-| `HealthBar.total_height` / `bar_width` / `track_bg` / `fill_color` / `follow_delta` / `name_backing_alpha` | — | existing: unchanged semantics | B (keep green) | green | green |
-
-Assert thresholds above are the architect's spec; PM confirms them against probed values.
+See section 7 (Design Changes).
 
 ---
 
-## 4. Edge Cases (from `step1_sota.md`) → how this design handles them
+## 4. Observable Contract (interface spec - names are verbatim)
 
-- **E1 Label rects lie (expand-fill) → must measure text rects.** `_label_text_rect` via
-  `Font.get_string_size`, honoring alignment; `attr_cluster_center_ok` / `desc_center_ok` /
-  reworked `points_attrs_gap_ok` all use it. The A-class pre-fix red (cluster ≈ 684) is
-  reproducible on the old layout precisely because the 180-min label's *rect* would still
-  center at 480 while its *text* sits at 608..660.
-- **E2 Hidden VBox children don't occupy space.** No observable sums widths across boxes;
-  every union is built from the *visible* phase's leaves only (existing `visible` gating
-  convention kept).
-- **E3 Two layers, fixed separately.** Row-internal hug = `horizontal_alignment=2` +
-  `expand=3` (unchanged, pinned by `attr_label_alignment_ok`); whole-screen centering =
-  row `SHRINK_CENTER` (new, pinned by the cluster observables). Changing only one layer
-  would recur the other.
-- **E4 Empty slot is an area problem.** Three levers together: height 8→12, cap 6→10
-  (48→120 px²), halo 4→6. Geometry/contrast only — no art, no node-type change
-  (`ProgressBar` + `EmptyCap` + `StyleBoxFlat` all preserved).
-- **E5 Existing pins.** Enumerated in 3.3: 64 ≤ 64, 24 ≤ 26, luminance/colors/follow_delta/
-  strip clamp all untouched; the only coupling is the hover offset −28→−32.
-- **E6 Full HP is the hardest sample.** The cap is a *constant* design element (like a
-  border), never driven by `value/max_value`; fill stays value-driven — no faked HP.
-  Acceptance is on 960×704 native frames, never zoomed evidence.
-- **E7 A/B classification discipline.** Table in §3; implementer must run the probe on
-  the un-fixed code (observables added first, layout changed second) and record measured
-  pre-fix values in `final/delivery_notes.md` with A/B labels. Derived values in this doc
-  are marked as such.
-- **E8 Node name/path freeze.** All edits are property-level; zero renames/reparents;
-  observables append-only on the `_common.yaml` surface.
-- **E9 `points_attrs_gap_ok` semantic fix without touching assert lines.** Same var name,
-  same `== true` assert lines; only the measured quantities change. New layout must keep it
-  true (480 vs 480) — verified above.
-- **E10 VBox hidden-child skipping vs fixed-width fallback.** We do NOT give the three
-  boxes fixed widths (the SOTA alternative): it would make ink right-heavy inside the
-  column and resurrect container-rect assertions. Row-level shrink-center keeps ink == frame.
-- **E11 Every new assert value contains an operator.** All new yaml values are
-  `== true` / `>= N` chains — never bare scalars (the harness hard rule from
-  `design/30_presentation.md`).
+| Surface var | Type | Writer | Meaning |
+|---|---|---|---|
+| `<Unit>.portrait_visible` | bool | per-frame predicate | all six visibility layers pass for that unit's ink leaf |
+| `<Unit>.portrait_fail_layer` | String | per-frame predicate | first failing layer id, "" when visible |
+| `MoveHintLabel.state` | String | per-frame poller | "hidden" / "idle" / "undo_ready" / "committed" |
+| `MoveHintLabel.text` | String | per-frame poller | the current Chinese hint copy |
+| `MoveHintLabel.visible` | bool | poller (sole writer) | label on-frame |
+| `MoveHintLabel.tile` | Vector2i | per-frame poller | tile the hint is docked to (player's tile) |
+| `MoveHintLabel.center` | Vector2 | per-frame poller | final clamped label center (viewport space) |
+| `MoveHintLabel.in_viewport` | bool | per-frame poller | label rect fully inside 960x704 |
+| `MoveHintLabel.bar_overlap` | bool | per-frame poller | 1px-inset overlap vs the player's `HealthBar` |
+
+`<Unit>` ∈ {`Player`, `East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`,
+`Central_Divine`}. All values assertable with comparison operators only.
 
 ---
 
-## 5. Design Changes (declared for `5_design`)
+## 5. Edge Cases (from `step1_sota.md`) and how this design handles them
 
-1. **`design/30_presentation.md` "血条:必须做小" conclusion is amended.**
-   - Was: 细条高 ≤ 8, 整体高度 ≤ 20, expand margin 3 (later 4), cap 6 px.
-   - Now: 条高 **12**, 部件 68×**24**, 空尾 **10** px, 光环 **6** px, hover offset −32
-     (unchanged 8 px gap). Reason: the old numbers were derived at comparison scale; at the
-     native 960×704 the 48 px² cap + 8 px bar reads as solid green (Q5 17/26). The playtest
-     envelope (`total_height <= 26`) already permitted the change — only the doc numbers move.
-     The historical conclusion stays as history with an amendment block after it.
-2. **`design/30_presentation.md` creation-screen layout row** gains: rows shrink-centered on
-   the x=480 axis (label min-width hugs text, nav/toggle rows `SHRINK_CENTER`, desc labels
-   center-aligned).
-3. `design/99_changelog.md` gets one row (this round, with the 容器矩形→墨迹 lesson as the
-   reason line).
-
----
-
-## 6. Safety, Baseline Protection, Rollback
-
-- **No irreversible operations.** No schema/data migration, no deletions, no rewrite of
-  user data. Every change is (a) a `.tscn` property edit, (b) additive script vars + one
-  private helper, (c) append-only playtest/test edits, (d) test-geometry sync. Rollback =
-  `git revert` per component; components are independent (3.1/3.2 creation-side,
-  3.3/3.4 bar-side, 3.5–3.8 gate-side).
-- **Probe-first workflow (mandatory order):** (1) add observables to `creation.gd` /
-  `health_bar.gd` (additive, no behavior change) → (2) probe pre-fix values by booting
-  `res://scenes/segments/creation.tscn` / the battle scene via the playtest harness and
-  recording the new vars → (3) record values + A/B labels in delivery notes → (4) apply the
-  layout/geometry edits → (5) re-probe (must be green) → (6) only then pin asserts.
-- **Baseline protection:** 43/44 scenarios must stay green (`terminal_victory` remains the
-  single deliberate red). Audited risks: the five creation scenarios assert phase/points/
-  attrs/wiring/visible/text — no pixel offsets, and `clicks:` targets aim at live node rect
-  centers, so moved buttons still receive the clicks; `ui_geometry_readability` HealthBar
-  asserts are all compatible with 68×24 (see 3.3); `spine_to_ending` untouched (no state
-  changes anywhere); unit suite stays 12 tests green after the sync in 3.4.
+- **`visible == true` but ancestor hidden / zero-size / off-screen / clipped /
+  occluded** - each is its own named layer in `first_fail_layer`; the predicate cannot
+  pass while any of them fails, and the *failing layer id* is itself observable, so the
+  red assertion says **why**, not just "no".
+- **Leaf-rect discipline** - `leaf_rect()` measures the unit's `Sprite` (the ink), never
+  the unit root (a slot); containers are never summed.
+- **Two invisible units, two causes** - the probe records each unit separately; the
+  scenario asserts each unit's own line; nothing merges them.
+- **A-class must be red at baseline, measured at runtime** - `portrait_visible` is read
+  from a live headless run (probe notes record the observed values), not derived from
+  `.tscn`; the health-bar round's authored-vs-runtime 2.75x gap is the recorded reason.
+- **Affordance copy must follow state** - the hint's `text`/`state` is a pure function of
+  the engine-owned fields; the scenario pins the copy in `idle`, `undo_ready`, **and**
+  `committed`, plus the return to `idle` after undo.
+- **RMB conflict** - the hint is display-only (`mouse_filter = 2`); it introduces no
+  input mapping, so it cannot collide with `click_move` / right-click undo / targeting.
+- **Protected geometry** - TopStrip, creation centering, health-bar geometry, and the five
+  protected click-move scenarios are untouched: no renames, no reparents, no edits to
+  their yamls (the two new scenarios are new files; `_common.yaml` is append-only).
+- **No mouse dependence in the visibility test** - layer 6 uses the draw-order/rect
+  comparison, never hover APIs.
 
 ---
 
-## 7. Suggested Task Decomposition (for PM)
+## 6. Technology Stack
 
-1. **T1 — creation observables + `points_attrs_gap_ok` rework** (`scripts/segments/creation.gd`): new vars + `_label_text_rect` / `_row_ink_union` helpers + reworked gap computation. Verify: compiles; probe pre-fix values recorded (A/B labels).
-2. **T2 — creation layout** (`scenes/segments/creation.tscn`): the property table in 3.1. Verify: re-probe all creation observables green; `creation_layout_readability` (existing asserts) still green.
-3. **T3 — creation gate wiring**: 3.5 surface append + 3.7 yaml in-place appends + 3.8 smoke-test function. Verify: pytest green; scenario green with new asserts.
-4. **T4 — health-bar geometry trio** (`scenes/ui/health_bar.tscn` + `scripts/ui/health_bar.gd`): tscn sizes, `EMPTY_CAP_PX`/halo/hover constants, new observables, stale comments. Probe `bar_height`/`empty_area_px` pre-fix first (add vars before changing constants).
-5. **T5 — unit-test sync** (`tests/test_health_bar.gd`, 3.4). Verify: GDScript suite 12/12.
-6. **T6 — health-bar gate wiring**: 3.5 HealthBar surface append + 3.6 yaml in-place appends. Verify: `ui_geometry_readability` green (old + new asserts).
-7. **T7 — docs + delivery notes** (3.9): README, `30_presentation.md` amendment, changelog row, probe table.
-
-T1 must precede T2 (probe needs the observables on un-fixed layout); T4's var additions must precede its constant changes for the same reason.
+- **Godot 4.4 engine APIs only** (per SOTA): `CanvasItem.is_visible_in_tree()`,
+  `Control.get_global_rect()`, `Rect2.intersection()/intersects()/encloses()`,
+  `Viewport.get_visible_rect()`, ancestor `clip_contents` scan, `z_index` /
+  `show_behind_parent` / `CanvasLayer` ordering. Zero new dependencies.
+- **Existing harness**: `playtest/` per-scenario yaml + `_common.yaml` contract,
+  `godot_playtest_scenario` inline probes, `tests/test_playtest_contract_smoke.py`
+  static contract, `run_tests.sh` (sidecar HTTP; unchanged).
+- **GDScript for all new code**; no `.gd` entries in `linter_manifest.json` (the
+  `gdscript_check` gate parses them host-side).
 
 ---
 
-## 8. Out of Scope / Not This Round
+## 7. Design Changes (declared for `5_design` to apply - the implementer does NOT edit `design/`)
 
-No new assets, no `TextureProgressBar`, no `_draw()` bar, no new scenes, no vision-gate
-question changes, no gameplay/state/number changes, no node renames or reparents, no
-keyboard/text-list resurrection, no touching `terminal_victory` (stays deliberately red).
+1. `design/40_ux_backlog.md`: UX-01 and UX-02 rows change to `CLOSED(jinyong-affordance)`
+   with one-line evidence pointers (`final/portrait_probe_notes.md`,
+   `playtest/portrait_visibility.yaml`, `playtest/move_target_affordance.yaml`). Closure
+   is an explicit action in the fixing commit (backlog rule 2) - it must not be inferred
+   from the findings disappearing.
+2. `design/30_presentation.md`: add the **layered portrait-visibility predicate** to the
+   readability hard-requirements section ("visible == true is necessary but not
+   sufficient; on-frame visibility = 6 layers, see `VisibilityProbe`") and a UI-layout
+   row for `MoveHintLabel` (below-the-feet, follows the player's tile, Chinese
+   state-following copy, `mouse_filter = 2`).
+3. `design/99_changelog.md`: one row for the round (probe findings summary + the two
+   CLOSED ids).
+4. If the UX-01 probe overturns the `_refresh_sprite_clamp` suspicion, the probe notes -
+   not this design - are the record of the real cause; `5_design` cites them.
 
-## 9. Acceptance Evidence Chain
+**No conflicts with the archive otherwise.** No numbers from `20_content.md` change; no
+system rules from `10_systems.md` change; the hint copy is Chinese per the hard
+requirement; no `90_decisions.md` Out-of-scope idea is reintroduced.
 
-playtest 44 scenarios → 43 green + `terminal_victory` unchanged-red; pytest green (with the
-new smoke function); GDScript unit suite 12/12; vision Q5 passes on 960×704 native frames
-(17/26 → all); pre-fix probe table in delivery notes proves every A-class observable was
-red before the fix; creation screen and health bar native-size frames human-verifiable.
+---
+
+## 8. Safety, Baseline Protection, Rollback
+
+- **No irreversible operations anywhere.** All edits are additive or property-level; no
+  file is deleted, no schema migrated, no data rewritten. The only "replacing" write is
+  `step2_design.md` itself (archived automatically).
+- **Baseline protection (hard constraints):**
+  - The 43 green scenarios stay green; `terminal_victory` stays the **only** allowed red.
+  - The five protected click-move scenarios (`click_move_to_tile`, `click_move_undo_right`,
+    `click_move_commit_lock`, `click_targeting_fixed`, `movement_range_highlight`) are
+    byte-untouched; the new scenario reuses their proven frame timings instead of
+    re-baselining them.
+  - Pinned node paths unchanged; `MoveHintLabel` is a new sibling at an unpinned path
+    (TopStrip precedent); `TopStrip` / creation / health-bar geometry untouched.
+  - The UX-01 fix must keep the four healthy units' `portrait_visible` true (B-class
+    guards) and `sprite_top` semantics unchanged.
+- **Rollback path:** every component is one commit-sized revert (helper file, two var
+  additions, one Label + driver, two yaml files, smoke-test function). If the fix
+  regresses a protected scenario, revert the fix commit alone - the observables and the
+  probe notes remain valid evidence either way.
+- **Probe-first gating:** the 3.3 fix task is blocked until
+  `final/portrait_probe_notes.md` exists with per-unit observed values. A fix PR without
+  probe evidence is rejected at review.
+
+---
+
+## 9. Suggested Task Decomposition (for the PM)
+
+| # | Task | Files | Depends on |
+|---|---|---|---|
+| A1 | Visibility predicate + per-unit observables + probe run + `final/portrait_probe_notes.md` | `scripts/ui/visibility_probe.gd` (NEW), `player.gd`/`enemy.gd` (additive), probe notes (NEW) | - |
+| A2 | UX-01 fix from probe evidence (locus per 3.3 table) + `portrait_visibility.yaml` + surface/order/smoke wiring | `grid_manager.gd` or character scripts (per probe), `playtest/portrait_visibility.yaml` (NEW), `_common.yaml` (append), `test_playtest_contract_smoke.py` (additive) | A1 |
+| B1 | `MoveHintLabel` node + driver + `move_target_affordance.yaml` + surface/order/smoke wiring + `final/move_hint_probe_notes.md` | `scenes/ui/hud.tscn` (new sibling), `scripts/ui/move_hint_label.gd` (NEW), `playtest/move_target_affordance.yaml` (NEW), `_common.yaml` (append), `test_playtest_contract_smoke.py` (additive) | - (parallel with A1/A2; the two-place `_common.yaml` sync must be serialized - one task lands its surface append, the other rebases) |
+| C1 | Docs + README round-state rewrite (declared changes of section 7 applied only if 5_design defers) | `README.md` | A2, B1 |
+
+Suggested order: A1 -> A2 -> B1 -> C1, with B1 allowed to start after A1 (never in
+parallel with A2 on `_common.yaml`).
+
+---
+
+## 10. Out of Scope / Not This Round
+
+- UX-03..UX-08 in the backlog (skill descriptions, lock reasons, HP numbers, creation
+  attr effects) - next rounds' candidates, not this round's contract.
+- Any change to damage / cooldown / turn-order numbers; any AI change; any art asset
+  regeneration (if the probe shows a **missing texture file**, the fix is wiring the
+  existing asset, not generating new art).
+- Replacing the yellow move-target box visuals themselves (the START_EDGE marker stays
+  as-is; the hint label adds the affordance around it).
+- Occlusion via hover/GUI mouse queries (mouse-dependent, rejected in SOTA).
+- Any new input action or rebind; RMB stays exactly as wired.
