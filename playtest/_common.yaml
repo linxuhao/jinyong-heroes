@@ -49,6 +49,31 @@
 # `playtest_spec.yaml` reappears next to this directory it is IGNORED, and the
 # play-test summary says so in its `summary` line.
 #
+# `clicks:` — REAL MOUSE EVENTS, and how to aim them (2026-08-25).
+# A `clicks:` entry is a spec string:  "<Node>[ +dx,dy][ left|right|middle]"
+#
+#   - Central_Divine_ClickTarget      左键点这个节点的屏幕中心
+#   - Player +0,-64                   左键点玩家上方一格(TILE_SIZE = 64)
+#   - Player +64,0 right              右键点玩家右边一格
+#
+# 这是 HIT TEST,不是调用处理函数:被别的控件盖住、mouse_filter=IGNORE、
+# 尺寸为 0、飘出视口的目标,事件就是收不到——而 `debug_click_*` 那种直接
+# 调处理函数的动作永远看不见这类失败。
+#
+# 为什么需要 OFFSET:战场格子是 `_draw()` 画出来的,空格子没有节点名可寻址,
+# 所以点击移动的目的地没法按名字写。写死屏幕像素能跑,但相机或格子尺寸一变
+# 就烂。锚在活节点上,场景就用设计本身的说法表达(「玩家右边那一格」)。
+#
+# 每一种失败都是 push_error → 硬闸门红,绝不静默跳过:
+#   `Player +64`(缺一维)、`Player sideways`(未知 token)、
+#   `Player +99999,0`(点在视口外)—— 三条都实测过。
+#
+# 已实测的边界(2026-08-24):`clicks:` 驱动不了「回头去问
+# get_global_mouse_position() 的处理函数」。处理函数必须用事件自己带的坐标
+# (`get_canvas_transform().affine_inverse() * event.position`)。player.gd 与
+# enemy.gd 现在都是这个形状。另外 Godot 的 GUI 拾取器不会把事件路由到
+# 「祖先是 Node2D 的 Control」——世界坐标的命中要走 `_input` 中继。
+#
 # ── AUTHORED HEADER, carried verbatim from the monolithic
 #    playtest_spec.yaml this directory replaced ──
 # Playtest contract — audited (step playtest_contract, A1-A19) against the
