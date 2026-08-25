@@ -46,7 +46,7 @@ timeline:
 - at: 135
   actions: []
   clicks:
-  - Player +0,0 right
+  - Player +64,0 right
 - at: 170
   actions: []
   assert:

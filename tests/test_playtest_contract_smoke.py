@@ -359,3 +359,35 @@ def test_creation_rework_and_bar_surface_contract() -> None:
                 "nav_cluster_center_ok", "trait_cluster_center_ok",
                 "desc_center_ok", "desc_alignment_ok"):
         assert var in creation_items, "CreationScreen.%s not whitelisted on the surface" % (var,)
+
+
+def test_timeline_at_values_are_integers() -> None:
+    """Every timeline ``at:`` in every ROUND_SCENARIOS file is a single integer.
+
+    Harness rule (playtest_summary.md, 2026-08-25): frames are single integers —
+    a range (``- {at: 3..15, ...}``) or a list (``- at: 20/25/30``) is NOT valid
+    spec syntax; the loader rejects such an entry and the whole run HARD-fails.
+    A timeline entry takes exactly two shapes: the inline dict
+    (``- {at: 3, actions: [ui_accept]}``) or the multiline dict (``- at: 3``).
+    ``\\bat\\s*:`` is word-boundary-guarded, so ``at`` inside identifiers
+    (``grid_pos``, ``format``) or prose never matches; the captured value class
+    ``[^,}\\s]*`` stops at ``,`` / ``}`` / whitespace, so an inline dict captures
+    only the number. Every captured value must pass ``isdigit()`` — a range
+    (``3..15``), a list (``20/25/30``), a quoted string (``'3'``), a float
+    (``3.0``) or an empty value all fail, catching malformed timeline entries at
+    static-check time instead of at runtime.
+    """
+    bad: list[str] = []
+    for name in ROUND_SCENARIOS:
+        text = (PLAYTEST_DIR / (name + ".yaml")).read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+            if m is None:
+                continue  # line carries no timeline `at:` key
+            val = m.group(1)
+            if not val.isdigit():
+                bad.append(
+                    f"{name}.yaml line {lineno}: non-integer timeline 'at' "
+                    f"value {val!r}"
+                )
+    assert not bad, "malformed timeline `at` values:\n" + "\n".join(bad)

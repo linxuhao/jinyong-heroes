@@ -220,3 +220,113 @@ data — probe-first discipline, not a conclusion.
 
 (`design/40_ux_backlog.md` WONTFIX/CLOSED marking is deferred to the 5_design step
 per P2 §7 — implementers do not edit `design/`.)
+
+---
+
+# Post-fix re-probe (task `fix_final_regression`, appended)
+
+## 1. Pre-fix contradiction recap (dead probe, NOT "all invisible")
+
+The 5_compile run that opened the final regression printed **all six**
+`portrait_visible == false` while every `portrait_fail_layer` stayed `""` — the
+forbidden `false/""` combination (consistency invariant row 3 below). It also
+logged, thousands of times:
+
+- `Parse Error: Could not find type "Canvas" in the current scope.`
+  (`scripts/ui/visibility_probe.gd:183`)
+- `Invalid call. Nonexistent function 'first_fail_layer' in base 'GDScript'.`
+  (`scripts/characters/player.gd:346`, `scripts/characters/enemy.gd:240`)
+- `Compile Error: Failed to compile depended scripts.` (player.gd / enemy.gd)
+
+`first_fail_layer` never ran, so `portrait_visible` sat at its declared `false`
+default. That baseline "all six invisible" reading is a **dead-probe artifact**,
+not measured evidence of invisibility. It also aborted `player.gd._process()`
+*before* the `undo_available` recompute, which is why the protected click-move
+scenarios showed `undo_available == false` (9/10) in that same run.
+
+## 2. Compile-fix static verification (read-backed facts)
+
+- `scripts/ui/visibility_probe.gd` — **no `Canvas` type anywhere** (the parse
+  error is gone). Layer-6 occlusion / draw-order helpers reference only
+  `CanvasLayer`, `CanvasItem`, `Control`, `Sprite2D`; `_canvas_layer()` (line 182)
+  walks the ancestor chain with `node is CanvasLayer` (the exact line that used
+  to say `Canvas`), `_effective_z()` (line 192) and `_tree_index()` (line 204)
+  are the other layer-6 primitives.
+- `scripts/characters/player.gd` `_process()` (line 346):
+  `portrait_fail_layer = VisibilityProbe.first_fail_layer(self)`, then line 347:
+  `portrait_visible = portrait_fail_layer == ""` — placed **before** the
+  `undo_available` recompute (line 353), so the probe and the undo logic both run.
+- `scripts/characters/enemy.gd` `_process()` (line 240–241): the same two lines
+  immediately after `_refresh_sprite_clamp()`.
+
+## 3. Consistency invariant (dead-probe rule)
+
+| `portrait_visible` | `portrait_fail_layer` | verdict |
+|---|---|---|
+| true | "" | probe alive, all six visible → UX-01 `WONTFIX(实测六个单位均可见,人工读帧误判)` |
+| false | non-empty id | probe alive, real defect → UX-01 `CLOSED(jinyong-affordance)`; the id is the real cause |
+| false | "" | CONTRADICTION — probe still dead; do NOT proceed |
+
+The pre-fix baseline sat on **row 3**. The post-fix re-probe below sat on **row 1**.
+
+## 4. Observed values (measured post-fix, probe class ALIVE)
+
+Re-measurement instrument: `playtest/portrait_visibility.yaml` f40, plus an
+inline contradiction probe (same boot prologue) that forces the harness to print
+every unit's `observed` at f40. Runs: `godot_playtest_scenario`
+`portrait_visibility` → **10/10 PASS** (all six `portrait_visible == true`, both
+`portrait_fail_layer == ""`, both `sprite_top >= 0.0`); the inline probe printed
+the `observed` column:
+
+| Unit | `portrait_visible` (observed) | `portrait_fail_layer` (observed) |
+|---|---|---|
+| `Player` | true | "" |
+| `East_Heretic` | true | "" |
+| `West_Poison` | true | "" |
+| `South_Emperor` | true | "" |
+| `North_Beggar` | true | "" |
+| `Central_Divine` | true | "" |
+
+This is the `true/""` invariant row — the probe **ran** (a dead probe cannot
+produce `true`) and every unit's portrait is on-frame. The pre-fix "all six
+false" was the dead-probe contradiction, not a defect.
+
+## 5. UX-01 disposition
+
+**UX-01 → `WONTFIX(实测六个单位均可见,人工读帧误判)`** — the re-probe measured
+all six units `portrait_visible == true` / `portrait_fail_layer == ""` with a
+live `VisibilityProbe`; the original UX-01 report ("王重阳 and 杨过 render no
+portrait ink") was a human frame-reading artifact, and the baseline's "all
+invisible" numbers came from the dead probe class, not from any real defect. No
+gameplay fix is warranted and none was made. (Per P2 §7 the WONTFIX marking in
+`design/40_ux_backlog.md` is applied by `fix_readme_round_state` Step 3 — this
+notes file is the evidence record it consumes; implementers do not edit
+`design/`.)
+
+## 6. UX-02 re-probe + clicks-spec correction (evidence-backed, recorded)
+
+`playtest/move_target_affordance.yaml` initially **HARD-failed**: the f135 undo
+click was `Player +0,0 right` — a right-click on the player's OWN tile, which the
+protected `click_move_undo_right.yaml` documents as "a benign no-op". The undo
+never fired (player stayed at (7,2)); the f175 `Player +0,-192` click then
+anchored at (7,2) → point `(480.0, -32.0)` **outside the 960×704 viewport** →
+harness `push_error` → hard gate red. Fix (**clicks spec only — no assertion
+value changed; all 18 asserts byte-identical**): f135 `Player +0,0 right` →
+`Player +64,0 right`, the exact proven undo click from `click_move_undo_right`.
+Re-run: **18/18 PASS**, state transitions idle → undo_ready → idle → undo_ready →
+committed, zero runtime errors. Protected `click_move_undo_right` (10/10) and
+`click_move_to_tile` (10/10) also pass post-fix — the pre-fix 9/10
+`undo_available` failures were the same dead-probe `_process` abort, now gone.
+
+## 7. Downstream gate mapping (not run by the implementer)
+
+The implementer has no shell/network, so the full 46-scenario playtest hard gate
+and the vision gate execute at the pipeline's 5_compile / 5_test / 5_vision
+steps. Expected outcome per the measured evidence above: 46 scenarios total, 45
+green — the 43 baseline-green scenarios (incl. the five protected click-move
+scenarios) plus `portrait_visibility` (10/10) and `move_target_affordance`
+(18/18) — with `terminal_victory_8_12_rounds_hp_15_40` remaining the **only**
+allowed red (deliberate balance-target red, 5/6). The static guard
+`test_timeline_at_values_are_integers` (added to
+`tests/test_playtest_contract_smoke.py`) asserts every timeline `at:` in all 8
+`ROUND_SCENARIOS` files is a single integer at pytest time.
