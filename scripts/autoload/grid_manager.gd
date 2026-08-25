@@ -258,6 +258,69 @@ func find_path(from_pos: Vector2i, to_pos: Vector2i) -> Array[Vector2i]:
 	return path
 
 
+## Pure planner: BFS/SPFA over the grid under the EXACT player._try_move cost
+## model (walkable + unoccupied landing tiles; 身轻如燕 slide-through of an
+## occupied tile at cost 2, landing on the walkable unoccupied tile beyond).
+## Path resolution, the movement-range highlighter and execution share this
+## one model so they can never drift apart.
+##
+## Returns { "dist": {Vector2i: int}, "steps": {Vector2i: Array[Vector2i]} }:
+## - dist[tile]  = cheapest movement cost to reach tile (the origin `from` is
+##   always present at cost 0);
+## - steps[tile] = ordered Array[Vector2i] of cardinal directions from `from`,
+##   one entry per player._try_move call (a slide-through is a single entry
+##   pointing INTO the occupied tile — _try_move performs the whole 2-tile
+##   slide natively from that one direction).
+## Unreachable tiles are simply omitted from both maps. Pure: reads only
+## walkability/occupancy; never mutates occupancy or the AStar graph.
+func plan_movement(from: Vector2i, budget: int, slide_ok: bool) -> Dictionary:
+	# Relaxation BFS: a tile is re-enqueued whenever a strictly cheaper cost is
+	# found, then re-expanded — REQUIRED because the mixed 1/2 cost model means
+	# a later cheap path can beat an earlier expensive one. Iteration order is
+	# the fixed _DIRECTIONS order only (playtest determinism is a hard repo
+	# rule). The origin is seeded directly (it may itself be occupied — the
+	# player's own tile), so relaxation can never re-enter it with a worse cost.
+	var dist: Dictionary = {from: 0}
+	var steps: Dictionary = {}
+	var from_steps: Array[Vector2i] = []
+	steps[from] = from_steps
+	var queue: Array[Vector2i] = [from]
+
+	while not queue.is_empty():
+		var v: Vector2i = queue.pop_front()
+		var d: int = dist[v]
+		var v_steps: Array[Vector2i] = steps[v]
+		for dir in _DIRECTIONS:
+			var nxt: Vector2i = v + dir
+			# Plain step: cost 1 onto a walkable, unoccupied landing tile.
+			if GridManager.is_walkable(nxt) and not GridManager.is_occupied(nxt) \
+					and d + 1 <= budget:
+				var nxt_cost: int = d + 1
+				if not dist.has(nxt) or dist[nxt] > nxt_cost:
+					var nxt_steps: Array[Vector2i] = v_steps.duplicate()
+					nxt_steps.append(dir)
+					dist[nxt] = nxt_cost
+					steps[nxt] = nxt_steps
+					queue.append(nxt)
+			# 身轻如燕 slide-through: an OCCUPIED neighbor is slid through at
+			# cost 2, landing on the walkable, unoccupied tile beyond it. One
+			# steps entry (the direction INTO the occupied tile) — the whole
+			# 2-tile slide is a single player._try_move call. The occupied tile
+			# itself is never a landing tile and never enters dist/steps.
+			elif slide_ok and GridManager.is_occupied(nxt) and d + 2 <= budget:
+				var beyond: Vector2i = nxt + dir
+				if GridManager.is_walkable(beyond) and not GridManager.is_occupied(beyond):
+					var slide_cost: int = d + 2
+					if not dist.has(beyond) or dist[beyond] > slide_cost:
+						var slide_steps: Array[Vector2i] = v_steps.duplicate()
+						slide_steps.append(dir)
+						dist[beyond] = slide_cost
+						steps[beyond] = slide_steps
+						queue.append(beyond)
+
+	return {"dist": dist, "steps": steps}
+
+
 # ---------------------------------------------------------------------------
 # Move-range calculation (flood-fill BFS)
 # ---------------------------------------------------------------------------
