@@ -48,6 +48,13 @@ var confirmed: bool = false
 ## connects in _ready (before connect() the connection list is empty).
 var pressed_connected: Dictionary = {}
 
+## Surface: true iff any rendered Label still shows the keyboard-cursor marker
+## (U+25B6 BLACK RIGHT-POINTING TRIANGLE) of the removed text list. Recomputed
+## at the END of every _render(); the playtest gate asserts it stays false — the
+## runtime proof the cursor-list surface is gone (a missing node alone would not
+## prove that).
+var cursor_markers_visible: bool = false
+
 var _traits: Array = []
 
 
@@ -250,42 +257,27 @@ func _on_trait_toggle_pressed(i: int) -> void:
 
 
 func _render() -> void:
-	var body: Label = get_node_or_null("BodyLabel") as Label
-	if body == null:
-		return
-	var text: String = ""
-	match phase:
-		"ATTRS":
-			text = "【塑造根骨】剩余点数 %d\n\n" % points_left
-			var keys: Array[String] = PlayerProfile.ATTR_KEYS
-			for i in range(keys.size()):
-				var key: String = keys[i]
-				var marker: String = "▶" if i == attr_index else " "
-				var cost: String = str(_step_cost(int(attrs[key]))) if int(attrs[key]) < ATTR_MAX else "--"
-				text += "%s %s %2d  (提升 +%s点)\n" % [marker, _attr_label(key), int(attrs[key]), cost]
-			text += "\n左右调整数值，上下选择属性，回车进入特质"
-		"TRAITS":
-			text = "【挑选特质】剩余点数 %d\n\n" % points_left
-			for i in range(_traits.size()):
-				var def = _traits[i]
-				var marker: String = "▶" if i == trait_index else " "
-				var owned: String = "已选" if trait_ids.has(def.id) else ("+" + str(def.cost) if def.cost > 0 else str(def.cost))
-				text += "%s %s  %s  %s\n" % [marker, def.display_name, owned, ("先天" if def.cost > 0 else "缺陷")]
-			text += "\n上下选择，回车切换，右键确认"
-		"CONFIRM":
-			text = "【确认】剩余点数 %d（可保留余点）\n\n" % points_left
-			for key in PlayerProfile.ATTR_KEYS:
-				text += "%s %2d  " % [_attr_label(key), int(attrs[key])]
-			text += "\n\n特质: "
-			for id in trait_ids:
-				var def = TraitData.get_def(id)
-				text += (def.display_name if def != null else id) + " "
-			text += "\n\n回车确认，踏上江湖"
-	body.text = text
+	# Single-surface model: the MouseBox button set is the ONLY operation
+	# surface; the old keyboard-cursor text list (BodyLabel) is gone. Keyboard
+	# input remains a pure shortcut layer acting on this button surface (row
+	# focus + +/- / toggle / accept). PointsLabel carries the points display
+	# that used to live inside the removed text list.
+	var points_label: Label = get_node_or_null("PointsLabel") as Label
+	if points_label != null:
+		points_label.text = "剩余点数 %d" % points_left
+	var hint_label: Label = get_node_or_null("HintLabel") as Label
+	if hint_label != null:
+		match phase:
+			"ATTRS":
+				hint_label.text = "点击 ± 调整属性 · 回车下一步"
+			"TRAITS":
+				hint_label.text = "点击切换特质 · 回车进入确认"
+			"CONFIRM":
+				hint_label.text = "点击确认踏上江湖 · 回车确认"
 	# Mouse widget surface: per-phase group visibility + row/toggle texts. The
-	# keyboard text model above is untouched; the buttons mirror the same state
-	# for the mouse path. Every leaf's `visible` mirrors the phase so node-level
-	# asserts (TraitToggle0.visible == false in ATTRS) hold, not just the group.
+	# buttons ARE the single operation surface (the keyboard text model is gone).
+	# Every leaf's `visible` mirrors the phase so node-level asserts
+	# (TraitToggle0.visible == false in ATTRS) hold, not just the group.
 	var attr_box: Control = get_node_or_null("MouseBox/AttrBox") as Control
 	var trait_box: Control = get_node_or_null("MouseBox/TraitBox") as Control
 	var confirm_box: Control = get_node_or_null("MouseBox/ConfirmBox") as Control
@@ -348,6 +340,29 @@ func _render() -> void:
 		trait_desc_label.visible = phase == "TRAITS"
 		if phase == "TRAITS" and trait_index >= 0 and trait_index < _traits.size():
 			trait_desc_label.text = _traits[trait_index].description
+	# Focused-row visual: attr_index / trait_index drive which row minus/plus or
+	# toggle acts on; show the focus on the single button surface via modulate
+	# (full vs dim) instead of a duplicated text list. modulate propagates to a
+	# row's buttons/labels — intended. Deterministic in every phase: CONFIRM
+	# dims everything.
+	for i in range(PlayerProfile.ATTR_KEYS.size()):
+		var row: Control = get_node_or_null("MouseBox/AttrBox/AttrRow%d" % i) as Control
+		if row != null:
+			row.modulate = Color(1, 1, 1, 1) if (phase == "ATTRS" and i == attr_index) else Color(0.72, 0.72, 0.72, 1)
+	for i in range(13):
+		var toggle: Button = get_node_or_null("MouseBox/TraitBox/TraitToggle%d" % i) as Button
+		if toggle != null:
+			toggle.modulate = Color(1, 1, 1, 1) if (phase == "TRAITS" and i == trait_index) else Color(0.72, 0.72, 0.72, 1)
+	# Runtime proof the keyboard-cursor surface is gone: scan every Label
+	# descendant for the U+25B6 marker (BLACK RIGHT-POINTING TRIANGLE) the
+	# removed text model rendered in front of the focused row. Must run LAST so
+	# freshly-written texts are seen.
+	cursor_markers_visible = false
+	for label in find_children("*", "Label", true, false):
+		var label_node: Label = label as Label
+		if label_node != null and label_node.text.contains("▶"):
+			cursor_markers_visible = true
+			break
 
 
 func _attr_label(key: String) -> String:
