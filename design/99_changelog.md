@@ -87,3 +87,4 @@
 `portrait_visibility.yaml` / `move_target_affordance.yaml` 两个 playtest 场景。
 44 → 46 场景;实测(`5_compile` 的 `playtest_summary.md`,2026-08-25)**45 绿 + 1 红**:`terminal_victory` 唯一允许的红(`Player.health` 观测 783,在 `max_health` 的 15%~40% 窗外;平衡数值按 `00_roadmap.md`「数值最后调」延后),新场景 `portrait_visibility` **10/10**、`move_target_affordance` **18/18**。
 视觉闸门同轮 **passed: true**(Q1~Q6 零失败,46 场景 184 帧);编译 69/69 零错误。
+| (人工) | 2026-08-25 | **推翻 UX-01 的 WONTFIX,拆成 UX-01a / UX-01b 重开**。`portrait_visible` 六层判据(hidden_in_tree / null_texture / zero_rect / off_viewport / clipped / occluded)对六个单位全报 true,而 960×704 原始帧上:杨过那一格什么都没画(`sprite_top = 224.0`,该处只有山景),王重阳画了但被顶栏的不透明黄色行动条压住(`sprite_top = 0.0`)。 | 判据有洞:`occluded` 要求遮挡物**完全包住**目标,部分遮挡漏过;而「什么都没画」这一支根本没被覆盖。**一个断言全绿不等于缺陷不在。**这一轮的 WONTFIX 引用的「实测」来自闸门跑的正是这条弱判据,而它自己的 `portrait_probe_notes.md` 至今写着 PENDING/(not run) —— 证据链断了一节而结论照样下了。下一轮先补判据,再谈关不关。 |

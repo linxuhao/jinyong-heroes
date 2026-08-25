@@ -21,7 +21,9 @@
 
 | id | 状态 | 界面 | 看见什么 | 玩家因此做不到什么 |
 |---|---|---|---|---|
-| UX-01 | **WONTFIX(实测六个单位均可见,人工读帧误判)** | 战斗棋盘 | 王重阳与杨过**只有名字和血条,立绘完全不在画面上**;其余四人立绘正常。两轮同一场景同一帧(`ui_geometry_readability` f85)完全一致,**不是 jinyong-layout 的回归,是更早就有的** | 看不出这两人站在哪一格,也无法用鼠标点选他们 —— 六个单位里有两个是隐形的。**证据:final/portrait_probe_notes.md、playtest/portrait_visibility.yaml(六单位 portrait_visible == true、portrait_fail_layer == "",2026-08-25 闸门实测 10/10)** |
+| UX-01a | **REOPENED** | 战斗棋盘 | **杨过那一格什么都没画**。探针读到 `Player.sprite_top = 224.0`,而 960×704 原始帧上该位置只有山景。判据 `portrait_visible` 却报 true(六层全过) | 看不出主角站在哪一格,也点不到他 |
+| UX-01b | **REOPENED** | 战斗棋盘 | **王重阳的立绘画出来了,但被顶栏压住**——`sprite_top = 0.0`,而顶栏 0..92 里有不透明的黄色行动条和出手顺序行。判据的 `occluded` 层要求遮挡物**完全包住**目标才算,部分遮挡漏过 | 认不出那是谁 |
+| UX-01 | ~~WONTFIX~~ **判据太弱,该结论作废** | — | 原判据 `portrait_visible == true` 六个单位全绿,而人眼在同一帧上看到两个单位有问题。`portrait_probe_notes.md` 至今仍写着 PENDING/(not run),那份 WONTFIX 引用的「实测」实际来自闸门的 `portrait_visibility` 10/10 —— 而那正是这条太弱的判据 | **教训:一个断言全绿不等于缺陷不在;先看真帧** |
 | UX-02 | **CLOSED(jinyong-affordance)** | 战斗棋盘 | 移动落点只有一个黄色空框,**没有任何确认 / 取消的可见提示** | 不知道可以右键退回 —— 右键退回这一轮做完了,可供性一个字都没有。**证据:final/move_hint_probe_notes.md、playtest/move_target_affordance.yaml(状态跟随中文提示,mouse_filter = 2,2026-08-25 闸门实测 18/18)** |
 | UX-03 | OPEN | 底部技能栏 | 技能按钮只有名称和「发挥 ×1.3」,没有效果说明,也没有内力消耗 | 无法判断该用哪一招,也不知道放完还剩多少内力 |
 | UX-04 | OPEN | 底部技能栏 5–8 格 | 只写「锁定」,没有锁定原因或解锁条件 | 不知道为什么不能用,也不知道怎么解锁 |
