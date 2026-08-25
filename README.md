@@ -123,7 +123,7 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 - **Skill description label** (`SkillDescLabel`): always-visible; default guidance → selected skill's Chinese description.
 - **Battle action buttons**: `EndTurnButton` (结束回合) + `AttackButton` (出招 (J)) in the top-right column under `PauseButton`, gate-guarded and disabled off-turn. **All battle clickables are `focus_mode = 0`**.
 - **Skill bar**: up to 12 `SkillButton` nodes (default 2 arts / 8 slots; 左右互搏 = 3 arts / 12). Each shows name, hotkey, 发挥 ×N.N, and a cooldown/state overlay.
-- **Health bars** (`HealthBar`): 64 px wide, name label above (now with a semi-transparent backing), green→yellow→red by HP fraction; floating bars clamp **below the top strip**.
+- **Health bars** (`HealthBar`): 64 px wide, **12 px tall bar**, name label above (semi-transparent backing), green→yellow→red by HP fraction, **fixed 10 px empty cap** and **6 px track halo** so the empty slot reads at the native 960×704 size; floating bars clamp **below the top strip**.
 - **Round indicator**: 回合 N, 行动: <name> · 移动 <m>, 顺序: <Chinese names>.
 
 ## Project Structure
@@ -183,7 +183,7 @@ The playtest harness posts **real** `InputEventMouseButton` events. The `clicks:
 
 ### Playtest surface (this round, append-only in `_common.yaml`)
 
-**Battle top-bar observables** — `HUD.top_text_pairwise_overlap` / `top_text_in_strip` / `top_strip_alpha` / `hint_hpbar_overlap` / `hpbar_strip_overlap`; `TopStrip.visible` / `size`; `HealthBar.name_backing_alpha`. **Creation-layout observables** — `CreationScreen.attr_rows_uniform` / `attr_label_alignment_ok` / `points_attrs_gap_ok` / `phase_skeleton_same` / `creation_in_viewport` / `creation_box_fits`. (Plus the prior round's `Player.turn_start_*` / `undo_available`, `MoveRangeHighlight.start_tile` / `undo_available`, `CreationScreen.cursor_markers_visible`, `PointsLabel.visible` / `text`, and `focus_mode` on the battle buttons.)
+**Battle top-bar observables** — `HUD.top_text_pairwise_overlap` / `top_text_in_strip` / `top_strip_alpha` / `hint_hpbar_overlap` / `hpbar_strip_overlap`; `TopStrip.visible` / `size`; `HealthBar.name_backing_alpha`. **Creation-layout observables** — `CreationScreen.attr_rows_uniform` / `attr_label_alignment_ok` / `points_attrs_gap_ok` / `phase_skeleton_same` / `creation_in_viewport` / `creation_box_fits` / attr_cluster_center_ok / attr_cluster_width_ok / nav_cluster_center_ok / trait_cluster_center_ok / desc_center_ok / desc_alignment_ok. (Plus the prior round's `Player.turn_start_*` / `undo_available`, `MoveRangeHighlight.start_tile` / `undo_available`, `CreationScreen.cursor_markers_visible`, `PointsLabel.visible` / `text`, and `focus_mode` on the battle buttons.)
 
 ## Technical Notes
 

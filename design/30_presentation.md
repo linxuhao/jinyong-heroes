@@ -64,6 +64,7 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 | 结束回合 / 出招 / 技能说明 | 顶栏下方右侧 |
 | 血条 + 名字 | 悬浮于角色上方,名字在血条**之上**(有半透明底),不叠压;血条顶边夹在顶栏之下(`top ≥ 94`) |
 | 教程面板 | 屏幕居中,**不透明底色** |
+| 捏人屏 | 三阶段(捏人 / 特质 / 确认)内容整组在 **x=480 轴上居中**;每行 shrink-center(AttrLabel 最小宽贴文字;AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`);描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`) |
 
 **技能按钮必须显示该招式的发挥度**(失常 / 正常 / 超常 + 乘数)——见
 `10_systems.md` §6。
@@ -147,6 +148,8 @@ empty portions」。逐项渲染验证后的结论:
 
 闸门的原话是「**above** or attached to the characters, a bar with a filled
 portion and an empty portion」——三个条件缺一不可。
+
+> **2026-08-25 修订(原生尺寸重验)**。旧数字「细条(高 ≤ 8)/ 整体高度 ≤ 20 / cap 6 px / expand margin 4」是在**对比放大尺度**下推出的,按历史保留;在 **960×704 原生帧**上重验后修订:条高 **12**、部件 **68×24**、空尾 **10 px**(空槽面积 120 px²,×2.5)、槽体光环 **6 px**、悬浮偏移 **−32**(悬空 8 px 不变)。原因:960×704 原生帧上 48 px² 空尾 + 8 px 条仍被视觉闸门读成 solid green(Q5 17/26);playtest 信封 `total_height <= 26` 本就允许,动的只有文档数字。
 
 ## 美术:整套重画(决定于 2026-08-23)
 
