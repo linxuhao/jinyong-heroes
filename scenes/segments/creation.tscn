@@ -60,10 +60,11 @@ theme_override_constants/separation = 14
 [node name="AttrRow0" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
+	size_flags_horizontal = 4
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow0"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(0, 0)
 [node name="AttrMinus0" type="Button" parent="MouseBox/AttrBox/AttrRow0"]
 	custom_minimum_size = Vector2(44, 34)
 text = "-"
@@ -76,10 +77,11 @@ focus_mode = 0
 [node name="AttrRow1" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
+	size_flags_horizontal = 4
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow1"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(0, 0)
 [node name="AttrMinus1" type="Button" parent="MouseBox/AttrBox/AttrRow1"]
 	custom_minimum_size = Vector2(44, 34)
 text = "-"
@@ -92,10 +94,11 @@ focus_mode = 0
 [node name="AttrRow2" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
+	size_flags_horizontal = 4
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow2"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(0, 0)
 [node name="AttrMinus2" type="Button" parent="MouseBox/AttrBox/AttrRow2"]
 custom_minimum_size = Vector2(44, 34)
 text = "-"
@@ -108,10 +111,11 @@ focus_mode = 0
 [node name="AttrRow3" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
+	size_flags_horizontal = 4
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow3"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(0, 0)
 [node name="AttrMinus3" type="Button" parent="MouseBox/AttrBox/AttrRow3"]
 custom_minimum_size = Vector2(44, 34)
 text = "-"
@@ -124,10 +128,11 @@ focus_mode = 0
 [node name="AttrRow4" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
+	size_flags_horizontal = 4
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow4"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(0, 0)
 [node name="AttrMinus4" type="Button" parent="MouseBox/AttrBox/AttrRow4"]
 custom_minimum_size = Vector2(44, 34)
 text = "-"
@@ -139,6 +144,7 @@ focus_mode = 0
 
 [node name="AttrDescLabel" type="Label" parent="MouseBox/AttrBox"]
 custom_minimum_size = Vector2(0, 48)
+horizontal_alignment = 1
 visible = false
 text = ""
 autowrap_mode = 3
@@ -146,6 +152,7 @@ mouse_filter = 2
 
 [node name="AttrNavRow" type="HBoxContainer" parent="MouseBox/AttrBox"]
 custom_minimum_size = Vector2(0, 44)
+size_flags_horizontal = 4
 [node name="AttrBackButton" type="Button" parent="MouseBox/AttrBox/AttrNavRow"]
 text = "返回菜单"
 focus_mode = 0
@@ -160,44 +167,58 @@ visible = false
 [node name="TraitToggle0" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle1" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle2" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle3" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle4" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle5" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle6" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle7" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle8" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle9" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle10" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle11" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 [node name="TraitToggle12" type="Button" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
+size_flags_horizontal = 4
 
 [node name="TraitDescLabel" type="Label" parent="MouseBox/TraitBox"]
+horizontal_alignment = 1
 visible = false
 text = ""
 autowrap_mode = 3
@@ -205,6 +226,7 @@ mouse_filter = 2
 
 [node name="TraitNavRow" type="HBoxContainer" parent="MouseBox/TraitBox"]
 custom_minimum_size = Vector2(0, 44)
+size_flags_horizontal = 4
 [node name="TraitBackButton" type="Button" parent="MouseBox/TraitBox/TraitNavRow"]
 text = "上一步"
 focus_mode = 0
