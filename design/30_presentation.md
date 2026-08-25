@@ -106,7 +106,9 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 
 | 动作 | 键 | Godot action |
 |---|---|---|
-| 移动 | WASD / 方向键 | move_up / move_down / move_left / move_right |
+| 移动(主) | 左键点空格;点敌格 = 攻击,点自己格 = 无操作 | (鼠标) |
+| 退回本回合移动 | 右键(出手 / 结束回合后拒绝) | (鼠标) |
+| 移动(快捷) | WASD / 方向键 | move_up / move_down / move_left / move_right |
 | 选择招式 | 1 ~ 8 | skill_1 … skill_8 |
 | 确认 / 出手 | J | confirm |
 | 结束回合 | Space | end_turn |
