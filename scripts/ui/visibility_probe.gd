@@ -11,14 +11,16 @@ class_name VisibilityProbe
 ## Layer order is cheap-to-expensive (from step1_sota.md):
 ##   1 "hidden_in_tree"  leaf's visible chain broken (leaf or an ancestor hidden)
 ##   2 "null_texture"    Sprite2D/TextureRect texture null or zero-sized
-##   3 "zero_rect"       leaf rect zero area / scale zero / alpha chain < 0.01
-##   4 "off_viewport"    leaf rect does NOT intersect the viewport rect
-##   5 "clipped"         a clip_contents ancestor does not enclose the leaf rect
-##   6 "occluded"        a later-drawn, mouse-visible Control fully covers it
+##   3 "blank_texture"   texture resource has no pixel with alpha > 0 (asset scan)
+##   4 "zero_rect"       leaf rect zero area / scale zero / alpha chain < 0.01
+##   5 "off_viewport"    leaf rect does NOT intersect the viewport rect
+##   6 "clipped"         a clip_contents ancestor does not enclose the leaf rect
+##   7 "occluded"        a later-drawn, mouse-visible Control fully covers it
+##   8 "covered"         a later-drawn opaque Control covers >= 25% (>= 64 px²)
 ##
 ## `visible == true` is necessary but not sufficient: an ancestor may be hidden,
 ## the rect may be off-screen, an ancestor may clip it, or a later-drawn host
-## may cover it. This probe checks all six.
+## may cover it. This probe checks all eight.
 
 ## Global rect of the ink-drawing leaf (the unit's "Sprite" child). Containers
 ## are NOT ink — never return the unit root's own rect (a slot).
