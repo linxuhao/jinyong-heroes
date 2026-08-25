@@ -699,6 +699,15 @@ func begin_turn(unit: Node) -> void:
 	elif _has_status(unit, "move_minus_next_turn"):
 		unit.moves_left = max(move_range - 2, 0)
 
+	# Turn-start snapshot (click-move undo target): records the EFFECTIVE
+	# post-restriction budget so right-click undo can restore it. Player-only —
+	# enemies have none of the three fields, and _is_player() is used (never a
+	# unit.is_player style call — enemy.gd does not define that method).
+	if _is_player(unit) and "turn_start_grid" in unit:
+		unit.turn_start_grid = unit.grid_pos
+		unit.turn_start_moves_left = unit.moves_left
+		unit.turn_start_moved = unit.moved
+
 	# (1) Cooldowns decrement by round at the unit's own turn start.
 	if "skill_cooldowns" in unit and unit.skill_cooldowns != null:
 		for i in range(unit.skill_cooldowns.size()):

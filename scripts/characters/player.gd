@@ -72,6 +72,27 @@ var moved: bool = false
 ## (CombatManager) on successful execution.
 var acted: bool = false
 
+## Turn-start grid position — the right-click undo restore target. Written by
+## the engine (CombatManager.begin_turn) at every turn start, like acted.
+var turn_start_grid: Vector2i = Vector2i(-1, -1)
+
+## Movement budget remaining at turn start (AFTER next-turn restrictions) —
+## what right-click undo restores moves_left to.
+var turn_start_moves_left: int = 0
+
+## Whether the unit had moved at turn start (always false in practice; part of
+## the same snapshot so undo restores the exact turn-start state).
+var turn_start_moved: bool = false
+
+## True when the turn's movement can still be undone (recomputed EVERY frame in
+## _process — never event-written, so it can never go stale). False once the
+## move is committed: a successful action (engine sets acted) or turn end.
+var undo_available: bool = false
+
+## Queued cardinal directions for a click-move path (one entry per _try_move
+## call), drained by _on_move_completed.
+var _pending_move_steps: Array[Vector2i] = []
+
 ## Number of turns this unit has taken since the battle began.
 var turns_taken: int = 0
 
@@ -174,6 +195,12 @@ func setup(data) -> void:
 	# Grid position from current world position (set by battlefield after
 	# positioning the node).
 	grid_pos = GridManager.world_to_grid(position)
+
+	# Turn-start snapshot initialisation (the engine re-writes these fields at
+	# every CombatManager.begin_turn; this only makes them sane pre-battle).
+	turn_start_grid = grid_pos
+	turn_start_moves_left = moves_left
+	turn_start_moved = false
 
 	# Visual appearance (defensive: _sprite is null before add_child, so the
 	# authoritative application happens in _ready() via _apply_sprite_visuals()).
@@ -311,6 +338,12 @@ func _process(_delta: float) -> void:
 	# the unit's own turn start — no per-frame ticking here.
 	_refresh_sprite_clamp()
 
+	# Undo availability — recomputed EVERY frame (never event-written), so it is
+	# always in sync no matter which writer changed acted / grid_pos / moves_left.
+	# A successful action commits the movement (engine sets acted), which is what
+	# flips this false.
+	undo_available = (not acted) and (grid_pos != turn_start_grid or moves_left != turn_start_moves_left)
+
 
 ## Counting-only observation of the input pipeline: records every left-button
 ## press that reaches this node, so the playtest can tell whether a synthesized
@@ -414,26 +447,36 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_click_targeting(event)
 		get_viewport().set_input_as_handled()
 
+	# --- Right-click: undo this turn's movement back to the turn-start tile ---
+	elif event is InputEventMouseButton \
+			and event.button_index == MOUSE_BUTTON_RIGHT \
+			and event.pressed:
+		handle_world_right_click(get_canvas_transform().affine_inverse() * event.position)
+		get_viewport().set_input_as_handled()
+
 
 # ---------------------------------------------------------------------------
 # Movement
 # ---------------------------------------------------------------------------
 
-## Attempt to move one tile in the given cardinal direction.
-func _try_move(direction: Vector2i) -> void:
+## Attempt to move one tile in the given cardinal direction. Returns true when
+## the step was accepted and its tween scheduled, false when gated. Existing
+## callers (WASD / arrow keys) legally ignore the return in GDScript; the
+## click-move step queue uses it to know whether the next queued step may run.
+func _try_move(direction: Vector2i) -> bool:
 	# Input gating — tutorial must allow movement.
 	if not TutorialManager.is_input_allowed("move"):
-		return
+		return false
 
 	# Turn budget: one tile per point; blocked at zero.
 	if moves_left <= 0:
-		return
+		return false
 
 	var target: Vector2i = grid_pos + direction
 
 	# Validate walkability (in-bounds and not a border wall tile).
 	if not GridManager.is_walkable(target):
-		return
+		return false
 
 	# 身轻如燕 (swallow_lightness): an occupied target tile can be SLID THROUGH
 	# when the trait is owned and the movement budget allows — consume 2 movement
@@ -451,11 +494,11 @@ func _try_move(direction: Vector2i) -> void:
 			grid_pos = beyond
 			var slide_tween: Tween = create_tween()
 			slide_tween.tween_callback(_on_move_completed).set_delay(MOVE_DURATION)
-			return
+			return true
 
 	# Validate occupancy.
 	if GridManager.is_occupied(target):
-		return
+		return false
 
 	# Consume one movement point and mark this turn as moved.
 	moves_left -= 1
@@ -470,11 +513,61 @@ func _try_move(direction: Vector2i) -> void:
 	var reset_tween: Tween = create_tween()
 	reset_tween.tween_callback(_on_move_completed).set_delay(MOVE_DURATION)
 
+	return true
+
+
+## Attempt to move to an arbitrary reachable tile by resolving it into a
+## cardinal step sequence via GridManager.plan_movement (the EXACT _try_move
+## cost model: walkable + unoccupied landing tiles, 身轻如燕 slide-through at
+## cost 2) and executing it one _try_move call per step. Gate order: tutorial
+## allowance (hint), budget (silent), own-tile no-op (silent), walkability
+## (silent — clicking the border ring is not a rejection worth a hint),
+## reachability (hint). Multi-step paths queue the remaining directions and are
+## drained by _on_move_completed.
+func _try_move_to(target_grid: Vector2i) -> void:
+	if not TutorialManager.is_input_allowed("move"):
+		action_hint.emit("教程尚未解锁")
+		return
+
+	if moves_left <= 0:
+		return
+
+	if target_grid == grid_pos:
+		return
+
+	if not GridManager.is_walkable(target_grid):
+		return
+
+	var plan: Dictionary = GridManager.plan_movement(
+		grid_pos, moves_left, traits.has("swallow_lightness"))
+	var steps: Array = plan.get("steps", {}).get(target_grid, [])
+	if steps.is_empty():
+		action_hint.emit("走不到那里")
+		return
+
+	if steps.size() == 1:
+		_try_move(steps[0])
+		return
+
+	_pending_move_steps = steps.duplicate()
+	var first: Vector2i = _pending_move_steps.pop_front()
+	_try_move(first)
+
 
 ## Called when the movement animation finishes.
 func _on_move_completed() -> void:
 	if not is_instance_valid(self):
 		return
+	# Drain the click-move step queue first: pop the next direction and try it.
+	# If it succeeded, the next completion callback is already scheduled — return
+	# early. If a queued step ever fails (e.g. the target got occupied mid-queue),
+	# clear the queue and fall through to the normal is_moving reset so the unit
+	# can never get stuck with is_moving == true.
+	if not _pending_move_steps.is_empty():
+		var next_dir: Vector2i = _pending_move_steps.pop_front()
+		if _try_move(next_dir):
+			return
+		_pending_move_steps.clear()
 	is_moving = false
 	# Snap position to exact grid centre (prevents floating-point drift).
 	position = GridManager.grid_to_world(grid_pos)
@@ -539,6 +632,52 @@ func handle_world_click(world_pos: Vector2) -> void:
 
 		# Only act on the first matched enemy.
 		break
+
+	# No enemy on the clicked tile — click-move fallback (enemy-first resolution
+	# preserved: a click on an enemy tile still attacks). Clicking the player's
+	# own tile is a silent no-op.
+	if click_grid == grid_pos:
+		return
+	_try_move_to(click_grid)
+
+
+## Shared world right-click entry point (PUBLIC — called by the right-click
+## branch of _unhandled_input). Carries the same 4-condition gate as
+## handle_world_click: battle active, player turn live, not paused, not
+## mid-animation. Undo restores the turn-start snapshot (grid_pos / moves_left /
+## moved) ANIMATED via GridManager.move_unit — the same tween pattern as
+## _try_move, not an instant snap. Refused once the move is committed: the
+## engine sets acted on a successful action (attack/skill/item) and end-turn
+## ends the player's turn, so commit == acted or not the player's turn.
+func handle_world_right_click(world_pos: Vector2) -> void:
+	var state: String = GameManager.get_state()
+	if state != "BATTLE":
+		return
+	if not CombatManager.is_player_turn():
+		return
+	if CombatManager.get_is_paused():
+		return
+	if is_moving:
+		return
+
+	# Commit lock: a successful action locks the turn's movement — no undo.
+	if acted:
+		action_hint.emit("已出手,无法退回")
+		return
+
+	# Benign no-op: already at the turn-start tile with the full budget.
+	if grid_pos == turn_start_grid and moves_left == turn_start_moves_left:
+		return
+
+	# Restore the exact turn-start state (animated, keeps occupancy consistent).
+	moved = turn_start_moved
+	moves_left = turn_start_moves_left
+	_pending_move_steps = []
+	is_moving = true
+	GridManager.move_unit(self, grid_pos, turn_start_grid)
+	grid_pos = turn_start_grid
+	var undo_tween: Tween = create_tween()
+	undo_tween.tween_callback(_on_move_completed).set_delay(MOVE_DURATION)
 
 
 ## Execute an attack (or selected skill) against the given target enemy.
