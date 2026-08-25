@@ -11,9 +11,16 @@
 ## Self-driving: polls GameManager.get_player() every frame (never stores the
 ## ref), hides when there is no battle / no player / not the player's turn / no
 ## remaining movement budget, and recomputes + redraws ONLY when the player's
-## grid position, the movement budget, the acted flag, or the occupancy map
-## changed since the last recompute. The node dies with the battlefield scene on
-## a swap — no manual teardown needed.
+## grid position, the movement budget, the acted flag, the occupancy map, the
+## turn-start tile, or the undo-available flag changed since the last recompute.
+## The node dies with the battlefield scene on a swap — no manual teardown
+## needed.
+##
+## Delivery note: the optional GridManager.plan_movement refactor of _recompute
+## was deliberately NOT performed (its private BFS stays, coexisting with the
+## planner). The task plan allows the switch only if movement_range_highlight
+## stays byte-green, which this implementer has no shell/Godot to verify — any
+## refactor risks drifting the pinned 39-tile assertion. No other deviations.
 extends Node2D
 
 # ---------------------------------------------------------------------------
@@ -30,6 +37,12 @@ const TILE_SIZE: int = 64
 ## readability hard rule #1).
 const MOVE_FILL: Color = Color(0.35, 0.85, 0.30, 0.16)
 const MOVE_EDGE: Color = Color(0.35, 0.85, 0.30, 0.45)
+
+## Bright amber-green edge for the turn-start tile marker ("where right-click
+## returns to"). Numerically distinct from MOVE_FILL/MOVE_EDGE (green) and from
+## RangeHighlight's blue/red: r and g high, b low (< 0.35).
+const START_EDGE: Color = Color(0.85, 0.90, 0.20, 0.90)
+const START_EDGE_DIM: Color = Color(0.85, 0.90, 0.20, 0.32)  # undo_available == false
 
 ## Cardinal neighbor offsets (4-direction BFS, mirroring _try_move's cardinal
 ## movement — there is no diagonal movement in this game).
@@ -48,6 +61,18 @@ var tile_count: int = 0
 ## scenarios can assert green-dominant distinctness vs RangeHighlight's blue.
 var fill_color: Color = MOVE_FILL
 
+## Turn-start tile the player's undo would return to. Polled every frame from
+## player.turn_start_grid; (-1,-1) when invalid or hidden. Marker state only —
+## never part of the reachable-set visibility condition.
+var start_tile: Vector2i = Vector2i(-1, -1)
+
+## Whether right-click undo is currently available (polled from
+## player.undo_available, which is recomputed per frame by the player). False
+## after a successful action commits the move (engine sets acted) or once the
+## turn ends. Marker state only — the commit is expressed through the marker's
+## dimmed color, never by hiding the reachable set.
+var undo_available: bool = false
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -63,6 +88,8 @@ var _last_grid: Vector2i = Vector2i(-1, -1)
 var _last_moves: int = -1
 var _last_acted: bool = false
 var _last_occ: String = ""
+var _last_start_tile: Vector2i = Vector2i(-1, -1)
+var _last_undo: bool = false
 
 # ---------------------------------------------------------------------------
 # Per-frame update
@@ -93,15 +120,27 @@ func _process(_delta: float) -> void:
 	# unit that acted but still has moves_left can and will walk.)
 	visible = true
 
+	# Poll the trying-state observables every frame (same pattern as the diff
+	# keys — player.turn_start_grid / player.undo_available are written outside
+	# this node, so a per-frame read can never go stale). The "turn_start_grid"
+	# in-player guard keeps this inert if the dependency task's fields are not
+	# present; start_tile then stays (-1,-1) and no marker is drawn.
+	if "turn_start_grid" in player:
+		start_tile = player.turn_start_grid
+	undo_available = player.undo_available
+
 	var occ_sig: String = _occupancy_signature()
 	if player.grid_pos == _last_grid and player.moves_left == _last_moves \
-			and player.acted == _last_acted and occ_sig == _last_occ:
+			and player.acted == _last_acted and occ_sig == _last_occ \
+			and start_tile == _last_start_tile and undo_available == _last_undo:
 		return  # Nothing changed — keep the current draw.
 
 	_last_grid = player.grid_pos
 	_last_moves = player.moves_left
 	_last_acted = player.acted
 	_last_occ = occ_sig
+	_last_start_tile = start_tile
+	_last_undo = undo_available
 	_recompute(player)
 	queue_redraw()
 
@@ -111,11 +150,15 @@ func _process(_delta: float) -> void:
 func _hide() -> void:
 	visible = false
 	tile_count = 0
+	start_tile = Vector2i(-1, -1)
+	undo_available = false
 	_reachable.clear()
 	_last_grid = Vector2i(-1, -1)
 	_last_moves = -1
 	_last_acted = false
 	_last_occ = ""
+	_last_start_tile = Vector2i(-1, -1)
+	_last_undo = false
 
 
 ## Sorted join of the occupancy keys — the cheap-diff signature for "did any
@@ -188,3 +231,13 @@ func _draw() -> void:
 		var rect: Rect2 = Rect2(cell.x * TILE_SIZE, cell.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
 		draw_rect(rect, MOVE_FILL)
 		draw_rect(rect, MOVE_EDGE, false, 1.0)
+
+	# Trying-state marker: edge-only outline on the turn-start tile (the tile
+	# right-click undo returns to). Drawn LAST so it sits on top of the reachable
+	# set. Bright when undo is available, dim when committed (undo_available
+	# flipped false — the commit state is expressed through the color, never by
+	# hiding the reachable set above). Nothing is drawn while the tile is invalid
+	# ((-1,-1), e.g. pre-battle or after _hide()) or out of bounds.
+	if start_tile.x >= 0 and GridManager.is_in_bounds(start_tile):
+		var start_rect: Rect2 = Rect2(start_tile.x * TILE_SIZE, start_tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+		draw_rect(start_rect, START_EDGE if undo_available else START_EDGE_DIM, false, 2.0)
