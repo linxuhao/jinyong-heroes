@@ -26,6 +26,11 @@ const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
 ## fill covers the whole bar rect and the widget would read as a solid block
 ## (5_vision Q5) — the cap keeps the "empty slot" of the bar always visible.
 const EMPTY_CAP_PX: float = 6.0
+## Bottom edge of the battle top strip, in viewport px. This is the PAIR of
+## hud.tscn's TopStrip offsets (0..80, full-width band drawn behind the top
+## HUD widgets): floating health bars clamp their top edge to STRIP_BOTTOM + 2
+## so no bar ever enters the strip zone. Keep in sync with hud.tscn.
+const STRIP_BOTTOM: float = 80.0
 
 # ---------------------------------------------------------------------------
 # State
@@ -74,10 +79,21 @@ var fill_color: Color = _FILL_GREEN
 ## the ColorRect node directly.
 var empty_cap_px: float = EMPTY_CAP_PX
 
+## Alpha of the name-label backing stylebox (0.7 once the backing exists;
+## 0.0 fallback when the NameLabel node is absent, e.g. headless). Written
+## unconditionally in setup(); asserted `> 0.3` on the playtest surface so
+## name labels stay readable when a portrait passes behind them.
+var name_backing_alpha: float = 0.0
+
 ## The dedicated "fill" stylebox of the bar. Created once in setup(); its
 ## bg_color is the only thing update_health() recolors. Null until setup runs
 ## (all write sites guard on it).
 var _fill_sb: StyleBoxFlat = null
+
+## The cached semi-transparent backing stylebox of the name label. Created once
+## in setup() (idempotent — re-assigned on repeated setup calls) and applied as
+## a "normal" stylebox override so the label reads on any artwork behind it.
+var _name_backing_sb: StyleBoxFlat = null
 
 # ---------------------------------------------------------------------------
 # Node references
@@ -175,6 +191,19 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		label.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.05))
 		label.add_theme_constant_override("outline_size", 2)
 		label.add_theme_constant_override("shadow_outline_size", 1)
+		# Name-label backing: a cached semi-transparent StyleBoxFlat applied as
+		# the "normal" stylebox so the label stays readable when a character
+		# portrait passes behind it. Idempotent — re-assigned on repeated
+		# setup() calls (stylebox overrides are replace-only, no accumulation).
+		_name_backing_sb = StyleBoxFlat.new()
+		_name_backing_sb.bg_color = Color(0.05, 0.05, 0.08, 0.7)
+		_name_backing_sb.corner_radius_top_left = 2
+		_name_backing_sb.corner_radius_top_right = 2
+		_name_backing_sb.corner_radius_bottom_right = 2
+		_name_backing_sb.corner_radius_bottom_left = 2
+		_name_backing_sb.content_margin_all(2.0)
+		label.add_theme_stylebox_override("normal", _name_backing_sb)
+		name_backing_alpha = 0.7
 
 	# Always record the name (unconditionally, outside the label-null guard)
 	# so the observable is set in every setup() path.
@@ -269,11 +298,15 @@ func follow_character() -> void:
 	# Keep the height observable live while the widget actually runs its layout
 	# pass (re-assigned on every frame follow_character() executes).
 	total_height = size.y
-	# Clamp so the bar never clips off the viewport edges.
+	# Clamp so the bar never clips off the viewport edges. The y LOWER bound is
+	# STRIP_BOTTOM + 2 (= 82): no floating bar ever enters the top strip zone
+	# (the full-width backed band, hud.tscn TopStrip offsets 0..80). The x
+	# clamp and the y upper bound stay viewport-edge based. Follow_delta above
+	# stays computed BEFORE this clamp, so its semantics are unchanged.
 	var vp: Vector2 = get_viewport_rect().size
 	global_position = Vector2(
 		clampf(screen_pos.x, 4.0, vp.x - size.x - 4.0),
-		clampf(screen_pos.y, 4.0, vp.y - size.y - 4.0))
+		clampf(screen_pos.y, STRIP_BOTTOM + 2.0, vp.y - size.y - 4.0))
 	visible = true
 
 # ---------------------------------------------------------------------------
