@@ -40,6 +40,7 @@ ROUND_SCENARIOS: list[str] = [
     "creation_single_ui",
     "creation_layout_readability",
     "portrait_visibility",
+    "move_target_affordance",
 ]
 
 
@@ -258,6 +259,23 @@ def test_affordance_surface_contract() -> None:
            stripped.startswith("North_Beggar.portrait_visible:"):
             assert any(op in stripped for op in ["==", "!=", "<", ">", "and", "or"]), (
                 f"portrait_visibility.yaml assert missing comparison operator: {stripped}"
+            )
+    # MoveHintLabel surface contract (UX-02)
+    assert "MoveHintLabel" in blocks, "surface missing MoveHintLabel block"
+    for var_name in ["state", "text", "visible", "tile", "center",
+                     "in_viewport", "bar_overlap"]:
+        assert var_name in blocks["MoveHintLabel"], (
+            f"MoveHintLabel.{var_name} not whitelisted on surface"
+        )
+    # Verify new scenario file exists and every MoveHintLabel.assert carries a
+    # comparison operator (the repo's "no bare-scalar silent-false" rule).
+    ma = PLAYTEST_DIR / "move_target_affordance.yaml"
+    assert ma.is_file(), "move_target_affordance.yaml missing"
+    for line in ma.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("MoveHintLabel."):
+            assert any(op in stripped for op in ["==", "!=", "<", ">", "and", "or"]), (
+                f"move_target_affordance.yaml assert missing comparison operator: {stripped}"
             )
 
 

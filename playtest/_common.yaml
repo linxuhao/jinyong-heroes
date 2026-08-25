@@ -276,6 +276,14 @@ surface:
   - top_strip_alpha
   - hint_hpbar_overlap
   - hpbar_strip_overlap
+  MoveHintLabel:
+  - state
+  - text
+  - visible
+  - tile
+  - center
+  - in_viewport
+  - bar_overlap
   TopStrip:
   - visible
   - size
@@ -685,3 +693,4 @@ scenario_order:
 - creation_single_ui
 - creation_layout_readability
 - portrait_visibility
+- move_target_affordance
