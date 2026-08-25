@@ -16,8 +16,8 @@ value = 100
 show_percentage = false
 
 [node name="EmptyCap" type="ColorRect" parent="Bar"]
-position = Vector2(54, 0)
-size = Vector2(10, 12)
+position = Vector2(50, 0)
+size = Vector2(14, 12)
 mouse_filter = 2
 
 [node name="NameLabel" type="Label" parent="."]

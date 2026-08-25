@@ -27,9 +27,9 @@ static func run() -> bool:
 	ok = _expect(ok, is_equal_approx(bar.bar_width, 64.0), "bar.bar_width == 64.0")
 	# Bar height (authored 12 px — read via the headless instantiate path, before
 	# the battle scene's theme min-size clamp pushes it to ~22) and the resulting
-	# visible empty-slot area (10 px cap × 12 px = 120 px², the Q5 area argument).
+	# visible empty-slot area (14 px cap × 12 px = 168 px², the Q5 area argument).
 	ok = _expect(ok, is_equal_approx(bar.bar_height, 12.0), "bar.bar_height == 12.0")
-	ok = _expect(ok, is_equal_approx(bar.empty_area_px, 120.0), "bar.empty_area_px == 120.0")
+	ok = _expect(ok, is_equal_approx(bar.empty_area_px, 168.0), "bar.empty_area_px == 168.0")
 	ok = _expect(ok, bar.name_text == "测试", 'bar.name_text == "测试"')
 
 	# Track visibility (5_vision Q5): the track bg is LIGHT (luminance > 0.30)
@@ -51,7 +51,7 @@ static func run() -> bool:
 	ok = _expect(ok, bar.fill_color.is_equal_approx(Color(0.9, 0.25, 0.2)),
 			"update_health(20,100) fill_color == red")
 
-	# The track draws 6px larger than the control rect on every side via
+	# The track draws 8px larger than the control rect on every side via
 	# expand margins (never content margins), and a dedicated fill stylebox
 	# must exist for the per-band recoloring — its bg_color is a distinct,
 	# dedicated fill, never the track color.
@@ -59,8 +59,8 @@ static func run() -> bool:
 	var bg = bar_node.get_theme_stylebox("background")
 	ok = _expect(ok, bg is StyleBoxFlat, "background stylebox is StyleBoxFlat")
 	if bg is StyleBoxFlat:
-		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 6.0),
-				"background expand_margin_all == 6.0")
+		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 8.0),
+				"background expand_margin_all == 8.0")
 		ok = _expect(ok, bg.border_width_left == 2 and bg.border_width_top == 2
 				and bg.border_width_right == 2 and bg.border_width_bottom == 2,
 				"background border_width == 2 on all four sides")

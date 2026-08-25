@@ -13,11 +13,14 @@ extends Control
 const _FILL_GREEN := Color(0.3, 0.9, 0.35)
 const _FILL_YELLOW := Color(0.95, 0.85, 0.2)
 const _FILL_RED := Color(0.9, 0.25, 0.2)
-## Light gray track: the EMPTY portion of the bar, kept light so a vision model
-## can see the filled/empty split at any fill level (5_vision Q5 — dark tracks
-## made full bars read as solid blocks). The fill never blends into it: all
-## three fill bands differ from this track color.
-const _TRACK_BG := Color(0.62, 0.62, 0.65)
+## Dark gray track: the EMPTY portion of the bar. The 2026-08-25 darkening
+## decision — the earlier light track (0.62) sat too close in luminance to the
+## green fill to register as an "empty portion" at 960x704 (5_vision Q5), and
+## the still-earlier dark-track failure (full bars read as solid blocks)
+## predated the wide empty cap. With a 14 px cap the dark slot is a strong
+## fill-vs-empty contrast (track luminance ~0.35 vs green fill ~0.73). The fill
+## never blends into it: all three fill bands differ from this track color.
+const _TRACK_BG := Color(0.35, 0.35, 0.38)
 ## Dark 1px border around the track so the light track stays visible against
 ## the light summit backdrop.
 const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
@@ -27,18 +30,18 @@ const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
 ## (5_vision Q5) — the cap keeps the "empty slot" of the bar always visible.
 ##
 ## THE COST, stated because the gain alone is not the whole truth: the cap is
-## drawn OVER the fill, so it hides the last 10 of the bar's 64 px at every
-## level. A full bar reads as roughly 84%, and everything from ~85% to 100%
-## looks identical. Measured on a real 960x704 frame: 58 px of green then 14 px
+## drawn OVER the fill, so it hides the last 14 of the bar's 64 px at every
+## level. A full bar reads as roughly 78%, and everything from ~78% to 100%
+## looks identical. Measured on a real 960x704 frame: 50 px of green then 14 px
 ## of track at full HP.
 ##
 ## Accepted anyway, for two reasons: every bar carries the same cap, so
-## comparing two units is unaffected; and the band it flattens (85-100%) is the
+## comparing two units is unaffected; and the band it flattens (~78-100%) is the
 ## one where the exact number matters least — the HP-gated skills open below
 ## 50%. If that ever stops being true, shrink the cap rather than widen it, and
 ## re-measure at 1x instead of zooming in (the 2026-08-25 lesson: a readability
 ## claim verified from a 4x crop is not a readability claim).
-const EMPTY_CAP_PX: float = 10.0
+const EMPTY_CAP_PX: float = 14.0
 ## Bottom edge of the battle top strip, in viewport px. This is the PAIR of
 ## hud.tscn's TopStrip offsets (0..92, full-width band drawn behind the top
 ## HUD widgets): floating health bars clamp their top edge to STRIP_BOTTOM + 2
@@ -161,7 +164,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		sb.border_width_right = 2
 		sb.border_width_bottom = 2
 		sb.border_color = _TRACK_BORDER
-		# Draw the track 4px larger than the control rect on every side. At
+		# Draw the track 8px larger than the control rect on every side. At
 		# 100% HP the fill covers the whole rect, so without this the widget is
 		# a solid coloured block and reads as a platform, not a bar — the
 		# readability gate reported exactly that 11/11 ("solid green
@@ -175,7 +178,7 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		#
 		# bar.size stays 64x12, so the `HealthBar.bar_width <= 64` geometric
 		# assert is untouched — this is drawing, not layout.
-		sb.set_expand_margin_all(6.0)
+		sb.set_expand_margin_all(8.0)
 		bar.add_theme_stylebox_override("background", sb)
 		# Dedicated fill stylebox: recolored by update_health() per HP band.
 		# No border widths on the fill (a border around only the filled
