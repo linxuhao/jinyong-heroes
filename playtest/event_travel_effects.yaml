@@ -1,0 +1,80 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+# No-repeat proof for the travel-event bag: after 3 resolved 游历 events the
+# sanitized events_seen holds 3 distinct ids (count ladder 0 -> 1 -> 2 -> 3).
+# Drawn ids are RNG-dependent and deliberately never asserted — only event_id
+# being non-empty and the count ladder are.
+name: event_travel_effects
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [debug_win_tutorial]}
+- {at: 40, actions: [ui_accept]}
+- {at: 60, actions: [ui_accept]}
+- {at: 70, actions: [ui_accept]}
+- {at: 80, actions: [ui_accept]}
+- {at: 90, actions: [move_right]}
+- {at: 100, actions: [ui_accept]}
+- {at: 110, actions: [ui_accept]}
+- at: 130
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.events_seen_count: events_seen_count == 0
+# Travel 1: pick card 0 -> ACTION_PICK focus 0 -> 3x move_down (focus 3 = 游历)
+# -> ui_accept draws the event (phase EVENT, id non-empty, count still 0)
+# -> ui_accept resolves option A -> count 1, next month's CARD_PICK staged.
+- {at: 140, actions: [ui_accept]}
+- {at: 150, actions: [move_down]}
+- {at: 160, actions: [move_down]}
+- {at: 170, actions: [move_down]}
+- {at: 180, actions: [ui_accept]}
+- at: 190
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.event_id: event_id != ""
+    CultivationScreen.events_seen_count: events_seen_count == 0
+- {at: 200, actions: [ui_accept]}
+- at: 210
+  assert:
+    CultivationScreen.events_seen_count: events_seen_count == 1
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 2
+# Travel 2: same cycle -> count 2, month 3.
+- {at: 220, actions: [ui_accept]}
+- {at: 230, actions: [move_down]}
+- {at: 240, actions: [move_down]}
+- {at: 250, actions: [move_down]}
+- {at: 260, actions: [ui_accept]}
+- at: 270
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.event_id: event_id != ""
+- {at: 280, actions: [ui_accept]}
+- at: 290
+  assert:
+    CultivationScreen.events_seen_count: events_seen_count == 2
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 3
+# Travel 3: same cycle -> count 3, month 4.
+- {at: 300, actions: [ui_accept]}
+- {at: 310, actions: [move_down]}
+- {at: 320, actions: [move_down]}
+- {at: 330, actions: [move_down]}
+- {at: 340, actions: [ui_accept]}
+- at: 350
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.event_id: event_id != ""
+- {at: 360, actions: [ui_accept]}
+- at: 370
+  assert:
+    CultivationScreen.events_seen_count: events_seen_count == 3
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 4

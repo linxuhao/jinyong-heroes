@@ -719,3 +719,4 @@ scenario_order:
 - creation_layout_readability
 - portrait_visibility
 - move_target_affordance
+- event_travel_effects

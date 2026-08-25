@@ -41,6 +41,7 @@ ROUND_SCENARIOS: list[str] = [
     "creation_layout_readability",
     "portrait_visibility",
     "move_target_affordance",
+    "event_travel_effects",
 ]
 
 
@@ -391,3 +392,73 @@ def test_timeline_at_values_are_integers() -> None:
                     f"value {val!r}"
                 )
     assert not bad, "malformed timeline `at` values:\n" + "\n".join(bad)
+
+
+def test_event_content_surface_contract() -> None:
+    """Static contract pin for the jinyong-events round (4 -> 16 event pool).
+
+    Three files are pinned, stdlib-only, so every assertion is decidable by
+    reading the repo (no Godot run needed):
+
+      1. playtest/_common.yaml — the six battle-unit surface blocks each carry
+         the four new portrait probe vars (portrait_covered_frac /
+         portrait_sprite_pos / portrait_tex_size / portrait_bar_pos), and the
+         CultivationScreen block carries events_seen_count (the no-repeat bag
+         observable the event_travel_effects scenario ladders on).
+      2. playtest/event_travel_effects.yaml — exists, its `name:` equals its
+         basename, every timeline `at:` is a single integer (the same regex as
+         test_timeline_at_values_are_integers), and every Node.var assert line
+         (exactly 4 leading spaces + a dotted key) carries a comparison
+         operator — the repo's no-bare-scalar-silent-false rule.
+      3. playtest/portrait_visibility.yaml — contains a
+         `f"{unit}.portrait_covered_frac:"` assert line for each of the six
+         units (the partial-occlusion A/B gate lines).
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    for unit in ["Player", "East_Heretic", "West_Poison", "South_Emperor",
+                 "North_Beggar", "Central_Divine"]:
+        assert unit in blocks, f"surface missing {unit} block"
+        for var in ("portrait_covered_frac", "portrait_sprite_pos",
+                    "portrait_tex_size", "portrait_bar_pos"):
+            assert var in blocks[unit], (
+                f"{unit}.{var} not whitelisted on the surface"
+            )
+    cultivation_items = blocks.get("CultivationScreen", [])
+    assert "events_seen_count" in cultivation_items, (
+        "CultivationScreen.events_seen_count not whitelisted on the surface"
+    )
+
+    # event_travel_effects.yaml: exists, name == basename, integer at values,
+    # comparison operator on every 4-space dotted assert line.
+    ev = PLAYTEST_DIR / "event_travel_effects.yaml"
+    assert ev.is_file(), "event_travel_effects.yaml missing"
+    ev_text = ev.read_text(encoding="utf-8")
+    assert re.search(
+        r"^name:\s*event_travel_effects\s*$", ev_text, re.MULTILINE
+    ), "event_travel_effects.yaml name: does not equal its basename"
+    for lineno, line in enumerate(ev_text.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"event_travel_effects.yaml line {lineno}: non-integer "
+                f"timeline 'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            assert any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            ), (
+                f"event_travel_effects.yaml line {lineno} assert missing "
+                f"comparison operator: {line.strip()}"
+            )
+
+    # portrait_visibility.yaml: each unit has a covered_frac assert line.
+    pv_text = (PLAYTEST_DIR / "portrait_visibility.yaml").read_text(
+        encoding="utf-8"
+    )
+    for unit in ["Player", "East_Heretic", "West_Poison", "South_Emperor",
+                 "North_Beggar", "Central_Divine"]:
+        assert any(
+            line.strip().startswith(f"{unit}.portrait_covered_frac:")
+            for line in pv_text.splitlines()
+        ), f"portrait_visibility.yaml missing {unit}.portrait_covered_frac assert"
