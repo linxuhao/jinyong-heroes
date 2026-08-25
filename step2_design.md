@@ -72,7 +72,7 @@ creation.tscn (property-only; tree/paths byte-identical):
   PointsLabel -> offsets so it sits 8..24 px above MouseBox top, x-centered.
 
 creation.gd _update_geometry_observables() (every _process):
-  per-frame write of: attr_rows_uniform, attr_label_button_gap_ok,
+  per-frame write of: attr_rows_uniform, attr_label_alignment_ok,
   points_attrs_gap_ok, phase_skeleton_same, creation_in_viewport, creation_box_fits
 
 GATES:
@@ -181,9 +181,14 @@ All rects live on the same CanvasLayer-10 scale-1 space — no coordinate conver
 
 ```gdscript
 var attr_rows_uniform: bool = true          # all 5 visible attr rows: same height/left/right (±1px)
-var attr_label_button_gap_ok: bool = true   # per row: 0 <= minus.left - label.right <= 8
-                                            #   and 0 <= plus.left - minus.right <= 8
-                                            #   and row height >= 32 (grouping + touch size)
+                                            #   and height >= 32 (grouping + touch size)
+var attr_label_alignment_ok: bool = true    # all five AttrRow*/AttrLabel: horizontal_alignment == 2
+                                            #   AND size_flags_horizontal == 3 — pins the FIX ITSELF.
+                                            #   Probed at HEAD (scenes/segments/creation.tscn): AttrLabel
+                                            #   carries ONLY custom_minimum_size = Vector2(180, 0) — no
+                                            #   alignment, no size_flags. The reported ~190px void between
+                                            #   text and "-" is INSIDE the label rect, so a rect-gap
+                                            #   observable is green before the fix and proves nothing.
 var points_attrs_gap_ok: bool = true        # PointsLabel bottom .. current phase box top in [4,24]
                                             #   and x-centers within 4px
 var phase_skeleton_same: bool = true        # visible phase box top offset == recorded ATTRS top (±2px)
@@ -194,7 +199,7 @@ var creation_box_fits: bool = true          # current visible phase box content 
 **`_update_geometry_observables()`** — new private method called from `_process` (creation.gd already has a `_process` for the DEBUG action). Logic:
 
 - Resolve phase boxes via the existing `get_node("MouseBox/AttrBox")`-style paths (they already exist in `_wire_mouse_widgets`); gate every measurement on `visible` (TraitBox/ConfirmBox are hidden in ATTRS; hidden Controls still report rects — E2).
-- `attr_rows_uniform` / `attr_label_button_gap_ok`: computed only when `phase == "ATTRS"` (rows only exist there); otherwise keep last value.
+- `attr_rows_uniform` / `attr_label_alignment_ok`: computed only when `phase == "ATTRS"` (rows only exist there); otherwise keep last value. `attr_label_alignment_ok` resolves each row label via `get_node("MouseBox/AttrBox/AttrRow%d/AttrLabel" % i)` and requires `horizontal_alignment == 2 and size_flags_horizontal == 3` on ALL FIVE rows. It is a computed bool rather than direct `AttrLabel.*` node asserts because all five labels share the bare name `AttrLabel` and the harness's recursive bare-name search cannot disambiguate five matches (the same unique-name requirement that forces `_ClickTarget` suffixes on click hit-surfaces).
 - `points_attrs_gap_ok`: compare `PointsLabel` rect against the CURRENT visible phase box (AttrBox / TraitBox / ConfirmBox) — same invariant in every phase.
 - `phase_skeleton_same`: on the first frame with `phase == "ATTRS"`, record `_ref_box_top = AttrBox.get_global_rect().position.y`; in other phases compare the visible box's top against it (±2px).
 - `creation_in_viewport` / `creation_box_fits`: always computed from `MouseBox` / visible phase box rects.
@@ -219,7 +224,7 @@ var creation_box_fits: bool = true          # current visible phase box content 
   - name_backing_alpha
   CreationScreen:     # append to existing block
   - attr_rows_uniform
-  - attr_label_button_gap_ok
+  - attr_label_alignment_ok
   - points_attrs_gap_ok
   - phase_skeleton_same
   - creation_in_viewport
@@ -236,7 +241,9 @@ Same file, same scenario, no two-place sync. Append new asserts to the existing 
     # ---- appended to the existing f30 assert block (existing 24 asserts untouched) ----
     HUD.top_text_pairwise_overlap: top_text_pairwise_overlap == false
     HUD.top_text_in_strip: top_text_in_strip == true
-    HUD.top_strip_alpha: top_strip_alpha > 0.4 and top_strip_alpha < 0.8
+    HUD.top_strip_alpha: top_strip_alpha >= 0.55  # single-sided lower bound: pins that a backing exists.
+    # NO upper bound — making the strip more opaque is the better direction and must stay legal
+    # (design/30_presentation.md precedent: tutorial panel = 不透明底色)
     HUD.hpbar_strip_overlap: hpbar_strip_overlap == false
     TopStrip.visible: visible == true
     HealthBar.name_backing_alpha: name_backing_alpha > 0.3
@@ -270,7 +277,7 @@ timeline:
   assert:
     CreationScreen.phase: phase == "ATTRS"
     CreationScreen.attr_rows_uniform: attr_rows_uniform == true
-    CreationScreen.attr_label_button_gap_ok: attr_label_button_gap_ok == true
+    CreationScreen.attr_label_alignment_ok: attr_label_alignment_ok == true
     CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
     CreationScreen.creation_in_viewport: creation_in_viewport == true
     CreationScreen.creation_box_fits: creation_box_fits == true
@@ -314,7 +321,7 @@ def test_topbar_layout_surface_contract() -> None:
                 "hint_hpbar_overlap", "hpbar_strip_overlap"):
         assert var in hud_items, "HUD.%s not whitelisted on the surface" % var
     creation_items = blocks.get("CreationScreen", [])
-    for var in ("attr_rows_uniform", "attr_label_button_gap_ok", "points_attrs_gap_ok",
+    for var in ("attr_rows_uniform", "attr_label_alignment_ok", "points_attrs_gap_ok",
                 "phase_skeleton_same", "creation_in_viewport", "creation_box_fits"):
         assert var in creation_items, "CreationScreen.%s not whitelisted on the surface" % var
     assert "name_backing_alpha" in blocks.get("HealthBar", []), \
@@ -331,19 +338,19 @@ All names below are the **hard contract** between implementation, `_common.yaml`
 |---|---|---|---|---|
 | HUD | `top_text_pairwise_overlap` | bool | any pair of {RoundLabel, ActiveLabel, OrderLabel, EnergyLabel, ActionHintLabel*} `_inset_overlap`s (* only when visible) | `== false` (f30 + hint-visible frame) |
 | HUD | `top_text_in_strip` | bool | every top text rect ⊆ TopStrip.grow(2) | `== true` |
-| HUD | `top_strip_alpha` | float | strip panel `bg_color.a` (1.0 fallback) | `> 0.4 and < 0.8` |
+| HUD | `top_strip_alpha` | float | strip panel `bg_color.a` (1.0 fallback) | `>= 0.55` (single-sided: pins that a backing exists; NO upper bound — an upper bound forbids the strictly-better direction of a more opaque strip, cf. the 不透明底色 tutorial-panel precedent) |
 | HUD | `hint_hpbar_overlap` | bool | visible hint ∩ any visible bar (inset convention) | `== false` (only while hint visible) |
 | HUD | `hpbar_strip_overlap` | bool | any visible bar ∩ TopStrip | `== false` |
 | TopStrip | `visible` / `size` | — | strip node presence | `visible == true` |
 | HealthBar | `name_backing_alpha` | float | backing stylebox alpha written in `setup()` | `> 0.3` |
-| CreationScreen | `attr_rows_uniform` | bool | 5 rows equal height/left/right ±1px (ATTRS only) | `== true` |
-| CreationScreen | `attr_label_button_gap_ok` | bool | per row: 0 ≤ minus.left−label.right ≤ 8; 0 ≤ plus.left−minus.right ≤ 8; row ≥ 32px | `== true` |
+| CreationScreen | `attr_rows_uniform` | bool | 5 rows equal height/left/right ±1px and height ≥ 32px (ATTRS only) | `== true` |
+| CreationScreen | `attr_label_alignment_ok` | bool | all five AttrRow*/AttrLabel: `horizontal_alignment == 2` AND `size_flags_horizontal == 3` — pins the fix itself; a rect-gap check is green pre-fix (the void sits inside the label rect) | `== true` |
 | CreationScreen | `points_attrs_gap_ok` | bool | PointsLabel bottom → phase box top ∈ [4,24]; x-centers ≤ 4px apart | `== true` |
 | CreationScreen | `phase_skeleton_same` | bool | visible box top == recorded ATTRS top ±2px | `== true` (TRAITS/CONFIRM frames) |
 | CreationScreen | `creation_in_viewport` | bool | MouseBox ⊆ viewport inset 16 | `== true` |
 | CreationScreen | `creation_box_fits` | bool | visible phase content bottom ≤ MouseBox bottom − 8 | `== true` |
 
-**Conventions (decided here, binding):** overlap = `Rect2` intersect after 1px inset on each side (`_inset_overlap`); hidden widgets are skipped, never asserted; all battle rects share the layer-10 scale-1 coordinate space (no conversions); the five existing HUD observables (`round_pause_overlap`, `skill8_right_edge`, `skill12_right_edge`, `hud_button_overlap`, `hud_desc_overlap`) keep their exact semantics.
+**Conventions (decided here, binding):** overlap = `Rect2` intersect after 1px inset on each side (`_inset_overlap`); hidden widgets are skipped, never asserted; all battle rects share the layer-10 scale-1 coordinate space (no conversions); the five existing HUD observables (`round_pause_overlap`, `skill8_right_edge`, `skill12_right_edge`, `hud_button_overlap`, `hud_desc_overlap`) keep their exact semantics. Label/button grouping on the creation screen is pinned by the fix's own properties, not by rect gaps: `attr_label_alignment_ok` reads `horizontal_alignment == 2` and `size_flags_horizontal == 3` on all five `AttrRow*/AttrLabel` nodes — a rect-gap observable measures nothing here, the defect void sits inside the label's own 180px rect (probed at HEAD: `AttrLabel` carries only `custom_minimum_size`, no alignment/size_flags). Strip backing alpha is pinned single-sided (`>= 0.55`, no upper bound): the gate proves a backing exists and must never forbid making it more opaque.
 
 ---
 
@@ -410,7 +417,7 @@ Each subtask is independently verifiable by the playtest gate or the smoke test:
 4. **Creation scene layout** — 3.4 (`creation.tscn`). Verify: five creation scenarios green.
 5. **Creation observables** — 3.5 (`creation.gd` + 3.6 surface). Verify: whitelist present.
 6. **Gate wiring** — 3.7 (extend `ui_geometry_readability.yaml`), 3.8 (new scenario + two-place sync), 3.9 (smoke test). Verify: pytest 5/5 → 6/6, new scenario green, extended scenario green.
-7. **Probe & baseline** — re-measure frames before/after (先取值再动手), confirm 42/43 + pytest + unit suite, confirm `terminal_victory` still red for the same reason only.
+7. **Probe & baseline** — re-measure frames before/after (先取值再动手), confirm 42/43 + pytest + unit suite, confirm `terminal_victory` still red for the same reason only. Keep frames in `5_compile/frames/` for the human review: creation ATTRS and creation TRAITS one each + one battle top-bar frame. The delivery notes must NOT claim "geometry asserts green ⇒ layout is good" — green geometry asserts prove non-overlap only; layout quality is judged by the human on those frames.
 
 Dependencies: 6 depends on the observable names from 2/3/5 (they are fixed by this document — the contract in §4); everything else is independent.
 
