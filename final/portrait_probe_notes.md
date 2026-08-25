@@ -186,3 +186,37 @@ the probe prints a failing layer id for an actual invisible unit.
   the same tutorial battle), so no unit is dead at f40.
 - No A/B class is claimed in this file because classification is defined as
   measured-only. Treat every derived cell above as unverified.
+
+---
+
+## A2 classification (task `ux01_fix_and_portrait_scenario`, appended by implementer)
+
+**Fix set: EMPTY.**
+
+Reason: the "Observed values (measured)" table above is still **PENDING** — the
+probe run was blocked by the godot-builder outage (9/9 HTTP 500, recorded in the
+run-status section) and no `observed` value for any of the six units'
+`portrait_visible` / `portrait_fail_layer` ever landed. Per the task-card rules
+("fix ONLY units measured `portrait_visible == false`; do NOT fabricate a defect;
+a fix PR without probe evidence is rejected"), no speculative gameplay fix may be
+written: there is no measured invisible unit, so no code point is justified.
+
+**Decision recorded:**
+
+- `scripts/autoload/grid_manager.gd`, `scripts/characters/player.gd`,
+  `scripts/characters/enemy.gd` — **no change** (empty diff vs baseline).
+  `_refresh_sprite_clamp` / `clamp_sprite_offset` are untouched (task-card rule:
+  never touch the clamp without a measured `off_viewport`).
+- B-class guards (units that would measure visible) are not asserted from derived
+  values — they remain to be confirmed by the live run of `portrait_visibility.yaml`.
+
+**Re-measurement instrument:** `playtest/portrait_visibility.yaml` (this round's new
+scenario) asserts all six units' `portrait_visible == true` at f40. Its first green
+run is the measured confirmation that UX-01 was a frame-reading artifact
+(all-six-visible); its first red run prints the real `observed` fail_layer for the
+genuinely broken unit(s), which then feeds a targeted per-layer fix (task-card §2
+table) in a later round. Either way this decision stays re-openable from measured
+data — probe-first discipline, not a conclusion.
+
+(`design/40_ux_backlog.md` WONTFIX/CLOSED marking is deferred to the 5_design step
+per P2 §7 — implementers do not edit `design/`.)

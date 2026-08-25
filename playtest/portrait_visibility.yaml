@@ -1,0 +1,28 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UX-01 regression gate: every battle unit's portrait must put ink on the
+# rendered frame at f40 (battle turn 1, all six units present). Each unit's
+# `portrait_visible` is the six-layer VisibilityProbe predicate (hidden_in_tree
+# / null_texture / zero_rect / off_viewport / clipped / occluded); the fail
+# layer id says WHY when one is red. This scenario is the re-measurement
+# instrument for the A2 fix set, which was EMPTY at wiring time (probe PENDING,
+# builder outage) — its first green run is the measured confirmation of
+# all-six-visible, its first red run prints the real observed fail_layer.
+name: portrait_visibility
+timeline:
+- {at: 3..15, actions: [ui_accept]}
+- {at: 20/25/30, actions: [tutorial_next]}
+- at: 40
+  assert:
+    Player.portrait_visible: portrait_visible == true
+    Player.portrait_fail_layer: portrait_fail_layer == ""
+    Central_Divine.portrait_visible: portrait_visible == true
+    Central_Divine.portrait_fail_layer: portrait_fail_layer == ""
+    East_Heretic.portrait_visible: portrait_visible == true
+    West_Poison.portrait_visible: portrait_visible == true
+    South_Emperor.portrait_visible: portrait_visible == true
+    North_Beggar.portrait_visible: portrait_visible == true
+    Player.sprite_top: sprite_top >= 0.0
+    Central_Divine.sprite_top: sprite_top >= 0.0

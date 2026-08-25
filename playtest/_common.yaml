@@ -203,6 +203,8 @@ surface:
   - turn_start_moves_left
   - turn_start_moved
   - undo_available
+  - portrait_visible
+  - portrait_fail_layer
   East_Heretic:
   - health
   - max_health
@@ -213,6 +215,8 @@ surface:
   - shield
   - status_names
   - sprite_top
+  - portrait_visible
+  - portrait_fail_layer
   West_Poison:
   - health
   - max_health
@@ -222,6 +226,8 @@ surface:
   - skill_cooldowns
   - shield
   - status_names
+  - portrait_visible
+  - portrait_fail_layer
   South_Emperor:
   - health
   - max_health
@@ -231,6 +237,8 @@ surface:
   - skill_cooldowns
   - shield
   - status_names
+  - portrait_visible
+  - portrait_fail_layer
   North_Beggar:
   - health
   - max_health
@@ -240,6 +248,8 @@ surface:
   - skill_cooldowns
   - shield
   - status_names
+  - portrait_visible
+  - portrait_fail_layer
   Central_Divine:
   - health
   - max_health
@@ -250,6 +260,8 @@ surface:
   - shield
   - status_names
   - sprite_top
+  - portrait_visible
+  - portrait_fail_layer
   HUD:
   - visible
   - size
@@ -672,3 +684,4 @@ scenario_order:
 - click_move_commit_lock
 - creation_single_ui
 - creation_layout_readability
+- portrait_visibility

@@ -39,6 +39,7 @@ ROUND_SCENARIOS: list[str] = [
     "click_move_commit_lock",
     "creation_single_ui",
     "creation_layout_readability",
+    "portrait_visibility",
 ]
 
 
@@ -227,6 +228,36 @@ def test_click_move_surface_contract() -> None:
             assert owner in blocks, (
                 "clicks: target %r in %s belongs to no whitelisted surface block "
                 "(looked for %r)" % (item, name, owner)
+            )
+
+
+def test_affordance_surface_contract() -> None:
+    """Surface contract for the jinyong-affordance round: portrait_visibility vars."""
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    for unit in ["Player", "East_Heretic", "West_Poison", "South_Emperor",
+                 "North_Beggar", "Central_Divine"]:
+        assert unit in blocks, f"surface missing {unit} block"
+        assert "portrait_visible" in blocks[unit], (
+            f"{unit}.portrait_visible not whitelisted on surface"
+        )
+        assert "portrait_fail_layer" in blocks[unit], (
+            f"{unit}.portrait_fail_layer not whitelisted on surface"
+        )
+    # Verify new scenario file exists and has comparison operators
+    pv = PLAYTEST_DIR / "portrait_visibility.yaml"
+    assert pv.is_file(), "portrait_visibility.yaml missing"
+    pv_text = pv.read_text(encoding="utf-8")
+    for line in pv_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("Player.portrait_visible:") or \
+           stripped.startswith("Central_Divine.portrait_visible:") or \
+           stripped.startswith("East_Heretic.portrait_visible:") or \
+           stripped.startswith("West_Poison.portrait_visible:") or \
+           stripped.startswith("South_Emperor.portrait_visible:") or \
+           stripped.startswith("North_Beggar.portrait_visible:"):
+            assert any(op in stripped for op in ["==", "!=", "<", ">", "and", "or"]), (
+                f"portrait_visibility.yaml assert missing comparison operator: {stripped}"
             )
 
 
