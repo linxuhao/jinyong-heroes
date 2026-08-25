@@ -18,6 +18,7 @@ extends SceneTree
 
 const CULTIVATION_SCENE = preload("res://scenes/segments/cultivation.tscn")
 const CardDataScript = preload("res://scripts/data/card_data.gd")
+const EventDataScript = preload("res://scripts/data/event_data.gd")
 
 var _sm = null   # SaveManager autoload node
 var _gm = null   # GameManager autoload node
@@ -63,6 +64,11 @@ func _test_all() -> bool:
 	ok = _test_fast_forward(ok)
 	ok = _test_save_load_delete_roundtrip(ok)
 	ok = _test_add_practice_no_unmastered_noop(ok)
+	ok = _test_event_seen_count_observable(ok)
+	ok = _test_event_draw_exclusion(ok)
+	ok = _test_event_pool_reset(ok)
+	ok = _test_event_effects_fresh(ok)
+	ok = _test_event_effects_adversary(ok)
 	return ok
 
 
@@ -285,7 +291,242 @@ func _test_add_practice_no_unmastered_noop(ok: bool) -> bool:
 	return ok
 
 
+# --- criterion 11: events_seen_count observable mirrors the sanitized bag -------
+
+func _test_event_seen_count_observable(ok: bool) -> bool:
+	var node: Node = _setup("shaolin", [], 11)
+	ok = _expect(ok, node.events_seen_count == 0, "fresh profile -> events_seen_count == 0")
+	_sm.profile.flags["events_seen"] = ["bandits", "merchant", "ruins"]
+	node._sync_surface()
+	ok = _expect(ok, node.events_seen_count == 3, "3 sanitized seen ids -> events_seen_count == 3")
+	# Hostile/stale ids still count — the observable mirrors the raw bag size, and
+	# _draw_event's has() filter ignores anything not in TABLE.
+	_sm.profile.flags["events_seen"] = ["bandits", "stale_garbage", "merchant", "", "ruins"]
+	node._sync_surface()
+	ok = _expect(ok, node.events_seen_count == 5, "hostile/stale/empty entries still counted (size 5)")
+	_teardown(node)
+	return ok
+
+
+# --- criterion 12: no-repeat bag — exclusion + forced draw ----------------------
+
+func _test_event_draw_exclusion(ok: bool) -> bool:
+	# events_seen holds 15 of the 16 TABLE ids -> the pool is exactly the one
+	# missing id, so the single randi_range(0, 0) is forced regardless of seed.
+	var all_ids: Array = _event_table_ids()
+	ok = _expect(ok, all_ids.size() >= 16, "event pool has >= 16 rows for the forced-draw test")
+	var missing: String = str(all_ids[0])
+	var seen: Array = []
+	for i in range(1, all_ids.size()):
+		seen.append(all_ids[i])
+	ok = _expect(ok, seen.size() == all_ids.size() - 1, "seen holds 15 of 16 ids")
+	_sm.new_profile({}, [])
+	_sm.profile.flags["events_seen"] = seen
+	_sm.apply_seed(2024)
+	var node: Node = CULTIVATION_SCENE.instantiate()
+	var drawn: String = node._draw_event()
+	ok = _expect(ok, drawn == missing,
+		"15-of-16 exclusion: draw returns the only missing id (got %s, want %s)" % [drawn, missing])
+	node.free()
+	return ok
+
+
+# --- criterion 13: pool-exhausted reset (never "", never a stall) ---------------
+
+func _test_event_pool_reset(ok: bool) -> bool:
+	# events_seen holds all 16 ids -> the pool is empty -> the reset branch
+	# clears events_seen and refills from all 16, then draws. The draw must
+	# return a non-empty id AND flags["events_seen"] must be empty immediately
+	# after (the reset branch) — never "", never a stall.
+	var all_ids: Array = _event_table_ids()
+	_sm.new_profile({}, [])
+	_sm.profile.flags["events_seen"] = all_ids.duplicate()
+	_sm.apply_seed(7)
+	var node: Node = CULTIVATION_SCENE.instantiate()
+	var drawn: String = node._draw_event()
+	ok = _expect(ok, drawn != "", "pool-exhausted reset returns a non-empty id")
+	ok = _expect(ok, all_ids.has(drawn), "drawn id is one of the 16 table ids (got %s)" % drawn)
+	var seen_after: Array = _sm.profile.flags.get("events_seen", [])
+	ok = _expect(ok, seen_after.is_empty(),
+		"reset clears events_seen immediately after the draw (size %d)" % seen_after.size())
+	node.free()
+	return ok
+
+
+# --- criterion 14: effects really land — 16 defs x 2 options on a fresh stub ----
+
+func _test_event_effects_fresh(ok: bool) -> bool:
+	var case_no := 0
+	for def in EventDataScript.all():
+		for opt_idx in [0, 1]:
+			case_no += 1
+			# Fresh hermetic stub: silver 100 (so both cost and gain silver
+			# effects move the field), one unmastered D gongfa (so a practice
+			# effect has a real target).
+			_sm.new_profile({}, [])
+			_sm.profile.silver = 100
+			_sm.profile.add_gongfa("shaolin_yijin_d", "D")
+			_sm.apply_seed(1000 + case_no)
+			var node: Node = CULTIVATION_SCENE.instantiate()
+			node.event_id = def.id
+			var before: Dictionary = _profile_snapshot()
+			node._apply_event_option(opt_idx)
+			var after: Dictionary = _profile_snapshot()
+			var opt = def.option_a if opt_idx == 0 else def.option_b
+			var expected: Dictionary = _expected_after(before, opt.effects)
+			ok = _expect(ok, int(after["silver"]) == int(expected["silver"]),
+				"silver %s/%s (%d -> %d, expected %d)" % [def.id, opt_idx, int(before["silver"]), int(after["silver"]), int(expected["silver"])])
+			for key in PlayerProfile.ATTR_KEYS:
+				ok = _expect(ok, int(after["attrs"][key]) == int(expected["attrs"][key]),
+					"attr %s %s/%s (%d -> %d, expected %d)" % [key, def.id, opt_idx, int(before["attrs"][key]), int(after["attrs"][key]), int(expected["attrs"][key])])
+			for target in expected["items"]:
+				ok = _expect(ok, _sm.profile.inventory.has(target),
+					"item %s granted %s/%s" % [target, def.id, opt_idx])
+			for gid in expected["practice"].keys():
+				ok = _expect(ok, int(after["practice"].get(gid, 0)) == int(expected["practice"][gid]),
+					"practice %s %s/%s (%d -> %d, expected %d)" % [gid, def.id, opt_idx, int(before["practice"].get(gid, 0)), int(after["practice"].get(gid, 0)), int(expected["practice"][gid])])
+			# Dead-content guard: at least one mutable field moved, unless the
+			# option is an explicit `none` (merchant option_b — the only row
+			# whose "no-op" is authored, not accidental).
+			ok = _expect(ok, _any_field_moved(before, after) or _is_explicit_none(opt),
+				"option lands or is explicit none %s/%s" % [def.id, opt_idx])
+			node.free()
+	return ok
+
+
+# --- criterion 15: effects land even in the adversary (worst-case) state --------
+
+func _test_event_effects_adversary(ok: bool) -> bool:
+	# Adversary worst-case profile: silver == 0 (silver costs clamp -> no-op),
+	# every equipment id already owned (item grants dedup -> no-op), and the only
+	# gongfa mastered (practice -> no-op). A row is DEAD CONTENT unless at least
+	# one of its two options still moves a field in this state.
+	var equip_ids: Array = [
+		"eq_sword_1", "eq_sword_2", "eq_sword_3", "eq_sword_4",
+		"eq_armor_1", "eq_armor_2", "eq_armor_3", "eq_armor_4",
+		"eq_boots_1", "eq_boots_2", "eq_boots_3", "eq_boots_4",
+	]
+	for def in EventDataScript.all():
+		var a_moved: bool = _adversary_option_moves(def.id, 0, equip_ids)
+		var b_moved: bool = _adversary_option_moves(def.id, 1, equip_ids)
+		if def.id == "merchant":
+			# WHITELIST (the single documented exception): merchant option_a pays
+			# 20 silver (clamped to no-op at silver == 0) for eq_sword_3 (already
+			# owned -> dedup no-op); option_b is an explicit "none". Both options
+			# are genuinely inert in the adversary state, so merchant is exempted.
+			# The four baseline rows are byte-identical; only this comment
+			# whitelists merchant. Any OTHER row that goes dead here fails.
+			ok = _expect(ok, not a_moved and not b_moved,
+				"whitelist merchant is inert in adversary state (A=%s B=%s)" % [a_moved, b_moved])
+			continue
+		ok = _expect(ok, a_moved or b_moved,
+			"adversary must-land row %s (A=%s B=%s)" % [def.id, a_moved, b_moved])
+	return ok
+
+
 # --- helpers ---------------------------------------------------------------------
+
+## All TABLE ids, in table order.
+func _event_table_ids() -> Array:
+	var out: Array = []
+	for def in EventDataScript.all():
+		out.append(def.id)
+	return out
+
+
+## Snapshot the profile fields that event effects can move, plus which gongfa is
+## currently the first unmastered (the practice effect's target).
+func _profile_snapshot() -> Dictionary:
+	var attrs := {}
+	for key in PlayerProfile.ATTR_KEYS:
+		attrs[key] = _sm.profile.get_attr(key)
+	var practice := {}
+	var first_unmastered := ""
+	for entry in _sm.profile.gongfa:
+		var id: String = str(entry.get("id", ""))
+		practice[id] = int(entry.get("practice", 0))
+		if first_unmastered == "" and not bool(entry.get("mastered", false)):
+			first_unmastered = id
+	return {
+		"silver": _sm.profile.silver,
+		"attrs": attrs,
+		"items": _sm.profile.inventory.duplicate(),
+		"practice": practice,
+		"first_unmastered": first_unmastered,
+	}
+
+
+## The state _apply_event_option's match produces from a before-state and an
+## effects array — mirrors cultivation.gd:_apply_event_option exactly (silver
+## clamps at 0, item dedups, practice targets the first unmastered gongfa).
+func _expected_after(before: Dictionary, effects: Array) -> Dictionary:
+	var silver: int = int(before["silver"])
+	var attrs: Dictionary = (before["attrs"] as Dictionary).duplicate()
+	var items: Array = (before["items"] as Array).duplicate()
+	var practice: Dictionary = (before["practice"] as Dictionary).duplicate()
+	for eff in effects:
+		var d: Dictionary = eff as Dictionary
+		match d.get("type", "none"):
+			"silver":
+				silver = maxi(silver + int(d.get("value", 0)), 0)
+			"attr":
+				var key: String = str(d.get("target", ""))
+				attrs[key] = int(attrs.get(key, 0)) + int(d.get("value", 0))
+			"item":
+				var target: String = str(d.get("target", ""))
+				if target != "" and not items.has(target):
+					items.append(target)
+			"practice":
+				var gid: String = str(before.get("first_unmastered", ""))
+				if gid != "":
+					practice[gid] = int(practice.get(gid, 0)) + int(d.get("value", 0))
+	return {"silver": silver, "attrs": attrs, "items": items, "practice": practice}
+
+
+## True if any of the tracked profile fields differ between two snapshots.
+func _any_field_moved(before: Dictionary, after: Dictionary) -> bool:
+	if int(after["silver"]) != int(before["silver"]):
+		return true
+	for key in PlayerProfile.ATTR_KEYS:
+		if int(after["attrs"][key]) != int(before["attrs"][key]):
+			return true
+	if (after["items"] as Array).size() != (before["items"] as Array).size():
+		return true
+	for gid in after["practice"].keys():
+		if int(after["practice"][gid]) != int(before["practice"].get(gid, 0)):
+			return true
+	return false
+
+
+## True when an option is an explicit authored no-op (every effect type == "none").
+func _is_explicit_none(opt) -> bool:
+	if opt == null or opt.effects == null:
+		return false
+	var effs: Array = opt.effects
+	if effs.is_empty():
+		return false
+	for eff in effs:
+		if (eff as Dictionary).get("type", "") != "none":
+			return false
+	return true
+
+
+## Apply one option against a fresh adversary profile; true if any field moved.
+func _adversary_option_moves(event_id: String, opt_idx: int, equip_ids: Array) -> bool:
+	_sm.new_profile({}, [])
+	_sm.profile.silver = 0
+	for eid in equip_ids:
+		_sm.profile.inventory.append(eid)
+	_sm.profile.add_gongfa("shaolin_yijin_d", "D")
+	_sm.profile.master_gongfa_of("shaolin_yijin_d")
+	_sm.apply_seed(99)
+	var node: Node = CULTIVATION_SCENE.instantiate()
+	node.event_id = event_id
+	var before: Dictionary = _profile_snapshot()
+	node._apply_event_option(opt_idx)
+	var after: Dictionary = _profile_snapshot()
+	node.free()
+	return _any_field_moved(before, after)
 
 ## Fresh deterministic scenario: new profile (attrs/traits), sect / year / month
 ## set on the profile, RNG seeded BEFORE any draw, state forced to CULTIVATION.

@@ -580,6 +580,7 @@ surface:
   - gongfa_ids
   - gongfa_grades
   - gongfa_names
+  - events_seen_count
   MapScreen:
   - current_node_id
   - focus_id

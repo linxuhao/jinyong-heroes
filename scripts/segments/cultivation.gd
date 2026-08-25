@@ -69,6 +69,12 @@ var drawn_card_categories: Array = []
 ## Surface: id of the currently displayed 游历 event ("" when none).
 var event_id: String = ""
 
+## Surface: size of the sanitized events_seen bag — the no-repeat proof. Grows
+## by 1 per resolved 游历 event; drops to 0 when the pool is exhausted and the
+## reset branch of _draw_event refills it (guaranteeing a non-empty draw — never
+## an empty event, never a stall).
+var events_seen_count: int = 0
+
 ## Surface: true once the DEBUG fast-forward has run.
 var fast_forward_used: bool = false
 
@@ -670,6 +676,7 @@ func _sync_surface() -> void:
 		gongfa_ids.append(id)
 		gongfa_grades.append(str(entry.get("grade", "")))
 		gongfa_names.append(ProgressionGongfaData.display_name_of(id))
+	events_seen_count = (SaveManager.profile.flags.get("events_seen", []) as Array).size()
 
 
 func _categories_of(cards: Array) -> Array:
