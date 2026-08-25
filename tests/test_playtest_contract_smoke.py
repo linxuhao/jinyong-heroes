@@ -166,4 +166,14 @@ def test_click_targeting_surface_contract() -> None:
     clicks_items = _items_under(click_text, "clicks")
     assert clicks_items, "click_targeting_fixed.yaml has no clicks: items"
     target = clicks_items[0]
-    assert target in blocks, target
+    # The target must BELONG to an observable unit — either the unit block
+    # itself, or that unit's click hit-surface, which enemy.gd:_ready() renames
+    # to "<EnemyNodeName>_ClickTarget" (unique-name requirement of the harness'
+    # recursive bare-name search). The hit-surface is a bare Control with no
+    # variables of its own, so it is deliberately NOT a surface block — asserting
+    # membership directly would force a meaningless observable into the contract.
+    owner = target[: -len("_ClickTarget")] if target.endswith("_ClickTarget") else target
+    assert owner in blocks, (
+        "clicks: target %r belongs to no whitelisted surface block "
+        "(looked for %r)" % (target, owner)
+    )
