@@ -180,10 +180,12 @@ static func _draws_after(c: CanvasItem, leaf: Node) -> bool:
 	return _tree_index(tree.root, c) > _tree_index(tree.root, leaf)
 
 static func _canvas_layer(item: CanvasItem) -> int:
-	var canvas: Canvas = item.get_canvas()
-	if canvas == null:
-		return 0
-	return canvas.layer
+	var node: Node = item
+	while node != null:
+		if node is CanvasLayer:
+			return (node as CanvasLayer).layer
+		node = node.get_parent()
+	return 0
 
 ## Effective z_index, honouring z_as_relative (sum ancestors' z until an
 ## absolute-z node is found).

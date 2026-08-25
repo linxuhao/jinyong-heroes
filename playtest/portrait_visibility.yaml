@@ -12,8 +12,21 @@
 # all-six-visible, its first red run prints the real observed fail_layer.
 name: portrait_visibility
 timeline:
-- {at: 3..15, actions: [ui_accept]}
-- {at: 20/25/30, actions: [tutorial_next]}
+# One entry per frame: `at` is a single integer. The shorthand from the probe
+# notes table (3..15 / 20/25/30) is NOT valid spec syntax — it reached int()
+# inside the harness and came back as a bare HTTP 500, which read as a
+# builder outage and cost this round its measurement. The harness now
+# rejects it by name instead (godot_harness.py, 2026-08-25).
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [tutorial_next]}
+- {at: 25, actions: [tutorial_next]}
+- {at: 30, actions: [tutorial_next]}
 - at: 40
   assert:
     Player.portrait_visible: portrait_visible == true
