@@ -152,6 +152,8 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		var cap: ColorRect = bar.get_node_or_null("EmptyCap") as ColorRect
 		if cap != null:
 			cap.position.x = bar.size.x - EMPTY_CAP_PX
+				# mouse_filter stays MOUSE_FILTER_IGNORE (2) — set in the tscn,
+				# re-asserted in update_health(); never blocks HUD clicks.
 			cap.size = Vector2(EMPTY_CAP_PX, bar.size.y)
 			cap.color = _TRACK_BG
 			cap.visible = true
@@ -210,6 +212,9 @@ func update_health(current: int, max_hp: int) -> void:
 		cap.size = Vector2(EMPTY_CAP_PX, _bar.size.y)
 		cap.color = _TRACK_BG
 		cap.visible = true
+		# MOUSE_FILTER_IGNORE (2): re-asserted every update so the cap never
+		# blocks clicks on the HUD layer (root widget is also filter 2).
+		cap.mouse_filter = 2  # == MOUSE_FILTER_IGNORE; click-through
 
 	var ratio: float = float(current) / float(max_hp) if max_hp > 0 else 0.0
 	_last_ratio = ratio

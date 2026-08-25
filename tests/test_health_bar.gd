@@ -76,6 +76,8 @@ static func run() -> bool:
 			"EmptyCap.color == track_bg")
 	ok = _expect(ok, abs(cap.position.x + cap.size.x - bar_node.size.x) < 0.01,
 			"EmptyCap right-aligned with Bar (position.x + size.x == Bar.size.x)")
+	ok = _expect(ok, cap.mouse_filter == 2,
+			"EmptyCap.mouse_filter == 2 (never blocks clicks on the HUD layer)")
 
 	# At full HP (ratio 1.0) the cap must STILL be pinned and visible — the
 	# fill covers the whole bar rect, so the cap is the only empty-track hint.
