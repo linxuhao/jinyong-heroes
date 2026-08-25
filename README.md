@@ -6,7 +6,7 @@ A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. You boot
 
 Playtesting surfaced six UX defects that all share one shape: the interface **implies** an interaction the engine does not actually support (keyboard-only transitions presented as button-navigable rows, a cached-pointer mouse attack, tooltip-only descriptions). This round makes every on-screen action a real, clickable button and makes the UI self-describing. All seven fixes reuse the existing convergence pattern (buttons delegate to the SAME handler the keyboard uses — the keyboard degrades to a shortcut, never a second logic path):
 
-1. **Mouse click-to-attack fixed at the event level.** `scripts/characters/player.gd` `_handle_click_targeting(event)` now converts the **click event's own** viewport coordinates (`get_canvas_transform().affine_inverse() * event.position`) instead of re-querying the viewport-cached `get_global_mouse_position()`. Identity-safe today, camera-proof later. *(Code correct by inspection; see Recorded Debt #8 — the harness proof leg is still open.)*
+1. **Mouse click-to-attack fixed at the event level.** `scripts/characters/player.gd` `_handle_click_targeting(event)` now converts the **click event's own** viewport coordinates (`get_canvas_transform().affine_inverse() * event.position`) instead of re-querying the viewport-cached `get_global_mouse_position()`. Identity-safe today, camera-proof later. *(Code correct by inspection; the end-to-end click-to-attack harness proof is still open — see Verification Status and Recorded Debt #6.)*
 2. **Creation screen is fully button-driven.** Four new phase-navigation buttons — `AttrBackButton` (返回菜单 → `GameManager.enter_menu()`), `AttrNextButton` (→ `_on_accept`), `TraitBackButton` (→ `_on_move_left`), `TraitNextButton` (→ `_on_move_right`) — each wired to the existing keyboard handler, with the `pressed_connected` snapshot extended to all four.
 3. **Trait descriptions now exist in data.** `trait_data.gd` `TraitDef.description` + all 13 机制 rows, verbatim from `design/40_progression.md` §2.2.
 4. **Attribute descriptions now render.** `creation.gd` `_ATTR_DESCS` + `AttrDescLabel` (气血 = 根骨 × 5, 内力值 = 内力 × 2, …) from `design/40_progression.md` §7.1.
@@ -199,12 +199,18 @@ Runs a compile check, a headless playtest against the `playtest/` contract (38 s
 
 ## Verification Status
 
-**Code inspection (this step — Final Verifier):** all seven fixes are present and structurally correct in the repo (see `final/verify_report.json` `verified_subtasks`). **Not yet verified — downstream gates:** `compile_report.json`, `vision_report.json`, `test_report.json`, and `playtest_summary.md` are produced by the downstream `5_compile` / `5_vision` / `5_test` gates, whose reports do not exist at this step. The objective acceptance bar (compile 0 errors; full 38-scenario playtest with `empty_round_stalls == 0`, runtime errors 0, and only `terminal_victory` red; vision readability; unit tests) is therefore **recorded as unverifiable here, not assumed passed**. See the issues list in `final/verify_report.json`.
+**Downstream gate results (as recorded in the `5_review` verdict — the authoritative gate evidence):**
 
-**Known open items:**
+| Gate | Result |
+|---|---|
+| Compile (`5_compile`) | **PASSED** — 0 errors, 66 GDScript scripts parsed |
+| Full playtest | **PARTIAL** — hard gate passed (0 runtime errors, `empty_round_stalls == 0`); **36/38** scenario assertion groups green |
+| Vision / readability (`5_vision`) | **FAILED** — `passed: false`, `blind: true`, `unparseable_response` (0/7 questions answered) |
+| Unit tests (`5_test`) | **NOT A PASS** — `no_tests_collected: true` (Godot tests under `tests/` unwired) |
 
-- `terminal_victory_8_12_rounds_hp_15_40` stays **5/6** — deliberate difficulty contract.
-- The click-to-attack harness proof (success criterion 1) is **not yet achieved**: the harness's `clicks:` key targets Control nodes only and cannot synthesize a click on a bare `Node2D` enemy, so `click_targeting_fixed.yaml`'s enemy-click leg is unproven-by-harness (Recorded Debt #8).
+**Verdict: NOT deployable** (`all_goals_met: false`, `ready_for_deploy: false` in `final/verify_report.json`).
+
+The two red playtest scenarios are `terminal_victory_8_12_rounds_hp_15_40` (5/6 — the deliberate difficulty contract, left red) and **`click_targeting_fixed` (0/2 — `Player.acted` did not change, `Central_Divine.health` stayed 130)**. Success criterion 1 (a harness-proven click-to-attack path with an observed damage value) is therefore **not met**: the C1 coordinate fix is present and correct by inspection, but the end-to-end click proof is contradicted — delivery notes claim a green 2/2 probe (with the added `Central_Divine_ClickTarget` Control hit-surface), while the authoritative gate run shows 0/2 red. A full-suite re-run flipping `click_targeting_fixed` green is required before this round is deployable.
 
 ## Recorded Debt
 
@@ -212,5 +218,5 @@ Runs a compile check, a headless playtest against the `playtest/` contract (38 s
 2. **Shell duplication**: `menu.tscn` duplicates `main.tscn`'s shell node block (forced by `main.tscn`'s byte-identity). Future shell edits must touch both.
 3. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
 4. **Segment-2 穿越 narrative content is deferred** — roadmap stage-3 content.
-5. **Unit-test gate reports `no_tests_collected`** — the Godot unit tests under `tests/` are unwired; that is NOT a pass signal. Wiring is deferred to a separate round.
-6. **`_handle_click_targeting` coordinate fix is correct but unproven-by-harness**: the `clicks:` harness is Control-only and cannot click a bare `Node2D` enemy (delivery notes measured `clicks: [Central_Divine]` fully inert). The enemy-click leg of `click_targeting_fixed.yaml` awaits either a coordinate-capable `clicks:` key or a Control hit-surface on enemies. Never ship a mouse-interaction scenario asserting only "no runtime errors" — this failure is silent.
+5. **Unit-test gate reports `no_tests_collected`** — the Godot unit tests under `tests/` are unwired; that is NOT a pass signal. `5_test` currently reports `passed: true` on `no_tests_collected: true` — treat that as skipped/unrun, never as a pass. Wiring is deferred to a separate round.
+6. **Click-to-attack harness proof (success criterion 1) is NOT established.** The C1 fix is correct by inspection (`player.gd` `_handle_click_targeting(event)` → `get_canvas_transform().affine_inverse() * event.position`; `get_global_mouse_position` absent from the `.gd` files), and a `ClickTarget` Control hit-surface was added to enemies. But the authoritative gate run shows `click_targeting_fixed.yaml` 0/2 red (`Player.acted` unchanged, `Central_Divine.health` 130 unchanged), while `final/delivery_notes.md` claims a green 2/2 probe (observed 91). Re-establish the proof with a full-suite run that flips `click_targeting_fixed` green — do NOT ship on the "no runtime errors" fallback, and do NOT take a single-scenario probe as the gate result.
