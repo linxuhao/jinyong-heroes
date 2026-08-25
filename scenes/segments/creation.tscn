@@ -24,9 +24,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -200.0
-offset_top = -310.0
+offset_top = -268.0
 offset_right = 200.0
-offset_bottom = -260.0
+offset_bottom = -248.0
 horizontal_alignment = 1
 mouse_filter = 2
 
@@ -52,66 +52,100 @@ offset_left = -280.0
 offset_top = -240.0
 offset_right = 280.0
 offset_bottom = 240.0
+theme_override_constants/separation = 14
 
 [node name="AttrBox" type="VBoxContainer" parent="MouseBox"]
+	theme_override_constants/separation = 10
 
 [node name="AttrRow0" type="HBoxContainer" parent="MouseBox/AttrBox"]
+	custom_minimum_size = Vector2(0, 44)
+	theme_override_constants/separation = 6
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow0"]
+	horizontal_alignment = 2
+	size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 [node name="AttrMinus0" type="Button" parent="MouseBox/AttrBox/AttrRow0"]
+	custom_minimum_size = Vector2(44, 34)
 text = "-"
 focus_mode = 0
 [node name="AttrPlus0" type="Button" parent="MouseBox/AttrBox/AttrRow0"]
+custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 
 [node name="AttrRow1" type="HBoxContainer" parent="MouseBox/AttrBox"]
+	custom_minimum_size = Vector2(0, 44)
+	theme_override_constants/separation = 6
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow1"]
+	horizontal_alignment = 2
+	size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 [node name="AttrMinus1" type="Button" parent="MouseBox/AttrBox/AttrRow1"]
+	custom_minimum_size = Vector2(44, 34)
 text = "-"
 focus_mode = 0
 [node name="AttrPlus1" type="Button" parent="MouseBox/AttrBox/AttrRow1"]
+custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 
 [node name="AttrRow2" type="HBoxContainer" parent="MouseBox/AttrBox"]
+	custom_minimum_size = Vector2(0, 44)
+	theme_override_constants/separation = 6
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow2"]
+	horizontal_alignment = 2
+	size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 [node name="AttrMinus2" type="Button" parent="MouseBox/AttrBox/AttrRow2"]
+custom_minimum_size = Vector2(44, 34)
 text = "-"
 focus_mode = 0
 [node name="AttrPlus2" type="Button" parent="MouseBox/AttrBox/AttrRow2"]
+custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 
 [node name="AttrRow3" type="HBoxContainer" parent="MouseBox/AttrBox"]
+	custom_minimum_size = Vector2(0, 44)
+	theme_override_constants/separation = 6
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow3"]
+	horizontal_alignment = 2
+	size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 [node name="AttrMinus3" type="Button" parent="MouseBox/AttrBox/AttrRow3"]
+custom_minimum_size = Vector2(44, 34)
 text = "-"
 focus_mode = 0
 [node name="AttrPlus3" type="Button" parent="MouseBox/AttrBox/AttrRow3"]
+custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 
 [node name="AttrRow4" type="HBoxContainer" parent="MouseBox/AttrBox"]
+	custom_minimum_size = Vector2(0, 44)
+	theme_override_constants/separation = 6
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow4"]
+	horizontal_alignment = 2
+	size_flags_horizontal = 3
 custom_minimum_size = Vector2(180, 0)
 [node name="AttrMinus4" type="Button" parent="MouseBox/AttrBox/AttrRow4"]
+custom_minimum_size = Vector2(44, 34)
 text = "-"
 focus_mode = 0
 [node name="AttrPlus4" type="Button" parent="MouseBox/AttrBox/AttrRow4"]
+custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 
 [node name="AttrDescLabel" type="Label" parent="MouseBox/AttrBox"]
+custom_minimum_size = Vector2(0, 48)
 visible = false
 text = ""
 autowrap_mode = 3
 mouse_filter = 2
 
 [node name="AttrNavRow" type="HBoxContainer" parent="MouseBox/AttrBox"]
+custom_minimum_size = Vector2(0, 44)
 [node name="AttrBackButton" type="Button" parent="MouseBox/AttrBox/AttrNavRow"]
 text = "返回菜单"
 focus_mode = 0
@@ -120,33 +154,47 @@ text = "下一步"
 focus_mode = 0
 
 [node name="TraitBox" type="VBoxContainer" parent="MouseBox"]
+theme_override_constants/separation = 4
 visible = false
 
 [node name="TraitToggle0" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle1" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle2" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle3" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle4" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle5" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle6" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle7" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle8" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle9" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle10" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle11" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 [node name="TraitToggle12" type="Button" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 
 [node name="TraitDescLabel" type="Label" parent="MouseBox/TraitBox"]
@@ -156,6 +204,7 @@ autowrap_mode = 3
 mouse_filter = 2
 
 [node name="TraitNavRow" type="HBoxContainer" parent="MouseBox/TraitBox"]
+custom_minimum_size = Vector2(0, 44)
 [node name="TraitBackButton" type="Button" parent="MouseBox/TraitBox/TraitNavRow"]
 text = "上一步"
 focus_mode = 0
@@ -164,12 +213,17 @@ text = "下一步"
 focus_mode = 0
 
 [node name="ConfirmBox" type="VBoxContainer" parent="MouseBox"]
+theme_override_constants/separation = 12
 visible = false
 
 [node name="ConfirmButton" type="Button" parent="MouseBox/ConfirmBox"]
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(240, 44)
 text = "确认踏上江湖"
 focus_mode = 0
 
 [node name="BackButton" type="Button" parent="MouseBox/ConfirmBox"]
+size_flags_horizontal = 4
+custom_minimum_size = Vector2(160, 44)
 text = "返回"
 focus_mode = 0
