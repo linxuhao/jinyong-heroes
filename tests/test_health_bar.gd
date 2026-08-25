@@ -19,12 +19,17 @@ static func run() -> bool:
 	var bar = HealthBarScene.instantiate()
 	bar.setup("测试", 100, null)
 
-	# Compact geometry: 68x20 widget, 64x8 bar, name label 9px tall above it
+	# Compact geometry: 68x24 widget, 64x12 bar, name label 9px tall above it
 	# (font 10; the label rect is intentionally shorter than the CJK glyph box —
 	# the no-clip guarantee is clip_text = false, not rect height).
-	ok = _expect(ok, bar.size == Vector2(68, 20), "bar.size == Vector2(68, 20)")
-	ok = _expect(ok, is_equal_approx(bar.total_height, 20.0), "bar.total_height == 20.0")
+	ok = _expect(ok, bar.size == Vector2(68, 24), "bar.size == Vector2(68, 24)")
+	ok = _expect(ok, is_equal_approx(bar.total_height, 24.0), "bar.total_height == 24.0")
 	ok = _expect(ok, is_equal_approx(bar.bar_width, 64.0), "bar.bar_width == 64.0")
+	# Bar height (authored 12 px — read via the headless instantiate path, before
+	# the battle scene's theme min-size clamp pushes it to ~22) and the resulting
+	# visible empty-slot area (10 px cap × 12 px = 120 px², the Q5 area argument).
+	ok = _expect(ok, is_equal_approx(bar.bar_height, 12.0), "bar.bar_height == 12.0")
+	ok = _expect(ok, is_equal_approx(bar.empty_area_px, 120.0), "bar.empty_area_px == 120.0")
 	ok = _expect(ok, bar.name_text == "测试", 'bar.name_text == "测试"')
 
 	# Track visibility (5_vision Q5): the track bg is LIGHT (luminance > 0.30)
@@ -46,7 +51,7 @@ static func run() -> bool:
 	ok = _expect(ok, bar.fill_color.is_equal_approx(Color(0.9, 0.25, 0.2)),
 			"update_health(20,100) fill_color == red")
 
-	# The track draws 4px larger than the control rect on every side via
+	# The track draws 6px larger than the control rect on every side via
 	# expand margins (never content margins), and a dedicated fill stylebox
 	# must exist for the per-band recoloring — its bg_color is a distinct,
 	# dedicated fill, never the track color.
@@ -54,8 +59,8 @@ static func run() -> bool:
 	var bg = bar_node.get_theme_stylebox("background")
 	ok = _expect(ok, bg is StyleBoxFlat, "background stylebox is StyleBoxFlat")
 	if bg is StyleBoxFlat:
-		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 4.0),
-				"background expand_margin_all == 4.0")
+		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 6.0),
+				"background expand_margin_all == 6.0")
 		ok = _expect(ok, bg.border_width_left == 2 and bg.border_width_top == 2
 				and bg.border_width_right == 2 and bg.border_width_bottom == 2,
 				"background border_width == 2 on all four sides")
@@ -69,6 +74,9 @@ static func run() -> bool:
 	# (5_vision Q5 — a visible empty slot at ANY fill level, incl. 100%).
 	var cap = bar_node.get_node("EmptyCap")
 	ok = _expect(ok, cap is ColorRect, "Bar/EmptyCap exists and is a ColorRect")
+	# Cap height tracks the bar height (authored 12 px, same value as bar_height).
+	ok = _expect(ok, is_equal_approx(cap.size.y, bar.bar_height),
+			"EmptyCap.size.y == bar.bar_height")
 	ok = _expect(ok, bar.empty_cap_px > 0, "empty_cap_px > 0")
 	ok = _expect(ok, is_equal_approx(cap.size.x, bar.empty_cap_px),
 			"EmptyCap.size.x == empty_cap_px")
@@ -92,7 +100,7 @@ static func run() -> bool:
 	# CJK glyph box (font 10 em ≈ 15px) — that is by design. The no-clip
 	# guarantee is Label.clip_text = false (text draws even outside the rect,
 	# never ellipsized: text_overrun_behavior = 0), so assert those instead of
-	# rect height, and keep the label + bar both fitting inside the 20px widget.
+	# rect height, and keep the label + bar both fitting inside the 24px widget.
 	var label: Label = bar.get_node("NameLabel")
 	ok = _expect(ok, label.clip_text == false, "NameLabel.clip_text == false (no clip)")
 	ok = _expect(ok, label.text_overrun_behavior == 0,
