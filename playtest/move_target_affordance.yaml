@@ -14,8 +14,16 @@
 # bare-scalar silent-false asserts).
 name: move_target_affordance
 timeline:
-- {at: 3..15, actions: [ui_accept]}
-- {at: 20/25/30, actions: [tutorial_next]}
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [tutorial_next]}
+- {at: 25, actions: [tutorial_next]}
+- {at: 30, actions: [tutorial_next]}
 - at: 45
   actions: []
   assert:
