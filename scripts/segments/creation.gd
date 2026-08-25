@@ -67,6 +67,19 @@ var points_attrs_gap_ok: bool = true
 var phase_skeleton_same: bool = true
 var creation_in_viewport: bool = true
 var creation_box_fits: bool = true
+## Round-3 leaf-ink layout observables (surface, append-only): measured on INK
+## (label TEXT rects via Font.get_string_size and button rects), never container
+## rects — the expand-fill AttrLabel's full rect centers at 480 by construction
+## while its text sits at the right edge (the container-rect lie this round
+## removes, design/99_changelog.md). Phase-gated facts keep their last value
+## outside their phase. All six are probe-first A/B-class facts: the probe notes
+## (final/creation_probe_notes.md) record their pre-fix values.
+var attr_cluster_center_ok: bool = true
+var attr_cluster_width_ok: bool = true
+var nav_cluster_center_ok: bool = true
+var trait_cluster_center_ok: bool = true
+var desc_center_ok: bool = true
+var desc_alignment_ok: bool = true
 var _ref_box_top: float = 0.0
 
 var _traits: Array = []
