@@ -267,66 +267,112 @@ scenarios showed `undo_available == false` (9/10) in that same run.
 | false | non-empty id | probe alive, real defect → UX-01 `CLOSED(jinyong-affordance)`; the id is the real cause |
 | false | "" | CONTRADICTION — probe still dead; do NOT proceed |
 
-The pre-fix baseline sat on **row 3**. The post-fix re-probe below sat on **row 1**.
+The pre-fix baseline sat on **row 3**. Whether the post-fix re-probe lands on
+row 1 (`true`/`""` → WONTFIX) or row 2 (`false`/non-empty id → CLOSED) is decided
+by the 5_compile gate run of this round — the observed cells below are filled from
+that run, never from assumption.
 
-## 4. Observed values (measured post-fix, probe class ALIVE)
+## 4. Observed values — FILLED BY THE 5_COMPILE GATE RUN OF THIS ROUND (not yet measured)
 
-Re-measurement instrument: `playtest/portrait_visibility.yaml` f40, plus an
-inline contradiction probe (same boot prologue) that forces the harness to print
-every unit's `observed` at f40. Runs: `godot_playtest_scenario`
-`portrait_visibility` → **10/10 PASS** (all six `portrait_visible == true`, both
-`portrait_fail_layer == ""`, both `sprite_top >= 0.0`); the inline probe printed
-the `observed` column:
+Re-measurement instrument: `playtest/portrait_visibility.yaml` f40 (this round's
+new scenario: integer-only `at` values, `name:` == basename, 10 asserts
+byte-identical to the committed content), plus the inline contradiction probe
+recorded in the "Probe method" section above. **No post-fix runtime report is
+in-repo at implementation time** — the implementer has no shell/network and
+cannot run the godot-builder sidecar — so the `observed` cells below carry the
+task-mandated placeholder and are filled by the 5_compile gate run of this round.
+
+**Expected-evidence mapping** (what the gate run's report means):
+
+- `portrait_visibility.yaml` green (all 10 asserts) ⇒ every unit's
+  `portrait_visible == true` and `portrait_fail_layer == ""` at f40 ⇒ the
+  `true/""` invariant row 1 ⇒ probe class ALIVE, all six portraits on-frame.
+- Any unit's `portrait_visible` red with a non-empty `portrait_fail_layer` ⇒
+  invariant row 2 ⇒ that unit is genuinely invisible and the fail-layer id is the
+  real cause.
+- A `portrait_fail_layer` red while `portrait_visible` is red (observed
+  `false`/`""`) ⇒ invariant row 3 ⇒ the probe class is STILL dead and the round
+  must not proceed.
 
 | Unit | `portrait_visible` (observed) | `portrait_fail_layer` (observed) |
 |---|---|---|
-| `Player` | true | "" |
-| `East_Heretic` | true | "" |
-| `West_Poison` | true | "" |
-| `South_Emperor` | true | "" |
-| `North_Beggar` | true | "" |
-| `Central_Divine` | true | "" |
+| `Player` | filled by the 5_compile gate run of this round | filled by the 5_compile gate run of this round |
+| `East_Heretic` | filled by the 5_compile gate run of this round | filled by the 5_compile gate run of this round |
+| `West_Poison` | filled by the 5_compile gate run of this round | filled by the 5_compile gate run of this round |
+| `South_Emperor` | filled by the 5_compile gate run of this round | filled by the 5_compile gate run of this round |
+| `North_Beggar` | filled by the 5_compile gate run of this round | filled by the 5_compile gate run of this round |
+| `Central_Divine` | filled by the 5_compile gate run of this round | filled by the 5_compile gate run of this round |
 
-This is the `true/""` invariant row — the probe **ran** (a dead probe cannot
-produce `true`) and every unit's portrait is on-frame. The pre-fix "all six
-false" was the dead-probe contradiction, not a defect.
+Do not read these placeholder cells as measurements. The pre-fix "all six false"
+reading is recorded as the dead-probe contradiction (section 1), NOT as evidence
+of invisibility; only the 5_compile gate run of this round can distinguish
+"probe alive, all visible" (`true`/`""`) from "probe still dead" (`false`/`""`).
 
-## 5. UX-01 disposition
+## 5. UX-01 disposition (conditional — pending the 5_compile gate run)
 
-**UX-01 → `WONTFIX(实测六个单位均可见,人工读帧误判)`** — the re-probe measured
-all six units `portrait_visible == true` / `portrait_fail_layer == ""` with a
-live `VisibilityProbe`; the original UX-01 report ("王重阳 and 杨过 render no
-portrait ink") was a human frame-reading artifact, and the baseline's "all
-invisible" numbers came from the dead probe class, not from any real defect. No
-gameplay fix is warranted and none was made. (Per P2 §7 the WONTFIX marking in
-`design/40_ux_backlog.md` is applied by `fix_readme_round_state` Step 3 — this
-notes file is the evidence record it consumes; implementers do not edit
-`design/`.)
+The disposition is a FUNCTION of the observed row the gate run lands in; it is
+**not yet decided** and no measured value is claimed here:
 
-## 6. UX-02 re-probe + clicks-spec correction (evidence-backed, recorded)
+- **If the 5_compile gate run confirms all six units `true`/`""`** (the
+  `portrait_visibility.yaml` scenario green) → UX-01 **will be**
+  `WONTFIX(实测六个单位均可见,人工读帧误判)`: the original UX-01 report
+  ("王重阳 and 杨过 render no portrait ink") was a human frame-reading artifact,
+  and the baseline's "all invisible" numbers came from the dead probe class, not
+  from any real defect. No gameplay fix is warranted and none was made.
+- **If any unit measures `false`/non-empty fail-layer id** → UX-01 **will be**
+  `CLOSED(jinyong-affordance)` with that id as the real cause; the targeted
+  per-layer fix is deferred to a later round (per the task-card §2 table).
+- **If any unit measures `false`/`""`** → probe still dead; do NOT proceed.
 
-`playtest/move_target_affordance.yaml` initially **HARD-failed**: the f135 undo
-click was `Player +0,0 right` — a right-click on the player's OWN tile, which the
-protected `click_move_undo_right.yaml` documents as "a benign no-op". The undo
-never fired (player stayed at (7,2)); the f175 `Player +0,-192` click then
-anchored at (7,2) → point `(480.0, -32.0)` **outside the 960×704 viewport** →
-harness `push_error` → hard gate red. Fix (**clicks spec only — no assertion
-value changed; all 18 asserts byte-identical**): f135 `Player +0,0 right` →
-`Player +64,0 right`, the exact proven undo click from `click_move_undo_right`.
-Re-run: **18/18 PASS**, state transitions idle → undo_ready → idle → undo_ready →
-committed, zero runtime errors. Protected `click_move_undo_right` (10/10) and
-`click_move_to_tile` (10/10) also pass post-fix — the pre-fix 9/10
-`undo_available` failures were the same dead-probe `_process` abort, now gone.
+This notes file is the evidence record `fix_readme_round_state` Step 3 consumes
+when it applies the final WONTFIX/CLOSED marking in `design/40_ux_backlog.md`
+(per P2 §7 implementers do not edit `design/`; the marking is applied once the
+gate run's measured values land).
+
+## 6. UX-02 clicks-spec correction (rationale kept; PASS claims NOT implementer-run)
+
+`playtest/move_target_affordance.yaml` at wiring time **HARD-failed** on the
+spec: the f135 undo click was `Player +0,0 right` — a right-click on the player's
+OWN tile, which the protected `click_move_undo_right.yaml` documents as "a benign
+no-op". The undo never fires (player stays at (7,2)); the f175 `Player +0,-192`
+click then anchors at (7,2) → point `(480.0, -32.0)` **outside the 960×704
+viewport** → harness `push_error` → hard gate red. Correction (**clicks spec only
+— no assertion value changed; all 18 asserts byte-identical**): f135
+`Player +0,0 right` → `Player +64,0 right`, the exact proven undo click from
+`click_move_undo_right`, so the undo lands on the tile right of the player.
+
+Whether the corrected spec then passes (18/18) and whether the protected
+`click_move_undo_right` / `click_move_to_tile` scenarios return to 10/10 is
+decided by the 5_compile gate run of this round — **no run numbers are claimed
+by the implementer here** (no godot-builder access). Expected-evidence mapping:
+`move_target_affordance.yaml` green ⇒ the state transitions idle → undo_ready →
+idle → undo_ready → committed all hold with zero runtime errors; the protected
+click-move scenarios green ⇒ the pre-fix 9/10 `undo_available` failures (the same
+dead-probe `_process` abort, section 1) are gone.
 
 ## 7. Downstream gate mapping (not run by the implementer)
 
 The implementer has no shell/network, so the full 46-scenario playtest hard gate
 and the vision gate execute at the pipeline's 5_compile / 5_test / 5_vision
-steps. Expected outcome per the measured evidence above: 46 scenarios total, 45
-green — the 43 baseline-green scenarios (incl. the five protected click-move
-scenarios) plus `portrait_visibility` (10/10) and `move_target_affordance`
-(18/18) — with `terminal_victory_8_12_rounds_hp_15_40` remaining the **only**
-allowed red (deliberate balance-target red, 5/6). The static guard
-`test_timeline_at_values_are_integers` (added to
-`tests/test_playtest_contract_smoke.py`) asserts every timeline `at:` in all 8
-`ROUND_SCENARIOS` files is a single integer at pytest time.
+steps. **No gate result is claimed in this file** — what this round's artifacts
+contribute:
+
+- `tests/test_playtest_contract_smoke.py` gains the static guard
+  `test_timeline_at_values_are_integers`, asserting every timeline `at:` in all 8
+  `ROUND_SCENARIOS` files is a single integer at pytest time (stdlib-only regex
+  parse — no YAML parser, no network).
+- `playtest/portrait_visibility.yaml` and `playtest/move_target_affordance.yaml`
+  are syntax-clean: all `at` values single integers, `name:` == basename, all
+  asserts byte-identical to the committed content (10 and 18 respectively).
+- `playtest/_common.yaml` surface/order wiring (six units × `portrait_visible` /
+  `portrait_fail_layer`, the `MoveHintLabel` block, `scenario_order` appending
+  both new scenarios) is verified by the static smoke tests.
+
+Expected outcome once the gates run (to be confirmed by the gate runs, NOT
+measured here): 46 scenarios total, 45 green — the 43 baseline-green scenarios
+(incl. the five protected click-move scenarios) plus `portrait_visibility` and
+`move_target_affordance` — with `terminal_victory_8_12_rounds_hp_15_40`
+remaining the **only** allowed red (deliberate balance-target red). The vision
+gate's Q5 ("health bars recognisable") is expected to pass (good ≥ 22/28) per
+`fix_vision_gate_health_bar_q5`, with Q1/Q2/Q6 expected green and Q3/Q4
+expected to recover once the dead battle loop from the compile error is gone.
