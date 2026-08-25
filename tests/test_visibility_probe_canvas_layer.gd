@@ -10,7 +10,6 @@
 ## get_parent() without a running SceneTree) — enough for a function that only
 ## walks get_parent().
 
-@warning_ignore("unsafe_call_argument")
 static func run() -> bool:
 	var ok := true
 
@@ -40,20 +39,31 @@ static func run() -> bool:
 	ok = _expect(ok, VisibilityProbe._canvas_layer(leaf_chain) == 2,
 			"_canvas_layer: nearest CanvasLayer ancestor (parent layer=2) -> 2")
 
-	# 4. The item ITSELF is a CanvasLayer -> its own layer. CanvasLayer is not a
-	#    CanvasItem, so it is passed through a Variant — the one legitimate way to
-	#    exercise the "node is CanvasLayer" branch at depth 0 through the typed
-	#    CanvasItem parameter (the object passes as a plain OBJECT Variant).
-	var self_cl: Variant = CanvasLayer.new()
-	self_cl.layer = 7
-	ok = _expect(ok, VisibilityProbe._canvas_layer(self_cl) == 7,
-			"_canvas_layer: item itself a CanvasLayer (layer=7) -> 7")
+	# 4. The walk crosses intermediate NON-CanvasItem nodes (a plain Node) on the
+	#    way to a CanvasLayer ancestor (layer 9) -> 9. `_canvas_layer` walks
+	#    Node.get_parent() and tests each node regardless of its concrete type,
+	#    so a non-2D intermediate must not stop the walk.
+	#    NOTE: the "item ITSELF is a CanvasLayer" case (the depth-0 `is
+	#    CanvasLayer` branch) is UNREACHABLE through this typed signature —
+	#    `_canvas_layer` takes a CanvasItem, and CanvasLayer is not a CanvasItem
+	#    (both derive from Node, sibling branches), so the engine rejects such a
+	#    call at runtime. Passing it as a Variant does not dodge that check and
+	#    would hard-abort the suite. The branch is therefore dead for any valid
+	#    call and is not separately testable; cases 2-3 exercise it at depth > 0.
+	var cl_deep: CanvasLayer = CanvasLayer.new()
+	cl_deep.layer = 9
+	var mid_node: Node = Node.new()
+	cl_deep.add_child(mid_node)
+	var leaf_deep: Node2D = Node2D.new()
+	mid_node.add_child(leaf_deep)
+	ok = _expect(ok, VisibilityProbe._canvas_layer(leaf_deep) == 9,
+			"_canvas_layer: walk crosses plain Node intermediate (layer=9) -> 9")
 
 	# Free the off-tree subtrees (no SceneTree to clean them up for us).
 	plain_root.free()
 	cl_parent.free()
 	cl_grandparent.free()
-	self_cl.free()
+	cl_deep.free()
 
 	if ok:
 		print("PASS: test_visibility_probe_canvas_layer")
