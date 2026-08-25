@@ -22,15 +22,70 @@ const ROW_EFFECTS := {
 		"A": [{"type": "silver", "value": -5, "target": ""}, {"type": "attr", "value": 1, "target": "fortune"}],
 		"B": [{"type": "practice", "value": 2, "target": ""}],
 	},
+	"tomb_bed": {
+		"A": [{"type": "attr", "value": 2, "target": "inner"}],
+		"B": [{"type": "item", "value": 0, "target": "eq_sword_2"}],
+	},
+	"wounded_eagle": {
+		"A": [{"type": "silver", "value": -8, "target": ""}, {"type": "practice", "value": 2, "target": ""}],
+		"B": [{"type": "attr", "value": 1, "target": "wisdom"}],
+	},
+	"peach_maze": {
+		"A": [{"type": "attr", "value": 2, "target": "agility"}],
+		"B": [{"type": "attr", "value": 1, "target": "wisdom"}],
+	},
+	"snake_bile": {
+		"A": [{"type": "silver", "value": -15, "target": ""}, {"type": "attr", "value": 2, "target": "bone"}],
+		"B": [{"type": "attr", "value": 1, "target": "fortune"}],
+	},
+	"dragon_scrap": {
+		"A": [{"type": "practice", "value": 4, "target": ""}],
+		"B": [{"type": "silver", "value": 25, "target": ""}],
+	},
+	"flood_ferry": {
+		"A": [{"type": "silver", "value": -10, "target": ""}],
+		"B": [{"type": "attr", "value": 1, "target": "inner"}],
+	},
+	"escort_job": {
+		"A": [{"type": "silver", "value": 22, "target": ""}],
+		"B": [{"type": "attr", "value": 1, "target": "wisdom"}],
+	},
+	"dali_market": {
+		"A": [{"type": "silver", "value": -18, "target": ""}, {"type": "item", "value": 0, "target": "eq_armor_2"}, {"type": "attr", "value": 1, "target": "bone"}],
+		"B": [{"type": "silver", "value": -14, "target": ""}, {"type": "item", "value": 0, "target": "eq_boots_2"}],
+	},
+	"night_rain": {
+		"A": [{"type": "silver", "value": -6, "target": ""}, {"type": "attr", "value": 1, "target": "bone"}],
+		"B": [{"type": "practice", "value": 2, "target": ""}],
+	},
+	"gambling_den": {
+		"A": [{"type": "silver", "value": 30, "target": ""}],
+		"B": [{"type": "attr", "value": 2, "target": "fortune"}],
+	},
+	"quanzhen_scripture": {
+		"A": [{"type": "attr", "value": 2, "target": "wisdom"}],
+		"B": [{"type": "silver", "value": -5, "target": ""}, {"type": "practice", "value": 3, "target": ""}],
+	},
+	"lost_purse": {
+		"A": [{"type": "attr", "value": 2, "target": "fortune"}],
+		"B": [{"type": "silver", "value": 20, "target": ""}],
+	},
 }
 
-const ROW_TITLES := {"bandits": "山道遇劫匪", "merchant": "行商路过", "ruins": "古墓残碑", "beggar": "老丐乞食"}
+const ROW_TITLES := {
+	"bandits": "山道遇劫匪", "merchant": "行商路过", "ruins": "古墓残碑", "beggar": "老丐乞食",
+	"tomb_bed": "古墓寒玉", "wounded_eagle": "神雕负伤", "peach_maze": "桃花迷阵",
+	"snake_bile": "蛇胆奇效", "dragon_scrap": "降龙残谱", "flood_ferry": "渡口风波",
+	"escort_job": "镖行招募", "dali_market": "大理市集", "night_rain": "破庙夜雨",
+	"gambling_den": "赌坊喧嚣", "quanzhen_scripture": "全真抄经", "lost_purse": "遗落的褡裢",
+}
 
 
 static func run() -> bool:
 	var ok := true
 	ok = _test_all_rows(ok)
 	ok = _test_option_effects(ok)
+	ok = _test_effect_targets(ok)
 	ok = _test_texts(ok)
 	ok = _test_unknown(ok)
 	ok = _test_fresh_instances(ok)
@@ -43,7 +98,7 @@ static func run() -> bool:
 
 static func _test_all_rows(ok: bool) -> bool:
 	var all_defs: Array = EventData.all()
-	ok = _expect(ok, all_defs.size() == 4, "all() has 4 rows")
+	ok = _expect(ok, all_defs.size() >= 16, "all() has >= 16 rows")
 	var seen := {}
 	for def in all_defs:
 		ok = _expect(ok, not seen.has(def.id), "duplicate event id " + def.id)
@@ -67,6 +122,68 @@ static func _test_option_effects(ok: bool) -> bool:
 			continue
 		ok = _expect(ok, _effects(def.option_a.effects) == ROW_EFFECTS[id]["A"], "option A effects " + id)
 		ok = _expect(ok, _effects(def.option_b.effects) == ROW_EFFECTS[id]["B"], "option B effects " + id)
+	return ok
+
+
+static func _test_effect_targets(ok: bool) -> bool:
+	## Whitelists mirroring cultivation.gd:_apply_event_option's hard contract —
+	## a typo'd type/target fails loudly here instead of silently no-opping.
+	var allowed_types := ["silver", "attr", "item", "practice", "none"]
+	var attr_keys := ["bone", "inner", "agility", "wisdom", "fortune"]
+	var equip_ids := ["eq_sword_1", "eq_sword_2", "eq_sword_3", "eq_sword_4",
+		"eq_armor_1", "eq_armor_2", "eq_armor_3", "eq_armor_4",
+		"eq_boots_1", "eq_boots_2", "eq_boots_3", "eq_boots_4"]
+	for def in EventData.all():
+		for opt in [def.option_a, def.option_b]:
+			ok = _expect(ok, opt != null, "both options non-null " + def.id)
+			if opt == null:
+				continue
+			ok = _expect(ok, opt.label != "", "option label non-empty " + def.id)
+			for e in opt.effects:
+				var d: Dictionary = e as Dictionary
+				ok = _expect(ok, d.has("type") and d.has("value") and d.has("target"), "effect has type/value/target " + def.id)
+				if not (d.has("type") and d.has("value") and d.has("target")):
+					continue
+				ok = _expect(ok, allowed_types.has(d["type"]), "effect type whitelist " + def.id + ":" + str(d["type"]))
+				if d["type"] == "attr":
+					ok = _expect(ok, attr_keys.has(d["target"]), "attr target whitelist " + def.id + ":" + str(d["target"]))
+				if d["type"] == "item":
+					ok = _expect(ok, equip_ids.has(d["target"]), "item target whitelist " + def.id + ":" + str(d["target"]))
+	# Costless-item uniqueness: an item grant with no paired silver effect is a
+	# free grant — two rows must never offer the same costless target.
+	var costless_targets := []
+	for def in EventData.all():
+		for opt in [def.option_a, def.option_b]:
+			if opt == null:
+				continue
+			var has_silver := false
+			for e in opt.effects:
+				if (e as Dictionary)["type"] == "silver":
+					has_silver = true
+			if has_silver:
+				continue
+			for e in opt.effects:
+				if (e as Dictionary)["type"] == "item":
+					costless_targets.append((e as Dictionary)["target"])
+	var seen := {}
+	for t in costless_targets:
+		ok = _expect(ok, not seen.has(t), "costless item target duplicate " + str(t))
+		seen[t] = true
+	# Must-land per row (acceptance criterion): at least one option contains an
+	# attr effect OR a non-zero silver effect — both always mutate profile state,
+	# whereas item/practice can no-op via dedup/mastered.
+	for def in EventData.all():
+		var row_lands := false
+		for opt in [def.option_a, def.option_b]:
+			if opt == null:
+				continue
+			for e in opt.effects:
+				var d: Dictionary = e as Dictionary
+				if d.get("type", "") == "attr":
+					row_lands = true
+				if d.get("type", "") == "silver" and int(d.get("value", 0)) != 0:
+					row_lands = true
+		ok = _expect(ok, row_lands, "row has a must-land option " + def.id)
 	return ok
 
 
