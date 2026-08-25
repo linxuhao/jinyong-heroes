@@ -1,631 +1,302 @@
-# Step 2 — Technical Architecture Design
-## Round goal: “全按钮化 — UI that explains itself” (five verified UX defects + movement-range highlight)
+# Technical Architecture Design — Round: Click-Driven Battle Movement
 
-This design implements the five defects verified in the Step 1 SOTA report plus the movement-range
-highlight gap, on top of the existing Godot 4.7 repo machinery. Every file path, node name, and
-signal cited below was verified against repo code on the 2026-08-24 baseline (see the "Verified
-baseline" appendix). Nothing in this design changes game logic, combat balance, or any of the
-32 existing playtest scenario files.
+Project: Huashan Sword Tournament (Godot 4 grid tactics). Round goal (from `design/99_changelog.md` rows 2026-08-25 and the SOTA report):
+
+1. **Click-driven battle movement** — left-click an empty tile walks there; right-click undoes the whole turn's movement back to the turn-start tile; a successful action (attack/skill) commits the movement (no more undo). Arrow keys stay as a shortcut, no longer the primary interaction.
+2. **Focus-mode fix** — battle HUD buttons must never hold keyboard focus, so GUI focus navigation stops swallowing arrow keys (the reported "sometimes can't move" defect).
+3. **Creation screen: one primary interaction** — the `▶` keyboard-cursor text model is removed; the button set is the single visible surface; keyboard input degrades to pure shortcuts (behavior pinned by 11/11 + 19/19 scenarios).
+4. **Click-aware movement-range highlight** — `MoveRangeHighlight` expresses the "trying" state: where right-click returns to (turn-start tile), whether undo is available, and reacts to click-driven movement.
+
+All design is grounded in verified repo reads: `scripts/characters/player.gd`, `scripts/autoload/combat_manager.gd` (`begin_turn` at line 684), `scripts/autoload/grid_manager.gd` (`world_to_grid`/`move_unit`/`is_walkable`/`is_occupied`), `scripts/ui/move_range_highlight.gd`, `scripts/ui/hud.gd`, `scenes/ui/hud.tscn`, `scenes/ui/skill_button.tscn`, `scripts/segments/creation.gd`, `scenes/segments/creation.tscn`, `playtest/_common.yaml` (surface whitelist + `clicks:` spec), `playtest/click_targeting_fixed.yaml`, `playtest/movement_range_highlight.yaml`, `tests/test_playtest_contract_smoke.py`.
 
 ---
 
 ## 1. Overview
 
-### 1.1 Goals (from the round brief, mapped to components)
+The battle already has one proven mouse path: `player._unhandled_input` (left button) → `_handle_click_targeting(event)` → `handle_world_click(world_pos)` → `GridManager.world_to_grid` → living-enemy match → `_try_attack_target`. The enemy `_input` relay converges on the same public `handle_world_click`. This round extends that single convergence point rather than creating a second mouse architecture:
 
-| # | Defect (SOTA) | Fix (component) |
+- `handle_world_click` gains a **fallback branch**: no enemy on the clicked tile → click-move to that tile (enemy-first resolution preserves `click_targeting_fixed`, clicking one's own tile is a no-op).
+- A **sibling right-button branch** in `_unhandled_input` implements undo; the harness drives it with the `clicks:` `right` token (real `InputEventMouseButton` events — no DEBUG action, no test-only path).
+- Movement **reuses `_try_move` byte-for-byte** as the single mutation path: a new pure path planner (`GridManager.plan_movement`) resolves the clicked tile into a cardinal step list under the exact `_try_move` cost model (walkable + unoccupied landing, 身轻如燕 swallow-lightness slide at cost 2), and a step queue executes it one `_try_move` call per step.
+- The turn-start snapshot (`turn_start_grid` / `turn_start_moves_left` / `turn_start_moved`) is written by `CombatManager.begin_turn` — the engine already owns the turn-start lifecycle and budget reset, so the snapshot lives there, next to the `moved`/`acted` resets.
+
+### 1.1 State machine: 试走 (trial) → 反悔 (undo) → 出手即锁定 (commit)
+
+| State | Entry | Exit |
 |---|---|---|
-| 1 | Click-targeting reads the cached pointer (`get_global_mouse_position()`), not the click event → mouse attack untestable/unusable | **C1** event-driven world-coordinate conversion in `player.gd` |
-| 2 | Creation screen buttons: no Back in TRAITS/ATTRS, no Next in ATTRS/TRAITS (keyboard-only) | **C2** four nav buttons delegating to existing handlers |
-| 3 | Skill descriptions exist but are invisible (tooltip-only) and the data is English (violates the archive's Chinese-UI hard rule) | **C5** visible `SkillDescLabel` + Chinese 文案 |
-| 4 | Trait descriptions do not exist in data | **C3** `description` field in `trait_data.gd` + `TraitDescLabel` |
-| 5 | Attribute descriptions do not exist in UI | **C4** static attr-description table + `AttrDescLabel` |
-| 6 | Battle button coverage: no End-Turn button, no attack-execution button (J/Space keyboard-only) | **C7** `EndTurnButton` + `AttackButton` in the HUD |
-| 7 | Movement-range highlight is a fresh gap (only selected-skill reach highlights) | **C6** `MoveRangeHighlight` node, BFS mirroring `_try_move` |
-| — | New observables + coverage for all of the above | **C8** `_common.yaml` surface append + 6 new scenario files |
+| **trial** | turn start (`begin_turn` snapshot) or after any move | undo, or commit |
+| **undo** | right-click while not committed | restores snapshot: `grid_pos = turn_start_grid`, `moves_left = turn_start_moves_left`, `moved = turn_start_moved` (animated via `GridManager.move_unit`) |
+| **commit** | `acted` becomes true (engine sets it only on successful execution) or turn ends | undo permanently refused this turn |
 
-### 1.2 Non-goals / protected invariants (do not touch)
+**Two rules, decided here and recorded for downstream:**
 
-- The **32 existing scenario files stay byte-identical**. `playtest/_common.yaml` is **append-only**
-  (surface entries + `scenario_order` entries only). New coverage = new scenario files.
-- `project.godot` is **not modified**: no new input actions, no new autoloads, no scene changes.
-  Buttons are driven by real mouse clicks (`pressed` signal) and the existing `click:`/`clicks:`
-  harness — no new debug actions are needed.
-- `move_*` actions stay movement-only in battle; `attack_confirm` (J), `end_turn` (Space) keyboard
-  paths are untouched. Buttons are additive delegates — "keyboard degrades to shortcuts".
-- No combat-engine, AI, balance, or data-value changes. `_try_move` stays the single authority for
-  movement rules; the movement highlight is a read-only mirror.
-- `terminal_victory_8_12_rounds_hp_15_40` stays red (difficulty contract); GDScript unit-suite
-  wiring, art rework, 穿越 演出, and `playtest_spec.yaml` monolith rebuild are all out of scope.
-- `playtest_spec.yaml` must NOT reappear at repo root (the `playtest/` directory is authoritative).
+- **Commit blocks UNDO, not movement.** `design/10_systems.md` §5.1 "移动与动作的先后不限" (move and act in any order) is a pinned rule, and `playtest/movement_range_highlight.yaml` explicitly pins `MoveRangeHighlight.visible == true` AFTER acting with `moves_left > 0` (the node's own comment forbids `acted` from entering the hide condition). Click-move after acting therefore stays allowed; only the undo affordance dies at commit. Reason: changing the order-unrestricted rule would break the pinned scenario and contradict the design doc — commit semantics are new, the movement rule is not.
+- **Commit condition is exactly `acted == true`** (player's own turn). The engine resets `acted = false` in `begin_turn`, so "acted became true since turn start" is simply `acted == true` while it is the player's turn. End-turn commits implicitly: after `end_current_turn` it is no longer the player's turn and the input gate already blocks all battle input.
 
-### 1.3 Architecture diagram (text)
+---
+
+## 2. Architecture Diagram (text)
 
 ```
-                    ┌────────────────────────── GameManager (autoload) ─────────────────────────┐
-                    │ states MENU / CHARACTER_CREATION / TUTORIAL / BATTLE / ...                │
-                    │ enter_menu() ── state_changed ──▶ SceneManager.swap_to("menu")            │
-                    └───────────────────────────────────────────────────────────────────────────┘
+                    Viewport input pipeline (_input → GUI focus nav → shortcut → _unhandled_input)
+                                                          │
+        ┌─────────────────────────────────────────────────┼───────────────────────────────┐
+        │ LEFT click (empty tile / enemy)                 │ RIGHT click                    │ enemy hit-surface relay
+        v                                                  v                                v
+player._unhandled_input ──_handle_click_targeting   player._unhandled_input ──right branch  enemy.gd._input
+        │                                                  │                                │
+        └──────────────────────┐                           └──── handle_world_right_click ──┘
+                               v                                                     │
+                    handle_world_click (single convergence point)                    │
+                               │                                                     │
+        world→grid: GridManager.world_to_grid(event-canvas-space position)           │
+                               │                                                     │
+              ┌────────────────┴────────────────────┐                                │
+              │ living enemy at tile? YES           │ NO: click_grid == grid_pos? no-op
+              v                                      v                                │
+   _try_attack_target (UNCHANGED, all gates)   _try_move_to(click_grid)               │
+                                                      │                               │
+                              GridManager.plan_movement(from, budget, slide_ok)       │
+                              (pure BFS — EXACT _try_move cost model, returns steps)  │
+                                                      │                               │
+                                              step queue ──> _try_move(dir) ×N        │
+                                              (single mutation path, budget/occupancy │
+                                               re-validated per step; tween per step)  │
+                                                      │                               v
+                                     _on_move_completed pops next step    committed (acted)?
+                                     ────────────────────────────────── NO ──> GridManager.move_unit
+                                     Player.undo_available (recomputed                 (self, grid_pos, turn_start_grid)
+                                       per frame in _process)                          + budget/moved refund
+                                                      │                        YES ──> hint 「已出手,无法退回」, no state change
+                                                      v
+                                  MoveRangeHighlight (polls player each frame):
+                                  reachable BFS (unchanged hide rules) + start_tile marker
+                                  + undo_available mirror (drawn/observable)
 
- InputEventMouseButton (harness `clicks:` or real mouse)
-        │
-        ▼
- ┌──────────────────────────┐        ┌──────────────────────────────────────────────────────────┐
- │ player.gd                │        │ HUD (CanvasLayer 10, persistent shell)                  │
- │ _unhandled_input         │        │  ├─ SkillBar: SkillButton1..12 (pressed→_on_skill_selected)│
- │   click →                 │        │  ├─ ActionHintLabel (rejection reasons, existing)        │
- │   _handle_click_targeting │        │  ├─ PauseButton (existing)                              │
- │   (event)                 │        │  ├─ EndTurnButton ──pressed──▶ HUD handler               │
- │   world =                 │        │  │        └─ gate(is_player_turn, !paused)               │
- │   canvas_transform⁻¹ ·    │        │  │           └─ CombatManager.end_current_turn()         │
- │   event.position          │        │  ├─ AttackButton ──pressed──▶ HUD handler                │
- │   → world_to_grid         │        │  │        └─ gate(…) └─ player._try_keyboard_attack()    │
- │   → enemy match           │        │  ├─ SkillDescLabel (selected skill.description)          │
- │   → _try_attack_target    │        │  └─ geometry observables (new_button_overlap etc.)      │
- └────────────┬─────────────┘        └──────────────────────────────────────────────────────────┘
-              │ (identical gates)
-              ▼
-        CombatManager.execute_action / end_current_turn        (engine — untouched)
+Engine side:
+CombatManager.begin_turn(unit) ──> budget reset (unchanged) ──> snapshot block:
+        unit.turn_start_grid = unit.grid_pos
+        unit.turn_start_moves_left = unit.moves_left   # AFTER next-turn restrictions
+        unit.turn_start_moved = unit.moved             # (guarded: fields exist only on Player)
 
- Battlefield (Node2D) world layer
-  ├─ RangeHighlight      (existing: skill reach, blue REACH / red TARGET; NEW: fill_color observable)
-  └─ MoveRangeHighlight  (NEW: movement reach, green; BFS mirroring player._try_move,
-                          reads player.grid_pos / moves_left / acted / traits / GridManager)
-
- CreationScreen (segment Control; creation.tscn direct-bootable)
-  ├─ MouseBox/AttrBox:   AttrMinus0..4 / AttrPlus0..4 (existing), AttrDescLabel (NEW),
-  │                      NavRow: AttrBackButton → GameManager.enter_menu() (NEW),
-  │                              AttrNextButton → _on_accept (NEW)
-  ├─ MouseBox/TraitBox:  TraitToggle0..12 (existing), TraitDescLabel (NEW, TraitData.description),
-  │                      NavRow: TraitBackButton → _on_move_left (NEW),
-  │                              TraitNextButton → _on_move_right (NEW)
-  └─ MouseBox/ConfirmBox: ConfirmButton / BackButton (existing, unchanged)
+Focus fix (static, per-scene):
+hud.tscn: PauseButton / EndTurnButton / AttackButton  += focus_mode = 0
+skill_button.tscn: root SkillButton (⇒ all SkillButton1..12 instances) += focus_mode = 0
+⇒ no battle Control can ever hold focus ⇒ ui_* focus navigation never consumes arrows ⇒
+  move_up/down/left/right reach _unhandled_input deterministically (the "intermittent" defect dies)
 ```
 
 ---
 
-## 2. Component list
+## 3. Component List
 
-### C1 — Click-targeting fix (`scripts/characters/player.gd` only)
+### 3.1 `scripts/characters/player.gd` — click-move + undo controller
 
-- **Responsibility:** make the world-click attack path driven by the click event's own coordinates
-  instead of the cached pointer position.
-- **Verified baseline:** `_unhandled_input` (L379-383) dispatches
-  `_handle_click_targeting()` with no argument; the method (L462-463) reads
-  `get_global_mouse_position()`. The unified input gate (L299-307: state == BATTLE,
-  `is_player_turn()`, not paused, not `is_moving`) already protects the path — keep it byte-identical.
-- **Change (two lines of code):**
-  1. `L382`: `_handle_click_targeting(event)` — pass the `InputEventMouseButton` that the
-     `elif` branch already narrowed.
-  2. `L463`: replace `var click_world: Vector2 = get_global_mouse_position()` with
-     `var click_world: Vector2 = get_canvas_transform().affine_inverse() * event.position`.
-- **Coordinate contract:** `event.position` is viewport-space. `get_canvas_transform()` on the
-  player node maps viewport → battlefield world. Today that transform is identity
-  (`main.tscn` has a Camera2D at (480,352) — viewport center — with no offset/zoom;
-  `battlefield.tscn` itself has none), so `event.position` equals world coordinates and existing
-  behavior for real mouse users is unchanged; the expression stays correct if a camera moves later.
-  `GridManager.world_to_grid` then maps world → grid cell, exactly as before.
-- **No other change:** enemy matching loop, `_try_attack_target` gates (acted / tutorial /
-  range / HP gate), auto-deselect — all untouched.
-- **Interface for C8:** a new scenario (`click_targeting_fixed.yaml`) must click an enemy node
-  and observe `Player.acted == true` + enemy health loss. This is the re-proof demanded by the
-  brief: the fixed path must be proven harness-drivable, not assumed.
+**Responsibility:** resolve world clicks into movement and undo on the player unit, without forking the movement rules.
 
-### C2 — Creation-screen navigation buttons (`scripts/segments/creation.gd` + `scenes/segments/creation.tscn`)
+**New state (playtest-surface observables):**
+```gdscript
+var turn_start_grid: Vector2i = Vector2i(-1, -1)   # engine-written at begin_turn; init in setup()
+var turn_start_moves_left: int = 0                  # AFTER next-turn restrictions
+var turn_start_moved: bool = false
+var undo_available: bool = false                    # recomputed EVERY frame in _process()
+var _pending_move_steps: Array[Vector2i] = []       # private step queue
+```
 
-- **Responsibility:** expose every keyboard-only step transition as a mouse button, delegating to
-  the SAME handlers the keyboard uses (convergence pattern, `_wire_mouse_widgets` L85-100).
-- **Verified phase semantics (handler reuse matrix):**
+`undo_available` is recomputed every frame (same pattern as `_refresh_sprite_clamp`), **never** event-written:
+```gdscript
+undo_available = (not acted) and (grid_pos != turn_start_grid or moves_left != turn_start_moves_left)
+```
+Per-frame recompute is the robust choice: `acted` is written externally by the engine on successful execution, and this formula can never go stale no matter who writes what.
 
-  | Phase | `_on_move_left` | `_on_move_right` | `_on_accept` |
-  |---|---|---|---|
-  | ATTRS | **decrements attr** (must NOT be Back) | increments attr | → TRAITS |
-  | TRAITS | → ATTRS (no trait mutation) | → CONFIRM | toggles trait |
-  | CONFIRM | → TRAITS | no-op | confirm+route |
+**Interface changes:**
 
-- **New nodes** (added to the `.tscn`; visibility is inherited from the parent box's existing
-  per-phase `visible` logic in `_render()`, but the per-leaf `visible` sync pattern must be
-  extended to them so node-level asserts hold):
-
-  | Node path | Handler | Label |
-  |---|---|---|
-  | `MouseBox/AttrBox/AttrNavRow/AttrBackButton` | NEW `_on_creation_back_to_menu()` | `返回菜单` |
-  | `MouseBox/AttrBox/AttrNavRow/AttrNextButton` | `_on_accept` (ATTRS → TRAITS) | `下一步` |
-  | `MouseBox/TraitBox/TraitNavRow/TraitBackButton` | `_on_move_left` (TRAITS → ATTRS, safe reuse) | `上一步` |
-  | `MouseBox/TraitBox/TraitNavRow/TraitNextButton` | `_on_move_right` (TRAITS → CONFIRM) | `下一步` |
-
-- **`_on_creation_back_to_menu()` (new, ~5 lines):**
-  `if confirmed or SceneManager.pending_swap: return` → `GameManager.enter_menu()`.
-  `enter_menu()` (game_manager.gd L254) is idempotent and unguarded; it emits
-  `state_changed("MENU")`, and SceneManager's `SCENE_MAP` swaps to the menu scene.
-  Do NOT reuse `_on_move_left` here — in ATTRS it decrements the focused attribute.
-- **`_wire_mouse_widgets()` additions:** connect the four buttons; extend the `pressed_connected`
-  snapshot with keys `AttrBackButton`, `AttrNextButton`, `TraitBackButton`, `TraitNextButton`
-  (same `get_signal_connection_list("pressed").size() > 0` pattern).
-- **Edge cases (from SOTA):** TRAITS Back must not mutate trait state (`_on_move_left` TRAITS arm
-  only changes phase — verified L129-132); the keyboard `move_left` in ATTRS stays
-  "decrement attr" (unchanged); `menu_to_creation_to_tutorial_order` stays keyboard-driven and
-  byte-identical because no keyboard handler is touched.
-- **Important boot caveat:** the back-to-menu walk must run under `main.tscn` (SceneManager needs
-  the persistent shell; a direct `creation.tscn` boot has no `/root/Main` hosts and would log
-  `host_missing`). The direct-boot scenario only exercises TRAITS/CONFIRM/ATTRS phase navigation.
-
-### C3 — Trait descriptions in data (`scripts/data/trait_data.gd`) + `TraitDescLabel`
-
-- **Responsibility:** add the authoritative 机制 文案 to the trait registry and render it.
-- **Data change:** add `var description: String = ""` to `TraitDef`; add a `"description"` key to
-  each of the 13 `TABLE` rows; copy it in `_build()`. Additive only — `all()` / `get_def()` /
-  `cost_of()` / `is_flaw()` / `positive_ids()` signatures unchanged, so
-  `tests/test_trait_data.gd` and every consumer keep working.
-- **文案 source (verbatim from `design/40_progression.md` §2.2 机制 column — the only allowed
-  source, no invented numbers):**
-
-  | id | display_name | description |
-  |---|---|---|
-  | ambidextrous | 左右互搏 | `技能栏可装 3 门外功(12 格),而不是 2 门 8 格` |
-  | self_taught | 无师自通 | `可以在前置不齐时直接学高一级功法(发挥度照旧按缺几门算,依然失常)` |
-  | gifted_bones | 骨骼清奇 | `可同时主修两门内功(常规只能一门)` |
-  | photographic_memory | 过目不忘 | `见过敌人用过的招式,可在无师门的情况下自学该门类的低级功法` |
-  | iron_shirt | 铁布衫 | `每场战斗第一次受到的致命伤转为剩 1 气血` |
-  | swallow_lightness | 身轻如燕 | `战斗中可穿过敌人所在格(不能停留其上)` |
-  | worldly_experience | 江湖阅历 | `大地图多一个行动:打听,揭示相邻节点的内容` |
-  | deep_fortune | 福缘深厚 | `游历事件每年可重掷一次` |
-  | sha_po_lang | 杀破狼 | `永远单人上阵,不能带同伴;同时领杀·破·狼三星` |
-  | old_wound | 旧伤 | `无法使用绝招(每门外功的第 4 招)` |
-  | inner_demon | 心魔 | `气血低于 30% 时,每回合有一次行动失控(随机移动,不攻击)` |
-  | lone_bane | 孤煞 | `门派只教你外功,不教内功;内功得另想办法` |
-  | dull_sinews | 筋骨迟钝 | `学不了轻功门类的任何功法` |
-
-- **UI:** new `Label` node `MouseBox/TraitBox/TraitDescLabel` (autowrap, `mouse_filter = 2`).
-  `_render()` sets `TraitDescLabel.text = _traits[trait_index].description` when TRAITS is active
-  (guard `trait_index` in range), and syncs its `visible` with the phase. Surface: `text`, `visible`.
-
-### C4 — Attribute descriptions (`scripts/segments/creation.gd`)
-
-- **Responsibility:** show what each attribute derives, from the authoritative formulas.
-- **Change:** a small `const` dictionary in `creation.gd` keyed by `PlayerProfile.ATTR_KEYS`,
-  plus a `_attr_desc(key)` accessor. **文案 from `design/40_progression.md` §7.1 formulas and
-  `design/10_systems.md` §1 meanings (verbatim formulas, no paraphrase):**
-
-  | key | label | description |
-  |---|---|---|
-  | bone | 根骨 | `气血 = 根骨 × 5` |
-  | inner | 内力 | `内力值 = 内力 × 2` |
-  | agility | 身法 | `移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法` |
-  | wisdom | 悟性 | `决定学功法的速度(修习查表)` |
-  | fortune | 福缘 | `影响事件与奇遇(游历事件可重掷)` |
-
-- **UI:** new `Label` node `MouseBox/AttrBox/AttrDescLabel` (autowrap, `mouse_filter = 2`).
-  `_render()` sets `AttrDescLabel.text = _attr_desc(ATTR_KEYS[attr_index])` in ATTRS phase and
-  syncs `visible`. Surface: `text`, `visible`.
-
-### C5 — Visible skill description in battle (`scripts/battlefield.gd` + `scripts/ui/hud.gd` + `scenes/ui/hud.tscn`)
-
-- **Responsibility:** make the selected skill's description readable without hovering (the
-  click-only harness cannot hover), and align the description DATA with the archive's Chinese-UI
-  hard rule (`design/30_presentation.md`: 界面文字一律中文; CJK font already global).
-- **Data alignment (declared change):** the `desc` arguments in
-  `battlefield.gd:_create_all_skill_data` are currently English (verified: e.g. "Ranged finger
-  strike that ignores damage reduction…"). They are data (only ever surfaced via tooltips, never
-  asserted), so switching them to Chinese breaks no scenario. The 8 player skills become the
-  exact 文案 below (numbers verbatim from `design/20_content.md` §1 — they ARE the contract, do
-  not paraphrase). Enemy-skill `desc` strings are switched to Chinese from the same tables
-  (`20_content.md` §2.1-2.5) for consistency; they are not asserted.
-
-  | skill (key unchanged) | Chinese description (visible text) |
-  |---|---|
-  | heavy_edge 重剑无锋 | `单体 45 伤害,击退 1 格。冷却 1 回合。` |
-  | grand_simplicity 大巧不工 | `直线 3 格 38 伤害。冷却 2 回合。` |
-  | thousand_force_cleave 力斩千钧 | `十字 2 格 34 伤害。冷却 3 回合。` |
-  | boundless_seas 绝招·四海无量 | `以自身为心,半径 2 格全体 70 伤害。冷却 6 回合。` |
-  | startle_heart 心惊肉跳 | `单体 38 伤害。冷却 1 回合。` |
-  | mud_drag 拖泥带水 | `单体 25 伤害,目标下一回合移动力 −2。冷却 2 回合。` |
-  | wander_valley 徘徊空谷 | `位移:跳 3 格,落点相邻全体 20 伤害。冷却 3 回合。` |
-  | seventeen_forms 绝招·黯然销魂十七式 | `相邻全体 70 伤害,击退 2 格。需气血低于 50%。冷却 8 回合。` |
-
-- **UI:** new `Label` node `SkillDescLabel` in `hud.tscn` (anchored top-right, below the new
-  button column: `offset_left -352 / offset_top 140 / offset_right -8 / offset_bottom 320`,
-  autowrap, `mouse_filter = 2`). It sits on HUD layer 10, below the tutorial panel's layer 100 —
-  satisfying the archive rule that HUD never draws ON the tutorial panel.
-  - Default text (no skill selected): `点击招式按钮,查看招式说明` — always visible, so the
-    "no introduction in battle" gap is closed even before a selection.
-  - `hud.gd:_on_skill_selected(index)`: after the existing `select_skill` call, re-read
-    `GameManager.get_player()` and set `SkillDescLabel.text` to `player.skills[index].description`
-    (guarded); if the same index is toggled off (`selected_skill_index < 0`), restore the default.
-  - `setup()` resets the label to the default text; `clear_battle_refs()` resets it too.
-  - Keep `tooltip_text = skill.description` in `skill_button.gd` (hover is a bonus, not the only path).
-
-### C6 — Movement-range highlight (new `scripts/ui/move_range_highlight.gd` + `scenes/battlefield.tscn`)
-
-- **Responsibility:** show every tile the player could still reach with the remaining movement
-  budget, using the exact `_try_move` rules. The displayed set must **equal** the executable set:
-  it must never suggest a move `_try_move` would refuse, **and it must never omit a move
-  `_try_move` would allow**. Over-showing and under-showing are both the interface lying about
-  the rules; under-showing is the more insidious one — the player just believes a tile is
-  unreachable and stops trying.
-- **Pattern reuse:** a sibling of `RangeHighlight` (`range_highlight.gd` — self-driving
-  `_process`, cheap-diff keys, `_hide()` as the only writer of `visible = false`, observables).
-  Node: `Battlefield/MoveRangeHighlight` (Node2D) with the new script, added to `battlefield.tscn`
-  next to `RangeHighlight`. Dies with the battlefield on scene swap — no teardown.
-- **Reachability model (BFS, display-only, mirrors `player.gd:_try_move` L391-439 exactly):**
+- `func _try_move(direction: Vector2i) -> bool` — signature changes `-> void` to `-> bool` (true = step accepted and tween scheduled). **All existing gates, cost bookkeeping and side effects byte-identical** — only the return value is new; existing callers (`_unhandled_input` movement arms) legally ignore it in GDScript, so the 37 keyboard-driven scenarios are untouched.
+- `func _try_move_to(target_grid: Vector2i) -> void` — new, private. Gates: `TutorialManager.is_input_allowed("move")` (else `action_hint.emit("教程尚未解锁")` — same literal the skill path uses), `moves_left > 0`, `target != grid_pos`, `GridManager.is_walkable(target)` (silent — clicking the border ring is not a meaningful rejection). Then `GridManager.plan_movement(grid_pos, moves_left, traits.has("swallow_lightness"))`; unreachable → `action_hint.emit("走不到那里")` and return. One step → plain `_try_move(step)`. Multiple → fill `_pending_move_steps`, pop-front the first and `_try_move` it.
+- `func _on_move_completed() -> void` — modified: if `_pending_move_steps` is non-empty, pop the next direction, `_try_move` it, and **return early if it succeeded** (next completion callback is already scheduled); on a failed step clear the queue. Otherwise fall through to the existing `is_moving = false` + grid-centre snap. This eliminates the stuck-`is_moving` deadlock if a planned step ever fails mid-queue.
+- `func handle_world_click(world_pos: Vector2) -> void` — modified, one append after the enemy-match loop (the loop and its `break` are untouched):
+  ```gdscript
+  if click_grid == grid_pos:
+      return                       # click on own tile: no-op
+  _try_move_to(click_grid)
   ```
-  budget   = player.moves_left
-  slide_ok = player.traits.has("swallow_lightness")
-  dist = {grid_pos: 0}; queue = [grid_pos]
-  while queue:
-      v = pop_front(); d = dist[v]
-      for dir in 4 directions:
-          nxt = v + dir
-          if GridManager.is_walkable(nxt) and not GridManager.is_occupied(nxt) and d+1 <= budget:
-              relax(nxt, d+1)                       # normal step, cost 1
-          elif slide_ok and GridManager.is_occupied(nxt) and d+2 <= budget:
-              beyond = nxt + dir
-              if GridManager.is_walkable(beyond) and not GridManager.is_occupied(beyond):
-                  relax(beyond, d+2)                # 身轻如燕 slide-through, cost 2
+  Enemy-first resolution is preserved: `click_targeting_fixed` (2/2 green) keeps its exact evidence chain. The enemy relay path can never reach the move branch (it only fires on enemy hit-surfaces, which always match an enemy).
+- `func handle_world_right_click(world_pos: Vector2) -> void` — new, **public** (mirrors the `handle_world_click` relay shape). Same 4-condition gate (state == BATTLE, `is_player_turn()`, not paused, not `is_moving`). Then: `if acted: action_hint.emit("已出手,无法退回"); return`. If already at turn start with full budget (`grid_pos == turn_start_grid and moves_left == turn_start_moves_left`): silent no-op (benign — nothing to undo). Otherwise restore: `moved = turn_start_moved`, `moves_left = turn_start_moves_left`, `is_moving = true`, `GridManager.move_unit(self, grid_pos, turn_start_grid)`, `grid_pos = turn_start_grid`, and schedule `_on_move_completed` after `MOVE_DURATION` (same tween pattern as `_try_move` — animated, not an instant snap; `move_unit` keeps occupancy consistent).
+- `_unhandled_input` — one new sibling branch (placed after the left-click branch):
+  ```gdscript
+  elif event is InputEventMouseButton \
+          and event.button_index == MOUSE_BUTTON_RIGHT \
+          and event.pressed:
+      handle_world_right_click(get_canvas_transform().affine_inverse() * event.position)
+      get_viewport().set_input_as_handled()
   ```
-  The origin tile is included (cost 0). The occupied slide-through tile itself is NOT in the set
-  (it is never a legal landing tile). Border ring is excluded by `is_walkable` automatically.
-- **Visibility rule:** show only while `GameManager.get_state() == BATTLE` **and**
-  `CombatManager.is_player_turn()` **and** `player.moves_left > 0` **and** the player is valid.
-  **`acted` is deliberately NOT a condition.** Design §5.1 makes move and action order-free
-  (≤ 移动力格 of movement + one action, either order), and `_try_move` (player.gd L391-400) gates
-  only on the tutorial `move` allowance and `moves_left <= 0` — it never reads `acted` (the only
-  two readers of `acted` in the file are the attack paths, L494/L537). A unit that has acted but
-  still has movement budget can still walk; hiding the highlight then would show the player a
-  board that says "you cannot move" while the engine accepts the move — the exact
-  interface-lies-about-the-rules defect this round exists to eliminate, in the over-conservative
-  direction. What governs movement is `moves_left`, so `moves_left > 0` is the only budget
-  condition. No tutorial gating: during TUTORIAL state `is_player_turn()` is false → hidden.
-- **Diff keys:** `grid_pos`, `moves_left`, `acted`, and an occupancy signature
-  (sorted join of `GridManager.occupancy.keys()`), mirroring the RangeHighlight cheap-diff so
-  `empty_round_stalls` can never be triggered by this node. Recompute → `queue_redraw()` only on
-  change. `acted` may stay in the diff-key set (it cannot change the reachable set, so it cannot
-  hurt), but it must never enter the visibility condition — see the visibility rule above.
-- **Colors (assertable distinctness — success criterion 5):**
-  - `MOVE_FILL = Color(0.35, 0.85, 0.30, 0.16)`, `MOVE_EDGE = Color(0.35, 0.85, 0.30, 0.45)`
-    (green family) — vs skill REACH blue (0.30,0.65,1.00) and TARGET red (1.00,0.30,0.20).
-  - Observables: `visible`, `tile_count`, `fill_color` (the FILL constant).
-- **Supporting change:** add `var fill_color: Color = REACH_FILL` to `range_highlight.gd`
-  (observable only — zero behavior change), so the new scenario can assert both colors and prove
-  inequality numerically (`green: g > r and g > b` vs `blue: b > r and b > g`).
+- `setup()` — initialise `turn_start_grid = grid_pos`, `turn_start_moves_left = moves_left`, `turn_start_moved = false` so the fields are sane before the first `begin_turn`.
 
-### C7 — Battle buttons: End Turn + Attack (`scenes/ui/hud.tscn` + `scripts/ui/hud.gd`)
+**New Chinese hint literals (grep-able acceptance points, consistent with the existing 7 reason texts):** `走不到那里` (unreachable tile), `已出手,无法退回` (undo refused after commit), `教程尚未解锁` (reused for tutorial-blocked click-move).
 
-- **Responsibility:** give every battle action a clickable button; keyboard stays a shortcut.
-  Skills already have buttons (SkillButton1..12); PauseButton exists. Missing: end turn, and the
-  J attack confirmation.
-- **New nodes in `hud.tscn` (authored, so they exist from scene parse — no programmatic
-  instantiation, no `SkillButton`-style naming work):** right column under PauseButton
-  (`anchor preset 3` — top-right; same width as Pause: `offset_left -140 / offset_right -8`):
+### 3.2 `scripts/autoload/combat_manager.gd` — turn-start snapshot (engine side)
 
-  | Node | Position (offsets) | Text | Wires to |
-  |---|---|---|---|
-  | `EndTurnButton` | top 52 / bottom 88 | `结束回合` | NEW `_on_end_turn_pressed` |
-  | `AttackButton` | top 96 / bottom 132 | `出招 (J)` | NEW `_on_attack_pressed` |
+**Responsibility:** own the snapshot in the same lifecycle that already owns budget reset. **No other engine behavior changes.**
 
-  Verified non-overlap: PauseButton y 8..44; RoundIndicator spans x 280..680; tutorial Panel
-  starts at y 152 and x ≤ 780. So y 52..132 at x 820..952 is clear of everything.
-- **Wiring in `hud.gd:setup()`** (idempotent: disconnect-first like `_wire_action_hint`), and a
-  `pressed_connected: Dictionary` snapshot `{"EndTurnButton": true, "AttackButton": true}` after
-  the connects (same proof-of-middle-chain pattern as `creation.gd`).
-- **Handlers (gates live here — `CombatManager.end_current_turn()` has NO internal turn gate;
-  `player._try_keyboard_attack()` expects the battle gate from its caller):**
-  ```
-  func _battle_input_allowed() -> bool:
-      return CombatManager.is_player_turn() and not CombatManager.get_is_paused()
-  func _on_end_turn_pressed():
-      if not _battle_input_allowed(): return
-      CombatManager.end_current_turn()                     # same engine call the Space key makes
-  func _on_attack_pressed():
-      if not _battle_input_allowed(): return
-      var player = GameManager.get_player()                # live lookup — never a stored ref
-      if player != null and is_instance_valid(player) and player.has_method("_try_keyboard_attack"):
-          player._try_keyboard_attack()                    # same call the J key makes
-  ```
-  `AttackButton` mirrors J exactly: fires the selected skill at the nearest valid target, or a
-  basic attack when none is selected (`_try_keyboard_attack`, player.gd L536). The label `出招 (J)`
-  also closes the documented gap "the J key is written nowhere on screen"
-  (design/30_presentation.md).
-- **Per-frame state:** in `hud.gd:_process` (BEFORE the existing `player == null` early-return,
-  next to `_update_geometry_observables`), set
-  `EndTurnButton.disabled = AttackButton.disabled = not _battle_input_allowed()`. A click on a
-  disabled button emits nothing — double protection; the visible disabled state also satisfies
-  the "current action must be visible" readability rule.
-- **Geometry observables (new, computed every frame in `_update_geometry_observables`):**
-  - `hud_button_overlap: bool` — EndTurnButton/AttackButton rects intersect any of
-    (PauseButton, RoundIndicator, SkillBar, ActionHintLabel).
-  - `hud_desc_overlap: bool` — SkillDescLabel rect intersects any of the above or the two new
-    buttons.
-  Both must be `false` whenever the HUD is visible; asserted in the new scenario and left on the
-  surface so any future button added on the HUD is guarded by an existing assert pattern.
+In `begin_turn(unit)` (line ~684), immediately after the existing budget-reset block (AFTER the `no_move_next_turn` / `move_minus_next_turn` restriction application so the snapshot records the effective budget), append:
+```gdscript
+if unit.is_player() and "turn_start_grid" in unit:
+    unit.turn_start_grid = unit.grid_pos
+    unit.turn_start_moves_left = unit.moves_left
+    unit.turn_start_moved = unit.moved
+```
+Guards keep it inert for enemies (which have neither the fields nor need them); `begin_turn` remains a no-op for enemy units apart from the existing lifecycle. `execute_action` is **not** touched — commit is *read* as `acted` by the player, never a second writer.
 
-### C8 — Playtest contract (append-only) + 6 new scenarios
+### 3.3 `scripts/autoload/grid_manager.gd` — pure movement planner
 
-- **`playtest/_common.yaml` additions** (append-only; the 32 scenario files untouched):
+**Responsibility:** one pure function that encodes the `_try_move` cost model, so path resolution and highlight reachability cannot drift apart.
 
-  ```yaml
-  surface:
-    RangeHighlight:
-    - visible
-    - tile_count
-    - target_count
-    - fill_color              # NEW (Color observable on the existing script)
-    MoveRangeHighlight:       # NEW node
-    - visible
-    - tile_count
-    - fill_color
-    HUD:
-    # (existing entries unchanged)
-    - pressed_connected       # NEW (Dictionary)
-    - hud_button_overlap      # NEW (bool)
-    - hud_desc_overlap        # NEW (bool)
-    EndTurnButton:            # NEW node
-    - visible
-    - size
-    - mouse_filter
-    - disabled
-    AttackButton:             # NEW node
-    - visible
-    - size
-    - mouse_filter
-    - disabled
-    SkillDescLabel:           # NEW node
-    - visible
-    - text
-    AttrBackButton:           # NEW node
-    - visible
-    - size
-    - mouse_filter
-    AttrNextButton:           # NEW node
-    - visible
-    - size
-    - mouse_filter
-    TraitBackButton:          # NEW node
-    - visible
-    - size
-    - mouse_filter
-    TraitNextButton:          # NEW node
-    - visible
-    - size
-    - mouse_filter
-    AttrDescLabel:            # NEW node
-    - visible
-    - text
-    TraitDescLabel:           # NEW node
-    - visible
-    - text
-  scenario_order:
-    # (existing 32 entries unchanged; append:)
-    - click_targeting_fixed
-    - creation_traits_back_next_buttons
-    - creation_back_to_menu_walk
-    - skill_description_visible
-    - movement_range_highlight
-    - battle_end_turn_attack_buttons
-  ```
+```gdscript
+## Pure planner: BFS/SPFA over the grid under the EXACT _try_move cost model.
+## from: origin tile. budget: movement points. slide_ok: 身轻如燕 enabled.
+## Returns { "dist": {tile: cost}, "steps": {tile: Array[Vector2i] of step directions} }.
+## Neighbor step cost 1 (walkable + unoccupied landing); slide-through of an
+## occupied tile costs 2 and lands on the walkable unoccupied tile beyond
+## (one direction entry encodes the whole 2-tile slide — _try_move executes it
+## natively). Landing tiles are never occupied; the origin is seeded at cost 0.
+func plan_movement(from: Vector2i, budget: int, slide_ok: bool) -> Dictionary
+```
+Reuses the existing relaxation pattern (`_relax`-style re-enqueue, needed because mixed 1/2 costs mean a later cheap path can beat an earlier expensive one). Grid is 15×11 with budget ≤ ~6 — performance is a non-issue.
 
-- **New scenario skeletons** (frame numbers and numeric thresholds marked PROBE are estimates to
-  be confirmed with a real run; behavioral asserts are fixed). `clicks:` is the harness key for
-  real `InputEventMouseButton` at the node's rect center.
+### 3.4 `scripts/ui/move_range_highlight.gd` — "trying" state
 
-  1. **`click_targeting_fixed.yaml`** — boots default (main.tscn). 7× `ui_accept` at f3..f15
-     (the proven battle-boot cadence), 3× `tutorial_next` at f20/f25/f30 to complete
-     WELCOME→MOVEMENT→ATTACK (`attack_confirm` becomes allowed; extra presses are no-ops once the
-     tutorial is inactive). `move_up` ×3 at f40/f55/f70 → player at (7,2), adjacent to
-     Central_Divine (7,1). `clicks: [Central_Divine]` at f100. Assert at f140:
-     `Player.acted == true`; `Central_Divine.health: health == max_health - 39` (PROBE —
-     basic attack 30 × fa_hui_du 1.3 → round → 39; Central has no damage reduction; verify via
-     probe, do not soften the assert to `changed` unless the probe proves the number wrong).
-     Click-point safety verified: Central's sprite center (480,96) is above the tutorial Panel
-     (y ≥ 152) and clear of HUD widgets (RoundIndicator ends y 72).
-  2. **`creation_traits_back_next_buttons.yaml`** — `scene: res://scenes/segments/creation.tscn`
-     (direct boot, proven at f30). Asserts at f30: `phase == "ATTRS"`;
-     `pressed_connected` true for all four new buttons; `AttrNextButton.visible/size.x > 0/mouse_filter == 0`;
-     `AttrBackButton.visible == true`; `TraitBackButton.visible == false`; `AttrDescLabel.visible`
-     and `AttrDescLabel.text: text.contains("气血") == true` (bone is focused at index 0).
-     Then: `clicks: [AttrNextButton]` f40 → f60 `phase == "TRAITS"`; `clicks: [TraitBackButton]`
-     f70 → f90 `phase == "ATTRS"` and `attrs["bone"] == 10` (proves the Back button mutated no
-     trait state); `clicks: [AttrNextButton]` f100 → f120 `phase == "TRAITS"` and
-     `TraitDescLabel.visible == true`, `TraitDescLabel.text: text.contains("技能栏") == true`
-     (trait 0 = 左右互搏); `clicks: [TraitNextButton]` f130 → f150 `phase == "CONFIRM"`;
-     `clicks: [BackButton]` f160 → f180 `phase == "TRAITS"`.
-  3. **`creation_back_to_menu_walk.yaml`** — boots default (main.tscn; the menu claims the boot).
-     Assert f30 `MenuPanel.visible == true`. `clicks: [MenuEntry0]` f40 → f100 (PROBE)
-     `GameManager.current_state == "CHARACTER_CREATION"` and `CreationScreen.visible == true`.
-     `clicks: [AttrBackButton]` f110 → f170 (PROBE) `GameManager.current_state == "MENU"` and
-     `MenuPanel.visible == true`. `clicks: [MenuEntry0]` f180 → f240 (PROBE)
-     `CreationScreen.visible == true`, `CreationScreen.phase == "ATTRS"`,
-     `CreationScreen.points_left == 30` (fresh state — the 进入→返回→再进入 walk).
-     Must NOT disturb `menu_to_creation_to_tutorial_order` (keyboard-driven, byte-identical files).
-  4. **`skill_description_visible.yaml`** — 7× `ui_accept` f3..f15. Assert f30:
-     `SkillDescLabel.visible == true`; `SkillDescLabel.text: text != "" and text.contains("点击") == true`
-     (default guidance). `skill_1` f35 → f50: `SkillDescLabel.text: text.contains("击退") == true`
-     (heavy_edge 文案) and `text.contains("点击") == false`. `skill_1` again f55 (toggle-off) →
-     f70: default text restored (`text.contains("点击") == true`).
-  5. **`movement_range_highlight.yaml`** — 7× `ui_accept` f3..f15; then 3× `tutorial_next`
-     f20/f25/f30 so `attack_confirm` is allowed (needed by the act-then-look segment below).
-     Assert f35 (round 1, player turn, moves_left 4): `MoveRangeHighlight.visible == true`;
-     `tile_count > 0` (PROBE: expect 40 — the |dx|+|dy| ≤ 4 diamond from (7,5) lies fully inside
-     the border ring and loses only the occupied (7,1));
-     `MoveRangeHighlight.fill_color: fill_color.g > fill_color.r and fill_color.g > fill_color.b`
-     (green-dominant); `RangeHighlight.fill_color: fill_color.b > fill_color.r and fill_color.b > fill_color.g`
-     (blue-dominant) — together the color-distinctness proof. `move_up` ×3 f40/f55/f70 → f85
-     `Player.moves_left == 1` and `MoveRangeHighlight.tile_count: changed`. **Act without
-     moving:** `skill_1` f90, `attack_confirm` f95 (heavy_edge from (7,2) hits the adjacent
-     Central_Divine at (7,1)) → f110 **the regression assert for this rule**:
-     `Player.acted == true` **and** `Player.moves_left == 1` **and**
-     `MoveRangeHighlight.visible == true` **and** `tile_count > 0` — the highlight must stay
-     visible after acting, because an action does NOT spend the movement budget (design §5.1:
-     move and action are order-free; `_try_move` never reads `acted`). This is the pin for the
-     reviewer-flagged rule: a run that hides the highlight on `acted` fails here.
-     `end_turn` f140 → f240 (PROBE) `MoveRangeHighlight.visible == false` and `tile_count == 0`
-     (enemy turn). Optionally at ~f1500 (PROBE) round changed and highlight visible again on the
-     next player turn.
-  6. **`battle_end_turn_attack_buttons.yaml`** — 7× `ui_accept` f3..f15; 3× `tutorial_next`
-     f20/f25/f30. Assert f35: `EndTurnButton.visible == true`, `size.x > 0`,
-     `mouse_filter == 0`, `disabled == false`; `AttackButton` same; `HUD.pressed_connected`
-     both true; `HUD.hud_button_overlap == false`; `HUD.hud_desc_overlap == false`.
-     `clicks: [EndTurnButton]` f40 → f120 (PROBE) `CombatManager.active_unit_name: active_unit_name != "Player"`
-     and `EndTurnButton.disabled == true` (enemy turn). At ~f1500 (PROBE) `current_round: changed`
-     and `EndTurnButton.disabled == false` (player turn again). `move_up` ×3 at f1560/f1575/f1590
-     (PROBE) → `clicks: [AttackButton]` f1660 → f1750: `Player.acted == true`
-     (target-agnostic — the button attacks the NEAREST valid target, like J; if a specific enemy
-     is adjacent in the probe run, add `X.health == max_health - <n>` with the probed value).
+**Responsibility:** show where right-click returns to and whether undo is available, on top of the existing reachable-set overlay.
+
+**Changes (additive only — the pinned `movement_range_highlight` scenario asserts `visible` / `tile_count` / `fill_color`, none of which change semantics):**
+
+- New observables: `var start_tile: Vector2i = Vector2i(-1, -1)`, `var undo_available: bool = false`. Polled every frame from `player.turn_start_grid` / `player.undo_available` in `_process` (before the diff early-return), and `start_tile` is added to the cheap-diff key set so the marker redraws when it changes.
+- New draw constant `START_EDGE` (a bright amber-green edge, distinct from `MOVE_FILL`/`MOVE_EDGE` and from `RangeHighlight`'s blue/red) and in `_draw()` an edge-only marker rect on `start_tile`.
+- **The visibility/hide condition is UNCHANGED.** `acted` must NOT enter the hide condition (documented in the file, pinned by `movement_range_highlight.yaml`, and required by the "commit blocks undo, not movement" rule of §1.1). The commit state is expressed through `undo_available` flipping false — never by hiding the reachable set.
+- Optional (guarded) refactor: `_recompute` may switch to `GridManager.plan_movement` (throwing away its private BFS) **only if** `movement_range_highlight` stays byte-green; otherwise keep the private BFS and the planner coexists. Flag any deviation in the delivery notes.
+
+### 3.5 Battle focus-mode sweep — `scenes/ui/hud.tscn`, `scenes/ui/skill_button.tscn`
+
+**Responsibility:** make "no battle Control ever holds focus" a static, per-scene property.
+
+- `./scenes/ui/hud.tscn`: add `focus_mode = 0` to `PauseButton`, `EndTurnButton`, `AttackButton` (the three buttons that currently default to FOCUS_ALL).
+- `./scenes/ui/skill_button.tscn`: add `focus_mode = 0` to the root `SkillButton` node — covers all SkillButton1..12 instances in one edit.
+- Sweep check (same task): any other `Button` in battle-visible UI (e.g. `scenes/ui/tutorial_overlay.tscn` if it has clickables) gets the same line, per the changelog implementation rule "新增可点控件一律显式设 focus_mode = 0". Do NOT touch creation/menu/settings scenes (already correct, 29 sites).
+
+**Why static per-scene instead of code:** the defect is a scene-authoring property (a Control with default focus mode); fixing it in `.tscn` is diff-visible, matches the 29-site precedent, and the new scenario asserts the result numerically via the `focus_mode` observable.
+
+### 3.6 Creation screen single-UI — `scenes/segments/creation.tscn`, `scripts/segments/creation.gd`
+
+**Responsibility:** collapse the two parallel operation surfaces (keyboard `▶` cursor text model in `BodyLabel` vs `MouseBox` buttons) into one: **buttons are the single visible interaction surface; keyboard remains a working shortcut layer.**
+
+**`./scenes/segments/creation.tscn`:**
+- **Remove the `BodyLabel` node** (the `▶` cursor text surface — the "second UI" the user reported). No scenario asserts on it (it is not in the `surface:` whitelist — verified).
+- **Add `PointsLabel`** (a `Label`, top area, e.g. centred above `MouseBox`): displays `剩余点数 N`. This carries the points display that used to live inside `BodyLabel`.
+- Keep `HintLabel` (new text, below) and **every `MouseBox/...` node name, path and `focus_mode = 0` line byte-identical** (pinned scenarios `creation_traits_back_next_buttons`, `creation_back_to_menu_walk`, `creation_mouse_interaction` depend on node names/paths).
+
+**`./scripts/segments/creation.gd`:**
+- `_render()`: delete the `BodyLabel` text-building (all three phases); add `PointsLabel.text = "剩余点数 %d" % points_left`; keep every existing `MouseBox` per-phase visibility/text update as-is.
+- **Focused-row visual**: in `_render()`, set `modulate` on the focused `AttrRow{i}` (ATTRS) / `TraitToggle{i}` (TRAITS) — focused row `Color(1,1,1,1)`, others `Color(0.72,0.72,0.72,1)`. `attr_index` / `trait_index` thus remain *visible* on the single button surface (they drive which row minus/plus acts on), instead of living in a duplicated text list. No new nodes, no new button names.
+- `HintLabel.text` per phase, accurate to the real controls and **without the stale 「右键确认」 promise** (the TRAITS right-click hint promised a handler that never existed — SOTA flags it as a candidate; it dies with the BodyLabel text): ATTRS → `点击 ± 调整属性 · 回车下一步`; TRAITS → `点击切换特质 · 回车进入确认`; CONFIRM → `点击确认踏上江湖 · 回车确认`. (Exact wording is implementer-fine-tunable; the hard requirement is: no right-click promise, no "两个界面".)
+- **`_unhandled_input`, `_process` (debug action), `_wire_mouse_widgets` and every handler stay byte-identical** — keyboard keeps working as a pure shortcut with the exact semantics pinned by `creation_budget_clamp_and_traits` (11/11) and `menu_to_creation_to_tutorial_order` (19/19). Arrow keys no longer "move a cursor list" because the cursor list is gone; they move row focus on the button surface.
+
+### 3.7 Playtest contract — `playtest/_common.yaml` + 5 new scenario files + `tests/test_playtest_contract_smoke.py`
+
+**Contract shape statement (for PM & implementer):**
+- `scene:` default stays `res://scenes/main.tscn`; the creation scenario overrides with `scene: res://scenes/segments/creation.tscn` (proven direct-boot pattern).
+- `actions:` list is **UNCHANGED** — no new input actions, no new DEBUG actions. Right-click is driven exclusively by `clicks:` entries with the `right` token (`"<Node>[ +dx,dy][ left|right|middle]"`), which post real `InputEventMouseButton` events through the real `_unhandled_input` branch.
+- `surface:` additions are **append-only, surgical** (never a file rewrite — the previous round's whole-file-rewrite audit is the standing warning):
+
+```yaml
+  Player:                    # append to existing block
+  - turn_start_grid
+  - turn_start_moves_left
+  - turn_start_moved
+  - undo_available
+  MoveRangeHighlight:        # append to existing block
+  - start_tile
+  - undo_available
+  EndTurnButton:             # append
+  - focus_mode
+  AttackButton:              # append
+  - focus_mode
+  PauseButton:               # append
+  - focus_mode
+  SkillButton1:              # append (representative: all 12 share the instanced scene)
+  - focus_mode
+  PointsLabel:               # new block
+  - visible
+  - text
+```
+
+**Scenario skeletons** (frames are placeholders for PM calibration; each ≤ 2999; battle preamble = 7× `ui_accept` f3..15 + `tutorial_next` f20/25/30, input live ~f35 — measured shape of the existing battle scenarios; every click needs ~15–30 frames after it before asserting, each walk step ≈ 9 frames (0.15 s tween) — leave 50+ frames after multi-step clicks):
+
+1. `battle_focus_arrow_keys` (focus-mode proof) — main.tscn, battle preamble. Assert the **static contract** `EndTurnButton.focus_mode == 0`, `AttackButton.focus_mode == 0`, `SkillButton1.focus_mode == 0`, `PauseButton.focus_mode == 0`. Then the behavioral differential: `clicks: [AttackButton]` (click focuses a button; its gate-guarded handler emits 「射程不够」 and does NOT end the turn), then `actions: [move_up]`, then assert `Player.grid_pos: changed` (the hard differential rule — arrow still reaches `_unhandled_input` after a button click). Note in the file: the static `focus_mode == 0` asserts are the direct proof of the fix and cannot be vacuous even if the harness synthesizes actions rather than raw keys; the `grid_pos: changed` differential is the end-to-end behavior proof.
+2. `click_move_to_tile` (click-move) — main.tscn, battle preamble (player (7,5), moves 4). `clicks: [Player +64,0]` → assert `Player.debug_click_events: changed` (click arrived), `Player.grid_pos == Vector2i(8,5)`, `Player.moves_left == 3`, `Player.moved == true`, `Player.undo_available == true`, `MoveRangeHighlight.start_tile == Vector2i(7,5)`. Then multi-step: `clicks: [Player +0,-192]` (offset is re-anchored to the player's NEW centre → tile (8,2), 3 steps) → assert `Player.grid_pos == Vector2i(8,2)`, `Player.moves_left == 0`. Then no-op control: `clicks: [Player +0,0]` → assert `Player.grid_pos: changed == false`-style differential (grid_pos still (8,2), moves_left still 0 — clicking one's own tile is a no-op; use the `changed` comparator or explicit `==`).
+3. `click_move_undo_right` (undo) — main.tscn, preamble. Control probe first: `clicks: [Player +0,0 right]` with nothing moved → assert `Player.grid_pos == Vector2i(7,5)` and `Player.moves_left == 4` (harmless no-op). Then `clicks: [Player +0,-192]` (walk (7,5)→(7,2), budget 1) → assert `grid_pos == Vector2i(7,2)`, `moves_left == 1`, `undo_available == true`. Then `clicks: [Player +0,0 right]` → assert `Player.grid_pos == Vector2i(7,5)`, `Player.moves_left == 4`, `Player.moved == false`, `Player.undo_available == false` (full restore — this is the differential proof that the `right` token truly selects the right button, mirrored by the measured left-vs-right contrast from SOTA).
+4. `click_move_commit_lock` (commit) — main.tscn, preamble. `clicks: [Player +0,-192]` → (7,2) adjacent to Central_Divine (7,1), budget 1. Then `clicks: [Central_Divine_ClickTarget]` → basic attack, assert `Player.acted == true`, `Central_Divine.health == max_health - 39` (PROBE number — recalibrate to observed, same convention as `click_targeting_fixed`). Then `clicks: [Player +0,0 right]` → assert `Player.grid_pos == Vector2i(7,2)` (NOT (7,5) — undo refused), `Player.moves_left == 1`, `Player.undo_available == false`.
+5. `creation_single_ui` (creation single surface) — `scene: res://scenes/segments/creation.tscn` direct boot. Assert at ~f30: `CreationScreen.visible == true`, `CreationScreen.phase == "ATTRS"`, `PointsLabel.visible == true`, `PointsLabel.text.contains("剩余点数") == true` (the `.contains() … == true` operator rule), `AttrPlus0.visible == true`, `TraitToggle0.visible == false` (phase-scoped single surface), `CreationScreen.pressed_connected.size() > 0` (wiring intact). Then keyboard-shortcut regression pins: `actions: [move_right]` → assert `CreationScreen.attrs.bone == 11` and `CreationScreen.points_left == 29`; `actions: [move_left]` → back to `10` / `30`. The "cursor text is gone" half of the acceptance is covered by the `BodyLabel`-removed `.tscn` diff + the vision gate (a screenshot must show ONE interaction surface); `BodyLabel` absence is intentionally not runtime-asserted because it was never a whitelisted node.
+
+**`tests/test_playtest_contract_smoke.py`:**
+- `ROUND_SCENARIOS` becomes the 5 new names **in this exact order**: `battle_focus_arrow_keys`, `click_move_to_tile`, `click_move_undo_right`, `click_move_commit_lock`, `creation_single_ui`.
+- Append the same 5 names to `scenario_order:` in `_common.yaml` (same order — the pytest asserts `indices == sorted(indices)`).
+- Add `test_click_move_surface_contract()`: assert `Player` block contains `turn_start_grid`, `turn_start_moves_left`, `undo_available`; `MoveRangeHighlight` block contains `start_tile`, `undo_available`. Extend the clicks-owner check for the new scenarios: parse each new scenario's `clicks:` items, take the **first whitespace-separated token** as the node name (offset spec strings like `Player +64,0`), strip a trailing `_ClickTarget`, and assert the owner is a whitelisted surface block (`Player`, `Central_Divine`, `AttackButton`). Reuses the existing `_items_under` helper; standard library only.
 
 ---
 
-## 3. Interface contract (implementation-ready summary)
+## 4. Interface / Data-Flow Summary (for PM decomposition)
 
-| File | Change | Interface |
+| # | Producer → Consumer | Contract |
 |---|---|---|
-| `scripts/characters/player.gd` | edit | `_handle_click_targeting(event: InputEventMouseButton)`; world = `get_canvas_transform().affine_inverse() * event.position` |
-| `scripts/segments/creation.gd` | edit | +`_on_creation_back_to_menu()`, +`_attr_desc(key)`, +`_ATTR_DESCS` const; wire/snapshot 4 new buttons; `_render()` updates `AttrDescLabel`/`TraitDescLabel` |
-| `scenes/segments/creation.tscn` | edit | +`AttrNavRow(AttrBackButton, AttrNextButton)`, +`TraitNavRow(TraitBackButton, TraitNextButton)`, +`AttrDescLabel`, +`TraitDescLabel` |
-| `scripts/data/trait_data.gd` | edit | `TraitDef.description: String`; TABLE rows + `_build()` copy |
-| `scripts/battlefield.gd` | edit | `desc` args of all skills → Chinese 文案 from `design/20_content.md` (8 player skills exact strings in §C5) |
-| `scenes/ui/hud.tscn` | edit | +`EndTurnButton` (y 52..88), +`AttackButton` (y 96..132), +`SkillDescLabel` (y 140..320) — all top-right column x 820..952 (label x 608..952) |
-| `scripts/ui/hud.gd` | edit | +`_battle_input_allowed()`, +`_on_end_turn_pressed()`, +`_on_attack_pressed()`, +`pressed_connected` snapshot, +desc-label update in `_on_skill_selected`/`setup`/`clear_battle_refs`, +`disabled` refresh in `_process`, +2 geometry observables |
-| `scripts/ui/range_highlight.gd` | edit | +`var fill_color: Color = REACH_FILL` (observable only) |
-| `scripts/ui/move_range_highlight.gd` | NEW | Node2D; BFS per §C6; observables `visible`/`tile_count`/`fill_color`; cheap-diff keys |
-| `scenes/battlefield.tscn` | edit | +`MoveRangeHighlight` node (sibling of `RangeHighlight`) |
-| `playtest/_common.yaml` | append-only | surface + scenario_order per §C8 |
-| `playtest/<6 new files>` | NEW | per §C8 skeletons |
-
-Data flow summary: mouse/button input → Button `pressed` → existing handler → existing engine API
-(single source of truth); the only new engine-adjacent paths are the two HUD button handlers,
-both thin delegates with a turn/pause gate. All new per-frame code (`MoveRangeHighlight`,
-HUD geometry/disabled refresh) is read-only observation.
+| 1 | `CombatManager.begin_turn` → `Player` | writes `turn_start_grid` / `turn_start_moves_left` / `turn_start_moved` after budget reset; guarded by `unit.is_player() and "turn_start_grid" in unit` |
+| 2 | `player._unhandled_input` / `enemy._input` relay → `handle_world_click(world_pos)` | unchanged signature; new fallback: enemy miss → `_try_move_to(click_grid)` |
+| 3 | `_unhandled_input` right branch → `handle_world_right_click(world_pos)` | public, same gate set as `handle_world_click` |
+| 4 | `GridManager.plan_movement(from, budget, slide_ok) -> {dist, steps}` | pure; `steps[tile]` = directions, one entry per `_try_move` call (slide = 1 entry) |
+| 5 | `_try_move(direction) -> bool` | single mutation path; semantics byte-identical, return value new |
+| 6 | `Player` (per-frame `undo_available`) → `MoveRangeHighlight` | polled, plus `turn_start_grid` → `start_tile` |
+| 7 | Scenario files → harness | `clicks:` spec strings with `right` token; surface whitelist gate |
+| 8 | `_common.yaml` surface → pytest | append-only; new blocks/items above |
 
 ---
 
-## 4. Tech stack
+## 5. Tech Stack
 
-- **Godot 4.7** (in use, `config/features=PackedStringArray("4.7")`), **GDScript**, built-in
-  `Button` / `Label` / `Node2D._draw()` / existing autoloads. **Zero new dependencies, zero new
-  autoloads, zero new input actions, no new assets or fonts.** This keeps the 32-scenario
-  contract and the headless gate intact.
-- Reused repo-proven machinery: Button+`pressed` convergence (creation/menu/settings panels),
-  `pressed_connected` snapshot, RangeHighlight cheap-diff highlight pattern, `get_canvas_transform()`
-  coordinate conversion, per-scenario `scene:` direct boot, `clicks:` harness.
+- **Godot 4.4 / GDScript + `.tscn` text scenes** — no new third-party dependencies, no new assets, no new autoloads. Everything is an edit to existing scripts/scenes or a new pure function.
+- **Harness features used:** `clicks:` real mouse events (left/right + node-relative offsets) — already shipped and measured (SOTA f31cbc2 / doc 50b9c8f); no new harness work.
+- **Python side:** standard-library-only `pytest` contract smoke (`ruff`-linted).
+- **Linting:** GDScript via the `gdscript_check`/compile gate (not in the manifest); `ruff` for `.py`; `basic` for `.yaml`/`.json`/`.md` (see `linter_manifest.json`).
 
-## 5. Extension considerations (deliberately minimal)
+## 6. Extensibility Considerations
 
-- `TraitDef.description` is a plain data field — future screens (companion cards, event UI) read
-  the same rows; no new table needed.
-- `MoveRangeHighlight` mirrors `_try_move`; if movement rules grow (e.g. hazards), the BFS gains
-  the same arm `_try_move` gains — keep them adjacent in review.
-- The two HUD button handlers are the single place future "clickable battle verbs" (wait,
-  cancel-selection) plug in: add a Button + a gate-guarded delegate.
-- No new abstraction layers were introduced — the design intentionally reuses existing patterns
-  instead of generalizing them.
+- `GridManager.plan_movement` is unit-agnostic and budget/slide-aware; future AI movement (enemies currently use the static `find_path` A*) can adopt it without touching the player.
+- The snapshot/commit state machine generalises to all units via the `"turn_start_grid" in unit` guard pattern — the engine already writes per-unit turn state.
+- `MoveRangeHighlight`'s observables pattern (`start_tile` / `undo_available`) is the template for any future "pending choice" visual (e.g., jump-landing preview) — poll + cheap-diff keys, no signals required.
+- The `clicks:` offset addressing needs **zero production per-tile nodes** — scenarios address tiles as offsets from live nodes; production code must NOT grow per-tile click targets this round (SOTA constraint).
+- Deliberately NOT built: a separate click-to-move hit-surface Control (measured broken in this codebase — GUI picker never routes to Controls under Node2D ancestors), and no new DEBUG action for undo (the harness's real-mouse `right` token supersedes it; a test-only path is the debt shape this round explicitly avoids).
 
-## 6. Migration / rollback plan (no destructive operations exist, but the protocol is followed)
+## 7. Design-Change Declaration (for the 5_design archive step)
 
-1. **Snapshot first:** commit the current tree as a baseline (git) before any edit.
-2. **Execute** in dependency order C1 → C3/C4 → C2 → C5 → C7 → C6 → C8 (see §7).
-3. **Validate before declaring done:**
-   - Whole-repo GDScript parse gate (sidecar `/compile`) green.
-   - Existing playtest run: the 32 files are byte-identical; compare failures against the
-     baseline snapshot — **zero new failures** allowed (the documented baseline reds like
-     `terminal_victory` 5/6 stay exactly as they are).
-   - The 6 new scenarios green; the two click scenarios specifically must show observed values
-     (damage number, frame numbers) in the delivery notes — asserts must not be relaxed to pass.
-   - `_common.yaml` diff is append-only (surface entries + scenario_order tail only).
-   - `ui_geometry_readability` stays green (new HUD widgets proven non-overlapping by the new
-     `hud_button_overlap`/`hud_desc_overlap` observables + the existing asserts).
-4. **Rollback path:** every change is an additive/line edit to git-tracked text files; revert the
-   touched file set (`git revert`/checkout of the baseline) restores the previous state exactly.
-   Nothing is deleted, renamed, or rewritten in bulk anywhere in this design.
+**No new design changes are introduced.** This round realises the already-recorded 2026-08-25 decisions in `design/99_changelog.md` rows 66–69 (click-driven movement, trial→undo→commit, focus_mode discipline, creation single-primary-interaction). Two decisions made in THIS document and worth recording downstream:
 
-## 7. Suggested task decomposition (for PM, 8 tasks)
+1. **Commit blocks undo, not movement** — `10_systems.md` §5.1 (order-free move+act) and the `movement_range_highlight` pin stay authoritative.
+2. **Creation keyboard input survives as a shortcut layer** acting on the button surface (row focus + ± / toggle / accept), never a second rendered list.
 
-| Task | Components | Depends on |
-|---|---|---|
-| T1 | C1 click fix + `click_targeting_fixed.yaml` (probe) | — |
-| T2 | C3 trait data + C4 attr desc + labels in creation (tscn+gd) | — |
-| T3 | C2 creation nav buttons + `creation_traits_back_next_buttons.yaml` / `creation_back_to_menu_walk.yaml` | T2 |
-| T4 | C5 skill 文案 + SkillDescLabel + `skill_description_visible.yaml` | — |
-| T5 | C7 battle buttons + geometry observables + `battle_end_turn_attack_buttons.yaml` | T4 (same files) |
-| T6 | C6 MoveRangeHighlight + RangeHighlight.fill_color + `movement_range_highlight.yaml` | — |
-| T7 | C8 `_common.yaml` append + scenario_order (can be authored incrementally per scenario) | T1..T6 |
-| T8 | Integration: full-suite regression vs baseline, compile gate, geometry re-check, delivery notes with observed values | all |
+Post-run archive sync candidates for `5_design` (not done here): `30_presentation.md` 输入映射 table (click-primary movement, right-click undo, arrow keys as shortcut), the creation-screen description (single button surface), and a §5.1 note for the trial/undo/commit state machine.
 
-## 8. Design decisions log (rationale for PM/implementer)
+## 8. Safety / Rollback Discipline (irreversible-op rule)
 
-- **D1 (C1):** use the event, not the pointer cache. The harness cannot move a real pointer; the
-  event carries the truth. `get_canvas_transform().affine_inverse()` is identity today
-  (`main.tscn` has a centered Camera2D with zero offset) and correct if a camera ever moves.
-- **D2 (C2):** ATTRS Back must be a NEW handler — `_on_move_left` in ATTRS decrements an
-  attribute, so reusing it for "back to menu" would silently eat a point on every back-press.
-- **D3 (C2):** TRAITS Back/TRAITS Next reuse `_on_move_left`/`_on_move_right` (safe arms),
-  ATTRS Next reuses `_on_accept` — maximal convergence with keyboard, minimal new logic.
-- **D4 (C7):** gates live in the HUD handler because `CombatManager.end_current_turn()` has no
-  turn gate and the player's `_unhandled_input` gate is on the keyboard path. Clicking End Turn
-  during ENEMY_TURN or pause is a silent no-op, mirroring the keyboard behavior exactly.
-- **D5 (C7):** `AttackButton` = J, not "basic attack only": `_try_keyboard_attack` fires the
-  selected skill or falls back to basic attack. Label `出招 (J)` advertises the key.
-- **D6 (C6):** BFS mirrors `_try_move` bit-for-bit (walkable, unoccupied landing, 身轻如燕
-  slide cost 2 with budget ≥ 2); the displayed set equals the executable set — it must neither
-  suggest a move `_try_move` would refuse, nor omit a move `_try_move` would allow.
-- **D7 (C6):** movement-highlight visibility is governed by `moves_left > 0` (plus BATTLE state
-  and player turn), NOT by `acted`. Design §5.1 makes move and action order-free and `_try_move`
-  never reads `acted`; hiding the highlight after acting would show the player a board that says
-  "cannot move" while the engine accepts the move — an over-conservative lie. `acted` stays in
-  the diff-key set only.
-- **D8 (C6):** green/blue color distinctness is asserted numerically via `fill_color` observables
-  on both highlight nodes ("just visible" proves nothing).
-- **D9 (C5):** the description label is always visible (default guidance → selected skill's
-  description); tooltips remain as a secondary path.
-- **D10 (C5):** switching skill `desc` data from English to Chinese is code aligning with the
-  archive hard rule (`design/30_presentation.md` 界面文字一律中文, CJK font bundled), not an
-  archive change — declared here so no later run "fixes" it back to English.
-- **D11 (C7):** new HUD widgets are placed in the top-right column (y 52..132 for buttons,
-  y 140..320 for the label) — verified clear of PauseButton (y ≤ 44), RoundIndicator (x ≤ 680),
-  SkillBar (y ≥ 648), ActionHintLabel (y ≥ 618), and the tutorial Panel (y ≥ 152, x ≤ 780); the
-  two new geometry observables make this a running assert instead of a one-time measurement.
-- **D12 (C2):** the back-to-menu walk boots `main.tscn` (SceneManager needs the persistent
-  shell); the direct-boot scenario covers phase navigation only.
-- **D13 (C5):** description text appends `冷却 N 回合` from each skill's own cooldown field
-  (data from `design/20_content.md`'s 冷却 column) — never invented numbers.
-- **D14 (language note):** in-game UI strings are Chinese per the project archive
-  (`design/30_presentation.md` hard requirement + bundled CJK font); node names, signal names,
-  action names, skill ids, and all code identifiers stay English. Design-doc prose is English.
+No database, no generated data, no bulk rewrites — but the contract files carry the historical risk, so:
 
-## Appendix — Verified baseline (file:line references, 2026-08-24)
+- **`_common.yaml` edits are append-only surgical edits**; the 38 existing scenario files must remain **byte-identical** (the previous round's measured acceptance criterion — `git diff --stat` must touch only `_common.yaml`, the 5 new files, and the pytest file).
+- **`creation.tscn` node removal** (BodyLabel) is a text-file edit; verify by direct-boot + `creation_single_ui` + the two pinned creation scenarios (which never referenced BodyLabel). Rollback = git revert of one file.
+- **`_try_move` return-type change** is verified by the 37 keyboard-driven scenarios staying green — that is the rollback gate for the single mutation path.
+- **Execution order for the gates**: (1) `pytest` contract smoke locally (millisecond gate) before any Godot run; (2) compile gate; (3) playtest gate; (4) vision gate on the creation screen (one interaction surface) and the battle (highlight marker visible). Fix any red gate in its own task before proceeding.
 
-- `scripts/characters/player.gd`: input gate L299-307; click dispatch L379-383; broken click
-  targeting L462-463; `_try_move` L391-439 — gate at L391-400 reads ONLY the tutorial `move`
-  allowance and `moves_left <= 0`, never `acted` (`acted` is read only on the attack paths
-  L494/L537); then walkable, occupied, 身轻如燕 slide cost 2;
-  `_try_keyboard_attack` L536; `_try_attack_target` L490-529; `can_skill_hit` L605-634.
-- `design/10_systems.md` §5.1 回合结构: a unit's turn = movement (≤ 移动力格) + one action
-  (普攻/招式/等待), either order — the authority D7 and the movement-highlight visibility rule cite.
-- `scenes/main.tscn`: Camera2D (480,352) current — identity screen transform; SceneHost;
-  SegmentLayer/SegmentHost; HUDLayer(layer 10)/HUD; TutorialLayer(layer 100)/TutorialOverlay.
-- `scenes/ui/tutorial_overlay.tscn`: Dim full-rect `mouse_filter = 2`; Panel 600×400 centered
-  (x 180..780, y 152..552).
-- `scripts/autoload/tutorial_manager.gd`: `is_input_allowed` L219; `_update_allowed_actions`
-  L330-346 (attack_confirm allowed once STEP_ATTACK is completed).
-- `scripts/segments/creation.gd`: `_wire_mouse_widgets` L85-100; `_on_move_left` L120-137;
-  `_on_move_right` L140-154; `_on_accept` L157-170; `_render` L217-288.
-- `scenes/segments/creation.tscn`: MouseBox/AttrBox/AttrRow0..4/AttrMinus{i}/AttrPlus{i};
-  TraitBox/TraitToggle0..12; ConfirmBox/ConfirmButton+BackButton.
-- `scripts/data/trait_data.gd`: TraitDef fields; 13 TABLE rows.
-- `scripts/ui/hud.gd`: setup L114; clear_battle_refs L162; `_update_geometry_observables` L84;
-  `_process` L335; `_on_skill_selected` L465; `_refresh_skill_button_states` L370.
-- `scenes/ui/hud.tscn`: HUD (mouse_filter 2), SkillBar (y 648..688), ActionHintLabel
-  (y 618..644, hidden), RoundIndicator (x 280..680, y 8..72), EnergyLabel, PauseButton
-  (x 820..952, y 8..44).
-- `scripts/autoload/combat_manager.gd`: `is_player_turn` L301; `get_is_paused` L267;
-  `end_current_turn` L650 (no internal turn gate).
-- `scripts/autoload/grid_manager.gd`: GRID 15×11, TILE 64, GRID_ORIGIN (32,32); `is_in_bounds`
-  L117; `is_walkable` L126 (border ring excluded); `is_occupied` L156.
-- `scripts/autoload/game_manager.gd`: `enter_menu` L254 (unguarded, emits state_changed);
-  `finish_creation` L324; STATE_MENU L59.
-- `scripts/autoload/scene_manager.gd`: SCENE_MAP/SCENE_PATHS L35-60 (MENU → menu panel);
-  `_do_swap` pending_swap guard L143; host resolution needs `/root/Main`.
-- `scripts/ui/range_highlight.gd`: REACH_FILL/TARGET_FILL L24-29; `_hide`/diff-keys L51-107.
-- `scripts/battlefield.gd`: `_skill()` L384-396; English desc data (verified samples L301-375);
-  `_wire_hud` L861.
-- `playtest/_common.yaml`: header rules (append-only, per-scenario `scene:`, direct-boot proof,
-  frame cap 3000); actions list; surface list; scenario_order L511-543.
+## 9. Task Decomposition Hints (for PM)
+
+Suggested task sequence with dependencies:
+1. **T1 — Player click-move + undo + engine snapshot** (`player.gd`, `combat_manager.gd`, `grid_manager.gd`): planner → `_try_move` bool → step queue → `_try_move_to` → `handle_world_click` fallback → right-click branch + `handle_world_right_click` → `undo_available` per-frame → snapshot block in `begin_turn`. Gate: compile + existing battle scenarios green.
+2. **T2 — Focus-mode sweep** (`hud.tscn`, `skill_button.tscn`, tutorial overlay check). Gate: compile + `battle_end_turn_attack_buttons` / `skill_button_visual_states` stay green (focus_mode=0 makes them more robust, not less).
+3. **T3 — MoveRangeHighlight trying state** (`move_range_highlight.gd`; optional planner refactor only if `movement_range_highlight` stays byte-green).
+4. **T4 — Creation single-UI** (`creation.tscn`, `creation.gd`). Gate: `creation_budget_clamp_and_traits` (11/11), `menu_to_creation_to_tutorial_order` (19/19), `creation_mouse_interaction`, `creation_traits_back_next_buttons`, `creation_back_to_menu_walk` all green.
+5. **T5 — Playtest contract**: `_common.yaml` append-only surface + `scenario_order`; author the 5 scenario YAMLs (with PROBE marks where numeric damage is asserted).
+6. **T6 — Pytest contract**: `ROUND_SCENARIOS` + `test_click_move_surface_contract` (+ offset-aware clicks-owner parsing). Gate: 4-test pytest green, then full playtest run green with 43 scenario files (38 pre-existing byte-identical + 5 new).
