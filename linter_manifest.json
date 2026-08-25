@@ -1,5 +1,5 @@
 {
-  ".py": "ruff",
+  "..py": "ruff",
   ".yaml": "basic",
   ".json": "basic",
   ".md": "basic"
