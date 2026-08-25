@@ -56,6 +56,15 @@
 #   - Player +0,-64                   左键点玩家上方一格(TILE_SIZE = 64)
 #   - Player +64,0 right              右键点玩家右边一格
 #
+# **两种锚点都支持,别推断成「只支持 Control」**:Control 取 `get_global_rect()`
+# 的中心,Node2D(棋盘上的单位)取 `get_global_transform_with_canvas().origin`。
+# 2026-08-25 有人据「harness 只认 Control」诊断过一次点击移动失灵,那是错的 ——
+# 实测 `Player +64,0` 精确落在 [544, 352](格子 (8,5) 中心)。点击到不了处理函数时,
+# 先分清是「没发出」还是「发出了被吞掉」:`Player.debug_input_events` 数的是到达
+# `_input` 的原始事件,`debug_click_events` 数的是进了 `handle_world_click` 的。
+# 前者有、后者没有 = 有个 Control 在 GUI 阶段吃掉了它(那次就是 main.tscn 的
+# `SegmentHost` 漏写 `mouse_filter`)。
+#
 # 这是 HIT TEST,不是调用处理函数:被别的控件盖住、mouse_filter=IGNORE、
 # 尺寸为 0、飘出视口的目标,事件就是收不到——而 `debug_click_*` 那种直接
 # 调处理函数的动作永远看不见这类失败。
