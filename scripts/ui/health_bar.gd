@@ -25,7 +25,7 @@ const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
 ## RIGHT end of the bar at every fill level, including 100%. At full HP the
 ## fill covers the whole bar rect and the widget would read as a solid block
 ## (5_vision Q5) — the cap keeps the "empty slot" of the bar always visible.
-const EMPTY_CAP_PX: float = 6.0
+const EMPTY_CAP_PX: float = 10.0
 ## Bottom edge of the battle top strip, in viewport px. This is the PAIR of
 ## hud.tscn's TopStrip offsets (0..92, full-width band drawn behind the top
 ## HUD widgets): floating health bars clamp their top edge to STRIP_BOTTOM + 2
@@ -59,7 +59,7 @@ var bar_height: float = 0.0
 ## >= 120 px² is not.
 var empty_area_px: float = 0.0
 
-## Total widget height in pixels (= size.y; 20.0 for the compact 68×20 layout).
+## Total widget height in pixels (= size.y; 24.0 for the compact 68×24 layout).
 ## Assigned in setup() (so the headless null-char test reads it without a char
 ## node) AND re-assigned in follow_character() whenever the widget lays out.
 var total_height: float = 0.0
@@ -160,9 +160,9 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		# the fill that way renders identically and changes nothing. Growing
 		# the track is the one that actually paints.
 		#
-		# bar.size stays 64x6, so the `HealthBar.bar_width <= 64` geometric
+		# bar.size stays 64x12, so the `HealthBar.bar_width <= 64` geometric
 		# assert is untouched — this is drawing, not layout.
-		sb.set_expand_margin_all(4.0)
+		sb.set_expand_margin_all(6.0)
 		bar.add_theme_stylebox_override("background", sb)
 		# Dedicated fill stylebox: recolored by update_health() per HP band.
 		# No border widths on the fill (a border around only the filled
@@ -291,11 +291,11 @@ func follow_character() -> void:
 	# At the default scale-1 window it is numerically identical to the old
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
-	# Compact 68×20 widget: offset by half the widget width (34) so it stays
-	# horizontally centred above the character, and −28 to float it above the
+	# Compact 68×24 widget: offset by half the widget width (34) so it stays
+	# horizontally centred above the character, and −32 to float it above the
 	# feet without covering the actor (widget bottom edge stays 8 px above the
-	# character: 28 − 20 = 8, the same hover height as before).
-	screen_pos += Vector2(-34, -28)
+	# character: 32 − 24 = 8, the same hover height as before).
+	screen_pos += Vector2(-34, -32)
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
 	# the bar is unclamped and free-following; grows only when a viewport edge
