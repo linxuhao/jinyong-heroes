@@ -25,6 +25,19 @@ const _TRACK_BORDER := Color(0.05, 0.05, 0.05)
 ## RIGHT end of the bar at every fill level, including 100%. At full HP the
 ## fill covers the whole bar rect and the widget would read as a solid block
 ## (5_vision Q5) — the cap keeps the "empty slot" of the bar always visible.
+##
+## THE COST, stated because the gain alone is not the whole truth: the cap is
+## drawn OVER the fill, so it hides the last 10 of the bar's 64 px at every
+## level. A full bar reads as roughly 84%, and everything from ~85% to 100%
+## looks identical. Measured on a real 960x704 frame: 58 px of green then 14 px
+## of track at full HP.
+##
+## Accepted anyway, for two reasons: every bar carries the same cap, so
+## comparing two units is unaffected; and the band it flattens (85-100%) is the
+## one where the exact number matters least — the HP-gated skills open below
+## 50%. If that ever stops being true, shrink the cap rather than widen it, and
+## re-measure at 1x instead of zooming in (the 2026-08-25 lesson: a readability
+## claim verified from a 4x crop is not a readability claim).
 const EMPTY_CAP_PX: float = 10.0
 ## Bottom edge of the battle top strip, in viewport px. This is the PAIR of
 ## hud.tscn's TopStrip offsets (0..92, full-width band drawn behind the top
