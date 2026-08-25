@@ -2,16 +2,18 @@
 
 A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. You boot into a **main menu** (mouse-first), create your own character **before** the tutorial, fight a keyboard-completable tutorial duel as the orchestrated Yang Guo, and then walk the six-segment line: **tutorial win -> transition -> sect selection -> cultivation (36 months) -> map -> ending**.
 
-> ⚠️ **Verification status: fixes landed and statically verified - post-fix runtime gates still pending.** The on-frame portrait-visibility predicate (`VisibilityProbe`) and the state-following move-target affordance (`MoveHintLabel`) are wired end-to-end, and the two pre-fix hard-fail causes (a `Canvas` parse error in `visibility_probe.gd` and a non-numeric `at:` timeline frame) are fixed at the source level (direct code audit). The playtest contract is **46 scenarios** with **45 green + 1 deliberately red** (`terminal_victory_8_12_rounds_hp_15_40`) as the **projected** outcome - no post-fix gate report exists in the repo at delivery time, so no runtime count is claimed as measured. See [Verification Status](#verification-status).
+> ⚠️ **Verification status: this round's code and contracts are landed and statically verified - the post-fix runtime gates had not run at delivery time.** The three jinyong-events deliverables (the eight-layer portrait-visibility predicate + the 92 px clamp fix, the 16-row travel-event pool, the no-repeat bag observable + its new scenario) are wired end-to-end and carry a measured pre-fix probe record (`final/portrait_cover_probe_notes.md`). No `compile_report.json` / `playtest_report.json` / `vision_report.json` / `test_report.json` for the post-fix tree exists in the repo, so no gate count below is claimed as measured. See [Verification Status](#verification-status).
 
-## What this round delivers - 立绘可见性可断言 + 移动目标提示 (jinyong-affordance)
+## What this round delivers - 事件从 4 条到 16 条 + 立绘可见性判据补洞 (jinyong-events)
 
-This round adds **no new mechanics** - it turns two things the gates previously could not express into decidable, assertable facts, with the existing assets and Chinese UI copy untouched:
+This round adds **no new mechanics, no new effect types, no number changes, no map/topology/art changes** - it is content + closing two measured holes in the visibility predicate:
 
-1. **On-frame portrait visibility made assertable (`VisibilityProbe`).** `scripts/ui/visibility_probe.gd` implements a six-layer predicate (`hidden_in_tree` / `null_texture` / `zero_rect` / `off_viewport` / `clipped` / `occluded`) - `visible == true` is necessary but not sufficient for a portrait to put ink on the rendered frame. Every battle unit (`Player`, `East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`, `Central_Divine`) publishes `portrait_visible` / `portrait_fail_layer` per frame. Probe evidence (`final/portrait_probe_notes.md`): the A2 fix set was **empty** - the probe run never landed a measured value (godot-builder outage 9/9 HTTP 500, then the round's own compile error), and per the 不许猜 rule no speculative fix was written. UX-01 is dispositioned `WONTFIX(实测六个单位均可见,人工读帧误判)` in `design/40_ux_backlog.md` - a disposition **conditional on the post-fix gate run** of `playtest/portrait_visibility.yaml`, which asserts all six units at `portrait_visible == true`: a green run confirms the frame-reading artifact; a red run prints the real fail-layer id for a targeted fix in a later round.
-2. **State-following move-target affordance (`MoveHintLabel`).** A new `Label` below the player's feet whose Chinese copy follows the move state machine (左键点格移动 · 右键退回 -> 右键退回起点 · 出手即确认 -> 已出手 · 移动已确认), `mouse_filter = 2` so it never eats click-move / right-click undo / targeting. `playtest/move_target_affordance.yaml` pins the copy in the idle, undo-ready and committed states (and the return to idle after an undo).
-3. **Two new playtest scenarios** - `portrait_visibility.yaml` and `move_target_affordance.yaml` - appended to `scenario_order` and `ROUND_SCENARIOS`; `playtest/_common.yaml` surface gains the six units' `portrait_visible` / `portrait_fail_layer` plus a `MoveHintLabel` block (`state` / `text` / `visible` / `tile` / `center` / `in_viewport` / `bar_overlap`); `tests/test_playtest_contract_smoke.py` gains `test_affordance_surface_contract`.
-4. **44 → 46 scenarios**, the baseline **projected** to carry forward to **45 green + 1 deliberately red** - `terminal_victory_8_12_rounds_hp_15_40` stays the only allowed red (the difficulty window is not yet met; balance tuning is deferred per `design/00_roadmap.md`). The last *measured* full run (pre-fix) failed 46/46 for the two now-fixed hard-fail causes; the post-fix run's report is the authoritative record and did not exist in the repo at delivery time.
+1. **Portrait-visibility predicate 6 -> 8 layers (`VisibilityProbe`).** `scripts/ui/visibility_probe.gd` gains `blank_texture` (asset-level alpha scan - a fully transparent resource renders nothing no matter how correct the geometry is; fail-open when the scan is unavailable) and `covered` (partial occlusion: a later-drawn opaque host hiding ≥ 25% of the ink rect, ≥ 64 px² absolute, max-single-coverer semantics) plus the public `covered_fraction()` helper. Every battle unit (`Player`, `East_Heretic`, `West_Poison`, `South_Emperor`, `North_Beggar`, `Central_Divine`) publishes **per frame**: `portrait_visible`, `portrait_fail_layer` (8 possible ids), `portrait_covered_frac`, and the **3-number probe** `portrait_sprite_pos` + `portrait_tex_size` + `portrait_bar_pos`.
+   - **Measured pre-fix (f40, native 960×704, `final/portrait_cover_probe_notes.md`):** exactly one unit RED - **Central_Divine (王重阳)**: `portrait_visible=false`, `fail_layer="covered"`, `covered_frac=0.333333333333333`, `sprite_top=0.0` (the old `occluded` layer, full-enclosure-only, could never fire here - this is the partial-occlusion hole closing). **Player (杨过)** measured GREEN with internally consistent 3-number geometry (`sprite_pos [480,352]` + `tex_size [96,128]` + `bar_pos [446,320]` -> ink x∈[432,528], y∈[224,352], mid-board) - the earlier "nothing drawn there" reading was a human frame-reading artifact, dispositioned `frame-reading divergence, no fix` per the no-guess rule.
+   - **The fix, only where the probe pointed:** `GridManager.clamp_sprite_offset`'s y lower bound gains the presentation constant `BOARD_TOP_MARGIN_Y = 92` (the existing top-strip bottom) so top-row portrait ink starts below the strip. One constant + one line; grid positions, movement, click-targeting and health-bar geometry untouched.
+   - `design/40_ux_backlog.md`: **UX-01a CLOSED(jinyong-events) - 实测无缺陷**; **UX-01b REOPENED** with the fix landed - closure deliberately deferred until a post-fix playtest gate report is on disk (backlog rule 2: closure is an action from evidence, not an inference).
+2. **Travel-event pool 4 -> 16 (`EventData.TABLE`).** Twelve new hand-written Jin Yong-flavored rows (古墓寒玉 / 神雕负伤 / 桃花迷阵 / 蛇胆奇效 / 降龙残谱 / 渡口风波 / 镖行招募 / 大理市集 / 破庙夜雨 / 赌坊喧嚣 / 全真抄经 / 遗落的褡裢) join the four baseline rows. Every option uses **only the 5 implemented effect types** (`silver` / `attr` / `item` / `practice` / `none`), `attr` targets only the five attribute keys, `item` targets only real equipment ids (`eq_sword_2` / `eq_armor_2` / `eq_boots_2` - distinct per row, distinct from the baseline `eq_sword_3`), and each row's two options are real trade-offs (item-with-cost, item-vs-item, item-vs-attr, paid-vs-free attr, growth-vs-money, moral fortune-vs-silver - no two rows interchangeable). Pure data: resolution stays in `cultivation.gd` untouched.
+3. **No-repeat bag made observable and provable.** `_draw_event()` already excluded `events_seen` and reset on pool exhaustion (never an empty draw, never a stall); this round adds the observable `CultivationScreen.events_seen_count`, the new scenario **`playtest/event_travel_effects.yaml`** (count ladder 0 -> 1 -> 2 -> 3 across three resolved 游历 travels, `event_id != ""` throughout, drawn ids deliberately never asserted - RNG-dependent), and deterministic GDScript unit tests (15-of-16 forced draw, all-16 pool reset, 32 fresh + 16 adversary effects-land cases). Scenarios **46 -> 47**.
 
 ## Quick Start
 
@@ -37,9 +39,8 @@ This round adds **no new mechanics** - it turns two things the gates previously 
 
 - Every turn = move up to your movement range **plus** one action, in any order. The green highlight shows every tile you can still reach.
 - Left-click an enemy tile attacks; left-click an empty walkable tile moves; left-click your own tile is a no-op; clicking an unreachable tile says 走不到那里.
-- Once you act (attack / skill / item), the turn's movement is committed - right-click undo is refused (已出手,无法退回). Ending the turn commits too.
+- Once you act (attack / skill / item), the turn's movement is committed - right-click undo is refused (已出手，无法退回). Ending the turn commits too.
 - Press `J` (or click 出招) with no skill selected to basic-attack the **nearest adjacent** enemy.
-- Select a skill with `1`–`8` (or `9`–`12`), then press `J` to fire it; `SkillDescLabel` shows the skill's Chinese description, the hint line tells you the next step, and the grid highlight shows reachable + target tiles.
 - **Two-phase unlock** (tutorial only): techniques `5`–`8` (Melancholy Palms) lock until **round 4**; technique `8` requires HP **below 50%**. A rejected selection says why instead of doing nothing.
 - Each unit acts once per round in initiative order: Yang Guo (88) -> East Heretic (85) -> Central Divine (80) -> South Emperor (76) -> North Beggar (74) -> West Poison (70).
 - Defeat all five Grandmasters to win; let your health reach zero to lose.
@@ -72,6 +73,29 @@ The whole game runs inside one persistent shell: `SceneManager` (an autoload) li
 | 4. Cultivation | `cultivation` | 36 monthly cycles: card draws + 练功/修习/做工/游历 + year-end stay/switch + 存盘/读档/删档 |
 | 5. Map / ending | `map` -> `ending` | Node-graph map (adjacency-checked moves) -> tiered ending text |
 
+## Travel Events (游历) - the 16-row pool
+
+Choosing **游历** in a cultivation month draws one event from `EventData.TABLE` (16 rows) and presents a **two-option real trade-off**. Resolution is entirely in `cultivation.gd`:
+
+- **Effect vocabulary (hard contract, 5 types only):** `silver` (clamped at 0), `attr` (target ∈ bone/inner/agility/wisdom/fortune), `item` (target must be a real equipment id; dedup'd - already-owned grants no-op), `practice` (adds to the first unmastered gongfa; no-op when everything is mastered), `none`. Anything else would silently no-op = dead content, so `tests/test_event_data.gd::_test_effect_targets` pins the whitelists statically and `tests/test_cultivation.gd` proves all 48 option cases actually mutate profile state (fresh + adversary worst-case).
+- **No-repeat bag:** `_draw_event()` builds the pool of TABLE ids **not** in `SaveManager.profile.flags["events_seen"]`; when the pool empties it clears the seen list and refills - a clean cycle restart, never an empty event, never a stall. Exactly **one `SaveManager.rng.randi_range` per travel** (RNG op order unchanged).
+- **Observables:** `CultivationScreen.events_seen_count` (the sanitized bag size - grows by 1 per resolved 游历, drops to 0 on pool exhaustion) and `CultivationScreen.event_id` (the currently drawn event). Pinned by `playtest/event_travel_effects.yaml`'s count ladder.
+
+## Portrait Visibility Probe (八层判据)
+
+`scripts/ui/visibility_probe.gd` turns "the unit's portrait puts ink on the rendered 960×704 frame" into a decidable fact. Pure static functions - one predicate serves the probe matrix, the A-class red-before-fix assertions and the B-class regression guards. Layer order is cheap-to-expensive:
+
+1. `hidden_in_tree` - the leaf's full visible chain is broken
+2. `null_texture` - Sprite2D/TextureRect texture null or zero-sized
+3. `blank_texture` - the texture resource has no pixel with alpha > 0 (asset-level scan, cached; fail-open when the scan is unavailable)
+4. `zero_rect` - zero area / zero scale / near-transparent alpha chain
+5. `off_viewport` - the ink rect does not intersect the viewport rect
+6. `clipped` - a `clip_contents` ancestor does not enclose the ink rect
+7. `occluded` - a later-drawn, mouse-visible Control **fully** covers it
+8. `covered` - a later-drawn, mouse-visible Control covers **≥ 25%** (and ≥ 64 px²) of the ink rect (max-single-coverer; `occluded` is checked first so full enclosure keeps the precise id)
+
+Every unit publishes `portrait_visible` / `portrait_fail_layer` / `portrait_covered_frac` / `portrait_sprite_pos` / `portrait_tex_size` / `portrait_bar_pos` per frame (the last three are the **3-number probe** - sprite `global_position` + texture size + health-bar `global_position` - the only sanctioned way to resolve a "numbers say it's there, frame says it isn't" contradiction, never pixel inference). The `covered` layer unlocked this round's single gated clamp fix: `GridManager.clamp_sprite_offset` keeps top-row ink below the 0..92 top strip (`BOARD_TOP_MARGIN_Y = 92`).
+
 ## Main Menu & Settings
 
 **Menu entries** (single activation path - mouse `pressed`, keyboard `ui_accept`, and the harness `debug_click_menu_entry` action all converge on `_activate_entry(i)`): 0 新的冒险 / 1 读取存档 / 2 设置 / 3 退出.
@@ -80,7 +104,7 @@ The whole game runs inside one persistent shell: `SceneManager` (an autoload) li
 
 ## Save / Load
 
-Saves live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` -> validate -> `.bak` rollback -> promote -> re-validate -> drop backup). The save carries the RNG seed + `rng_state` + the per-category deck lists, so a reload replays the identical card sequence. `STABLE_STATES` is `["CULTIVATION", "MAP"]`.
+Saves live at `user://save_<slot>.json` (plain JSON, 3 slots, versioned schema, atomic `.tmp` -> validate -> `.bak` rollback -> promote -> re-validate -> drop backup). The save carries the RNG seed + `rng_state` + the per-category deck lists, so a reload replays the identical card sequence. `events_seen` rides in `flags` (sanitized to non-empty Strings on load; old 4-row-era saves simply draw from the 16-row pool). `STABLE_STATES` is `["CULTIVATION", "MAP"]`.
 
 ## Chinese Font Theme
 
@@ -113,25 +137,27 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 
 ## HUD
 
-- **Top strip** (`TopStrip`): full-width 0..92px semi-transparent dark `StyleBoxFlat` band (`mouse_filter = 2`, drawn behind everything) hosting 回合数 / 行动条 / 出手顺序 / 技能提示 / 内力, pairwise non-overlapping. `PauseButton` stays top-right on the band; `EndTurnButton` / `AttackButton` / `SkillDescLabel` sit below it. *(Correct as of the previous round - untouched this round.)*
+- **Top strip** (`TopStrip`): full-width 0..92px semi-transparent dark `StyleBoxFlat` band (`mouse_filter = 2`, drawn behind everything) hosting 回合数 / 行动条 / 出手顺序 / 技能提示 / 内力, pairwise non-overlapping. `PauseButton` stays top-right on the band; `EndTurnButton` / `AttackButton` / `SkillDescLabel` sit below it.
 - **Grid overlay** (`GridLines`): 1 px semi-transparent cell boundaries across the 15×11 board plus a border ring.
 - **Movement-range highlight** (`MoveRangeHighlight`): green BFS mirror of `_try_move`; observables `visible` / `tile_count` / `fill_color` plus `start_tile` / `undo_available` trying-state markers.
 - **Range/target highlight** (`RangeHighlight`): blue reachable tiles + red valid targets, mirroring `player.can_skill_hit()`; `fill_color` observable for the green-vs-blue distinctness assert.
 - **Action hint line** (`ActionHintLabel`): shows 按 J 出招 / 点击目标 after a selection and a specific Chinese reason on every rejection. Lives inside the top strip.
+- **Move-target affordance** (`MoveHintLabel`): state-following Chinese copy below the player's feet (左键点格移动 · 右键退回 -> 右键退回起点 · 出手即确认 -> 已出手 · 移动已确认), `mouse_filter = 2` so it never eats click-move / undo / targeting.
 - **Skill description label** (`SkillDescLabel`): always-visible; default guidance -> selected skill's Chinese description.
 - **Battle action buttons**: `EndTurnButton` (结束回合) + `AttackButton` (出招 (J)) in the top-right column under `PauseButton`, gate-guarded and disabled off-turn. **All battle clickables are `focus_mode = 0`**.
 - **Skill bar**: up to 12 `SkillButton` nodes (default 2 arts / 8 slots; 左右互搏 = 3 arts / 12). Each shows name, hotkey, 发挥 ×N.N, and a cooldown/state overlay.
 - **Health bars** (`HealthBar`): 64 px wide, **12 px tall bar** (68×24 widget; the battle scene's theme min-size makes the runtime bar render ~22 px tall), name label above (semi-transparent backing), green->yellow->red by HP fraction, **fixed 10 px empty cap** and **6 px track halo** so the empty slot reads at the native 960×704 size; floating bars clamp **below the top strip** (`top ≥ 94`) with an 8 px hover gap above the character's feet.
+- **Portrait sprites**: top-row ink is clamped below the top strip (`GridManager.clamp_sprite_offset`, `BOARD_TOP_MARGIN_Y = 92` - this round's gated fix), and every unit's portrait is probe-observable per frame (see [Portrait Visibility Probe](#portrait-visibility-probe-八层判据)).
 - **Round indicator**: 回合 N, 行动: <name> · 移动 <m>, 顺序: <Chinese names>.
 
 ## Project Structure
 
 ```
 ├── project.godot                 # Engine config, autoloads, input map, theme, run/main_scene -> menu.tscn
-├── playtest/                     # Headless playtest contract, one file per scenario (46)
+├── playtest/                     # Headless playtest contract, one file per scenario (47)
 │   ├── _common.yaml              #   shared scene / actions / surface + scenario_order
-│   └── <scenario>.yaml           #   basename == name:
-├── run_tests.sh                  # CLI gate: compile + headless playtest + unit tests
+│   └── <scenario>.yaml           #   basename == name:  (incl. event_travel_effects.yaml, this round)
+├── run_tests.sh                  # CLI gate: compile + headless playtest + GDScript unit suite
 ├── design/                       # Authoritative design archive (00..99)
 ├── assets/                       # characters / terrain / backdrop / audio / fonts / themes / seed_manifest
 ├── scenes/
@@ -144,14 +170,16 @@ Pure static math lives in `scripts/data/trait_effects.gd`; engine hooks live in 
 │   ├── battlefield.gd grid_lines.gd
 │   ├── autoload/ (game_manager, scene_manager, save_manager, settings_manager, grid_manager,
 │   │              combat_manager, tutorial_manager, theme_manager, audio_manager)
-│   ├── characters/ (player.gd, enemy.gd)
+│   ├── characters/ (player.gd, enemy.gd)          # both publish the 6 portrait-probe vars per frame
 │   ├── ai/ (ai_base + 5 Grandmaster controllers + ai_sparring)
 │   ├── data/ (character_data, skill_data, gongfa_data, player_profile, trait_data, trait_effects,
-│   │          tutorial_fillers, encounter_data, progression_gongfa_data, card_data, event_data,
-│   │          map_data, battle_setup)
+│   │          tutorial_fillers, encounter_data, progression_gongfa_data, card_data,
+│   │          event_data (16-row travel-event pool), map_data, battle_setup)
 │   ├── segments/ (creation, transition, sect_select, cultivation, map, ending)
 │   └── ui/ (menu_panel, settings_panel, hud, health_bar, skill_button, round_indicator,
-│             pause_button, tutorial_step, range_highlight, move_range_highlight)
+│             pause_button, tutorial_step, range_highlight, move_range_highlight,
+│             move_hint_label, visibility_probe)
+├── final/                        # probe notes + delivery notes + verify_report.json
 └── tests/                        # test_*.gd + unit_test_runner.gd + test_playtest_contract_smoke.py
 ```
 
@@ -179,9 +207,17 @@ The playtest harness posts **real** `InputEventMouseButton` events. The `clicks:
 
 `save_slot(s)` / `load_slot(s)` / `autosave()` / `delete_slot(s)`, `has_save_file(s)`, `ensure_user_dir()`, `new_profile(attrs, traits)`, `apply_seed(seed)`, `draw_cards(monthly)`; surface vars `seed`, `last_error`, `slot`, `has_save`, deck counts, roundtrip observables, and `last_io_error_code` / `last_io_error_text` / `debug_user_dir_exists`. Signal: `loaded(slot)`.
 
+### `VisibilityProbe` static API (this round)
+
+`first_fail_layer(unit_root) -> String` ("" = visible; else one of the 8 layer ids), `portrait_visible(unit_root) -> bool`, `covered_fraction(unit_root) -> float` (worst single later-drawn opaque-host cover fraction, [0,1]), `leaf_rect(unit_root) -> Rect2`; constants `COVERED_AREA_FRAC = 0.25`, `COVERED_MIN_PX = 64.0`.
+
+### `EventData` static API (this round)
+
+`all() -> Array[EventDef]` (fresh instances, table order), `def(id) -> EventDef` (null when unknown). `EventDef` = `{id, title, text, option_a, option_b}`; `EventOption` = `{label, effects: Array[Dictionary], battle_id: null}`; each effect = `{"type": silver|attr|item|practice|none, "value": int, "target": String}`.
+
 ### Playtest surface observables
 
-**Battle top-bar observables** - `HUD.top_text_pairwise_overlap` / `top_text_in_strip` / `top_strip_alpha` / `hint_hpbar_overlap` / `hpbar_strip_overlap`; `TopStrip.visible` / `size`; `HealthBar.name_backing_alpha`. **Creation-layout observables (row rhythm, round jinyong-layout)** - `CreationScreen.attr_rows_uniform` / `attr_label_alignment_ok` / `points_attrs_gap_ok` / `phase_skeleton_same` / `creation_in_viewport` / `creation_box_fits`. **Creation leaf-ink observables (this round, jinyong-layout-r2)** - `CreationScreen.attr_cluster_center_ok` / `attr_cluster_width_ok` / `nav_cluster_center_ok` / `trait_cluster_center_ok` / `desc_center_ok` / `desc_alignment_ok`, plus the reworked internals of `points_attrs_gap_ok` (same name/asserts; now measured on ink). **Health-bar readability observables (this round)** - `HealthBar.bar_height` / `empty_area_px` / `empty_cap_px`. (Plus the prior rounds' `Player.turn_start_*` / `undo_available`, `MoveRangeHighlight.start_tile` / `undo_available`, `CreationScreen.cursor_markers_visible`, `PointsLabel.visible` / `text`, and `focus_mode` on the battle buttons.)
+**Portrait-probe observables (all six battle units, this round)** - `portrait_visible` / `portrait_fail_layer` / `portrait_covered_frac` / `portrait_sprite_pos` / `portrait_tex_size` / `portrait_bar_pos`. **Cultivation event observables (this round)** - `CultivationScreen.events_seen_count` / `event_id`. **Battle top-bar observables** - `HUD.top_text_pairwise_overlap` / `top_text_in_strip` / `top_strip_alpha` / `hint_hpbar_overlap` / `hpbar_strip_overlap`; `TopStrip.visible` / `size`; `HealthBar.name_backing_alpha`. **Creation observables** - `CreationScreen.attr_rows_uniform` / `attr_label_alignment_ok` / `points_attrs_gap_ok` / `phase_skeleton_same` / `creation_in_viewport` / `creation_box_fits` plus the leaf-ink cluster vars (`attr_cluster_center_ok` / `attr_cluster_width_ok` / `nav_cluster_center_ok` / `trait_cluster_center_ok` / `desc_center_ok` / `desc_alignment_ok`). **Health-bar readability** - `HealthBar.bar_height` / `empty_area_px` / `empty_cap_px`. (Plus the prior rounds' `Player.turn_start_*` / `undo_available`, `MoveRangeHighlight.start_tile` / `undo_available`, `MoveHintLabel.state` / `text` / `visible`, `CreationScreen.cursor_markers_visible`, and `focus_mode` on the battle buttons.)
 
 ## Technical Notes
 
@@ -190,14 +226,16 @@ The playtest harness posts **real** `InputEventMouseButton` events. The `clicks:
 - **Freed-object safety**: `is_instance_valid()` before every `as` cast / typed assignment; scene swaps await the outgoing scene's `tree_exited`.
 - **Tween safety**: `_await_tween_safe()` caps every action tween at 0.25 s.
 - **Deterministic AI**: zero RNG - pure priority lists.
-- **Seeded RNG**: one `RandomNumberGenerator` owned by `SaveManager`, seeded from `mix_seed(system_entropy)` (splitmix64 finalizer - frozen).
+- **Seeded RNG**: one `RandomNumberGenerator` owned by `SaveManager`, seeded from `mix_seed(system_entropy)` (splitmix64 finalizer - frozen). The travel-event draw consumes exactly one `randi_range` per 游历, so the seeded stream's op order is unchanged by the 4 -> 16 pool growth.
 - **Rounding**: `round()` half away from zero; `45 * 1.3` = 58.5 -> 59. Percentages never take the fhd multiplier.
 - **Highlight layering**: `RangeHighlight` and `MoveRangeHighlight` sit between `GridLines` and `Characters`; translucent fills (alpha ≤ 0.28) keep grid lines readable.
 - **Movement path planning**: `GridManager.plan_movement(from, budget, slide_ok)` is a pure relaxation BFS under the exact `_try_move` cost model (walkable + unoccupied landing at cost 1, 身轻如燕 slide-through at cost 2).
-- **Overlap convention**: a pair "overlaps" iff the two rects intersect after each is inset 1px on all sides (`_inset_overlap`); hidden widgets are skipped, never asserted; all battle rects share the layer-10 scale-1 coordinate space (no Node2D↔Control conversion).
-- **Ink, not slots (this round's measurement discipline)**: a Container's `get_global_rect()` measures the *slot*, not the *ink* - any assertion built on container rects can be satisfied by content hugging one corner of the slot. Position observables measure what actually draws: label **text** sub-rects via `Font.get_string_size` (honoring `horizontal_alignment`) and button rects. Row-internal rhythm (label hugging `-`/`+`) and whole-screen centering (row-level `SHRINK_CENTER`) are two layers, pinned separately.
-- **Full-screen host discipline**: HUD hosts and full-rect hosts explicitly declare `mouse_filter`; all clickables `focus_mode = 0` (the changelog's two hard-won disciplines).
-- **ProgressBar theme min-size clamp (probed)**: once a `ProgressBar` enters the scene tree, Godot raises `size.y` to its theme minimum (~22 px) - the authored 12 px survives only on the headless instantiate path (`tests/test_health_bar.gd`). The runtime empty-slot readability therefore rests on the cap width (10 px -> 220 px² at runtime).
+- **Overlap convention**: a pair "overlaps" iff the two rects intersect after each is inset 1px on all sides (`_inset_overlap`); hidden widgets are skipped, never asserted; all battle rects share the layer-10 scale-1 coordinate space.
+- **Ink, not slots**: a Container's `get_global_rect()` measures the *slot*, not the *ink*. Position observables measure what actually draws: label **text** sub-rects via `Font.get_string_size`, button rects, and (for portraits) the sprite's canvas-space transformed texture AABB (`VisibilityProbe._sprite_global_rect`).
+- **Opaque-host convention**: a Control counts as a potential occluder/coverer iff `mouse_filter != MOUSE_FILTER_IGNORE` and it draws after the ink leaf (CanvasLayer -> effective z -> tree order). A unit's own subtree (its Sprite, its invisible ClickTarget) never counts.
+- **Full-screen host discipline**: HUD hosts and full-rect hosts explicitly declare `mouse_filter`; all clickables `focus_mode = 0`.
+- **Probe-first rule (先查明再修，不许猜)**: a protected-code fix (e.g. `clamp_sprite_offset`) is only unlocked by a measured fail-layer id from `final/portrait_cover_probe_notes.md`; all numbers quoted in delivery notes are probe-measured `observed` values, never derived.
+- **ProgressBar theme min-size clamp (probed)**: once a `ProgressBar` enters the scene tree, Godot raises `size.y` to its theme minimum (~22 px) - the authored 12 px survives only on the headless instantiate path (`tests/test_health_bar.gd`).
 
 ## Testing
 
@@ -205,42 +243,46 @@ The playtest harness posts **real** `InputEventMouseButton` events. The `clicks:
 ./run_tests.sh
 ```
 
-Runs a compile check, a headless playtest against the `playtest/` contract (46 scenarios), then the Godot unit tests under `tests/`. A passing run requires a clean compile, zero runtime errors, `empty_round_stalls == 0`, and every assertion green (except the deliberately-red `terminal_victory_8_12_rounds_hp_15_40` difficulty window).
+Runs, against the godot-builder sidecar: a compile check, a headless playtest against the `playtest/` contract (**47 scenarios**), then the GDScript unit suite (the `/script` gate auto-discovers every `tests/*.gd` that `extends SceneTree` - `test_event_data.gd` and `test_cultivation.gd` included; an empty discovery is a hard failure, not a pass). A passing run requires a clean compile, zero runtime errors, `empty_round_stalls == 0`, and every assertion green (except the deliberately-red `terminal_victory_8_12_rounds_hp_15_40` difficulty window).
 
-Additionally, the static pytest gate (`tests/test_playtest_contract_smoke.py`, standard-library only, no Godot) verifies the contract integrity: `scenario_order` ↔ scenario-file completeness, the round scenarios present on disk and ordered, the surface whitelist + `clicks:`-owner contract, `test_topbar_layout_surface_contract` (top-bar/creation observables), `test_creation_rework_and_bar_surface_contract` (`HealthBar.bar_height` / `empty_area_px` / `empty_cap_px` + the six `CreationScreen` leaf-ink vars), **`test_affordance_surface_contract`** (this round's six-unit `portrait_visible` / `portrait_fail_layer` + `MoveHintLabel` surface blocks), and **`test_timeline_at_values_are_integers`** (this round's static guard: every timeline `at:` in the round scenario files must be a single integer - the malformed-range class that hard-failed the pre-fix run is now caught at pytest time instead of at runtime).
+Additionally, the static pytest gate (`tests/test_playtest_contract_smoke.py`, standard-library only, no Godot) verifies the contract integrity: `scenario_order` ↔ scenario-file completeness, the round scenarios present on disk and ordered, the surface whitelist + `clicks:`-owner contract, the top-bar/creation/health-bar/affordance surface contracts, `test_timeline_at_values_are_integers` (every timeline `at:` in the round scenario files is a single integer), and **`test_event_content_surface_contract`** (this round: the six units' four new portrait vars + `CultivationScreen.events_seen_count` on the surface, `event_travel_effects.yaml` exists with `name:` == basename / integer `at:` values / comparison operators on every assert, and `portrait_visibility.yaml` carries the `covered_frac` lines).
 
 ## Verification Status
 
 **Static verification complete - runtime gates pending their post-fix runs.** Nothing under "Pending" below is a measured gate result: no `compile_report.json`, `playtest_report.json` / `playtest_summary.md`, `vision_report.json`, or `test_report.json` for the post-fix tree exists in the repo at delivery time, and unproduced evidence is never reported as passed.
 
+**Measured (probe runs, `final/portrait_cover_probe_notes.md`, f40 native 960×704):**
+
+- `Central_Divine`: `portrait_visible=false`, `portrait_fail_layer="covered"`, `portrait_covered_frac=0.333333333333333`, `sprite_top=0.0` - the A-class red that unlocked the clamp fix.
+- `Player`: `portrait_visible=true`, all eight layers green, `covered_frac=0.104166666666667`, 3-number geometry self-consistent - "nothing drawn there" was a frame-reading artifact.
+- `East_Heretic` / `West_Poison` / `South_Emperor` / `North_Beggar`: green, `covered_frac=0.166666666666667` (sub-threshold B-class guards).
+- Dead-probe invariant clean: no unit sits on the `false` + `fail_layer==""` contradiction.
+
 **Verified by direct code/contract audit at this step (Step 5):**
 
-- `scripts/ui/visibility_probe.gd` contains **no `Canvas` type reference**: the layer-6 occlusion helpers use only engine-native types, and `_canvas_layer()` walks the ancestor chain with `node is CanvasLayer`. The parse error that cascaded into `player.gd` / `enemy.gd` failing to compile is gone at the source level.
-- `scripts/characters/player.gd` (`_process()` lines 346-347) and `scripts/characters/enemy.gd` (lines 240-241) publish `portrait_fail_layer` / `portrait_visible` after `_refresh_sprite_clamp()` and **before** the `undo_available` recompute - the pre-fix dead-probe abort that broke the protected click-move scenarios cannot recur through this path.
-- Both new scenario timelines (`playtest/portrait_visibility.yaml`, `playtest/move_target_affordance.yaml`) use single-integer `at:` frames only; the f135 undo click is the proven `Player +64,0 right` spec from `click_move_undo_right`.
-- `scenes/ui/hud.tscn` carries the `MoveHintLabel` node with `move_hint_label.gd` attached (`mouse_filter = 2`); the driver is a read-only self-driving poller whose state machine (`idle` / `undo_ready` / `committed`, Chinese state-following copy) is a pure function of existing engine-owned fields and existing autoload API (`CombatManager.tutorial_battle`, `CombatManager.is_player_turn()`, `GameManager.get_player()`).
-- `playtest/_common.yaml` whitelists the six units' `portrait_visible` / `portrait_fail_layer` plus the seven-var `MoveHintLabel` block, and appends both scenarios to `scenario_order` in the same order as `ROUND_SCENARIOS` in `tests/test_playtest_contract_smoke.py` (the two-place sync rule).
+- `EventData.TABLE` holds **16 unique ids**; every effect type is within the 5-type vocabulary; every `attr` target within the five keys; every `item` target a real equipment id; `battle_id` null everywhere; `_build`/`_build_option` fresh-instance contract preserved.
+- `cultivation.gd`: `events_seen_count` declared and synced in `_sync_surface()`; `_draw_event()` exclusion + pool-reset unchanged (one rng op per travel); `_apply_event_option()` match unchanged.
+- `player.gd` / `enemy.gd` publish the covered-fraction and 3-number probe vars after the visibility verdict and before the `undo_available` recompute (the dead-probe abort class cannot recur through this path).
+- `GridManager.clamp_sprite_offset` uses `BOARD_TOP_MARGIN_Y = 92` (one constant + one line; the taller-than-board guard unchanged).
+- `playtest/portrait_visibility.yaml` extended in place (original 10 asserts byte-identical + 12 appended); `playtest/event_travel_effects.yaml` registered at the end of `scenario_order` **and** `ROUND_SCENARIOS` (same order, two-place sync rule); 47 scenario files on disk.
+- `tests/test_event_data.gd` (`>= 16` + 16-row pins + `_test_effect_targets`) and `tests/test_cultivation.gd` (5 new event test functions incl. the 48 effects-land cases) wired into `run()`; `run_tests.sh`'s unit gate auto-discovers them.
 
 **Pending the downstream gate runs (projected, not measured):**
 
-- **Playtest (46 scenarios)**: expected **45 green + 1 deliberately red**. `terminal_victory_8_12_rounds_hp_15_40` scored 5/6 with `Player.health` observed at **783** in the last recorded run (outside the 15-40% of `max_health` window) - the balance-tuning target, explicitly deferred per `design/00_roadmap.md`, and **not** claimed green (see Known Issues below). The 45-green figure for the other scenarios is the implementer's projection (`final/portrait_probe_notes.md` §7: "to be confirmed by the gate runs, NOT measured here"); the last *measured* full run (pre-fix) failed 46/46 for the two now-fixed hard-fail causes. The first post-fix run's report is the authoritative record.
-- **Unit tests**: the static pytest gate now holds **9 test functions** (7 baseline + `test_affordance_surface_contract` + `test_timeline_at_values_are_integers`); the last recorded run (review-era) reported 8 passed / 0 failed **before** the timeline guard was added. A fresh 5_test run must confirm the current tree.
-- **Vision gate (Q1-Q6)**: the last recorded vision run (against the pre-fix, compile-broken tree) **failed** - Q5 "health bars recognisable" 16/28 bad, Q3 10 bad, Q4 4 bad. Q5's geometry was fixed in `jinyong-layout-r2` (bar height 12px, empty cap 10px, 6px halo) and the Q3/Q4 differentials were expected casualties of the dead battle loop, but recovery is a projection until 5_vision re-runs on post-fix frames. No fresh per-question scores exist in the repo, so none are fabricated here.
-
-**Pre-fix hard-fail history (both causes fixed this round - recorded, not hidden).** The pre-fix full run hard-failed for two reasons (per the review record and `final/portrait_probe_notes.md` §1; no `playtest_summary.md` exists in the repo):
-
-1. `scripts/ui/visibility_probe.gd:183` raised `Parse Error: Could not find type "Canvas" in the current scope`, cascading into `player.gd` / `enemy.gd` failing to compile, so `first_fail_layer` did not exist and `portrait_visibility` sat at its declared `false` default - `portrait_visibility` then measured 4/10 with all six units reading `false`/`""` (the forbidden dead-probe combination, not evidence of invisibility). Fixed by correcting the type check; the scenario now *asserts* all six units at `portrait_visible == true` - the measured confirmation is the post-fix gate run, still pending at delivery time.
-2. `playtest/move_target_affordance.yaml` timeline entry 0 used a non-numeric `at: '3..15'` (`Frames are single integers`), so the scenario could not parse - `move_target_affordance` measured 3/18. Fixed by rewriting the timeline as single-integer frames.
+- **Playtest (47 scenarios)**: expected **46 green + 1 deliberately red**. `terminal_victory_8_12_rounds_hp_15_40` is the allowed red (its difficulty window - 8–12 rounds, player HP 15–40% of max - is the explicitly deferred balance target; observed `Player.health` 783 in the last recorded run). The 46-green figure is the implementer's projection; the first post-fix run's report is the authoritative record. Post-fix `portrait_visibility.yaml` green (incl. `Central_Divine.portrait_covered_frac < 0.25` after the clamp fix) is the evidence that will close **UX-01b** in `design/40_ux_backlog.md`.
+- **Unit tests**: the GDScript suite (existing + this round's event tests) and the pytest contract gate (now incl. `test_event_content_surface_contract`) await a fresh `5_test` run; the effects-really-land claim for all 48 option cases is recorded **UNPROVEN** in `final/delivery_notes.md` §5 until a report lists them as discovered and passed.
+- **Vision gate (Q1–Q6)**: no fresh per-question scores exist in the repo for this tree; none are fabricated here.
 
 **Known Issues**
 
-- **`terminal_victory_8_12_rounds_hp_15_40` is the one deliberately-red scenario.** Its difficulty window asserts the tutorial duel finishes in 8-12 rounds with the player's HP between 15% and 40% of `max_health`; the observed value is `Player.health == 783`, far above the 40% ceiling. Per `design/00_roadmap.md` ("数值最后调"), numeric balance tuning is deferred to a later phase, and this scenario is explicitly allowed to go red on balance changes - that is its purpose. It must not be reported as green until the window is actually met.
+- **`terminal_victory_8_12_rounds_hp_15_40` is the one deliberately-red scenario** (balance tuning deferred per `design/00_roadmap.md` 「数值最后调」). It must not be reported as green until the window is actually met.
+- **UX-01b (王重阳 portrait partially covered by the top strip)**: fix landed (`BOARD_TOP_MARGIN_Y = 92`), pre-fix red measured; `design/40_ux_backlog.md` keeps it **REOPENED** until a post-fix playtest report is on disk (closure is an action from evidence, not an inference).
 
 ## Recorded Debt
 
-1. **`spine_to_ending` and `creation_budget_clamp_and_traits` walk a test-only path** (TUTORIAL WON -> TRANSITION -> CHARACTER_CREATION -> SECT_SELECTION) that no longer exists in the real flow. Follow-up: convert `creation_budget_clamp_and_traits` to a direct `creation.tscn` boot.
-2. **Shell duplication**: `menu.tscn` duplicates `main.tscn`'s shell node block (forced by `main.tscn`'s byte-identity). Future shell edits must touch both.
-3. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
-4. **Segment-2 穿越 narrative content is deferred** - roadmap stage-3 content.
-5. **Unit-test gate wiring is deferred** - the Godot unit tests under `tests/` are still unwired into `run_tests.sh`; the static `test_playtest_contract_smoke.py` is the one genuine pytest signal in the meantime.
-6. ~~Changelog gap~~ **Resolved**: `design/99_changelog.md` now carries both rounds' rows (`jinyong-layout` and `jinyong-layout-r2`, 2026-08-25).
+1. **`design/20_content.md` has no section for the 16-event pool** - the round's closure constraint 「新增内容在 `design/20_content.md` 记一节」 is unmet; the event content lives in `scripts/data/event_data.gd` + tests + `final/delivery_notes.md` + the `99_changelog.md` row. A follow-up design pass should add it.
+2. **`design/30_presentation.md` still documents the six-layer predicate** while the code implements eight layers (`blank_texture` / `covered`, 0.25 / 64 px² thresholds, max-single-coverer semantics) - declared as out-of-round in the round design; amend in a later design pass.
+3. **`spine_to_ending` and `creation_budget_clamp_and_traits` walk a test-only path** (TUTORIAL WON -> TRANSITION -> CHARACTER_CREATION -> SECT_SELECTION) that no longer exists in the real flow. Follow-up: convert `creation_budget_clamp_and_traits` to a direct `creation.tscn` boot.
+4. **Shell duplication**: `menu.tscn` duplicates `main.tscn`'s shell node block (forced by `main.tscn`'s byte-identity). Future shell edits must touch both.
+5. **`has_save` is session-memory**; menu availability is file existence. Do not "fix" one by pointing at the other.
+6. **Segment-2 穿越 narrative content is deferred** - roadmap stage-3 content.
