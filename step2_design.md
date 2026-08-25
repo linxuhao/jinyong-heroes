@@ -1,305 +1,423 @@
-# Technical Architecture Design — Round: Click-Driven Battle Movement
+# Technical Architecture Design — Round: 把界面排出来 (Interface Layout)
 
-Project: Huashan Sword Tournament (Godot 4 grid tactics). Round goal (from `design/99_changelog.md` rows 2026-08-25 and the SOTA report):
+**Project:** jinyong-clickmove round 2 — Godot 4 grid tactics ("Huashan Sword Tournament"). Viewport 960×704 (`canvas_items`/`keep`), HUD on CanvasLayer 10 (scale-1: HUD px == viewport px).
 
-1. **Click-driven battle movement** — left-click an empty tile walks there; right-click undoes the whole turn's movement back to the turn-start tile; a successful action (attack/skill) commits the movement (no more undo). Arrow keys stay as a shortcut, no longer the primary interaction.
-2. **Focus-mode fix** — battle HUD buttons must never hold keyboard focus, so GUI focus navigation stops swallowing arrow keys (the reported "sometimes can't move" defect).
-3. **Creation screen: one primary interaction** — the `▶` keyboard-cursor text model is removed; the button set is the single visible surface; keyboard input degrades to pure shortcuts (behavior pinned by 11/11 + 19/19 scenarios).
-4. **Click-aware movement-range highlight** — `MoveRangeHighlight` expresses the "trying" state: where right-click returns to (turn-start tile), whether undo is available, and reacts to click-driven movement.
+**Round goal** (from the brief + `step1_sota.md`, ground-truth frames `s42_frame_0030.png` / `s39_frame_0070.png`):
 
-All design is grounded in verified repo reads: `scripts/characters/player.gd`, `scripts/autoload/combat_manager.gd` (`begin_turn` at line 684), `scripts/autoload/grid_manager.gd` (`world_to_grid`/`move_unit`/`is_walkable`/`is_occupied`), `scripts/ui/move_range_highlight.gd`, `scripts/ui/hud.gd`, `scenes/ui/hud.tscn`, `scenes/ui/skill_button.tscn`, `scripts/segments/creation.gd`, `scenes/segments/creation.tscn`, `playtest/_common.yaml` (surface whitelist + `clicks:` spec), `playtest/click_targeting_fixed.yaml`, `playtest/movement_range_highlight.yaml`, `tests/test_playtest_contract_smoke.py`.
+1. **Creation-screen re-layout** — five attr rows are crammed top-left, the `-`/`+` buttons visually disconnected from their row labels, the points label floats, a large black void dominates, and the three phases (ATTRS / TRAITS / CONFIRM) lay out differently. Fix with **property-only** layout changes (no reparenting / renaming / new containers between pinned path segments).
+2. **Battle top bar** — "回合 1" unreadable against Wang Chongyang's portrait, the order line half-covered by the yellow ActiveLabel panel and low-contrast on the sky, the skill hint over Ouyang Feng's HP bar, HP-bar name labels over portraits. Fix by putting the five items (回合数 / 出手顺序 / 行动条 / 技能提示 / 血条姓名) into a non-overlapping, backed layout — the brief's "照这个形状补齐" = extend the existing `_update_geometry_observables()` pattern: one bool observable per fixed overlap pair, asserted `== false` in `ui_geometry_readability.yaml`.
+
+**Stack (fixed):** Godot 4.4, GDScript, Chinese UI text, playtest gate (`playtest/*.yaml` + `tests/test_playtest_contract_smoke.py`), visual gate unchanged (six fixed questions — **no new questions this round**; single-frame spatial questions are judged numerically by playtest, per `design/30_presentation.md`).
+
+All design below is grounded in verified repo reads: `scenes/ui/hud.tscn`, `scripts/ui/hud.gd`, `scripts/ui/round_indicator.gd`, `scripts/ui/health_bar.gd`, `scenes/segments/creation.tscn`, `scripts/segments/creation.gd`, `playtest/_common.yaml`, `playtest/ui_geometry_readability.yaml`, `playtest/creation_single_ui.yaml`, `tests/test_playtest_contract_smoke.py`.
 
 ---
 
 ## 1. Overview
 
-The battle already has one proven mouse path: `player._unhandled_input` (left button) → `_handle_click_targeting(event)` → `handle_world_click(world_pos)` → `GridManager.world_to_grid` → living-enemy match → `_try_attack_target`. The enemy `_input` relay converges on the same public `handle_world_click`. This round extends that single convergence point rather than creating a second mouse architecture:
+Two independent geometry subsystems, one shared idiom:
 
-- `handle_world_click` gains a **fallback branch**: no enemy on the clicked tile → click-move to that tile (enemy-first resolution preserves `click_targeting_fixed`, clicking one's own tile is a no-op).
-- A **sibling right-button branch** in `_unhandled_input` implements undo; the harness drives it with the `clicks:` `right` token (real `InputEventMouseButton` events — no DEBUG action, no test-only path).
-- Movement **reuses `_try_move` byte-for-byte** as the single mutation path: a new pure path planner (`GridManager.plan_movement`) resolves the clicked tile into a cardinal step list under the exact `_try_move` cost model (walkable + unoccupied landing, 身轻如燕 swallow-lightness slide at cost 2), and a step queue executes it one `_try_move` call per step.
-- The turn-start snapshot (`turn_start_grid` / `turn_start_moves_left` / `turn_start_moved`) is written by `CombatManager.begin_turn` — the engine already owns the turn-start lifecycle and budget reset, so the snapshot lives there, next to the `moved`/`acted` resets.
+- **Battle top strip.** Add one new `TopStrip` Panel node to `hud.tscn` (drawn behind all top widgets, `mouse_filter = 2`), semi-transparent dark backing `StyleBoxFlat`. Relocate the existing top widgets *by offsets/anchors only* so that RoundLabel / ActiveLabel / OrderLabel / ActionHintLabel / EnergyLabel all sit inside the strip band, pairwise non-overlapping. The ActionHintLabel moves **in position, not in path** (stays a direct child of HUD, per the SOTA recommendation). PauseButton stays where it is (never moved into the strip). EndTurn / Attack / SkillDesc shift down so nothing straddles the strip's bottom edge.
+- **HP-bar discipline.** `health_bar.gd` gains a strip-aware bottom clamp (bar top ≥ strip bottom + 2) so floating bars never enter the strip zone, and the name label gets a small semi-transparent backing so it reads even where a portrait passes behind it.
+- **Creation rhythm.** `creation.tscn` gets property-only rhythm: uniform row heights, expand-filled right-aligned value labels hugging the `-`/`+` cluster, container separations, PointsLabel repositioned onto the group, fixed-size centered CONFIRM buttons. `creation.gd` computes per-frame geometry observables (same shape as hud.gd).
+- **Gate wiring.** Append-only surface additions in `playtest/_common.yaml`; extend `ui_geometry_readability.yaml` **in place** (no two-place sync); one new scenario `creation_layout_readability.yaml` (boots `res://scenes/segments/creation.tscn` directly — needs the two-place sync: `scenario_order` + `ROUND_SCENARIOS`, both appended at the end in the same order).
 
-### 1.1 State machine: 试走 (trial) → 反悔 (undo) → 出手即锁定 (commit)
-
-| State | Entry | Exit |
-|---|---|---|
-| **trial** | turn start (`begin_turn` snapshot) or after any move | undo, or commit |
-| **undo** | right-click while not committed | restores snapshot: `grid_pos = turn_start_grid`, `moves_left = turn_start_moves_left`, `moved = turn_start_moved` (animated via `GridManager.move_unit`) |
-| **commit** | `acted` becomes true (engine sets it only on successful execution) or turn ends | undo permanently refused this turn |
-
-**Two rules, decided here and recorded for downstream:**
-
-- **Commit blocks UNDO, not movement.** `design/10_systems.md` §5.1 "移动与动作的先后不限" (move and act in any order) is a pinned rule, and `playtest/movement_range_highlight.yaml` explicitly pins `MoveRangeHighlight.visible == true` AFTER acting with `moves_left > 0` (the node's own comment forbids `acted` from entering the hide condition). Click-move after acting therefore stays allowed; only the undo affordance dies at commit. Reason: changing the order-unrestricted rule would break the pinned scenario and contradict the design doc — commit semantics are new, the movement rule is not.
-- **Commit condition is exactly `acted == true`** (player's own turn). The engine resets `acted = false` in `begin_turn`, so "acted became true since turn start" is simply `acted == true` while it is the player's turn. End-turn commits implicitly: after `end_current_turn` it is no longer the player's turn and the input gate already blocks all battle input.
+**No gameplay, no numbers, no assets, no visual-gate changes.** All edits are scene-property changes plus additive script observables. Every existing scenario asserts node names/paths or behavior, never pixel offsets — so property-level edits cannot break them (see §8 for the per-chain audit).
 
 ---
 
 ## 2. Architecture Diagram (text)
 
 ```
-                    Viewport input pipeline (_input → GUI focus nav → shortcut → _unhandled_input)
-                                                          │
-        ┌─────────────────────────────────────────────────┼───────────────────────────────┐
-        │ LEFT click (empty tile / enemy)                 │ RIGHT click                    │ enemy hit-surface relay
-        v                                                  v                                v
-player._unhandled_input ──_handle_click_targeting   player._unhandled_input ──right branch  enemy.gd._input
-        │                                                  │                                │
-        └──────────────────────┐                           └──── handle_world_right_click ──┘
-                               v                                                     │
-                    handle_world_click (single convergence point)                    │
-                               │                                                     │
-        world→grid: GridManager.world_to_grid(event-canvas-space position)           │
-                               │                                                     │
-              ┌────────────────┴────────────────────┐                                │
-              │ living enemy at tile? YES           │ NO: click_grid == grid_pos? no-op
-              v                                      v                                │
-   _try_attack_target (UNCHANGED, all gates)   _try_move_to(click_grid)               │
-                                                      │                               │
-                              GridManager.plan_movement(from, budget, slide_ok)       │
-                              (pure BFS — EXACT _try_move cost model, returns steps)  │
-                                                      │                               │
-                                              step queue ──> _try_move(dir) ×N        │
-                                              (single mutation path, budget/occupancy │
-                                               re-validated per step; tween per step)  │
-                                                      │                               v
-                                     _on_move_completed pops next step    committed (acted)?
-                                     ────────────────────────────────── NO ──> GridManager.move_unit
-                                     Player.undo_available (recomputed                 (self, grid_pos, turn_start_grid)
-                                       per frame in _process)                          + budget/moved refund
-                                                      │                        YES ──> hint 「已出手,无法退回」, no state change
-                                                      v
-                                  MoveRangeHighlight (polls player each frame):
-                                  reachable BFS (unchanged hide rules) + start_tile marker
-                                  + undo_available mirror (drawn/observable)
+BATTLE HUD (CanvasLayer 10, scale-1 — all rects below share ONE coordinate system;
+no Node2D↔Control conversion anywhere in this design — see decision E5)
 
-Engine side:
-CombatManager.begin_turn(unit) ──> budget reset (unchanged) ──> snapshot block:
-        unit.turn_start_grid = unit.grid_pos
-        unit.turn_start_moves_left = unit.moves_left   # AFTER next-turn restrictions
-        unit.turn_start_moved = unit.moved             # (guarded: fields exist only on Player)
+hud.tscn (sibling draw order = tree order; TopStrip inserted as FIRST child => drawn
+behind everything else on the layer):
 
-Focus fix (static, per-scene):
-hud.tscn: PauseButton / EndTurnButton / AttackButton  += focus_mode = 0
-skill_button.tscn: root SkillButton (⇒ all SkillButton1..12 instances) += focus_mode = 0
-⇒ no battle Control can ever hold focus ⇒ ui_* focus navigation never consumes arrows ⇒
-  move_up/down/left/right reach _unhandled_input deterministically (the "intermittent" defect dies)
+  HUD (Control, full-screen, mouse_filter=2)
+  ├── TopStrip        [NEW Panel, full-width 0..80, mouse_filter=2,
+  │                    StyleBoxFlat bg (0.07,0.07,0.10,0.60)]      <- backing band
+  ├── HealthBarContainer   (unchanged tree order; bars clamp BELOW strip at runtime)
+  ├── SkillBar / rows      (unchanged)
+  ├── ActionHintLabel      (anchors moved: center-top, y 62..78 — inside strip)
+  ├── RoundIndicator       (center-top 400px, y 0..56: RoundLabel 0..20 /
+  │                         ActiveLabel 22..42 / OrderLabel 44..60)
+  ├── EnergyLabel          (y 4..24)
+  ├── PauseButton          (y 8..44, unchanged position — sits ON the strip band)
+  ├── EndTurnButton        (y 52..88  ->  84..120, clears strip bottom edge)
+  ├── AttackButton         (y 96..132 -> 124..160)
+  └── SkillDescLabel       (y 140..320 -> 164..344, clears AttackButton)
+
+health_bar.gd (per floating widget):
+  desired pos = above sprite top (existing) -> clamp y >= STRIP_BOTTOM + 2 (= 82)
+  NameLabel += backing StyleBoxFlat (semi-transparent, built once in setup)
+
+hud.gd _update_geometry_observables() (runs FIRST in _process, before the player
+null-check — readable pre-battle; guards: null/invalid/visible per widget):
+  per-frame write of: top_text_pairwise_overlap, top_text_in_strip,
+  top_strip_alpha, hint_hpbar_overlap, hpbar_strip_overlap   (+ existing 5 vars)
+
+CREATION SCREEN (direct creation.tscn boot in the playtest):
+
+creation.tscn (property-only; tree/paths byte-identical):
+  MouseBox (VBox, 560x480 centered) -> separation 14
+  ├── AttrBox:    separation 10; rows min-height 44, HBox separation 6;
+  │               AttrLabel min 180 + horizontal_alignment=2 + size_flags=3
+  │               (value text right-aligned, hugging -/+ cluster at row right);
+  │               buttons min 44x34; AttrNavRow min-height 44
+  ├── TraitBox:   separation 4; toggles min-height 24 (13 rows fit; no overflow)
+  └── ConfirmBox: separation 12; ConfirmButton/BackButton
+                  size_flags_horizontal=4 (shrink-center) + min (240,44)
+  PointsLabel -> offsets so it sits 8..24 px above MouseBox top, x-centered.
+
+creation.gd _update_geometry_observables() (every _process):
+  per-frame write of: attr_rows_uniform, attr_label_button_gap_ok,
+  points_attrs_gap_ok, phase_skeleton_same, creation_in_viewport, creation_box_fits
+
+GATES:
+  playtest/_common.yaml   surface += HUD.* (5) / HealthBar.* (1) / TopStrip block /
+                          CreationScreen.* (6); scenario_order += creation_layout_readability
+  ui_geometry_readability.yaml   extended IN PLACE (existing asserts untouched)
+  creation_layout_readability.yaml  NEW (scene boot, clicks: AttrNextButton/TraitNextButton)
+  tests/test_playtest_contract_smoke.py  ROUND_SCENARIOS += creation_layout_readability
+                          + test_topbar_layout_surface_contract()
 ```
 
 ---
 
 ## 3. Component List
 
-### 3.1 `scripts/characters/player.gd` — click-move + undo controller
+### 3.1 `scenes/ui/hud.tscn` — top strip + widget repositioning (property-only)
 
-**Responsibility:** resolve world clicks into movement and undo on the player unit, without forking the movement rules.
+**Responsibility:** make the battle top texts live inside one backed band, pairwise non-overlapping, without touching node identity.
 
-**New state (playtest-surface observables):**
-```gdscript
-var turn_start_grid: Vector2i = Vector2i(-1, -1)   # engine-written at begin_turn; init in setup()
-var turn_start_moves_left: int = 0                  # AFTER next-turn restrictions
-var turn_start_moved: bool = false
-var undo_available: bool = false                    # recomputed EVERY frame in _process()
-var _pending_move_steps: Array[Vector2i] = []       # private step queue
-```
+**Changes (all offsets/anchors; no renames, no reparents, no type changes):**
 
-`undo_available` is recomputed every frame (same pattern as `_refresh_sprite_clamp`), **never** event-written:
-```gdscript
-undo_available = (not acted) and (grid_pos != turn_start_grid or moves_left != turn_start_moves_left)
-```
-Per-frame recompute is the robust choice: `acted` is written externally by the engine on successful execution, and this formula can never go stale no matter who writes what.
+| Node | Change |
+|---|---|
+| `TopStrip` (NEW) | Insert as **first child** of HUD (drawn behind everything). `type="Panel"`, anchors preset 10 (left=0, right=1), offsets `0,0,0,80`. `mouse_filter = 2` (mandatory — a full-width Control would otherwise eat battlefield clicks; the SegmentHost lesson, changelog 2026-08-25). `theme_override_styles/panel` = new `StyleBoxFlat` sub_resource: `bg_color = Color(0.07, 0.07, 0.10, 0.6)` (semi-transparent — see decision E6), no border. `load_steps` bumps 4 → 5. |
+| `RoundIndicator` | `offset_top` 8 → 0, `offset_bottom` 72 → 56 (width/anchors unchanged: 400px centered — CJK order line verified to fit at font 10, no re-verify needed). |
+| `RoundIndicator/OrderLabel` | `offset_bottom` 64 → 60 (16px line, font 10). |
+| `ActionHintLabel` | Anchors from bottom-center (preset 7) to top-center (preset 5): `anchor_left=0.5, anchor_right=0.5`, offsets `left=-200, top=62, right=200, bottom=78`. Keep `mouse_filter = 2`, `clip_text = false`, `visible = false` default. |
+| `EnergyLabel` | `offset_top` 8 → 4, `offset_bottom` 28 → 24. |
+| `EndTurnButton` | y 52..88 → 84..120. |
+| `AttackButton` | y 96..132 → 124..160. |
+| `SkillDescLabel` | y 140..320 → 164..344 (clears AttackButton's new bottom edge). |
+| `PauseButton` | **Unchanged** (y 8..44; sits on the strip band — fine, it is not one of the five text items). |
 
-**Interface changes:**
+Resulting strip content (y): RoundLabel 0..20, ActiveLabel 22..42, OrderLabel 44..60, hint 62..78 — all inside strip 0..80, ≥2px vertical gaps between every pair.
 
-- `func _try_move(direction: Vector2i) -> bool` — signature changes `-> void` to `-> bool` (true = step accepted and tween scheduled). **All existing gates, cost bookkeeping and side effects byte-identical** — only the return value is new; existing callers (`_unhandled_input` movement arms) legally ignore it in GDScript, so the 37 keyboard-driven scenarios are untouched.
-- `func _try_move_to(target_grid: Vector2i) -> void` — new, private. Gates: `TutorialManager.is_input_allowed("move")` (else `action_hint.emit("教程尚未解锁")` — same literal the skill path uses), `moves_left > 0`, `target != grid_pos`, `GridManager.is_walkable(target)` (silent — clicking the border ring is not a meaningful rejection). Then `GridManager.plan_movement(grid_pos, moves_left, traits.has("swallow_lightness"))`; unreachable → `action_hint.emit("走不到那里")` and return. One step → plain `_try_move(step)`. Multiple → fill `_pending_move_steps`, pop-front the first and `_try_move` it.
-- `func _on_move_completed() -> void` — modified: if `_pending_move_steps` is non-empty, pop the next direction, `_try_move` it, and **return early if it succeeded** (next completion callback is already scheduled); on a failed step clear the queue. Otherwise fall through to the existing `is_moving = false` + grid-centre snap. This eliminates the stuck-`is_moving` deadlock if a planned step ever fails mid-queue.
-- `func handle_world_click(world_pos: Vector2) -> void` — modified, one append after the enemy-match loop (the loop and its `break` are untouched):
-  ```gdscript
-  if click_grid == grid_pos:
-      return                       # click on own tile: no-op
-  _try_move_to(click_grid)
-  ```
-  Enemy-first resolution is preserved: `click_targeting_fixed` (2/2 green) keeps its exact evidence chain. The enemy relay path can never reach the move branch (it only fires on enemy hit-surfaces, which always match an enemy).
-- `func handle_world_right_click(world_pos: Vector2) -> void` — new, **public** (mirrors the `handle_world_click` relay shape). Same 4-condition gate (state == BATTLE, `is_player_turn()`, not paused, not `is_moving`). Then: `if acted: action_hint.emit("已出手,无法退回"); return`. If already at turn start with full budget (`grid_pos == turn_start_grid and moves_left == turn_start_moves_left`): silent no-op (benign — nothing to undo). Otherwise restore: `moved = turn_start_moved`, `moves_left = turn_start_moves_left`, `is_moving = true`, `GridManager.move_unit(self, grid_pos, turn_start_grid)`, `grid_pos = turn_start_grid`, and schedule `_on_move_completed` after `MOVE_DURATION` (same tween pattern as `_try_move` — animated, not an instant snap; `move_unit` keeps occupancy consistent).
-- `_unhandled_input` — one new sibling branch (placed after the left-click branch):
-  ```gdscript
-  elif event is InputEventMouseButton \
-          and event.button_index == MOUSE_BUTTON_RIGHT \
-          and event.pressed:
-      handle_world_right_click(get_canvas_transform().affine_inverse() * event.position)
-      get_viewport().set_input_as_handled()
-  ```
-- `setup()` — initialise `turn_start_grid = grid_pos`, `turn_start_moves_left = moves_left`, `turn_start_moved = false` so the fields are sane before the first `begin_turn`.
+**Interface:** none (pure scene). Nodes keep exact names/paths; `hud.gd`'s `$` refs all still resolve.
 
-**New Chinese hint literals (grep-able acceptance points, consistent with the existing 7 reason texts):** `走不到那里` (unreachable tile), `已出手,无法退回` (undo refused after commit), `教程尚未解锁` (reused for tutorial-blocked click-move).
+### 3.2 `scripts/ui/hud.gd` — battle geometry observables
 
-### 3.2 `scripts/autoload/combat_manager.gd` — turn-start snapshot (engine side)
+**Responsibility:** per-frame, decidable non-overlap facts for the playtest gate (the brief's "照这个形状补齐" — same shape as `round_pause_overlap` / `hud_button_overlap`).
 
-**Responsibility:** own the snapshot in the same lifecycle that already owns budget reset. **No other engine behavior changes.**
-
-In `begin_turn(unit)` (line ~684), immediately after the existing budget-reset block (AFTER the `no_move_next_turn` / `move_minus_next_turn` restriction application so the snapshot records the effective budget), append:
-```gdscript
-if unit.is_player() and "turn_start_grid" in unit:
-    unit.turn_start_grid = unit.grid_pos
-    unit.turn_start_moves_left = unit.moves_left
-    unit.turn_start_moved = unit.moved
-```
-Guards keep it inert for enemies (which have neither the fields nor need them); `begin_turn` remains a no-op for enemy units apart from the existing lifecycle. `execute_action` is **not** touched — commit is *read* as `acted` by the player, never a second writer.
-
-### 3.3 `scripts/autoload/grid_manager.gd` — pure movement planner
-
-**Responsibility:** one pure function that encodes the `_try_move` cost model, so path resolution and highlight reachability cannot drift apart.
+**New surface vars (append-only; declared at the top next to the existing five):**
 
 ```gdscript
-## Pure planner: BFS/SPFA over the grid under the EXACT _try_move cost model.
-## from: origin tile. budget: movement points. slide_ok: 身轻如燕 enabled.
-## Returns { "dist": {tile: cost}, "steps": {tile: Array[Vector2i] of step directions} }.
-## Neighbor step cost 1 (walkable + unoccupied landing); slide-through of an
-## occupied tile costs 2 and lands on the walkable unoccupied tile beyond
-## (one direction entry encodes the whole 2-tile slide — _try_move executes it
-## natively). Landing tiles are never occupied; the origin is seeded at cost 0.
-func plan_movement(from: Vector2i, budget: int, slide_ok: bool) -> Dictionary
+var top_text_pairwise_overlap: bool = false  # any pair of the top text rects visually overlaps
+var top_text_in_strip: bool = true           # every top text rect ⊆ TopStrip rect (±2px)
+var top_strip_alpha: float = 1.0             # backing alpha read from the strip stylebox
+var hint_hpbar_overlap: bool = false         # visible hint rect ∩ any visible bar rect
+var hpbar_strip_overlap: bool = false        # any visible bar rect ∩ TopStrip rect
 ```
-Reuses the existing relaxation pattern (`_relax`-style re-enqueue, needed because mixed 1/2 costs mean a later cheap path can beat an earlier expensive one). Grid is 15×11 with budget ≤ ~6 — performance is a non-issue.
 
-### 3.4 `scripts/ui/move_range_highlight.gd` — "trying" state
+**`_update_geometry_observables()` extension** (after the existing block; same guard style — `get_node_or_null` re-resolution + `is_instance_valid` + `visible` gates; runs before the player null-check so it is readable pre-battle):
 
-**Responsibility:** show where right-click returns to and whether undo is available, on top of the existing reachable-set overlay.
+- Resolve `TopStrip` via `get_node_or_null("TopStrip") as Panel`; cache in a member.
+- **Overlap convention (single, documented):** a pair "overlaps" iff the two rects intersect after each is inset by 1px on all sides — helper `_inset_overlap(a: Rect2, b: Rect2) -> bool: return a.grow(-1.0).intersects(b.grow(-1.0))`. `Rect2.intersects()` is inclusive of touching edges; two stacked labels with a 2px gap must not read as overlapping (SOTA edge case E1). This helper is the ONLY overlap predicate used by every new observable.
+- `top_text_pairwise_overlap`: pairwise `_inset_overlap` over {RoundLabel, ActiveLabel, OrderLabel, EnergyLabel} plus ActionHintLabel **only when `visible`** (hidden widgets still have rects — a hidden hint at an old position would false-positive; SOTA E2). Labels resolved via `_round_indicator` children and existing members.
+- `top_text_in_strip`: for the same set (hint again only when visible): `strip.grow(2.0).encloses(r)` AND `r.size.x > 0`. True by construction after 3.1; pins it.
+- `top_strip_alpha`: `sb = strip.get_theme_stylebox("panel")`; `top_strip_alpha = sb.bg_color.a if sb != null else 1.0`.
+- `hint_hpbar_overlap`: **only evaluated when the hint is visible** — iterate `_health_bars` (existing array of instantiated HealthBar Controls), skip invalid, test `_inset_overlap(hint rect, bar.get_global_rect())`; any hit → true. When the hint is hidden, keep the last value (or false) — it is only asserted at frames where the hint is visible (E2 convention: skip non-visible, never assert a hidden-hint frame).
+- `hpbar_strip_overlap`: any valid visible bar's rect vs TopStrip rect via `_inset_overlap`. With the 3.3 clamp this is structurally false; the observable pins it (a bar under the strip would be dimmed by the backing — the readability defect moved, not fixed).
 
-**Changes (additive only — the pinned `movement_range_highlight` scenario asserts `visible` / `tile_count` / `fill_color`, none of which change semantics):**
+All rects live on the same CanvasLayer-10 scale-1 space — no coordinate conversion anywhere in this component.
 
-- New observables: `var start_tile: Vector2i = Vector2i(-1, -1)`, `var undo_available: bool = false`. Polled every frame from `player.turn_start_grid` / `player.undo_available` in `_process` (before the diff early-return), and `start_tile` is added to the cheap-diff key set so the marker redraws when it changes.
-- New draw constant `START_EDGE` (a bright amber-green edge, distinct from `MOVE_FILL`/`MOVE_EDGE` and from `RangeHighlight`'s blue/red) and in `_draw()` an edge-only marker rect on `start_tile`.
-- **The visibility/hide condition is UNCHANGED.** `acted` must NOT enter the hide condition (documented in the file, pinned by `movement_range_highlight.yaml`, and required by the "commit blocks undo, not movement" rule of §1.1). The commit state is expressed through `undo_available` flipping false — never by hiding the reachable set.
-- Optional (guarded) refactor: `_recompute` may switch to `GridManager.plan_movement` (throwing away its private BFS) **only if** `movement_range_highlight` stays byte-green; otherwise keep the private BFS and the planner coexists. Flag any deviation in the delivery notes.
+### 3.3 `scripts/ui/health_bar.gd` — strip clamp + name-label backing
 
-### 3.5 Battle focus-mode sweep — `scenes/ui/hud.tscn`, `scenes/ui/skill_button.tscn`
+**Responsibility:** keep floating HP widgets out of the strip zone and make name labels readable on artwork.
 
-**Responsibility:** make "no battle Control ever holds focus" a static, per-scene property.
+**Changes:**
 
-- `./scenes/ui/hud.tscn`: add `focus_mode = 0` to `PauseButton`, `EndTurnButton`, `AttackButton` (the three buttons that currently default to FOCUS_ALL).
-- `./scenes/ui/skill_button.tscn`: add `focus_mode = 0` to the root `SkillButton` node — covers all SkillButton1..12 instances in one edit.
-- Sweep check (same task): any other `Button` in battle-visible UI (e.g. `scenes/ui/tutorial_overlay.tscn` if it has clickables) gets the same line, per the changelog implementation rule "新增可点控件一律显式设 focus_mode = 0". Do NOT touch creation/menu/settings scenes (already correct, 29 sites).
+1. **Constant** `const STRIP_BOTTOM: float = 80.0` (strip height in viewport px — the battle HUD's top band; documented as the pair of hud.tscn's TopStrip offsets).
+2. **Clamp** in `follow_character()`: after the existing viewport edge-clamps, add `root.position.y = maxf(root.position.y, STRIP_BOTTOM + 2.0)`. `follow_delta` stays computed BEFORE any clamp (existing semantics preserved — the player's mid-board bar at f30 never engages the new clamp, so `HealthBar.follow_delta <= 24` in `ui_geometry_readability` is untouched).
+3. **Name backing** in `setup()` (idempotent, same defensive `get_node_or_null` pattern): build one cached `StyleBoxFlat` (bg `Color(0.05, 0.05, 0.08, 0.7)`, corner radius 2, `content_margin_all(2.0)`) and `add_theme_stylebox_override("normal", ...)` on `_name_label`. New surface var written unconditionally in `setup()`:
+   ```gdscript
+   var name_backing_alpha: float = 0.0   # 0.7 once the backing exists; 0.0 fallback
+   ```
 
-**Why static per-scene instead of code:** the defect is a scene-authoring property (a Control with default focus mode); fixing it in `.tscn` is diff-visible, matches the 29-site precedent, and the new scenario asserts the result numerically via the `focus_mode` observable.
+**Interface:** additive only. Existing unit tests (`test_health_bar.gd` pins the 68×20 widget geometry, labels 9px, bar y=12) are unaffected — the backing is a stylebox override, not layout; the clamp only engages for sprites whose bar would reach y < 82.
 
-### 3.6 Creation screen single-UI — `scenes/segments/creation.tscn`, `scripts/segments/creation.gd`
+### 3.4 `scenes/segments/creation.tscn` — layout rhythm (property-only)
 
-**Responsibility:** collapse the two parallel operation surfaces (keyboard `▶` cursor text model in `BodyLabel` vs `MouseBox` buttons) into one: **buttons are the single visible interaction surface; keyboard remains a working shortcut layer.**
+**Responsibility:** uniform, breathing layout across ATTRS / TRAITS / CONFIRM without touching the pinned tree (`MouseBox/AttrBox/AttrRow0/AttrMinus0` … paths must stay byte-identical — no reparenting, no renaming, no new container between pinned path segments; only sibling-level additions would be legal and none are needed).
 
-**`./scenes/segments/creation.tscn`:**
-- **Remove the `BodyLabel` node** (the `▶` cursor text surface — the "second UI" the user reported). No scenario asserts on it (it is not in the `surface:` whitelist — verified).
-- **Add `PointsLabel`** (a `Label`, top area, e.g. centred above `MouseBox`): displays `剩余点数 N`. This carries the points display that used to live inside `BodyLabel`.
-- Keep `HintLabel` (new text, below) and **every `MouseBox/...` node name, path and `focus_mode = 0` line byte-identical** (pinned scenarios `creation_traits_back_next_buttons`, `creation_back_to_menu_walk`, `creation_mouse_interaction` depend on node names/paths).
+**Changes:**
 
-**`./scripts/segments/creation.gd`:**
-- `_render()`: delete the `BodyLabel` text-building (all three phases); add `PointsLabel.text = "剩余点数 %d" % points_left`; keep every existing `MouseBox` per-phase visibility/text update as-is.
-- **New observable `cursor_markers_visible` — the gate-judged proof that the keyboard-cursor surface is gone.** `var cursor_markers_visible: bool = false`, recomputed at the END of `_render()`: walk every `Label` descendant (e.g. `find_children("*", "Label", true, false)`) and set it true if any label's `text` contains the `▶` marker (U+25B6). Why `▶` is the right signature: the keyboard-cursor model's entire visual language is the `▶` marker in front of the focused attr/trait row — that marker list IS the second, parallel operation surface; the button surface expresses focus through modulate/disabled states and never uses `▶`. So 「no `▶` in any rendered creation text」 ⟺ 「the cursor-list surface is gone」, regardless of which node renders it. A node-absence check (BodyLabel deleted) would miss the cursor model reviving in a different label — this observable goes red in exactly that case, which is why it is asserted `== false` by the playtest gate (scenario 5) instead of being accepted by a `.tscn` diff.
-- **Focused-row visual**: in `_render()`, set `modulate` on the focused `AttrRow{i}` (ATTRS) / `TraitToggle{i}` (TRAITS) — focused row `Color(1,1,1,1)`, others `Color(0.72,0.72,0.72,1)`. `attr_index` / `trait_index` thus remain *visible* on the single button surface (they drive which row minus/plus acts on), instead of living in a duplicated text list. No new nodes, no new button names.
-- `HintLabel.text` per phase, accurate to the real controls and **without the stale 「右键确认」 promise** (the TRAITS right-click hint promised a handler that never existed — SOTA flags it as a candidate; it dies with the BodyLabel text): ATTRS → `点击 ± 调整属性 · 回车下一步`; TRAITS → `点击切换特质 · 回车进入确认`; CONFIRM → `点击确认踏上江湖 · 回车确认`. (Exact wording is implementer-fine-tunable; the hard requirement is: no right-click promise, no "两个界面".)
-- **`_unhandled_input`, `_process` (debug action), `_wire_mouse_widgets` and every handler stay byte-identical** — keyboard keeps working as a pure shortcut with the exact semantics pinned by `creation_budget_clamp_and_traits` (11/11) and `menu_to_creation_to_tutorial_order` (19/19). Arrow keys no longer "move a cursor list" because the cursor list is gone; they move row focus on the button surface.
+| Node | Change |
+|---|---|
+| `MouseBox` | `theme_override_constants/separation = 14` (breathing between the phase blocks and PointsLabel rhythm). |
+| `PointsLabel` | Keep node + name + anchors preset 8; offsets `top=-268, bottom=-248` → rect y 84..104, bottom 8px above MouseBox top (112). x stays `-200..200` (centered == MouseBox center). |
+| `AttrBox` | `theme_override_constants/separation = 10`. |
+| `AttrRow0..4` | `custom_minimum_size = Vector2(0, 44)` (uniform row height — kills the "crammed" look and the void); `theme_override_constants/separation = 6`. |
+| `AttrRow*/AttrLabel` | Keep `custom_minimum_size = Vector2(180, 0)`; add `horizontal_alignment = 2` (right) + `size_flags_horizontal = 3` (expand-fill). The value text ("根骨 10") right-aligns and the row's `-`/`+` cluster hugs it at the row's right edge — label and buttons read as one group (the reported "`-`/`+` disconnected from row labels" defect). |
+| `AttrRow*/AttrMinusN` / `AttrPlusN` | `custom_minimum_size = Vector2(44, 34)` (uniform, grouped touch targets; rows stretch them to 44). Keep `focus_mode = 0`. |
+| `AttrNavRow` | `custom_minimum_size = Vector2(0, 44)`. |
+| `AttrDescLabel` | `custom_minimum_size = Vector2(0, 48)` (reserved rhythm when visible; hidden children occupy no layout space, so the default-hidden state is unaffected). |
+| `TraitBox` | `theme_override_constants/separation = 4`; each `TraitToggle0..12` `custom_minimum_size = Vector2(0, 24)` (13 × 24 + 12 × 4 + desc + nav stays inside the 480-tall box with desc visible — verified by the `creation_box_fits` observable). |
+| `TraitNavRow` | `custom_minimum_size = Vector2(0, 44)`. |
+| `ConfirmBox` | `theme_override_constants/separation = 12`; `ConfirmButton` / `BackButton`: `size_flags_horizontal = 4` (shrink-center — fixed width instead of full-width stretch) + `custom_minimum_size = Vector2(240, 44)` (BackButton 160, 44). |
 
-### 3.7 Playtest contract — `playtest/_common.yaml` + 5 new scenario files + `tests/test_playtest_contract_smoke.py`
+**Interface:** none. `creation.gd`'s `get_node("MouseBox/…")` paths all still resolve — nothing was moved, renamed, or re-typed.
 
-**Contract shape statement (for PM & implementer):**
-- `scene:` default stays `res://scenes/main.tscn`; the creation scenario overrides with `scene: res://scenes/segments/creation.tscn` (proven direct-boot pattern).
-- `actions:` list is **UNCHANGED** — no new input actions, no new DEBUG actions. Right-click is driven exclusively by `clicks:` entries with the `right` token (`"<Node>[ +dx,dy][ left|right|middle]"`), which post real `InputEventMouseButton` events through the real `_unhandled_input` branch.
-- `surface:` additions are **append-only, surgical** (never a file rewrite — the previous round's whole-file-rewrite audit is the standing warning):
+### 3.5 `scripts/segments/creation.gd` — creation geometry observables
+
+**Responsibility:** per-frame, decidable rhythm facts for the new scenario (same pattern as hud.gd).
+
+**New surface vars (append-only):**
+
+```gdscript
+var attr_rows_uniform: bool = true          # all 5 visible attr rows: same height/left/right (±1px)
+var attr_label_button_gap_ok: bool = true   # per row: 0 <= minus.left - label.right <= 8
+                                            #   and 0 <= plus.left - minus.right <= 8
+                                            #   and row height >= 32 (grouping + touch size)
+var points_attrs_gap_ok: bool = true        # PointsLabel bottom .. current phase box top in [4,24]
+                                            #   and x-centers within 4px
+var phase_skeleton_same: bool = true        # visible phase box top offset == recorded ATTRS top (±2px)
+var creation_in_viewport: bool = true       # MouseBox rect inside viewport inset 16
+var creation_box_fits: bool = true          # current visible phase box content bottom <= MouseBox bottom - 8
+```
+
+**`_update_geometry_observables()`** — new private method called from `_process` (creation.gd already has a `_process` for the DEBUG action). Logic:
+
+- Resolve phase boxes via the existing `get_node("MouseBox/AttrBox")`-style paths (they already exist in `_wire_mouse_widgets`); gate every measurement on `visible` (TraitBox/ConfirmBox are hidden in ATTRS; hidden Controls still report rects — E2).
+- `attr_rows_uniform` / `attr_label_button_gap_ok`: computed only when `phase == "ATTRS"` (rows only exist there); otherwise keep last value.
+- `points_attrs_gap_ok`: compare `PointsLabel` rect against the CURRENT visible phase box (AttrBox / TraitBox / ConfirmBox) — same invariant in every phase.
+- `phase_skeleton_same`: on the first frame with `phase == "ATTRS"`, record `_ref_box_top = AttrBox.get_global_rect().position.y`; in other phases compare the visible box's top against it (±2px).
+- `creation_in_viewport` / `creation_box_fits`: always computed from `MouseBox` / visible phase box rects.
+
+**Interface:** no behavior change — `_render`, phase transitions, wiring, and all existing surface vars stay byte-identical.
+
+### 3.6 `playtest/_common.yaml` — surface + scenario order (append-only)
+
+**Surface additions** (append-only direction, sanctioned by the SOTA):
 
 ```yaml
-  Player:                    # append to existing block
-  - turn_start_grid
-  - turn_start_moves_left
-  - turn_start_moved
-  - undo_available
-  MoveRangeHighlight:        # append to existing block
-  - start_tile
-  - undo_available
-  EndTurnButton:             # append
-  - focus_mode
-  AttackButton:              # append
-  - focus_mode
-  PauseButton:               # append
-  - focus_mode
-  SkillButton1:              # append (representative: all 12 share the instanced scene)
-  - focus_mode
-  PointsLabel:               # new block
+  HUD:                # append to existing block
+  - top_text_pairwise_overlap
+  - top_text_in_strip
+  - top_strip_alpha
+  - hint_hpbar_overlap
+  - hpbar_strip_overlap
+  TopStrip:           # NEW block
   - visible
-  - text
-  CreationScreen:            # append to existing block
-  - cursor_markers_visible
+  - size
+  HealthBar:          # append to existing block
+  - name_backing_alpha
+  CreationScreen:     # append to existing block
+  - attr_rows_uniform
+  - attr_label_button_gap_ok
+  - points_attrs_gap_ok
+  - phase_skeleton_same
+  - creation_in_viewport
+  - creation_box_fits
 ```
 
-**Scenario skeletons** (frames are placeholders for PM calibration; each ≤ 2999; battle preamble = 7× `ui_accept` f3..15 + `tutorial_next` f20/25/30, input live ~f35 — measured shape of the existing battle scenarios; every click needs ~15–30 frames after it before asserting, each walk step ≈ 9 frames (0.15 s tween) — leave 50+ frames after multi-step clicks):
+**`scenario_order`:** append `creation_layout_readability` at the END (after `creation_single_ui`).
 
-1. `battle_focus_arrow_keys` (focus-mode proof) — main.tscn, battle preamble. Assert the **static contract** `EndTurnButton.focus_mode == 0`, `AttackButton.focus_mode == 0`, `SkillButton1.focus_mode == 0`, `PauseButton.focus_mode == 0`. Then the behavioral differential: `clicks: [AttackButton]` (click focuses a button; its gate-guarded handler emits 「射程不够」 and does NOT end the turn), then `actions: [move_up]`, then assert `Player.grid_pos: changed` (the hard differential rule — arrow still reaches `_unhandled_input` after a button click). Note in the file: the static `focus_mode == 0` asserts are the direct proof of the fix and cannot be vacuous even if the harness synthesizes actions rather than raw keys; the `grid_pos: changed` differential is the end-to-end behavior proof.
-2. `click_move_to_tile` (click-move) — main.tscn, battle preamble (player (7,5), moves 4). `clicks: [Player +64,0]` → assert `Player.debug_click_events: changed` (click arrived), `Player.grid_pos == Vector2i(8,5)`, `Player.moves_left == 3`, `Player.moved == true`, `Player.undo_available == true`, `MoveRangeHighlight.start_tile == Vector2i(7,5)`. Then multi-step: `clicks: [Player +0,-192]` (offset is re-anchored to the player's NEW centre → tile (8,2), 3 steps) → assert `Player.grid_pos == Vector2i(8,2)`, `Player.moves_left == 0`. Then no-op control: `clicks: [Player +0,0]` → assert `Player.grid_pos: changed == false`-style differential (grid_pos still (8,2), moves_left still 0 — clicking one's own tile is a no-op; use the `changed` comparator or explicit `==`).
-3. `click_move_undo_right` (undo) — main.tscn, preamble. Control probe first: `clicks: [Player +0,0 right]` with nothing moved → assert `Player.grid_pos == Vector2i(7,5)` and `Player.moves_left == 4` (harmless no-op). Then `clicks: [Player +0,-192]` (walk (7,5)→(7,2), budget 1) → assert `grid_pos == Vector2i(7,2)`, `moves_left == 1`, `undo_available == true`. Then `clicks: [Player +0,0 right]` → assert `Player.grid_pos == Vector2i(7,5)`, `Player.moves_left == 4`, `Player.moved == false`, `Player.undo_available == false` (full restore — this is the differential proof that the `right` token truly selects the right button, mirrored by the measured left-vs-right contrast from SOTA).
-4. `click_move_commit_lock` (commit) — main.tscn, preamble. `clicks: [Player +0,-192]` → (7,2) adjacent to Central_Divine (7,1), budget 1. Then `clicks: [Central_Divine_ClickTarget]` → basic attack, assert `Player.acted == true`, `Central_Divine.health == max_health - 39` (PROBE number — recalibrate to observed, same convention as `click_targeting_fixed`). Then `clicks: [Player +0,0 right]` → assert `Player.grid_pos == Vector2i(7,2)` (NOT (7,5) — undo refused), `Player.moves_left == 1`, `Player.undo_available == false`.
-5. `creation_single_ui` (creation single surface) — `scene: res://scenes/segments/creation.tscn` direct boot. Assert at ~f30: `CreationScreen.visible == true`, `CreationScreen.phase == "ATTRS"`, `PointsLabel.visible == true`, `PointsLabel.text.contains("剩余点数") == true` (the `.contains() … == true` operator rule), `AttrPlus0.visible == true`, `TraitToggle0.visible == false` (phase-scoped single surface), `CreationScreen.pressed_connected.size() > 0` (wiring intact), `CreationScreen.cursor_markers_visible == false` (the runtime proof the keyboard-cursor surface is gone — no `▶` in any rendered label; see §3.6 for why this captures 「two UIs」 and not just 「a node is missing」). Then keyboard-shortcut regression pins: `actions: [move_right]` → assert `CreationScreen.attrs.bone == 11` and `CreationScreen.points_left == 29`; `actions: [move_left]` → back to `10` / `30`. Phase-completeness: after the keyboard pins, press `confirm` (Enter) into TRAITS and re-assert `CreationScreen.cursor_markers_visible == false` and `TraitToggle0.visible == true` — the scan runs at the end of every `_render()`, so each phase's rendered text is covered. Note in the file: this acceptance is judged by the playtest gate, NOT by the `BodyLabel`-removed `.tscn` diff and NOT by the vision gate (whose six fixed questions never ask about UI-surface multiplicity) — a diff is a review aid, not an acceptance gate.
+### 3.7 `playtest/ui_geometry_readability.yaml` — extend IN PLACE
 
-**`tests/test_playtest_contract_smoke.py`:**
-- `ROUND_SCENARIOS` becomes the 5 new names **in this exact order**: `battle_focus_arrow_keys`, `click_move_to_tile`, `click_move_undo_right`, `click_move_commit_lock`, `creation_single_ui`.
-- Append the same 5 names to `scenario_order:` in `_common.yaml` (same order — the pytest asserts `indices == sorted(indices)`).
-- Add `test_click_move_surface_contract()`: assert `Player` block contains `turn_start_grid`, `turn_start_moves_left`, `undo_available`; `MoveRangeHighlight` block contains `start_tile`, `undo_available`; `CreationScreen` block contains `cursor_markers_visible`. Extend the clicks-owner check for the new scenarios: parse each new scenario's `clicks:` items, take the **first whitespace-separated token** as the node name (offset spec strings like `Player +64,0`), strip a trailing `_ClickTarget`, and assert the owner is a whitelisted surface block (`Player`, `Central_Divine`, `AttackButton`). Reuses the existing `_items_under` helper; standard library only.
+Same file, same scenario, no two-place sync. Append new asserts to the existing f30 block and add one hint-visible block (skeleton — PM fills/verifies exact frames by probing, 先取值再动手):
+
+```yaml
+    # ---- appended to the existing f30 assert block (existing 24 asserts untouched) ----
+    HUD.top_text_pairwise_overlap: top_text_pairwise_overlap == false
+    HUD.top_text_in_strip: top_text_in_strip == true
+    HUD.top_strip_alpha: top_strip_alpha > 0.4 and top_strip_alpha < 0.8
+    HUD.hpbar_strip_overlap: hpbar_strip_overlap == false
+    TopStrip.visible: visible == true
+    HealthBar.name_backing_alpha: name_backing_alpha > 0.3
+# ---- new entries after the existing f85 block ----
+- at: 100
+  actions:
+  - skill_1            # selecting a skill makes the hint line visible
+- at: 115
+  actions: []
+  assert:
+    ActionHintLabel.visible: visible == true
+    HUD.hint_hpbar_overlap: hint_hpbar_overlap == false
+```
+
+Rules obeyed: every assert value contains a comparison operator (the `30_presentation.md` hard rule); `hint_hpbar_overlap` is only asserted while the hint is visible (E2); `round_pause_overlap`'s existing assert stays byte-identical (RoundIndicator width unchanged → still false).
+
+### 3.8 `playtest/creation_layout_readability.yaml` — NEW scenario
+
+Direct `creation.tscn` boot (proven pattern from `creation_single_ui`; asserts hold at f30 on a direct boot). Skeleton with placeholders for PM:
+
+```yaml
+name: creation_layout_readability
+description: >-
+  creation.tscn direct boot: the three phases share one vertical skeleton — uniform
+  attr rows with the value label hugging its -/+ cluster, the points label attached
+  to the block, everything inside the viewport, and no phase overflows its box.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attr_rows_uniform: attr_rows_uniform == true
+    CreationScreen.attr_label_button_gap_ok: attr_label_button_gap_ok == true
+    CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
+    CreationScreen.creation_in_viewport: creation_in_viewport == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+- at: 40
+  clicks:
+  - AttrNextButton        # real mouse event on the 下一步 button -> TRAITS
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    CreationScreen.phase_skeleton_same: phase_skeleton_same == true
+    CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+- at: 100
+  clicks:
+  - TraitNextButton       # -> CONFIRM
+- at: 150
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+    CreationScreen.phase_skeleton_same: phase_skeleton_same == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+```
+
+Has real input (clicks — satisfies the "every scenario must press something" rule). Click targets `AttrNextButton` / `TraitNextButton` are whitelisted surface blocks and buttons (bare-name recursive search finds them wherever layout puts them — moving them does not invalidate the click). Frame numbers are placeholders; PM probes observed values before pinning.
+
+**Two-place sync (mandatory):** append the name to `playtest/_common.yaml` `scenario_order` AND to `ROUND_SCENARIOS` in `tests/test_playtest_contract_smoke.py`, same order (end of both lists).
+
+### 3.9 `tests/test_playtest_contract_smoke.py` — contract pin
+
+1. `ROUND_SCENARIOS` += `"creation_layout_readability"` (appended last, matching `scenario_order`).
+2. New test `test_topbar_layout_surface_contract()` (mirrors the existing `test_click_move_surface_contract` shape):
+
+```python
+def test_topbar_layout_surface_contract() -> None:
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "TopStrip" in blocks, "surface has no TopStrip block"
+    hud_items = blocks.get("HUD", [])
+    for var in ("top_text_pairwise_overlap", "top_text_in_strip", "top_strip_alpha",
+                "hint_hpbar_overlap", "hpbar_strip_overlap"):
+        assert var in hud_items, "HUD.%s not whitelisted on the surface" % var
+    creation_items = blocks.get("CreationScreen", [])
+    for var in ("attr_rows_uniform", "attr_label_button_gap_ok", "points_attrs_gap_ok",
+                "phase_skeleton_same", "creation_in_viewport", "creation_box_fits"):
+        assert var in creation_items, "CreationScreen.%s not whitelisted on the surface" % var
+    assert "name_backing_alpha" in blocks.get("HealthBar", []), \
+        "HealthBar.name_backing_alpha not whitelisted on the surface"
+```
 
 ---
 
-## 4. Interface / Data-Flow Summary (for PM decomposition)
+## 4. Observable Contract (interface spec — PM fills thresholds, implementers match names exactly)
 
-| # | Producer → Consumer | Contract |
-|---|---|---|
-| 1 | `CombatManager.begin_turn` → `Player` | writes `turn_start_grid` / `turn_start_moves_left` / `turn_start_moved` after budget reset; guarded by `unit.is_player() and "turn_start_grid" in unit` |
-| 2 | `player._unhandled_input` / `enemy._input` relay → `handle_world_click(world_pos)` | unchanged signature; new fallback: enemy miss → `_try_move_to(click_grid)` |
-| 3 | `_unhandled_input` right branch → `handle_world_right_click(world_pos)` | public, same gate set as `handle_world_click` |
-| 4 | `GridManager.plan_movement(from, budget, slide_ok) -> {dist, steps}` | pure; `steps[tile]` = directions, one entry per `_try_move` call (slide = 1 entry) |
-| 5 | `_try_move(direction) -> bool` | single mutation path; semantics byte-identical, return value new |
-| 6 | `Player` (per-frame `undo_available`) → `MoveRangeHighlight` | polled, plus `turn_start_grid` → `start_tile` |
-| 7 | Scenario files → harness | `clicks:` spec strings with `right` token; surface whitelist gate |
-| 8 | `_common.yaml` surface → pytest | append-only; new blocks/items above |
+All names below are the **hard contract** between implementation, `_common.yaml` surface, and scenario asserts (Expression evaluation on live nodes — names must match verbatim).
+
+| Node | Var | Type | Meaning (convention) | Asserted as |
+|---|---|---|---|---|
+| HUD | `top_text_pairwise_overlap` | bool | any pair of {RoundLabel, ActiveLabel, OrderLabel, EnergyLabel, ActionHintLabel*} `_inset_overlap`s (* only when visible) | `== false` (f30 + hint-visible frame) |
+| HUD | `top_text_in_strip` | bool | every top text rect ⊆ TopStrip.grow(2) | `== true` |
+| HUD | `top_strip_alpha` | float | strip panel `bg_color.a` (1.0 fallback) | `> 0.4 and < 0.8` |
+| HUD | `hint_hpbar_overlap` | bool | visible hint ∩ any visible bar (inset convention) | `== false` (only while hint visible) |
+| HUD | `hpbar_strip_overlap` | bool | any visible bar ∩ TopStrip | `== false` |
+| TopStrip | `visible` / `size` | — | strip node presence | `visible == true` |
+| HealthBar | `name_backing_alpha` | float | backing stylebox alpha written in `setup()` | `> 0.3` |
+| CreationScreen | `attr_rows_uniform` | bool | 5 rows equal height/left/right ±1px (ATTRS only) | `== true` |
+| CreationScreen | `attr_label_button_gap_ok` | bool | per row: 0 ≤ minus.left−label.right ≤ 8; 0 ≤ plus.left−minus.right ≤ 8; row ≥ 32px | `== true` |
+| CreationScreen | `points_attrs_gap_ok` | bool | PointsLabel bottom → phase box top ∈ [4,24]; x-centers ≤ 4px apart | `== true` |
+| CreationScreen | `phase_skeleton_same` | bool | visible box top == recorded ATTRS top ±2px | `== true` (TRAITS/CONFIRM frames) |
+| CreationScreen | `creation_in_viewport` | bool | MouseBox ⊆ viewport inset 16 | `== true` |
+| CreationScreen | `creation_box_fits` | bool | visible phase content bottom ≤ MouseBox bottom − 8 | `== true` |
+
+**Conventions (decided here, binding):** overlap = `Rect2` intersect after 1px inset on each side (`_inset_overlap`); hidden widgets are skipped, never asserted; all battle rects share the layer-10 scale-1 coordinate space (no conversions); the five existing HUD observables (`round_pause_overlap`, `skill8_right_edge`, `skill12_right_edge`, `hud_button_overlap`, `hud_desc_overlap`) keep their exact semantics.
 
 ---
 
-## 5. Tech Stack
+## 5. Edge Cases (from `step1_sota.md`) and how this design handles them
 
-- **Godot 4.4 / GDScript + `.tscn` text scenes** — no new third-party dependencies, no new assets, no new autoloads. Everything is an edit to existing scripts/scenes or a new pure function.
-- **Harness features used:** `clicks:` real mouse events (left/right + node-relative offsets) — already shipped and measured (SOTA f31cbc2 / doc 50b9c8f); no new harness work.
-- **Python side:** standard-library-only `pytest` contract smoke (`ruff`-linted).
-- **Linting:** GDScript via the `gdscript_check`/compile gate (not in the manifest); `ruff` for `.py`; `basic` for `.yaml`/`.json`/`.md` (see `linter_manifest.json`).
+- **E1 `Rect2.intersects()` inclusive of touching edges** → single `_inset_overlap` convention, 1px inset per side, used by every new pair; stacked labels with 2px gaps never read as overlapping.
+- **E2 Hidden widgets still have rects** → hint excluded from pairwise/strip membership when hidden; `hint_hpbar_overlap` evaluated and asserted only on visible-hint frames; creation phase boxes gated on `visible`.
+- **E3 Coordinate spaces (HUD vs world)** → avoided entirely: no observable compares a Control rect to a Node2D sprite rect. Text-vs-portrait readability is encoded structurally (`top_text_in_strip` + `top_strip_alpha`), because the strip legitimately overlaps top-row portraits (see E6).
+- **E4 "Covered by an opaque bar" vs "geometrically non-overlapping"** → the architect's chosen formulation, documented: text-to-text pairs are strict (`== false`), text-vs-strip is containment (`== true`), text-vs-portrait is the structural fact (text in backed strip + backing alpha pinned), hint-vs-HP-bar and HP-bar-vs-strip are strict (`== false`). These are different assertions and the doc records which one each observable encodes.
+- **E5 HP bars are dynamic** → strip assertions are mode/position-agnostic; `hint_hpbar_overlap` is sampled only at a deterministic frame where the hint is visible; no bar-vs-bar assert exists (adjacent units' 68px widgets can legitimately touch at 64px cell spacing — not pinned).
+- **E6 Two-row vs single-row skill bar** → all new observables are top-strip only; the skill bar is untouched, so the observables are mode-agnostic by construction.
+- **E7 Node identity pinned, layout not** → every change is a property change (offsets, anchors, `size_flags`, `theme_override_constants`, alignment, min sizes). No reparenting, renaming, type changes, or containers inserted between pinned path segments (`MouseBox/AttrBox/AttrRow0/AttrMinus0` …, `HUD.*` names, `RoundIndicator/*` names). The one new node (`TopStrip`) is a sibling addition at a path nothing pins.
+- **E8 New clickable / full-screen host disciplines** → `TopStrip.mouse_filter = 2` (full-width host); no new clickables introduced (PauseButton stays where it is); all existing buttons keep `focus_mode = 0`.
+- **E9 Assertions must contain operators** → every new assert value is `== false` / `== true` / a comparison chain; never a bare scalar.
+- **E10 New scenario two-place sync** → `creation_layout_readability` appended to both `scenario_order` and `ROUND_SCENARIOS` (same order); the in-place extension of `ui_geometry_readability` avoids sync for the battle half.
+- **E11 Pre-battle frames** → HUD observables computed before the player null-check (existing ordering preserved); TopStrip exists in the scene from load, so all reads are safe pre-battle.
+- **E12 Baseline protection** → see §8.
+- **E13 CJK fit** → RoundIndicator keeps its 400px width (order line already verified at font 10); hint strings fit the 400px band at font 12 (longest ~"已出手,无法退回" ≈ 100px); no text_overrun changes.
+- **E14 PointsLabel/HintLabel not buttons** → names kept, repositioned via anchors/offsets only; `PointsLabel` stays visible in ATTRS (`creation_single_ui` asserts `visible` + `text.contains("剩余点数")` — unchanged).
 
-## 6. Extensibility Considerations
+---
 
-- `GridManager.plan_movement` is unit-agnostic and budget/slide-aware; future AI movement (enemies currently use the static `find_path` A*) can adopt it without touching the player.
-- The snapshot/commit state machine generalises to all units via the `"turn_start_grid" in unit` guard pattern — the engine already writes per-unit turn state.
-- `MoveRangeHighlight`'s observables pattern (`start_tile` / `undo_available`) is the template for any future "pending choice" visual (e.g., jump-landing preview) — poll + cheap-diff keys, no signals required.
-- The `clicks:` offset addressing needs **zero production per-tile nodes** — scenarios address tiles as offsets from live nodes; production code must NOT grow per-tile click targets this round (SOTA constraint).
-- Deliberately NOT built: a separate click-to-move hit-surface Control (measured broken in this codebase — GUI picker never routes to Controls under Node2D ancestors), and no new DEBUG action for undo (the harness's real-mouse `right` token supersedes it; a test-only path is the debt shape this round explicitly avoids).
+## 6. Safety, Baseline Protection, Rollback
 
-## 7. Design-Change Declaration (for the 5_design archive step)
+**No irreversible operations exist in this design** — no schema/data migrations, no deletions, no rewrites of user data. All changes are (a) `.tscn` property edits, (b) additive script vars + one new method, (c) append-only playtest/test edits. Rollback = `git revert` of any component independently; the components are order-independent (3.1/3.2/3.3 are battle-side, 3.4/3.5 are creation-side, 3.6–3.9 are gate-side and only pin what already exists). Where an edit is destructive (hud.tscn offsets change), the pre-change values are in VCS history; no "delete-then-write" sequence exists anywhere.
 
-**No new design changes are introduced.** This round realises the already-recorded 2026-08-25 decisions in `design/99_changelog.md` rows 66–69 (click-driven movement, trial→undo→commit, focus_mode discipline, creation single-primary-interaction). Two decisions made in THIS document and worth recording downstream:
+**Order of work (the "先取值,再动手" discipline):** probe observed values first — re-measure the defect frames (`5_compile/frames/s42_frame_0030.png`, `s39_frame_0070.png`) and the current rects before editing; after editing, re-probe and confirm the new observables are green before pinning asserts.
 
-1. **Commit blocks undo, not movement** — `10_systems.md` §5.1 (order-free move+act) and the `movement_range_highlight` pin stay authoritative.
-2. **Creation keyboard input survives as a shortcut layer** acting on the button surface (row focus + ± / toggle / accept), never a second rendered list.
+**Must stay green (audited, not assumed):**
 
-Post-run archive sync candidates for `5_design` (not done here): `30_presentation.md` 输入映射 table (click-primary movement, right-click undo, arrow keys as shortcut), the creation-screen description (single button surface), and a §5.1 note for the trial/undo/commit state machine.
+| Chain | Why it survives property-only changes |
+|---|---|
+| `click_move_*` (10/10, 9/9), `click_targeting_fixed` | clicks aim at node rect centers — buttons/bars moved still receive the event; `TopStrip.mouse_filter = 2` means the new full-width Control eats nothing |
+| five creation scenarios incl. `creation_single_ui` (16/16) | they assert phase/points/attrs/visible/wiring/`cursor_markers_visible` — no pixel offsets; node paths unchanged |
+| `ui_geometry_readability` (24/24) | existing asserts kept byte-identical; `round_pause_overlap` unchanged (RoundIndicator width/pause position untouched); `HealthBar.*` geometry asserts read the player's mid-board bar (new clamp never engages there); `follow_delta` computed pre-clamp |
+| `skill_hint_and_range_highlight`, `skill_rejection_reason_texts` | they assert `ActionHintLabel.visible/text` — text paths untouched, only position moved |
+| `battle_end_turn_attack_buttons`, `skill_description_visible` | they assert size/disabled/mouse_filter/visible/text — not position |
+| `spine_to_ending`, tutorial chain, `terminal_victory` (deliberately red) | no gameplay/state/frame-count changes; pure layout |
+| GDScript unit suite (12/12 via `run_tests.sh` → sidecar) | `test_health_bar` pins widget geometry (68×20, labels 9px, bar y=12) — backing is a stylebox override, clamp is runtime-positional; both out of the test's static assertions |
+| pytest 5/5 | smoke test changes are additive (new test + one list append) |
 
-## 8. Safety / Rollback Discipline (irreversible-op rule)
+**Baseline expectations to verify before/after:** 42/43 green, `terminal_victory` red (that's its job), pytest 5/5, `creation_single_ui` 16/16, `ui_geometry_readability` 24/24 + new asserts.
 
-No database, no generated data, no bulk rewrites — but the contract files carry the historical risk, so:
+---
 
-- **`_common.yaml` edits are append-only surgical edits**; the 38 existing scenario files must remain **byte-identical** (the previous round's measured acceptance criterion — `git diff --stat` must touch only `_common.yaml`, the 5 new files, and the pytest file).
-- **`creation.tscn` node removal** (BodyLabel) is a text-file edit; verify by direct-boot + `creation_single_ui` + the two pinned creation scenarios (which never referenced BodyLabel). Rollback = git revert of one file.
-- **`_try_move` return-type change** is verified by the 37 keyboard-driven scenarios staying green — that is the rollback gate for the single mutation path.
-- **Execution order for the gates**: (1) `pytest` contract smoke locally (millisecond gate) before any Godot run; (2) compile gate; (3) playtest gate; (4) vision gate on the battle frames only (its six fixed questions cover battle readability — Q1–Q5 are `applies_to: "battle"`, Q6 is text truncation; none asks about UI-surface multiplicity). The creation single-surface acceptance is the playtest assertion `CreationScreen.cursor_markers_visible == false` in `creation_single_ui`, never a vision question. Fix any red gate in its own task before proceeding.
+## 7. Design Notes for 5_design (declared presentation changes)
 
-## 9. Task Decomposition Hints (for PM)
+These are implementation-level presentation changes within the brief's mandate; no game rules/numbers change. On delivery, `5_design` may update `design/30_presentation.md`'s layout table with:
 
-Suggested task sequence with dependencies:
-1. **T1 — Player click-move + undo + engine snapshot** (`player.gd`, `combat_manager.gd`, `grid_manager.gd`): planner → `_try_move` bool → step queue → `_try_move_to` → `handle_world_click` fallback → right-click branch + `handle_world_right_click` → `undo_available` per-frame → snapshot block in `begin_turn`. Gate: compile + existing battle scenarios green.
-2. **T2 — Focus-mode sweep** (`hud.tscn`, `skill_button.tscn`, tutorial overlay check). Gate: compile + `battle_end_turn_attack_buttons` / `skill_button_visual_states` stay green (focus_mode=0 makes them more robust, not less).
-3. **T3 — MoveRangeHighlight trying state** (`move_range_highlight.gd`; optional planner refactor only if `movement_range_highlight` stays byte-green).
-4. **T4 — Creation single-UI** (`creation.tscn`, `creation.gd`). Gate: `creation_budget_clamp_and_traits` (11/11), `menu_to_creation_to_tutorial_order` (19/19), `creation_mouse_interaction`, `creation_traits_back_next_buttons`, `creation_back_to_menu_walk` all green.
-5. **T5 — Playtest contract**: `_common.yaml` append-only surface + `scenario_order`; author the 5 scenario YAMLs (with PROBE marks where numeric damage is asserted).
-6. **T6 — Pytest contract**: `ROUND_SCENARIOS` + `test_click_move_surface_contract` (+ offset-aware clicks-owner parsing). Gate: 4-test pytest green, then full playtest run green with 43 scenario files (38 pre-existing byte-identical + 5 new).
+1. **New battle HUD element: a full-width top strip (0..80px, semi-transparent dark backing, `mouse_filter = IGNORE`)** hosting 回合数 / 行动(行动条面板) / 出手顺序 / 技能提示 / 内力. PauseButton remains top-right on the band; EndTurn/Attack/技能说明 sit below the band on the right.
+2. **ActionHintLabel relocated** from bottom-center to the strip (position only — node name/path unchanged).
+3. **Floating HP widgets clamp below the strip** (`top ≥ strip_bottom + 2`) — the top-row exception to "floats above the sprite" (no headroom above a viewport-top sprite); the name label gains a semi-transparent backing so it reads on artwork.
+4. **Creation screen rhythm:** uniform 44px attr rows, value text right-aligned hugging its `-`/`+` cluster, PointsLabel attached 8px above the block, one shared vertical skeleton for the three phases, fixed-width centered CONFIRM buttons.
+
+---
+
+## 8. Suggested Task Decomposition (for PM)
+
+Each subtask is independently verifiable by the playtest gate or the smoke test:
+
+1. **Battle scene layout** — 3.1 (`hud.tscn` TopStrip + offsets). Verify: game boots, no parse errors, existing battle scenarios stay green.
+2. **Battle observables** — 3.2 (`hud.gd` + 3.6 surface additions). Verify: whitelist + f30 assert block green.
+3. **HP-bar discipline** — 3.3 (`health_bar.gd`). Verify: `HealthBar.name_backing_alpha > 0.3` assert + unit suite 12/12.
+4. **Creation scene layout** — 3.4 (`creation.tscn`). Verify: five creation scenarios green.
+5. **Creation observables** — 3.5 (`creation.gd` + 3.6 surface). Verify: whitelist present.
+6. **Gate wiring** — 3.7 (extend `ui_geometry_readability.yaml`), 3.8 (new scenario + two-place sync), 3.9 (smoke test). Verify: pytest 5/5 → 6/6, new scenario green, extended scenario green.
+7. **Probe & baseline** — re-measure frames before/after (先取值再动手), confirm 42/43 + pytest + unit suite, confirm `terminal_victory` still red for the same reason only.
+
+Dependencies: 6 depends on the observable names from 2/3/5 (they are fixed by this document — the contract in §4); everything else is independent.
+
+## 9. Out of Scope / Not This Round
+
+- No new assets, no art, no audio (the strip is a `StyleBoxFlat`, not a texture).
+- No visual-gate changes (six fixed questions unchanged; spatial questions stay playtest-judged).
+- No gameplay/numeric changes; `design/10_systems.md` / `20_content.md` untouched.
+- No changes to skill-bar layout, tutorial overlay, menu, settings, or any other screen.
+- No changes to `run_tests.sh` or the sidecar wiring.
