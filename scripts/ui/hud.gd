@@ -58,6 +58,25 @@ var pressed_connected: Dictionary = {}
 var hud_button_overlap: bool = false
 var hud_desc_overlap: bool = false
 
+## Round-2 top-strip observables (playtest surface under HUD.): the five top
+## texts (RoundLabel / ActiveLabel / OrderLabel / EnergyLabel, plus
+## ActionHintLabel ONLY while visible) must be pairwise non-overlapping and
+## fully inside the TopStrip backing band, whose panel stylebox must carry a
+## real backing alpha. hint_hpbar_overlap / hpbar_strip_overlap pin the
+## floating HP widgets clear of the strip and of the visible hint. Convention:
+## overlap = 1px-inset Rect2 intersect (_inset_overlap); hidden widgets are
+## skipped, never asserted.
+var top_text_pairwise_overlap: bool = false
+var top_text_in_strip: bool = true
+var top_strip_alpha: float = 1.0
+var hint_hpbar_overlap: bool = false
+var hpbar_strip_overlap: bool = false
+
+## Lazily-resolved TopStrip node (nullable — NOT an @onready var, so scenes
+## without the node stay safe; resolved inside _update_geometry_observables()
+## like the existing _round_indicator pattern).
+var _top_strip: Panel = null
+
 ## Preloaded health_bar scene for instantiation.
 var _health_bar_scene: PackedScene = preload("res://scenes/ui/health_bar.tscn")
 
@@ -91,6 +110,13 @@ var _action_hint_player: Node = null
 ## cast. Do NOT cache buttons in a typed array (typed arrays validate on write).
 func _skill_button(n: String) -> Control:
 	return _skill_bar.find_child(n, true, false) as Control
+
+## The ONE overlap predicate every round-2 top-strip observable uses: a pair
+## "overlaps" iff the two rects intersect after each is inset 1px on all sides.
+## Rect2.intersects() is inclusive of touching edges, so two stacked labels
+## with a 2px gap must NOT read as overlapping.
+func _inset_overlap(a: Rect2, b: Rect2) -> bool:
+	return a.grow(-1.0).intersects(b.grow(-1.0))
 
 ## Recompute the two HUD geometric observables every frame:
 ##   - round_pause_overlap: RoundIndicator rect vs PauseButton rect (false
@@ -177,6 +203,82 @@ func _update_geometry_observables() -> void:
 		for r in button_rects:
 			if d.intersects(r):
 				hud_desc_overlap = true
+
+	# --- Round-2 top strip geometry (top-bar non-overlap) ---
+	# The five top texts live inside the TopStrip backing band, pairwise
+	# non-overlapping; the floating HP widgets stay clear of the strip and of
+	# the visible skill hint. Overlap convention: _inset_overlap (1px-inset
+	# Rect2 intersect) so touching edges and 2px-gap stacked labels never read
+	# as overlapping. Hidden widgets are skipped — a hidden ActionHintLabel
+	# still reports a real get_global_rect(). All rects share the HUD layer-10
+	# scale-1 coordinate system: no coordinate conversion anywhere.
+	if _top_strip == null or not is_instance_valid(_top_strip):
+		_top_strip = get_node_or_null("TopStrip") as Panel
+	if _top_strip == null or not is_instance_valid(_top_strip):
+		return  # scene without the strip: keep last values
+	var strip_rect: Rect2 = _top_strip.get_global_rect()
+
+	# Resolve the four always-participating top labels (same re-resolution
+	# style as the block above; indicator is the already re-resolved
+	# _round_indicator from the top of this function).
+	var round_label: Label = null
+	var active_label: Label = null
+	var order_label: Label = null
+	if indicator != null:
+		round_label = indicator.get_node_or_null("RoundLabel") as Label
+		active_label = indicator.get_node_or_null("ActiveLabel") as Label
+		order_label = indicator.get_node_or_null("OrderLabel") as Label
+	var energy_label: Label = _energy_label
+	if energy_label == null or not is_instance_valid(energy_label):
+		energy_label = get_node_or_null("EnergyLabel") as Label
+		if energy_label != null:
+			_energy_label = energy_label
+
+	var top_rects: Array[Rect2] = []
+	for label in [round_label, active_label, order_label, energy_label]:
+		if label != null and is_instance_valid(label):
+			top_rects.append(label.get_global_rect())
+	# The hint participates ONLY when visible (hidden widgets still have rects;
+	# a hidden hint at its old position must not false-positive).
+	if _action_hint_label != null and is_instance_valid(_action_hint_label) \
+			and _action_hint_label.visible:
+		top_rects.append(_action_hint_label.get_global_rect())
+
+	top_text_pairwise_overlap = false
+	for i in range(top_rects.size()):
+		for j in range(i + 1, top_rects.size()):
+			if _inset_overlap(top_rects[i], top_rects[j]):
+				top_text_pairwise_overlap = true
+
+	top_text_in_strip = true
+	for r in top_rects:
+		if not (strip_rect.grow(2.0).encloses(r) and r.size.x > 0):
+			top_text_in_strip = false
+
+	top_strip_alpha = 1.0
+	var sb := _top_strip.get_theme_stylebox("panel") as StyleBoxFlat
+	if sb != null:
+		top_strip_alpha = sb.bg_color.a
+
+	hpbar_strip_overlap = false
+	for bar in _health_bars:
+		if not is_instance_valid(bar) or not bar.visible:
+			continue
+		if _inset_overlap(bar.get_global_rect(), strip_rect):
+			hpbar_strip_overlap = true
+
+	# hint_hpbar_overlap is only meaningful while the hint is visible; when it
+	# is hidden the variable keeps its last value (it is only asserted on
+	# visible-hint frames).
+	if _action_hint_label != null and is_instance_valid(_action_hint_label) \
+			and _action_hint_label.visible:
+		hint_hpbar_overlap = false
+		var hint_rect: Rect2 = _action_hint_label.get_global_rect()
+		for bar in _health_bars:
+			if not is_instance_valid(bar) or not bar.visible:
+				continue
+			if _inset_overlap(hint_rect, bar.get_global_rect()):
+				hint_hpbar_overlap = true
 
 # ---------------------------------------------------------------------------
 # Public API
