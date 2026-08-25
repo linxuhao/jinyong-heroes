@@ -2,6 +2,8 @@
 
 A **Godot 4** single-player wuxia cultivation + turn-based tactics RPG. You boot into a **main menu** (mouse-first), create your own character **before** the tutorial, fight a keyboard-completable tutorial duel as the orchestrated Yang Guo, and then walk the six-segment line: **tutorial win → transition → sect selection → cultivation (36 months) → map → ending**.
 
+> ⚠️ **Verification status: FAILED — not ready for deploy.** This round's primary deliverable (click-driven battle movement — left-click move / right-click undo / commit lock) does not work end-to-end: `click_move_to_tile` 1/10, `click_move_undo_right` 6/11, `click_move_commit_lock` 1/9. The vision gate also failed (Q5 health-bar readability, 20/28 battle scenarios). Passing: the focus-mode fix (`battle_focus_arrow_keys` 9/9) and the creation single-surface (`creation_single_ui` 16/16). See [Verification Status](#verification-status).
+
 ## What this round delivers — 点击驱动移动 (click-driven battle movement)
 
 Playtesting reported two defects: (1) arrow keys "intermittently" stop moving the player in battle, and (2) the creation screen still shows two stacked operation surfaces (the keyboard `▶` cursor list *plus* the mouse button group). Both are fixed this round, plus battle movement is re-centered on the mouse:
@@ -209,21 +211,33 @@ Additionally, the static pytest gate (`tests/test_playtest_contract_smoke.py`, s
 
 ## Verification Status
 
-**Step 5 (Final Verifier) status — this is an implementation-level verdict, NOT a downstream-gate verdict.**
+**Step 5 (Final Verifier) verdict — FAILED (not ready for deploy).**
 
-The four goals of this round are **implemented and integrated, confirmed by inspection**:
+Downstream gate evidence is now available (`5_review`) and it contradicts the implementation-level claim that click-driven movement works end-to-end. The round's PRIMARY deliverable is non-functional.
 
-1. Focus-mode fix — `focus_mode = 0` on all battle clickables, and `battle_focus_arrow_keys` asserts it plus the click-then-arrow differential.
-2. Click-driven movement — `handle_world_click` fallback → `_try_move_to` → `GridManager.plan_movement` → step queue through `_try_move`; right-click undo with turn-start snapshot and commit lock.
-3. Creation single surface — `BodyLabel` removed, `PointsLabel` added, `cursor_markers_visible` runtime proof.
-4. Click-aware highlight — `start_tile` / `undo_available` trying-state markers.
+**Gate results:**
 
-**The downstream gate evidence (`compile_report.json` / `playtest_report.json` / `test_report.json` / `vision_report.json`) is NOT produced at Step 5**, so the compile gate, the full playtest gate, the pytest gate, and the vision gate are **unconfirmed**. `final/verify_report.json` therefore records `all_goals_met: false` / `ready_for_deploy: false` pending those gates. Do not treat this round as shipped until:
+- Compile: **passed** (0 errors).
+- Pytest contract (`tests/test_playtest_contract_smoke.py`): **passed** (5 passed).
+- Playtest runtime hard gate: **passed** (no crash / scene-load / illegal-spec-key / input_dead; runtime errors 0).
+- Vision gate: **FAILED** — `vision_report.json` `passed: false`; Q5 (health bars recognisable, `design/30_presentation.md` 可读性硬要求 #4) answered NO in 20/28 battle scenarios.
 
-- `5_compile` reports 0 errors,
-- the full playtest shows the 37-green baseline preserved plus the 5 new scenarios green, `empty_round_stalls == 0`, runtime errors 0 (only `terminal_victory` 5/6 red),
-- `5_test` reports the pytest contract 4 passed,
-- `5_vision` returns a **parseable** `passed: true` (a `blind`/`unparseable_response` result is a gate FAILURE that must be re-run, never skipped).
+**Behavioral assertions (the decisive ones):**
+
+- `battle_focus_arrow_keys` 9/9 ✅ — focus-mode fix verified (click a button, then an arrow key still moves the player).
+- `creation_single_ui` 16/16 ✅ — creation is a single surface (`cursor_markers_visible == false`).
+- `click_targeting_fixed` 2/2 ✅ — node-targeted click-attack still works.
+- `click_move_to_tile` 1/10 ❌ — `Player.debug_click_events` stays 0; the `Player +dx,dy` left-click never reaches the handler; `grid_pos` stays `(7,5)`, `moves_left` stays 4.
+- `click_move_undo_right` 6/11 ❌ — `grid_pos` never changes from `(7,5)`.
+- `click_move_commit_lock` 1/9 ❌ — `acted` never true; `Central_Divine.health` stays 130.
+
+**Root-cause hypothesis (must be confirmed and fixed):** player-anchored offset clicks (`Player +64,0` / `Player +0,-192`) fail while node-targeted clicks (`Central_Divine_ClickTarget`) succeed — the offset addressing / canvas-transform conversion for Player-anchored targets, or the click-move handler itself, is broken.
+
+`final/verify_report.json` records `all_goals_met: false` / `ready_for_deploy: false`. Do not ship until:
+
+- the three click-move scenarios (`click_move_to_tile` / `click_move_undo_right` / `click_move_commit_lock`) are green,
+- the vision Q5 health-bar failure is fixed or explicitly dispositioned and `5_vision` is re-run to a parseable `passed: true`,
+- the full 43-scenario playtest is re-run with the 37-green baseline preserved plus all 5 new scenarios green (only `terminal_victory` 5/6 red), `empty_round_stalls == 0`, runtime errors 0.
 
 ## Recorded Debt
 
