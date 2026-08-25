@@ -161,6 +161,10 @@ surface:
   - energy
   - sprite_top
   - traits
+  - debug_input_events
+  - debug_last_raw_event_pos
+  - debug_click_events
+  - debug_last_click_grid
   East_Heretic:
   - health
   - max_health

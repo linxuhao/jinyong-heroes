@@ -114,6 +114,26 @@ var selected_skill_index: int = -1
 var sprite_top: float = 0.0
 
 # ---------------------------------------------------------------------------
+# Click-path diagnostics (playtest observables — measurement only, never gates)
+# ---------------------------------------------------------------------------
+
+## Count of every left-button press event observed by this node's `_input`
+## (counting only; never marks the event handled). Tells the playtest whether
+## the synthesized `clicks:` event reaches the tree at all.
+var debug_input_events: int = 0
+
+## The raw viewport position of the last observed left-button press.
+var debug_last_raw_event_pos: Vector2 = Vector2.ZERO
+
+## Count of entries into handle_world_click (the single convergence point of
+## _unhandled_input, the enemy _input relay, and the enemy gui_input relay).
+## Incremented BEFORE the gate so a gated-out click still counts.
+var debug_click_events: int = 0
+
+## The world→grid tile resolved for the last handle_world_click call.
+var debug_last_click_grid: Vector2i = Vector2i(-1, -1)
+
+# ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
 
@@ -290,6 +310,18 @@ func _process(_delta: float) -> void:
 	# NOTE: cooldowns are int ROUNDS, decremented only by the turn engine at
 	# the unit's own turn start — no per-frame ticking here.
 	_refresh_sprite_clamp()
+
+
+## Counting-only observation of the input pipeline: records every left-button
+## press that reaches this node, so the playtest can tell whether a synthesized
+## `clicks:` event arrived at all. Never marks the event handled — this must
+## not interfere with the real _unhandled_input path.
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton \
+			and event.button_index == MOUSE_BUTTON_LEFT \
+			and event.pressed:
+		debug_input_events += 1
+		debug_last_raw_event_pos = event.position
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -477,6 +509,7 @@ func _handle_click_targeting(event: InputEventMouseButton) -> void:
 ## only the first matched enemy is acted on. A click during ENEMY_TURN / pause /
 ## mid-move is a silent no-op, identical to the keyboard path.
 func handle_world_click(world_pos: Vector2) -> void:
+	debug_click_events += 1
 	var state: String = GameManager.get_state()
 	if state != "BATTLE":
 		return
@@ -488,6 +521,7 @@ func handle_world_click(world_pos: Vector2) -> void:
 		return
 
 	var click_grid: Vector2i = GridManager.world_to_grid(world_pos)
+	debug_last_click_grid = click_grid
 
 	# Iterate living enemies to see if one occupies the clicked tile.
 	var enemies: Array[Node] = GameManager.get_enemies_alive()

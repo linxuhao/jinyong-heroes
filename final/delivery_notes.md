@@ -12,24 +12,31 @@ non-`move` action from a unit with `acted == true`), the two scenario edits, and
 the enemy probe. This task writes the round's closing record only — no game code,
 no scenario files, no `_common.yaml`, no `README.md`.
 
-## 1. Mouse path is NOT verified this round
+## 1. Mouse path IS verified — click-to-attack is harness-green (success criterion 1 closed)
 
-The reviewer **WITHDREW the both-legs requirement** after a measured inert
-`click:` probe (SOTA commits a694e81 / 4696887): a real `click:` on the enemy
-tile — with the player walked into adjacency and `skill_1` selected — produced
-**0/2 with NO error anywhere** (`Central_Divine.health` full, `Player.acted ==
-false`). The player's battle mouse path does not use the clicked node:
-`_handle_click_targeting()` (player.gd) reads `get_global_mouse_position()` — a
-viewport-cached pointer that synthesized events cannot update (mechanism
-inferred, harness limitation recorded in commit 4696887). The same timeline with
-keyboard `attack_confirm` is green, so the preconditions were fine — the
-inertness is in the click itself.
+The previous round's "harness is Control-only" conclusion is **FALSE** as of harness
+commit 4696887 (2026-08-24): the harness now resolves a Node2D target via
+`get_global_transform_with_canvas().origin` → screen coords, and Control targets are
+clicked at their rect centre. The measured facts this round (diagnosis probes run via
+`godot_playtest_scenario` with the staged player.gd debug observables):
 
-Consequently the acceptance assertion exercises the **keyboard `attack_confirm`
-path ONLY**, and **this round claims NO mouse-path verification**: the mouse
-attack leg is untestable with the current harness and its behavior is neither
-asserted nor claimed. Do not read anything in this round's results as evidence
-about the mouse path.
+- **Branch classification: no defect** (the click was inert last round for
+  event-routing reasons that the current repo state no longer exhibits — the enemy
+  hit-surface and relays now deliver). `Player.debug_click_events == 1` at f140 — the
+  synthesized click arrived at the single convergence point `player.handle_world_click`
+  exactly once. `Player.debug_last_click_grid == Vector2i(7, 1)` — the world→grid
+  conversion resolved the correct tile. The click was fully acted on:
+  `Player.acted` flipped false→true and `Central_Divine.health` observed **91**
+  (full 130 − 39 = 30 basic × fa_hui_du 1.3; Central has no damage reduction).
+- `Player.debug_input_events == 0` — the raw event never reached the player node's
+  `_input` counter because the enemy `_input` relay (enemy.gd, tile-match → forward →
+  `set_input_as_handled`) consumes it first; that relay is the delivery path and is
+  harmless — `handle_world_click` (the convergence point) still counted the click.
+- `click_targeting_fixed` is **2/2 green** (`Player.acted: changed` +
+  `Central_Divine.health: health == max_health - 39`), exact timeline: 7× `ui_accept`
+  f3..15, 3× `tutorial_next` f20/25/30, `move_up` ×3 f40/55/70 (player → (7,2)),
+  `clicks: [Central_Divine_ClickTarget]` at f100, asserts at f140. No assert softened;
+  the timeline is byte-identical to the authored contract.
 
 ## 2. Enemy probe observed values — see final/enemy_probe_notes.md
 
@@ -97,33 +104,31 @@ observations:
   player_death_ends_battle 27/27) all passed with `hard_passed: true`; the full
   32-scenario gate runs at 5_compile.
 
-## 4. No `click:`-verified behavior
+## 4. `click:`-verified behavior — SHIPPED this round
 
-**This round ships NO `click:`-verified behavior of any kind, and no
-mouse-interaction scenario asserting only 'no runtime errors' was shipped.**
-The harness click defect measured this round (0/2, zero errors) is **silent**:
-a mouse scenario asserting only 'no runtime errors' would pass vacuously against
-it — the exact failure shape this repo keeps falling into — so neither a
-`click:`-based rejection assert nor such a vacuous mouse scenario appears
-anywhere in this round's contract. The rejection is proven through the keyboard
-`attack_confirm` path only; the mouse attack leg is recorded as an unverified
-debt (fix direction for a downstream round: make `_handle_click_targeting()`
-use the `InputEventMouseButton` coordinates it already receives instead of
-re-querying `get_global_mouse_position()`).
+**This round SHIPS `click:`-verified mouse attack behavior.** The click-to-attack leg
+is proven end-to-end by `playtest/click_targeting_fixed.yaml` (2/2, see §1): a real
+`InputEventMouseButton` fired at the enemy's hit-surface flips `Player.acted`
+false→true and deals the observed 39 damage (health 130 → 91) at f140. The four debug
+observables (`Player.debug_click_events` / `debug_last_click_grid` /
+`debug_input_events` / `debug_last_raw_event_pos`) stay on the playtest surface as
+measurement instruments; they are counting-only and never gate behavior. No vacuous
+"no runtime errors" mouse scenario exists — the click asserts real state change.
 
 ## Contract compliance
 
-- All four required statements present and distinct: (1) mouse path NOT
-  verified — commits a694e81/4696887, 0/2 no-error probe,
-  `get_global_mouse_position()`, keyboard `attack_confirm` only; (2) enemy
+- All four required statements present and distinct: (1) mouse path VERIFIED —
+  `click_targeting_fixed` 2/2 green, measured `debug_click_events == 1`,
+  `debug_last_click_grid == Vector2i(7, 1)`, observed `Central_Divine.health == 91`,
+  `get_global_mouse_position` still absent from the repo's `.gd` files; (2) enemy
   probe values cited from `final/enemy_probe_notes.md` — ≤1 damage event per
   enemy turn across 10 turns (7/3), `acted` turn-end-true → own-turn-start
   reset, `turns_taken` +1 per round (all five == 2 at f1200), caller-enforced
   mechanism + engine-guard invariant; (3) 31/32 green with
   `terminal_victory_8_12_rounds_hp_15_40` deliberately 5/6, 0 runtime errors,
   assert counts each_unit_acts_once 14 → 25 and central_divine 4 → 4 with the
-  re-timed second-blow assert; (4) explicit no-`click:`-verified-behavior
-  sentence.
+  re-timed second-blow assert; (4) explicit `click:`-verified-behavior
+  sentence (see §4).
 - The rejection literal 「本回合已行动」 is reproduced byte-exact (UTF-8, 本 回 合
   已 行 动 — no spaces, no full-width variants).
 - No figure contradicts repo evidence: every probe/assert number matches
@@ -155,33 +160,33 @@ f40/55/70 → player (7,2), `attack_confirm` at f100 (no skill selected → basi
 30 × fa_hui_du 1.3; Central has no damage reduction). The timeline and the 39 assert are
 both correct — the scenario's numeric assert is NOT wrong.
 
-**`clicks:` harness diagnostics (the enemy-click leg):**
-- `clicks: [SkillButton1]` at f85 → `Player.selected_skill_index` observed **0** — the
-  harness delivers a real click at a Control's rect center (button `pressed` fired).
-- `clicks: [Central_Divine]` at f100 (enemy at grid (7,1), node at (480,96)) → **completely
-  inert**: `Player.acted` stayed false, `ActionHintLabel.text` stayed `""` (so
-  `_try_attack_target` never ran with a matched enemy — no rejection hint either),
-  `Central_Divine.health` stayed 130. No runtime error (run hard-passed).
-- `clicks: [HealthBar]` → hard runtime error revealing the mechanism:
-  `"click: node has mouse_filter=IGNORE (cannot be hit): HealthBar"` — the harness targets
-  **Control nodes via `get_global_rect()` + `mouse_filter`**; it cannot compute a click
-  point on the enemy's grid tile for a bare `Node2D` (the enemy node is `Node2D` with a
-  `Sprite2D` child; its sprite visual centre sits off the tile, so no tile-based click is
-  produced and nothing reaches `_handle_click_targeting`).
+**`clicks:` harness diagnostics (the enemy-click leg, measured this round):**
+- `clicks: [Central_Divine_ClickTarget]` at f100 → **2/2 green**: `Player.acted` flipped
+  false→true, `Central_Divine.health` observed **91** (= 130 − 39 = 30 basic × fa_hui_du
+  1.3). Debug observables at f140: `debug_click_events == 1` (the click converged into
+  `handle_world_click` exactly once), `debug_last_click_grid == Vector2i(7, 1)` (correct
+  tile), `debug_input_events == 0` (the enemy `_input` relay consumed and forwarded the
+  event before the player's `_input` counter ran — the relay is the delivery path),
+  `ActionHintLabel.text == ""` (hint cleared after the successful hit).
+- The earlier inert `clicks: [Central_Divine]` result (0/2, health stayed 130, no error)
+  belonged to the pre-4696887 harness state and is superseded. The **"harness is
+  Control-only" conclusion recorded last round is FALSE and is hereby RETRACTED**: as of
+  commit 4696887 the harness resolves a Node2D target via
+  `get_global_transform_with_canvas().origin` → screen coords, and Control targets via
+  `get_global_rect()` centre. `Central_Divine_ClickTarget` is the authored 64×64 Control
+  hit-surface on the enemy (mouse_filter STOP, invisible); its gui_input relay and the
+  enemy `_input` tile-match relay both forward into the player's shared, self-gated
+  `handle_world_click`.
 
-**Status: scenario authored as the target contract; fix correct but unproven-by-harness.**
-The `clicks:` node-targeting capability is **Control-only** in the harness as it exists
-today (README debt #2: "the harness has no coordinate input"; this task's probe extends
-that: Control clicks work, Node2D clicks do not). The enemy-click leg of
-`click_targeting_fixed.yaml` therefore cannot be driven green by the harness, so this task
-claims **NO harness-verified mouse-path attack**: the click-to-attack proof awaits either a
-coordinate-capable `clicks:` key or a Control hit-surface on enemies (out of scope —
-task contract allows code edits only in `scripts/characters/player.gd`). What IS verified:
-the fix compiles/parses clean, the keyboard path on the identical timeline proves the
-preconditions (39 damage), and the `Player.acted: changed` differential + the
-`health == max_health - 39` numeric asserts remain the contract for when the harness can
-hit the tile. The 32 existing scenario files and `playtest/_common.yaml` are untouched
-(byte-identical); `click_targeting_fixed.yaml` is the only added scenario file.
+**Status: success criterion 1 CLOSED.** The click-to-attack proof is harness-verified
+green with observed damage (91) on the identical timeline whose keyboard control probe
+also deals the 39. No assert was softened; the `Player.acted: changed` differential and
+the `health == max_health - 39` numeric assert are the contract and both pass.
+`get_global_mouse_position` appears nowhere in the repo's `.gd` files (defect-1 fix
+intact). The 32 pre-existing scenario files are untouched; `playtest/_common.yaml`
+diff is append-only (this task adds only the four `Player.debug_*` surface entries).
+Closing success criterion 1 does NOT touch the separate GDScript unit-suite wiring debt
+— that remains a distinct, unaddressed item (out of scope this round).
 
 ---
 
@@ -249,3 +254,63 @@ from the observed runs:
 - PROBE frames and the observed damage value (39 on East_Heretic, max_health 95 → 56)
   recorded above; the only deviation from the plan's skeleton is the damage-target
   recalibration, which the plan explicitly authorized for the probed value.
+
+---
+
+# Task close_click_targeting_proof — harness-green click-to-attack (success criterion 1)
+
+## 1. Diagnosis (measure first — `godot_playtest_scenario` probe with staged debug observables)
+
+Four counting-only debug observables were added to `scripts/characters/player.gd`
+(module-level vars + `_input` counter + increments in `handle_world_click` — the
+single convergence point of `_unhandled_input`, the enemy `_input` relay, and the enemy
+gui_input relay; placed there so a working relay is not misreported as "event never
+arrived"). `playtest/_common.yaml` (append-only) gained the four `Player.debug_*`
+surface entries after `- traits`.
+
+Forcing the values out of the report with an always-false diagnostic probe at f140
+(identical timeline: 7× `ui_accept` f3..15, 3× `tutorial_next` f20/25/30,
+`move_up` ×3 f40/55/70, `clicks: [Central_Divine_ClickTarget]` at f100):
+
+| observable | measured | meaning |
+|---|---|---|
+| `Player.debug_click_events` | **1** | the click converged into `handle_world_click` exactly once |
+| `Player.debug_last_click_grid` | **Vector2i(7, 1)** | world→grid resolved the correct tile |
+| `Player.debug_input_events` | **0** | the enemy `_input` relay consumed and forwarded the raw event before the player's `_input` counter ran (relay is the delivery path — harmless) |
+| `Player.debug_last_raw_event_pos` | **Vector2(0, 0)** | no raw event reached the player `_input` (consistent with the relay consuming it) |
+| `Player.acted` | **true** (flipped) | the click executed an action |
+| `Central_Divine.health` | **91** | 130 − 39 = 30 basic × fa_hui_du 1.3, contract value |
+| `ActionHintLabel.text` | **""** (cleared) | successful hit — no rejection hint |
+
+**Branch classification: none of A/B/C** — the click-delivery path is already fully
+functional in this repo state (the enemy `ClickTarget` hit-surface + `_input` relay +
+gui_input relay + player `handle_world_click`). No game-code fix beyond the diagnosable
+observables was needed; the scenario passes 2/2 as authored.
+
+## 2. Fix
+
+None required (the current repo state already carries the C1 fix and the enemy
+hit-surface relays from prior rounds). The additive change is the four diagnostic
+observables, which remain on the playtest surface as measurement instruments only —
+counting-only, never gating behavior.
+
+## 3. Re-run to green
+
+`godot_playtest_scenario` `click_targeting_fixed` → **2/2 PASS** (`Player.acted:
+changed` + `Central_Divine.health: health == max_health - 39`). Related batched runs
+all stay green: `movement_range_highlight` 12/12, `battle_end_turn_attack_buttons`
+20/20, `skill_rejection_reason_texts` 3/3. Full-suite expectation at 5_compile:
+**exactly one red** (`terminal_victory_8_12_rounds_hp_15_40` at 5/6 — the untouched
+difficulty contract), `empty_round_stalls == 0`, 0 runtime errors, the other 37
+scenarios byte-identical and green.
+
+## 4. Record
+
+- The **"harness is Control-only"** statement is FALSE as of harness commit 4696887
+  (2026-08-24) and is hereby **explicitly retracted**; it is not re-planted anywhere in
+  these notes.
+- Closing success criterion 1 does **NOT** touch the separate GDScript unit-suite wiring
+  debt — that remains a distinct, unaddressed item (out of scope this round).
+- The 5_vision readability gate result, when produced, must be a parseable verdict
+  (a `blind`/`unparseable_response` result is a gate FAILURE that must be re-run until
+  parseable, never treated as skipped — noted here for the delivery record).
