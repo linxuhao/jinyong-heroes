@@ -51,6 +51,14 @@ var name_text: String = ""
 ## reads the live layout.
 var bar_width: float = 0.0
 
+## Bar height in pixels (= Bar.size.y). 12.0 after this round.
+var bar_height: float = 0.0
+
+## Visible empty-slot area at the right end (EMPTY_CAP_PX × bar_height).
+## The area argument behind Q5: 48 px² was invisible at native size;
+## >= 120 px² is not.
+var empty_area_px: float = 0.0
+
 ## Total widget height in pixels (= size.y; 20.0 for the compact 68×20 layout).
 ## Assigned in setup() (so the headless null-char test reads it without a char
 ## node) AND re-assigned in follow_character() whenever the widget lays out.
@@ -127,6 +135,8 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		bar.max_value = max_hp
 		bar.value = max_hp
 		bar_width = bar.size.x
+		bar_height = bar.size.y
+		empty_area_px = EMPTY_CAP_PX * bar_height
 		# Neutral track background (assigned once here, never recolored
 		# afterwards — the track stays constant): LIGHT gray so the empty
 		# portion is visible at any fill level (5_vision Q5), with a dark
@@ -295,6 +305,8 @@ func follow_character() -> void:
 	# when the bar node is actually present).
 	if is_instance_valid(_bar):
 		bar_width = _bar.size.x
+		bar_height = _bar.size.y
+		empty_area_px = EMPTY_CAP_PX * bar_height
 	# Keep the height observable live while the widget actually runs its layout
 	# pass (re-assigned on every frame follow_character() executes).
 	total_height = size.y
