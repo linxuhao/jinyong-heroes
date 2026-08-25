@@ -85,3 +85,4 @@
 **新增:** `VisibilityProbe` 六层可见性断言类,`MoveHintLabel` 自驱动轮询节点,
 `portrait_visibility.yaml` / `move_target_affordance.yaml` 两个 playtest 场景。
 44 → 46 场景,43 绿(terminal_victory 仍为唯一允许的红)。
+- **jinyong-affordance**: VisibilityProbe 6-layer on-frame predicate, MoveHintLabel state-following affordance. UX-01 WONTFIX (probe: all six portraits on-frame, human frame-reading artifact), UX-02 CLOSED. Playtest 45/46 green (terminal_victory deliberately red).
