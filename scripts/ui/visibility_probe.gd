@@ -22,6 +22,19 @@ class_name VisibilityProbe
 ## the rect may be off-screen, an ancestor may clip it, or a later-drawn host
 ## may cover it. This probe checks all eight.
 
+## Cover-fraction threshold for the `covered` layer: a later-drawn opaque
+## Control that hides at least this share of the ink rect's area is a "cover".
+const COVERED_AREA_FRAC: float = 0.25
+## Absolute covered-area floor in px²: the overlap must also be at least this
+## large, keeping the layer above antialias/rounding noise on tiny rects.
+const COVERED_MIN_PX: float = 64.0
+
+## One-time alpha-scan cache for the `blank_texture` layer, keyed by
+## texture.resource_path (instance-id fallback when the path is empty). The
+## per-frame cost of the layer is a dictionary lookup; the pixel walk happens
+## once per texture ever.
+static var _alpha_scan_cache: Dictionary = {}
+
 ## Global rect of the ink-drawing leaf (the unit's "Sprite" child). Containers
 ## are NOT ink — never return the unit root's own rect (a slot).
 static func leaf_rect(unit_root: Node2D) -> Rect2:
@@ -58,7 +71,15 @@ static func first_fail_layer(unit_root: Node2D) -> String:
 		if tr.texture == null or tr.texture.get_size() == Vector2.ZERO:
 			return "null_texture"
 
-	# 3. zero_rect — zero area, zero scale, or a (near-)transparent alpha chain.
+	# 3. blank_texture — the resource itself has no ink (a fully transparent
+	#    asset renders nothing no matter how correct the geometry is).
+	#    Fail-open: when the pixel scan is unavailable (headless/compressed
+	#    edge) the layer PASSES rather than fabricating a red.
+	var tex: Texture2D = _leaf_texture(leaf)
+	if tex != null and _texture_is_blank(tex):
+		return "blank_texture"
+
+	# 4. zero_rect — zero area, zero scale, or a (near-)transparent alpha chain.
 	var rect: Rect2 = leaf_rect(unit_root)
 	if rect.get_area() <= 0.0:
 		return "zero_rect"
@@ -67,7 +88,7 @@ static func first_fail_layer(unit_root: Node2D) -> String:
 	if _combined_alpha(leaf) < 0.01:
 		return "zero_rect"
 
-	# 4. off_viewport — the ink must actually intersect the rendered frame
+	# 5. off_viewport — the ink must actually intersect the rendered frame
 	#    (touching edges do NOT count: Rect2.intersects default include_borders=false).
 	var vp: Viewport = unit_root.get_viewport()
 	if vp == null:
@@ -75,7 +96,7 @@ static func first_fail_layer(unit_root: Node2D) -> String:
 	if not rect.intersects(vp.get_visible_rect()):
 		return "off_viewport"
 
-	# 5. clipped — every clip_contents ancestor must enclose the leaf rect.
+	# 6. clipped — every clip_contents ancestor must enclose the leaf rect.
 	var anc: Node = leaf.get_parent()
 	while anc != null and anc != vp:
 		if anc is Control and (anc as Control).clip_contents:
@@ -83,9 +104,16 @@ static func first_fail_layer(unit_root: Node2D) -> String:
 				return "clipped"
 		anc = anc.get_parent()
 
-	# 6. occluded — a later-drawn, non-IGNORE Control fully covers the ink.
+	# 7. occluded — a later-drawn, non-IGNORE Control fully covers the ink.
 	if _is_occluded(unit_root, leaf, rect):
 		return "occluded"
+
+	# 8. covered — a later-drawn opaque Control hides >= 25% of the ink rect
+	#    (and >= 64 px² absolute). `occluded` is checked first so a fully
+	#    covered portrait still reports the precise id.
+	var frac: float = _covering_fraction(unit_root, leaf, rect)
+	if frac >= COVERED_AREA_FRAC and rect.get_area() * frac >= COVERED_MIN_PX:
+		return "covered"
 
 	return ""
 
@@ -93,9 +121,92 @@ static func first_fail_layer(unit_root: Node2D) -> String:
 static func portrait_visible(unit_root: Node2D) -> bool:
 	return first_fail_layer(unit_root) == ""
 
+## Worst single later-drawn opaque-host cover fraction of the ink rect, in
+## [0, 1]; 0.0 when nothing qualifies. Shares its candidate walk with the
+## `covered` layer (via _covering_fraction) so the probe and the guards read
+## ONE number and never re-derive the math.
+static func covered_fraction(unit_root: Node2D) -> float:
+	if unit_root == null or not is_instance_valid(unit_root):
+		return 0.0
+	var leaf: Node = unit_root.get_node_or_null("Sprite")
+	if leaf == null or not is_instance_valid(leaf):
+		return 0.0
+	var rect: Rect2 = leaf_rect(unit_root)
+	if rect.get_area() <= 0.0:
+		return 0.0
+	return _covering_fraction(unit_root, leaf, rect)
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
+## The leaf's texture resource (Sprite2D.texture / TextureRect.texture), or
+## null when the leaf is neither (no ink resource to scan).
+static func _leaf_texture(leaf: Node) -> Texture2D:
+	if leaf is Sprite2D:
+		return (leaf as Sprite2D).texture
+	if leaf is TextureRect:
+		return (leaf as TextureRect).texture
+	return null
+
+## True when the texture resource contains NO pixel with alpha > 0 (a fully
+## transparent asset). Asset-level scan — a resource measurement, never a
+## rendered-frame-pixel verdict. Cached per texture. FAIL-OPEN: get_image()
+## returning null (headless/compressed edge) yields false — the layer passes,
+## the probe notes record "scan unavailable" — never a fabricated red.
+static func _texture_is_blank(tex: Texture2D) -> bool:
+	var key: String = tex.resource_path
+	if key == "":
+		key = str(tex.get_instance_id())
+	if _alpha_scan_cache.has(key):
+		return _alpha_scan_cache[key]
+	var blank: bool = false
+	var img: Image = tex.get_image()
+	if img != null:
+		blank = not _image_has_alpha(img)
+	_alpha_scan_cache[key] = blank
+	return blank
+
+## True when the image has at least one pixel with alpha > 0.0. The convert to
+## RGBA8 guarantees a directly-readable alpha channel regardless of the
+## texture's original format; it runs once per texture (scan is cached).
+static func _image_has_alpha(img: Image) -> bool:
+	if img == null:
+		return false
+	img.convert(Image.FORMAT_RGBA8)
+	for y in img.get_height():
+		for x in img.get_width():
+			if img.get_pixel(x, y).a > 0.0:
+				return true
+	return false
+
+## Max single-coverer fraction of `rect` hidden by later-drawn, mouse-visible,
+## non-ancestor Controls — the same candidate walk as _is_occluded, but with a
+## partial-overlap geometric test (intersection area / rect area) instead of
+## full enclosure. Max-single-coverer semantics: overlapping coverers never
+## sum, so the reported number is always attributable to one host.
+static func _covering_fraction(unit_root: Node2D, leaf: Node, rect: Rect2) -> float:
+	if rect.get_area() <= 0.0:
+		return 0.0
+	var tree: SceneTree = unit_root.get_tree()
+	if tree == null:
+		return 0.0
+	var best: float = 0.0
+	var stack: Array[Node] = [tree.root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is Control and n.is_visible_in_tree() \
+				and n != leaf and not _is_ancestor_of(n, leaf):
+			var c: Control = n as Control
+			if c.mouse_filter != Control.MOUSE_FILTER_IGNORE \
+					and _draws_after(c, leaf):
+				var overlap: Rect2 = c.get_global_rect().intersection(rect)
+				var area: float = overlap.get_area()
+				if area > 0.0:
+					best = maxf(best, area / rect.get_area())
+		for child in n.get_children():
+			stack.append(child)
+	return best
 
 ## Global rect of a Sprite2D ink leaf: transform the four local-rect corners by
 ## the sprite's canvas-space transform and take the AABB (rotation-safe — the

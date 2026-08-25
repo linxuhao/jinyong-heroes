@@ -140,6 +140,17 @@ var portrait_visible: bool = false
 ## First failing visibility layer id, "" when fully visible on-frame.
 var portrait_fail_layer: String = ""
 
+## Worst single later-drawn opaque-host cover fraction of the ink rect
+## ([0, 1]) — the `covered` layer's measured input. Playtest surface probe.
+var portrait_covered_frac: float = 0.0
+## The Sprite child's global_position (canvas space) — 3-number probe #1.
+var portrait_sprite_pos: Vector2 = Vector2.ZERO
+## The Sprite texture size in px — 3-number probe #2.
+var portrait_tex_size: Vector2 = Vector2.ZERO
+## The unit's own floating HealthBar global_position; (-1,-1) when no bar
+## resolves (before HUD.setup() or after battle exit) — 3-number probe #3.
+var portrait_bar_pos: Vector2 = Vector2(-1, -1)
+
 # ---------------------------------------------------------------------------
 # Click-path diagnostics (playtest observables — measurement only, never gates)
 # ---------------------------------------------------------------------------
@@ -165,6 +176,12 @@ var debug_last_click_grid: Vector2i = Vector2i(-1, -1)
 # ---------------------------------------------------------------------------
 
 @onready var _sprite: Sprite2D = $Sprite
+
+## The HUD-side HealthBar that follows this unit, resolved by duck-typing
+## (a Control with follow_character() whose _char_node == self) because bar
+## node names are composition-varying. Cached; re-resolved only when null or
+## invalid (bars are freed on battle exit).
+var _portrait_bar: Node = null
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -345,6 +362,22 @@ func _process(_delta: float) -> void:
 	_refresh_sprite_clamp()
 	portrait_fail_layer = VisibilityProbe.first_fail_layer(self)
 	portrait_visible = portrait_fail_layer == ""
+
+	# 3-number probe + covered-fraction observables (UX-01a/01b) — published
+	# every frame after the visibility verdict, before the undo recompute. All
+	# probe reads null-guard so teardown / pre-tree states yield sentinels.
+	portrait_covered_frac = VisibilityProbe.covered_fraction(self)
+	if _sprite != null:
+		portrait_sprite_pos = _sprite.global_position
+		portrait_tex_size = _sprite.texture.get_size() if _sprite.texture != null else Vector2.ZERO
+	else:
+		portrait_sprite_pos = Vector2.ZERO
+		portrait_tex_size = Vector2.ZERO
+	var bar: Node = _resolve_portrait_bar()
+	if bar != null:
+		portrait_bar_pos = (bar as Control).global_position
+	else:
+		portrait_bar_pos = Vector2(-1, -1)
 
 	# Undo availability — recomputed EVERY frame (never event-written), so it is
 	# always in sync no matter which writer changed acted / grid_pos / moves_left.
@@ -900,6 +933,30 @@ func _sync_status_names() -> void:
 	status_names = []
 	for st in statuses:
 		status_names.append(str(st.get("id", "")))
+
+
+## Resolve the HUD-side HealthBar that follows this unit, or null. Matched by
+## duck-typing (a Control with follow_character() whose _char_node == self) —
+## bar node names are composition-varying, never matched by name. Cached in
+## _portrait_bar; re-resolved only when the cached node is null/invalid (bars
+## are freed on battle exit).
+func _resolve_portrait_bar() -> Node:
+	if _portrait_bar != null and is_instance_valid(_portrait_bar):
+		return _portrait_bar
+	_portrait_bar = null
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return null
+	var stack: Array[Node] = [tree.root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is Control and n.is_visible_in_tree() and n.has_method("follow_character"):
+			if n.get("_char_node") == self:
+				_portrait_bar = n
+				return _portrait_bar
+		for child in n.get_children():
+			stack.append(child)
+	return null
 
 
 ## Apply presentation-only sprite visuals (modulate + feet anchor).

@@ -205,6 +205,10 @@ surface:
   - undo_available
   - portrait_visible
   - portrait_fail_layer
+  - portrait_covered_frac
+  - portrait_sprite_pos
+  - portrait_tex_size
+  - portrait_bar_pos
   East_Heretic:
   - health
   - max_health
@@ -217,6 +221,10 @@ surface:
   - sprite_top
   - portrait_visible
   - portrait_fail_layer
+  - portrait_covered_frac
+  - portrait_sprite_pos
+  - portrait_tex_size
+  - portrait_bar_pos
   West_Poison:
   - health
   - max_health
@@ -228,6 +236,10 @@ surface:
   - status_names
   - portrait_visible
   - portrait_fail_layer
+  - portrait_covered_frac
+  - portrait_sprite_pos
+  - portrait_tex_size
+  - portrait_bar_pos
   South_Emperor:
   - health
   - max_health
@@ -239,6 +251,10 @@ surface:
   - status_names
   - portrait_visible
   - portrait_fail_layer
+  - portrait_covered_frac
+  - portrait_sprite_pos
+  - portrait_tex_size
+  - portrait_bar_pos
   North_Beggar:
   - health
   - max_health
@@ -250,6 +266,10 @@ surface:
   - status_names
   - portrait_visible
   - portrait_fail_layer
+  - portrait_covered_frac
+  - portrait_sprite_pos
+  - portrait_tex_size
+  - portrait_bar_pos
   Central_Divine:
   - health
   - max_health
@@ -262,6 +282,10 @@ surface:
   - sprite_top
   - portrait_visible
   - portrait_fail_layer
+  - portrait_covered_frac
+  - portrait_sprite_pos
+  - portrait_tex_size
+  - portrait_bar_pos
   HUD:
   - visible
   - size
