@@ -185,6 +185,11 @@ static func _image_has_alpha(img: Image) -> bool:
 ## partial-overlap geometric test (intersection area / rect area) instead of
 ## full enclosure. Max-single-coverer semantics: overlapping coverers never
 ## sum, so the reported number is always attributable to one host.
+## A unit's OWN subtree (its Sprite leaf, its invisible 64x64 ClickTarget
+## hit-area, etc.) never counts: a unit's own controls cannot "hide" its own
+## portrait, and the ClickTarget renders nothing — flagging it would be a
+## false positive (measured: it is the real coverer behind every `covered`
+## red, see final/portrait_cover_probe_notes.md).
 static func _covering_fraction(unit_root: Node2D, leaf: Node, rect: Rect2) -> float:
 	if rect.get_area() <= 0.0:
 		return 0.0
@@ -196,7 +201,8 @@ static func _covering_fraction(unit_root: Node2D, leaf: Node, rect: Rect2) -> fl
 	while not stack.is_empty():
 		var n: Node = stack.pop_back()
 		if n is Control and n.is_visible_in_tree() \
-				and n != leaf and not _is_ancestor_of(n, leaf):
+				and n != leaf and not _is_ancestor_of(n, leaf) \
+				and not _is_ancestor_of(unit_root, n):
 			var c: Control = n as Control
 			if c.mouse_filter != Control.MOUSE_FILTER_IGNORE \
 					and _draws_after(c, leaf):
@@ -244,7 +250,8 @@ static func _combined_alpha(leaf: Node) -> float:
 
 ## A later-drawn, mouse-visible Control fully covering the ink = occluded.
 ## Uses the repo's opaque-host convention: candidates must declare a non-IGNORE
-## mouse_filter (pure-visibility test, no mouse/hover API involved).
+## mouse_filter (pure-visibility test, no mouse/hover API involved). A unit's
+## own subtree is excluded — same rationale as _covering_fraction.
 static func _is_occluded(unit_root: Node2D, leaf: Node, rect: Rect2) -> bool:
 	var tree: SceneTree = unit_root.get_tree()
 	if tree == null:
@@ -253,7 +260,8 @@ static func _is_occluded(unit_root: Node2D, leaf: Node, rect: Rect2) -> bool:
 	while not stack.is_empty():
 		var n: Node = stack.pop_back()
 		if n is Control and n.is_visible_in_tree() \
-				and n != leaf and not _is_ancestor_of(n, leaf):
+				and n != leaf and not _is_ancestor_of(n, leaf) \
+				and not _is_ancestor_of(unit_root, n):
 			var c: Control = n as Control
 			if c.mouse_filter != Control.MOUSE_FILTER_IGNORE \
 					and c.get_global_rect().encloses(rect) \

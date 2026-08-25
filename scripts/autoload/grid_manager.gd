@@ -21,6 +21,10 @@ const GRID_WIDTH: int = 15
 const GRID_HEIGHT: int = 11
 const GRID_ORIGIN: Vector2 = Vector2(32, 32)  # half-tile offset for centering
 
+## Bottom edge of the 0..92 top strip (presentation constant). Portrait ink may
+## not start above it, so the clamp keeps top-row textures below the strip.
+const BOARD_TOP_MARGIN_Y: float = 92.0
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -148,7 +152,7 @@ static func clamp_sprite_offset(position: Vector2, tex_size: Vector2) -> Vector2
 	var origin: Vector2 = position + offset
 	var clamped := Vector2(
 		clampf(origin.x, half.x, board.x - half.x),
-		clampf(origin.y, half.y, board.y - half.y))
+		clampf(origin.y, BOARD_TOP_MARGIN_Y + half.y, board.y - half.y))
 	return clamped - position
 
 

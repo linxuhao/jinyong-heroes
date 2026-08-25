@@ -39,3 +39,15 @@ timeline:
     North_Beggar.portrait_visible: portrait_visible == true
     Player.sprite_top: sprite_top >= 0.0
     Central_Divine.sprite_top: sprite_top >= 0.0
+    East_Heretic.portrait_fail_layer: portrait_fail_layer == ""
+    West_Poison.portrait_fail_layer: portrait_fail_layer == ""
+    South_Emperor.portrait_fail_layer: portrait_fail_layer == ""
+    North_Beggar.portrait_fail_layer: portrait_fail_layer == ""
+    Player.portrait_covered_frac: portrait_covered_frac < 0.25
+    Central_Divine.portrait_covered_frac: portrait_covered_frac < 0.25
+    East_Heretic.portrait_covered_frac: portrait_covered_frac < 0.25
+    West_Poison.portrait_covered_frac: portrait_covered_frac < 0.25
+    South_Emperor.portrait_covered_frac: portrait_covered_frac < 0.25
+    North_Beggar.portrait_covered_frac: portrait_covered_frac < 0.25
+    Player.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
+    Central_Divine.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
