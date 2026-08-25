@@ -55,6 +55,20 @@ var pressed_connected: Dictionary = {}
 ## prove that).
 var cursor_markers_visible: bool = false
 
+## Round-2 geometry observables (surface, append-only): per-frame, decidable
+## creation-screen layout facts consumed by the playtest gate under
+## CreationScreen.* (creation_layout_readability.yaml). Phase-gated facts
+## (attr_rows_uniform / attr_label_alignment_ok) keep their last value outside
+## the ATTRS phase; _ref_box_top records the ATTRS skeleton top on the first
+## ATTRS frame so TRAITS/CONFIRM can prove they share one vertical skeleton.
+var attr_rows_uniform: bool = true
+var attr_label_alignment_ok: bool = true
+var points_attrs_gap_ok: bool = true
+var phase_skeleton_same: bool = true
+var creation_in_viewport: bool = true
+var creation_box_fits: bool = true
+var _ref_box_top: float = 0.0
+
 var _traits: Array = []
 
 
@@ -85,6 +99,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	# Round-2 geometry observables: computed every frame (cheap rect reads) so
+	# the playtest gate can assert them at any deterministic frame. Runs before
+	# the DEBUG branch; the branch below is unchanged.
+	_update_geometry_observables()
 	# Harness-only DEBUG action (defined by project.godot [input]; an absent
 	# action just returns false from is_action_just_pressed — never crashes).
 	# debug_click_creation_widget drives the SAME _on_attr_plus_pressed the
@@ -93,6 +111,94 @@ func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("debug_click_creation_widget"):
 		if not confirmed and phase == "ATTRS":
 			_on_attr_plus_pressed(attr_index)
+
+
+## Round-2 geometry observables (the "把界面排出来" gate): per-frame, decidable
+## creation-screen layout facts for the playtest harness, same shape as hud.gd's
+## _update_geometry_observables(). Every rect comes from get_global_rect() on the
+## shared canvas coordinate system (creation screen is a full-viewport Control —
+## global rect == viewport px). Every measurement of a phase box is gated on
+## `visible` (hidden Controls still report rects). Phase-gated facts keep their
+## last value outside their phase. Purely additive — no existing surface var or
+## behavior is touched.
+func _update_geometry_observables() -> void:
+	var points_label: Label = get_node_or_null("PointsLabel") as Label
+	var mouse_box: Control = get_node_or_null("MouseBox") as Control
+	var attr_box: Control = get_node_or_null("MouseBox/AttrBox") as Control
+	var trait_box: Control = get_node_or_null("MouseBox/TraitBox") as Control
+	var confirm_box: Control = get_node_or_null("MouseBox/ConfirmBox") as Control
+	# The current visible phase box: exactly one of the three is visible per phase
+	# (set by _render's per-leaf visible sync).
+	var phase_box: Control = null
+	if attr_box != null and attr_box.visible:
+		phase_box = attr_box
+	elif trait_box != null and trait_box.visible:
+		phase_box = trait_box
+	elif confirm_box != null and confirm_box.visible:
+		phase_box = confirm_box
+	# 1. attr_rows_uniform (ATTRS only): all five visible rows share height,
+	#    left and right edges (±1px) and are tall enough to group the value label
+	#    with its -/+ cluster into one touch row (>= 32px).
+	if phase == "ATTRS":
+		attr_rows_uniform = true
+		var ref_rect: Rect2 = Rect2()
+		var have_ref: bool = false
+		for i in 5:
+			var row: Control = get_node_or_null("MouseBox/AttrBox/AttrRow%d" % i) as Control
+			if row == null or not row.visible:
+				attr_rows_uniform = false
+				break
+			var r: Rect2 = row.get_global_rect()
+			if not have_ref:
+				ref_rect = r
+				have_ref = true
+			if r.size.y < 32.0 \
+					or absf(r.size.y - ref_rect.size.y) > 1.0 \
+					or absf(r.position.x - ref_rect.position.x) > 1.0 \
+					or absf(r.end.x - ref_rect.end.x) > 1.0:
+				attr_rows_uniform = false
+				break
+	# 2. attr_label_alignment_ok (ATTRS only): all five AttrRow*/AttrLabel carry
+	#    horizontal_alignment == 2 (right) AND size_flags_horizontal == 3
+	#    (expand-fill) — the property pair that makes the value text hug its -/+
+	#    cluster. Computed bool, not node asserts: the five labels share the bare
+	#    name "AttrLabel" (the harness's recursive bare-name search cannot
+	#    disambiguate five matches), so they are resolved by indexed path.
+	if phase == "ATTRS":
+		attr_label_alignment_ok = true
+		for i in 5:
+			var label: Label = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrLabel" % i) as Label
+			if label == null \
+					or int(label.horizontal_alignment) != 2 \
+					or label.size_flags_horizontal != 3:
+				attr_label_alignment_ok = false
+				break
+	# 3. points_attrs_gap_ok (always): PointsLabel bottom .. current visible phase
+	#    box top ∈ [4, 24] px AND the two x-centers within 4px.
+	if points_label != null and phase_box != null:
+		var p_rect: Rect2 = points_label.get_global_rect()
+		var b_rect: Rect2 = phase_box.get_global_rect()
+		var gap: float = b_rect.position.y - p_rect.end.y
+		points_attrs_gap_ok = gap >= 4.0 and gap <= 24.0 \
+				and absf(p_rect.get_center().x - b_rect.get_center().x) <= 4.0
+	# 4. phase_skeleton_same: record the AttrBox top on the first ATTRS frame;
+	#    TRAITS/CONFIRM compare the visible box top against it (±2px). ATTRS is
+	#    the reference itself, so the fact reads true by construction.
+	if phase == "ATTRS":
+		if attr_box != null:
+			_ref_box_top = attr_box.get_global_rect().position.y
+		phase_skeleton_same = true
+	elif phase_box != null and _ref_box_top > 0.0:
+		phase_skeleton_same = absf(phase_box.get_global_rect().position.y - _ref_box_top) <= 2.0
+	# 5. creation_in_viewport (always): MouseBox rect fully inside the viewport
+	#    inset by 16px.
+	if mouse_box != null:
+		var viewport_rect: Rect2 = get_viewport().get_visible_rect()
+		creation_in_viewport = viewport_rect.grow(-16.0).encloses(mouse_box.get_global_rect())
+	# 6. creation_box_fits (always): current visible phase box content bottom
+	#    stays 8px clear of the MouseBox bottom.
+	if mouse_box != null and phase_box != null:
+		creation_box_fits = phase_box.get_global_rect().end.y <= mouse_box.get_global_rect().end.y - 8.0
 
 
 ## Wire every mouse widget's pressed signal to the bound handler — the keyboard
