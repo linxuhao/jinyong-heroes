@@ -86,3 +86,26 @@ The three-case decision remains the contract for `fix_health_bar_q5_gated`, to b
 - Case 3: `Primary model all green → fallback model limitation, proceed to fix_health_bar_q5_gated Case 3`
 
 **To unblock:** run the pinned Group 1 and Group 2 frames (§2, §3) through the primary `qwen3` (`backend=primary`) `/vision` harness with the verbatim Q5 text, then fill the `model answer` / `model reason` columns and select the case. The frame inventory (8 full-HP + 5 injured, ≥5 distinct scenarios per group, HP verified via the playtest observable) is complete and ready to feed that run.
+
+## 6 Fix decision (fix_health_bar_q5_gated)
+
+**Classification (read from §5 Conclusion at fix time):** **PENDING**.
+
+- §5 states **PENDING** — the primary-model Q5 run is unavailable in the implementer step (the godot-builder `/vision` endpoint runs at the downstream `5_vision` gate) and **no `final/vision_report.json` exists on disk**; §2/§3 carry no model answer for any Group 1 or Group 2 frame (all cells **PENDING**).
+
+**Disposition:** **no code changed.**
+
+- Per the hard requirement (no `health_bar.gd` constant change without probe evidence showing red on injured frames), no constant was modified. Verified read-back of the working tree at fix time:
+  - `scripts/ui/health_bar.gd`: `const EMPTY_CAP_PX: float = 14.0` (L44), `sb.set_expand_margin_all(8.0)` (L181) — unchanged.
+  - `scenes/ui/health_bar.tscn`: `EmptyCap` remains at baseline — unchanged.
+  - `tests/test_health_bar.gd`: still asserts baseline values (e.g. `empty_area_px` 168.0 / `get_expand_margin_all()` 8.0) — unchanged.
+- `playtest/ui_geometry_readability.yaml` untouched (unchanged in every branch).
+- No case assertion made in `design/30_presentation.md` (Case 2/3 design notes deferred; a PENDING classification asserts no case).
+
+**Deferral:** the fix is deferred to the `5_vision` gate's primary `qwen3` (`backend=primary`) run. Once the pinned Group 1 / Group 2 frames (§2, §3) are run and a real case (1/2/3) is classified from measured answers, re-open `fix_health_bar_q5_gated`:
+- Case 1 (primary says NO on injured frames) → apply `EMPTY_CAP_PX = 20.0`, expand margin `12.0`, `EmptyCap` rect (44,0)/(20,12), test 240.0/12.0, and the `design/30_presentation.md` runtime note.
+- Case 2 or 3 → no `health_bar.gd` change; record the finding in `design/30_presentation.md` only.
+
+This classification is not fabricated: it is the only honest reading given an unavailable run.
+
+**Verification (verify_change_minimality):** Edited-file set for this task = `{ final/health_bar_q5_probe_notes.md }` (EOF append only). This matches the PENDING branch's allowed set (probe-notes append only; `scripts/ui/health_bar.gd`, `scenes/ui/health_bar.tscn`, `tests/test_health_bar.gd`, `design/30_presentation.md`, `playtest/ui_geometry_readability.yaml` all untouched). §1–§5 of this file are byte-identical to the baseline. No gate was run in this implementer step (no shell); dynamic gates (compile clean, playtest, unit suite, pytest) run at the downstream `5_compile` step.
