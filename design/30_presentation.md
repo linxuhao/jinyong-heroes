@@ -575,10 +575,11 @@ HotkeyLabel / StateTag / CooldownLabel 等被钉住的子节点矩形):
 | `CostLabel`(新增) | 顶部带 (26,2)-(62,14) | 9 | 居中 | 内力消耗:`cost == 0` → 「无消耗」;`cost > 0` → 「内力 N」。数值只取自既有 `SkillData` |
 | `InfoLabel`(新增) | 右下 (56,34)-(102,46) | 8 | 右 | 上下文案切换:锁定(5–8 格,第 4 轮前)→ 锁定原因「第 4 轮解锁」;否则 → 效果摘要 `effect_summary_text` |
 
-- **内力不足(`no_energy`)状态与「已锁定」必须可区分**:新调色板条目 `no_energy`
-  (浅紫,亮度 0.6629,与全部五个既有状态的亮度差 ≥ 0.10)+ 中文标签「内力不足」,
-  与 phase_locked 的「锁定」不同;走既有 `state_palette` / `state_luma_value` /
-  `_apply_state` 机制,不分叉。当前数据下该状态永不触发(消耗全 0)。
+- **内力不足(`no_energy`)按钮状态:本轮推迟、未落地。** 代码中不存在该状态——调色板
+  仍只有 ready / cooldown / phase_locked / hp_gated / waiting 五个状态(亮度 0.3874 /
+  0.0814 / 0.5306 / 0.2020 / 0.1558),无「内力不足」标签,`hud.gd` 的 disabled 推导
+  不含 no_energy 项。待真实招式消耗定义后,再实现一个与「已锁定」(phase_locked)亮度差
+  ≥ 0.10 的视觉可区分状态。
 - **锁定原因派生自同一谓词**:只有 `CombatManager.tutorial_battle and i >= 4 and
   current_round < 4` 时 `lock_reason_text` 非空;遭遇战 / 第 4 轮起为空,绝不写死一条
   常显字符串。

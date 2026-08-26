@@ -15,10 +15,14 @@ Three UX items, all **information missing** (roadmap stage 2 — the player can 
    inner-force cost.** Added `cost_text` (renders 「无消耗」 with current data — see
    §5), `effect_text` (= the skill's Chinese description, surfaced on-face and as the
    tooltip) and `effect_summary_text` (short on-face summary derived only from
-   existing `SkillData` numbers). New `no_energy` insufficient-inner-force button
-   state (palette entry luma 0.6629, ≥ 0.10 from `phase_locked`'s 0.5306 and every
-   other state; Chinese tag 「内力不足」) — visually distinct from 锁定 by
-   construction, but **cannot fire with current data** (all costs 0, pool 180).
+   existing `SkillData` numbers). The insufficient-inner-force button state
+   (`no_energy` / 「内力不足」) was **NOT implemented this round — deferred in
+   full**: the palette still has only the five states ready/cooldown/phase_locked/
+   hp_gated/waiting and `hud.gd` still derives `disabled == phase_locked or
+   on_cooldown or hp_gated` (no no_energy term). It is deferred until a future
+   round defines real per-skill costs so it can actually fire and be tested. This
+   round's only inner-force work: `SkillData.cost` (schema, default 0) and
+   `CostLabel` rendering 「无消耗」.
 2. **UX-04 — locked slots 5–8 show only 「锁定」, no lock reason / unlock condition.**
    Added `lock_reason_text`, derived per-frame by the HUD from the **same** tutorial
    phase-lock predicate (`tutorial_battle and i >= 4 and current_round < 4`):
@@ -60,18 +64,19 @@ anywhere: health asserts are expressed via `hp_max` (e.g. `hp_value == hp_max`,
 
 ## 3. Gate results
 
-**Honest state at write time (2026-08-26): none of the gate-report artifacts
-(`compile_report.json` / `playtest_report.json` / `playtest_summary.md` /
-`vision_report.json` / `test_report.json`) is on disk.** The pipeline's gate steps
-run after this task stage. Per the repo's no-fabrication rule every gate count below
-is marked **UNVERIFIED** with its target stated; no count is invented.
+**Gate results are recorded from the pipeline's gate-step products (injected
+context entries from the `5_compile` / `5_test` / `5_vision` step directories —
+these are NOT repo files).** The repo's `final/verify_report.json` is a **STALE
+prior-round artifact** (it mentions only the jinyong-events scenario names
+`portrait_visibility` / `event_travel_effects`, 47 scenarios, vision Q5 — none of
+this round's three scenario names), so it is NOT cited as evidence.
 
-| Gate | Target | Status at write time |
-|---|---|---|
-| Compile (`/compile`) | 0 errors across the whole repo | **UNVERIFIED** — no `compile_report.json` on disk |
-| Playtest (`/playtest`) | **50 scenarios, spine_to_ending fully green**; existing suites not red; only `terminal_victory_8_12_rounds_hp_15_40` may stay red (sanctioned balance deferral) | **UNVERIFIED** — no `playtest_report.json` / `playtest_summary.md` on disk |
-| Vision (`/vision`) | 6/6 questions pass on native 960×704 frames | **UNVERIFIED** — no `vision_report.json` on disk |
-| Unit tests (`/test`) | GDScript suite pass (existing 12 + new `test_skill_button_info.gd` / `test_health_bar_text.gd`) | **UNVERIFIED** — no `test_report.json` on disk |
+| Gate | Result |
+|---|---|
+| Compile (`5_compile` `compile_report.json`) | **71/71 scripts, 0 errors** |
+| Unit tests (`5_test` `test_report.json`) | **11/11, 0 failures** |
+| Playtest (`5_compile` `playtest_summary.md`) | hard gate **passed**; three new scenarios green — `skill_button_effect_info` **5/5**, `locked_slot_unlock_reason` **8/8**, `health_bar_numbers` **5/5**; `spine_to_ending` **32/32** green; only `terminal_victory_8_12_rounds_hp_15_40` red (**sanctioned balance deferral**, `design/00_roadmap.md`) |
+| Vision (`5_vision` `vision_report.json`) | **blind: true** (`endpoint_unreachable`, human-judged) — CostLabel / InfoLabel / HpLabel ink legibility was **not machine-adjudicated**; the rect-disjointness probe in `final/hud_info_probe_notes.md` §3 is projected from authored rects, not rendered-ink measurement |
 
 On-disk (non-gate) facts verified directly this round: the three new scenario files
 exist with `name:` == basename, single-integer `at:` values, and every assert line
