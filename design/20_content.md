@@ -175,7 +175,7 @@
 
 **物品 vs 属性 (item-vs-attr)。** `tomb_bed` 古墓寒玉——床上练内力,还是床畔捡剑。
 
-**属性二选一 (attr-A-vs-attr-B)。** `ruins` 古墓残碑——悟性与身法二选一;
+**属性二选一 (attr-A-vs-attr-B)。** `ruins` 古墓残碑——悟性与福缘二选一;
 `peach_maze` 桃花迷阵——闯阵的身法,还是观潮的悟性。
 
 **练功 vs 金钱 (growth-vs-money)。** `dragon_scrap` 降龙残谱——强记掌谱练功,还是卖给书贾换银两。
