@@ -210,6 +210,17 @@ fallback-model limitation) remains PENDING. No code change to health_bar.gd (EMP
 expand margin 8.0, EmptyCap rect all unchanged). The next 5_vision gate run (with the retry fix
 applied on the gate side) will produce the real verdict.
 
+> **2026-08-26 wording alignment (docs only, `align_vision_gate_wording_v2`).** The repo's
+> recorded Q5 description (`final/verify_report.json`, `README.md`) now reports the gate state
+> honestly: the gate **did not judge** (4/47 scenarios, all full-HP, zero injured) — not "Q5
+> FAILED", not a "19/28" count (that figure is not independently confirmable from the on-disk
+> artifact), and no claim that the primary endpoint was "repaired". The Q5 question text itself
+> lives in the godot-builder `/vision` gate config (outside this repo); the recorded repo text is
+> kept aligned to the gate's actual question so the two cannot drift. Per the 78–100% HP
+> flattening design, the "empty portion" condition in Q5 has meaning only on non-full bars; a
+> full-HP bar rendering ~78–82% filled is still recognisable as a health bar. Docs alignment only —
+> no code change to `health_bar.gd`.
+
 ## 美术:整套重画(决定于 2026-08-23)
 
 **现有美术资产数量少、质量不够,不逐条修补,到时候整套重画。**

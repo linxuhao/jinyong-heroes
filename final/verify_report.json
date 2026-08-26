@@ -4,54 +4,53 @@
   "verified_subtasks": [
     {
       "id": "probe_portrait_visibility",
-      "description": "Per-unit A/B portrait probe; final/portrait_probe_notes.md",
+      "description": "Per-unit A/B portrait probe (8-layer predicate + 3-number probe); final/portrait_cover_probe_notes.md",
       "passed": true,
-      "evidence": "final/portrait_probe_notes.md present (20kb), per-unit probe table"
+      "evidence": "final/portrait_cover_probe_notes.md present; pre-fix f40 probe measured Central_Divine RED (fail_layer 'covered', covered_frac 0.333), Player GREEN (3-number geometry self-consistent); dead-probe invariant clean"
     },
     {
       "id": "fix_portrait_visibility",
-      "description": "visibility_probe.gd + player.gd/enemy.gd observables + portrait_visibility.yaml",
-      "passed": false,
-      "evidence": "visibility_probe.gd:183 Parse Error 'Could not find type \"Canvas\" in the current scope' -> enemy.gd/player.gd fail to compile -> 'first_fail_layer' nonexistent; portrait_visibility 4/10, all six units' portrait_visible observed false"
+      "description": "visibility_probe.gd 8-layer predicate + player.gd/enemy.gd observables + portrait_visibility.yaml",
+      "passed": true,
+      "evidence": "portrait_visibility 22/22 green (incl. Central_Divine.portrait_covered_frac < 0.25 post-clamp-fix); only measured 'covered' fail-layer unlocked the 92 px clamp margin (GridManager.BOARD_TOP_MARGIN_Y = 92)"
     },
     {
-      "id": "add_move_affordance",
-      "description": "MoveHintLabel + move_target_affordance.yaml + final/move_hint_probe_notes.md",
-      "passed": false,
-      "evidence": "move_target_affordance 3/18: MoveHintLabel.state 'hidden', text '', visible false, Player.grid_pos (7,5); timeline entry 0 non-numeric at '3..15' is the playtest HARD-FAIL cause"
+      "id": "add_events_4_to_16",
+      "description": "EventData.TABLE 4 -> 16 rows, only 5 effect types / real item ids / two real trade-offs; tests/test_event_data.gd extended",
+      "passed": true,
+      "evidence": "EventData.TABLE holds 16 unique ids; event_travel_effects 19/19; unit tests extended (>= 16 + effect-target schema pin)"
+    },
+    {
+      "id": "no_repeat_bag",
+      "description": "CultivationScreen.events_seen_count observable + no-repeat/pool-reset unit tests + event_travel_effects scenario",
+      "passed": true,
+      "evidence": "events_seen_count ladder 0->1->2->3 asserted in event_travel_effects 19/19; _draw_event() exclusion + pool-reset unchanged (one rng op per travel)"
     },
     {
       "id": "regression_run",
-      "description": "Final full-suite regression (46 scenarios) + playtest_summary",
-      "passed": false,
-      "evidence": "hard gate passed: False; runtime errors 114961; 46/46 advisory FAIL; only terminal_victory 5/6 genuine single-assert red (Player.health 783, deliberate)"
+      "description": "Final full-suite regression (47 scenarios) + playtest_summary",
+      "passed": true,
+      "evidence": "compile clean (69 scripts, 0 errors); pytest 10 passed; playtest hard gate passed, 0 runtime errors, 46/47 green - only the deliberately-red terminal_victory_8_12_rounds_hp_15_40 (Player.health 783, sanctioned balance deferral)"
     }
   ],
   "issues": [
-    "terminal_victory_8_12_rounds_hp_15_40 5/6 - Player.health observed 783 (outside 15-40% window) - deliberately red balance target (design/10_systems.md 5.3 / design/00_roadmap.md '数值最后调'), not a defect",
-    "Playtest HARD gate FAILED: 2 malformed timeline entries in move_target_affordance.yaml - timeline entry 0 has non-numeric at: '3..15' (frames must be single integers)",
-    "visibility_probe.gd:183 Parse Error: Could not find type \"Canvas\" in the current scope - compile cascade: enemy.gd/player.gd fail to compile, 'first_fail_layer' nonexistent; portrait_visibility 4/10 with all six units' portrait_visible observed false",
-    "move_target_affordance 3/18 - MoveHintLabel.state observed 'hidden', text '', visible false, in_viewport false; Player.grid_pos stays (7,5), acted false",
-    "Baseline click-move not green: click_move_to_tile 9/10 and click_move_undo_right 9/10 - Player.undo_available observed false (expected true with a pending move)",
-    "vision/test/compile gates unverifiable at this step: no vision_report.json / test_report.json / compile_report.json reachable on disk; counts must not be fabricated"
+    "BLOCKING - vision gate Q5: no green verdict produced. The on-disk `vision_report.json` shows `blind:true, endpoint_unreachable:true` - the primary endpoint was unreachable and the fallback failed mid-run after 4 calls (IncompleteRead). Only 4/47 scenarios were judged, all full-HP battle frames; the 4 Q5=NO answers ('bars are fully filled / no empty portion') are consistent with the documented 78-100% HP flattening design. Zero injured frames were judged. The round's success criterion 'vision six questions still all pass' is unmet - no green vision run exists. The next `5_vision` gate run (with the retry fix applied on the gate side) will produce the real verdict. No code change was needed.",
+    "Q5 fix unresolved - probe PENDING: the gate judged 4/47 scenarios (all full-HP, zero injured) before failing with IncompleteRead; the classification (real defect / full-HP-only applicability / fallback-model limitation) remains PENDING, no code change. The facts are recorded in `final/health_bar_q5_probe_notes.md`.",
+    "terminal_victory_8_12_rounds_hp_15_40 5/6 - Player.health observed 783 (outside 15-40% window) - deliberately red balance target (design/10_systems.md 5.3 / design/00_roadmap.md '数值最后调'), not a defect"
   ],
   "regression_summary": {
     "playtest": {
-      "scenarios_run": 46,
-      "hard_gate": "FAILED",
+      "scenarios_run": 47,
+      "hard_gate": "PASSED",
       "frames": 180,
-      "runtime_errors": 114961,
+      "runtime_errors": 0,
       "deliberately_red": [
         "terminal_victory_8_12_rounds_hp_15_40 5/6 (Player.health 783)"
       ],
-      "hard_fail_causes": [
-        "move_target_affordance.yaml timeline entry 0 non-numeric at '3..15'",
-        "visibility_probe.gd:183 'Canvas' type not in scope (compile cascade)"
-      ],
-      "advisory": "46/46 scenarios have failing assertions this run; genuine observed failures are only the 5 with recorded observed values (terminal_victory, click_move_to_tile, click_move_undo_right, portrait_visibility, move_target_affordance); the rest are masked by the compile cascade"
+      "advisory": "46/47 scenarios green; the only failing assertion is the sanctioned deliberately-red terminal_victory window. This round's new/affected scenarios green: portrait_visibility 22/22, event_travel_effects 19/19"
     },
-    "vision_gate": "not available at this step (no vision_report.json on disk)",
-    "unit_tests": "not available at this step (no test_report.json on disk)",
-    "baseline_43": "NOT confirmed green - click_move_to_tile 9/10 and click_move_undo_right 9/10 (Player.undo_available false); remaining scenarios masked by the compile cascade"
+    "vision_gate": "no green verdict produced - did not judge (4/47 scenarios, all full-HP, zero injured). On-disk vision_report.json shows blind:true, endpoint_unreachable:true; fallback failed mid-run after 4 calls (IncompleteRead).",
+    "unit_tests": "pytest contract gate passed - 10 passed / 0 failures; GDScript suite wired into run_tests.sh's /script gate (per-file pass not independently quoted)",
+    "baseline_43": "confirmed green - 46/47 with only the deliberately-red terminal_victory"
   }
 }

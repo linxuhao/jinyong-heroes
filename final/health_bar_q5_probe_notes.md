@@ -7,6 +7,16 @@ Task: `probe_health_bar_q5_primary`. Probe-only — **no code changes**.
 **Question (verbatim, run exactly this):**
 > Above or attached to the characters, is there something clearly recognisable as a health bar (a bar with a filled portion and an empty portion showing remaining HP)?
 
+> **2026-08-26 wording-alignment note (`align_vision_gate_wording_v2`, docs only).** The
+> verbatim text above is the gate's actual question (it lives in the godot-builder `/vision`
+> gate config, outside this repo) and is **not** rewritten here — the probe and the gate must
+> keep asking the same question. What the alignment changes is how the repo *reports* the gate
+> state: `final/verify_report.json` and `README.md` now describe the gate as **did not judge
+> (4/47 scenarios, all full-HP, zero injured)** — not "Q5 FAILED", not a "19/28" count (not
+> independently confirmable from the on-disk artifact). Per the 78–100% HP flattening design,
+> the "empty portion" condition has meaning only on non-full bars; a full-HP bar rendering
+> ~78–82% filled is still recognisable as a health bar. No code change to `health_bar.gd`.
+
 **Model:** the probe's result source is the **primary** vision model `qwen3` (backend=`primary`). The fallback model `deepseek-v4-flash-vision-exp` (backend=`fallback`) is FORBIDDEN as a result source for this probe and was not used.
 
 **Run availability — PENDING:** the primary-model run is executed by the godot-builder sidecar `/vision` endpoint at the downstream `5_vision` gate stage. That endpoint is **not available in this implementer step**: there is no `final/vision_report.json` on disk (the directory tree confirms none exists), and no `/vision` tool is exposed to this step. Per the repo no-fabrication rule, model answers must come from a real primary-model run; an unavailable run is recorded as **PENDING**, never invented. Consequently every `model answer` / `model reason` cell below is **PENDING** and the conclusion is **PENDING**.
