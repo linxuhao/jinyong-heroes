@@ -201,6 +201,15 @@ portion and an empty portion」——三个条件缺一不可。
 > `tests/test_health_bar.gd`,**不要照运行时读数回填 tscn**--那是在把
 > 引擎的钳制当成设计。
 
+**2026-08-26 Q5 status (jinyong-events fix round).** The 5_vision gate judged 4/47 scenarios
+(all full-HP battle frames) before failing with IncompleteRead; the primary endpoint was
+unreachable (blind:true). The 4 Q5=NO answers ("bars are fully filled / no empty portion")
+are consistent with the documented 78–100% HP flattening design (health_bar.gd:38-43). Zero
+injured frames were judged. The classification (real defect / full-HP-only applicability /
+fallback-model limitation) remains PENDING. No code change to health_bar.gd (EMPTY_CAP_PX 14.0,
+expand margin 8.0, EmptyCap rect all unchanged). The next 5_vision gate run (with the retry fix
+applied on the gate side) will produce the real verdict.
+
 ## 美术:整套重画(决定于 2026-08-23)
 
 **现有美术资产数量少、质量不够,不逐条修补,到时候整套重画。**

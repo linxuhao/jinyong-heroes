@@ -11,6 +11,19 @@ Task: `probe_health_bar_q5_primary`. Probe-only — **no code changes**.
 
 **Run availability — PENDING:** the primary-model run is executed by the godot-builder sidecar `/vision` endpoint at the downstream `5_vision` gate stage. That endpoint is **not available in this implementer step**: there is no `final/vision_report.json` on disk (the directory tree confirms none exists), and no `/vision` tool is exposed to this step. Per the repo no-fabrication rule, model answers must come from a real primary-model run; an unavailable run is recorded as **PENDING**, never invented. Consequently every `model answer` / `model reason` cell below is **PENDING** and the conclusion is **PENDING**.
 
+**2026-08-26 gate run (5_vision):** The vision gate judged 4 out of 47 scenarios before failing
+with `IncompleteRead` (connection established then dropped mid-stream). The 4 scenarios judged
+were: `round_one_snapshot_and_turn_order`, `enemy_acts_only_after_player_ends_turn`,
+`each_unit_acts_once_per_round_initiative_order`, `cooldowns_decrement_by_round`. All 4 are
+battle scenarios; all frames were captured at full HP (early rounds). The Q5 answers on all 4:
+- "green bars are fully filled."
+- "green bars are full, no empty portion visible"
+- "bars are solid green, no empty portion."
+- "bars are full, no empty portion visible"
+These are the expected behaviour of the 78–100% HP flattening design (health_bar.gd:38-43).
+**Zero injured frames were judged by any model.** The primary endpoint was unreachable
+(blind:true, endpoint_unreachable:true). Classification remains PENDING.
+
 **Frame identity:** `(playtest scenario basename, sample frame)`. The vision gate captures the same frames this probe targets (same scenarios, same `at:` frames); actual captured filenames follow the gate's `{scenario}_{frame}` convention.
 
 **HP-state verification (observables, NOT visual judgment):**
@@ -57,6 +70,8 @@ Full-HP frames (`Player.health >= 0.78 * max`). Q5 text verbatim (see §1).
 | battle_end_turn_attack_buttons/f1750 | 823 | 82.3% | **PENDING** | PENDING — primary `/vision` run not available in this step |
 | cultivation_changes_combat/f490 | 1000 | 100% | **PENDING** | PENDING — primary `/vision` run not available in this step |
 
+Note: The 5_vision gate judged 4 full-HP battle frames (Q5=NO on all 4, reasons consistent with 78–100% flattening). No primary-model answers exist for the pinned probe frames.
+
 ## 3 Group 2 results table
 
 Injured frames (`Player.health < 0.78 * max`). Q5 text verbatim (see §1).
@@ -69,6 +84,8 @@ Injured frames (`Player.health < 0.78 * max`). Q5 text verbatim (see §1).
 | round_one_snapshot_and_turn_order/f80 (post debug_damage_player) | 400 | 40% | **PENDING** | PENDING — primary `/vision` run not available in this step |
 | battle_end_turn_attack_buttons/f80 (post debug_damage_player) | 400 | 40% | **PENDING** | PENDING — primary `/vision` run not available in this step |
 
+Note: Zero injured frames were judged by the 5_vision gate (the gate failed after 4 calls, all on full-HP frames). No primary-model answers exist for any injured frame.
+
 ## 4 Summary
 
 - **Group 1 (full-HP):** 8 frames, 8 × PENDING → YES 0, NO 0, PENDING 8.
@@ -78,7 +95,18 @@ Injured frames (`Player.health < 0.78 * max`). Q5 text verbatim (see §1).
 
 ## 5 Conclusion
 
-**PENDING** — the primary-model Q5 run is unavailable in this step (the godot-builder `/vision` endpoint runs at the downstream `5_vision` gate; no `vision_report.json` is produced yet). Per the no-fabrication rule, the probe cannot classify the failure into any of the three cases, and it must not be claimed as Case 1/2/3 on fabricated data.
+PENDING — the 5_vision gate judged 4/47 scenarios (all full-HP, Q5=NO consistent with the
+78–100% HP flattening design), then failed with IncompleteRead. Zero injured frames were judged.
+The primary endpoint was unreachable (blind:true). The three-case classification (real defect /
+full-HP-only applicability / fallback-model limitation) cannot be resolved without a complete
+primary-model gate run that includes injured frames. The next 5_vision gate run (with the retry
+fix applied on the gate side) will produce the real verdict.
+
+NOTE (non-authoritative): An experimental model instance (Qwen/Qwen3.5-9B, port 8001, temp 0,
+2026-08-26 01:2x UTC) — which is NOT the designated primary model for this pipeline — answered
+5/5 YES on the pinned probe frames (both full-HP and injured). This is a real measurement from
+a real model, but it does not constitute a primary-model verdict and does not close the
+classification. It only shows that at least one model can see the empty portion.
 
 The three-case decision remains the contract for `fix_health_bar_q5_gated`, to be resolved from a real primary-model run:
 - Case 1: `Primary model says NO on injured frames → real defect, proceed to fix_health_bar_q5_gated Case 1`
@@ -95,7 +123,8 @@ The three-case decision remains the contract for `fix_health_bar_q5_gated`, to b
 
 **Disposition:** **no code changed.**
 
-- Per the hard requirement (no `health_bar.gd` constant change without probe evidence showing red on injured frames), no constant was modified. Verified read-back of the working tree at fix time:
+- The 5_vision gate judged 4/47 full-HP frames (Q5=NO, consistent with 78–100% flattening). Zero injured frames judged. No code change to health_bar.gd (EMPTY_CAP_PX 14.0, expand margin 8.0, EmptyCap rect all unchanged). Awaiting a complete primary-model gate run.
+- Verified read-back of the working tree at fix time:
   - `scripts/ui/health_bar.gd`: `const EMPTY_CAP_PX: float = 14.0` (L44), `sb.set_expand_margin_all(8.0)` (L181) — unchanged.
   - `scenes/ui/health_bar.tscn`: `EmptyCap` remains at baseline — unchanged.
   - `tests/test_health_bar.gd`: still asserts baseline values (e.g. `empty_area_px` 168.0 / `get_expand_margin_all()` 8.0) — unchanged.
@@ -108,4 +137,4 @@ The three-case decision remains the contract for `fix_health_bar_q5_gated`, to b
 
 This classification is not fabricated: it is the only honest reading given an unavailable run.
 
-**Verification (verify_change_minimality):** Edited-file set for this task = `{ final/health_bar_q5_probe_notes.md }` (EOF append only). This matches the PENDING branch's allowed set (probe-notes append only; `scripts/ui/health_bar.gd`, `scenes/ui/health_bar.tscn`, `tests/test_health_bar.gd`, `design/30_presentation.md`, `playtest/ui_geometry_readability.yaml` all untouched). §1–§5 of this file are byte-identical to the baseline. No gate was run in this implementer step (no shell); dynamic gates (compile clean, playtest, unit suite, pytest) run at the downstream `5_compile` step.
+**Verification (verify_change_minimality):** Edited-file set for this task = `{ final/health_bar_q5_probe_notes.md, design/30_presentation.md }`. In this file: §1 gains the 2026-08-26 gate-fact block; §2 and §3 each gain a PENDING-preserving gate-fact note; §5 was rewritten to the PENDING + 4/47 + non-authoritative experimental-model NOTE; §6 keeps "no code changed" with a gate-facts rationale. All Group 1 / Group 2 model-answer cells remain **PENDING** — no model answer was fabricated. `scripts/ui/health_bar.gd`, `scenes/ui/health_bar.tscn`, `tests/test_health_bar.gd`, and `playtest/ui_geometry_readability.yaml` are untouched. No gate was run in this implementer step (no shell); dynamic gates (compile clean, playtest, unit suite, pytest) run at the downstream `5_compile` step.
