@@ -563,3 +563,34 @@ f900 / f940 / f980 / f1020 / f1060 / f1100  ——  八个连续采样点完全�
 `each_unit_acts_once` 要求第 2 回合杨过先手)。**断言的前提出错,比断言的数值出错更难发现,
 因为它每次都失败得很有道理。**
 
+## 战斗 HUD 说人话(2026-08-26,jinyong-hud 轮)
+
+### 技能按钮信息层(UX-03 / UX-04)
+
+技能按钮保持 **104×48** 不变,新增两个信息 Label(只改新增节点的矩形,不改
+HotkeyLabel / StateTag / CooldownLabel 等被钉住的子节点矩形):
+
+| 节点 | 位置 | 字号 | 对齐 | 内容 |
+|---|---|---|---|---|
+| `CostLabel`(新增) | 顶部带 (26,2)-(62,14) | 9 | 居中 | 内力消耗:`cost == 0` → 「无消耗」;`cost > 0` → 「内力 N」。数值只取自既有 `SkillData` |
+| `InfoLabel`(新增) | 右下 (56,34)-(102,46) | 8 | 右 | 上下文案切换:锁定(5–8 格,第 4 轮前)→ 锁定原因「第 4 轮解锁」;否则 → 效果摘要 `effect_summary_text` |
+
+- **内力不足(`no_energy`)状态与「已锁定」必须可区分**:新调色板条目 `no_energy`
+  (浅紫,亮度 0.6629,与全部五个既有状态的亮度差 ≥ 0.10)+ 中文标签「内力不足」,
+  与 phase_locked 的「锁定」不同;走既有 `state_palette` / `state_luma_value` /
+  `_apply_state` 机制,不分叉。当前数据下该状态永不触发(消耗全 0)。
+- **锁定原因派生自同一谓词**:只有 `CombatManager.tutorial_battle and i >= 4 and
+  current_round < 4` 时 `lock_reason_text` 非空;遭遇战 / 第 4 轮起为空,绝不写死一条
+  常显字符串。
+- **无省略号纪律**:新增 Label `clip_text=false`、`text_overrun_behavior=0`;放不下就
+  缩短摘要(效果摘要 ≤ 6 个中文字符),绝不宽进被钉住的兄弟矩形、绝不用省略号。
+
+### 血条数值(UX-05)
+
+`HpLabel` 作为 `Bar` 的子节点(沿用 EmptyCap 先例),锚定 Bar 全矩形 (0,0)-(64,12),
+居中,字号 9,`clip_text=false`、`text_overrun_behavior=0`、`mouse_filter=2`,绘制为
+Bar 的最后一个子节点(盖在填充与 EmptyCap 之上)。文字 `cur/max`(如「500/500」),
+浅色字加深色描边(同 NameLabel 配方)。**`health_bar.gd` / `health_bar.tscn` /
+`tests/test_health_bar.gd` 的几何常数一律不动**(68×24 部件、Bar 64×12 @(2,12)、
+`EMPTY_CAP_PX`、expand margin、`STRIP_BOTTOM` 全部逐字节不变),本轮只往血条上加数字。
+
