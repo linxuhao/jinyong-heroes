@@ -61,6 +61,27 @@ var state_tag_text: String = ""
 ## Written by _apply_state's cooldown branch: str(cooldown_remaining).
 var cooldown_label_text: String = ""
 
+## Observable: rendered inner-force cost line (UX-03). Written once in setup()
+## from the skill's `cost` via the static cost_label_text(): 0 -> "无消耗",
+## n > 0 -> "内力 <n>". Chinese-only (界面文字一律中文).
+var cost_text: String = ""
+
+## Observable: the skill's full Chinese effect description (skill.description);
+## "" for placeholder / description-less skills. Written once in setup();
+## the same value is surfaced as tooltip_text (hover reads the effect).
+var effect_text: String = ""
+
+## Observable: short on-face summary derived ONLY from existing SkillData
+## numbers by the static effect_summary() (e.g. "单体 45", "十字 34",
+## "跳3 · 20", "回复 35"); "" when the skill defines no damage/heal/jump.
+## Written once in setup().
+var effect_summary_text: String = ""
+
+## Observable: unlock condition for a locked slot (UX-04), e.g. "第 4 轮解锁".
+## "" unless the slot is phase-locked. Declared + rendered here; written EVERY
+## frame by the HUD derivation (hud_derivation task).
+var lock_reason_text: String = ""
+
 ## Observable: bg luminance (Color.get_luminance(), raw-component BT.709
 ## convention) of the state currently applied to this button. Written EVERY
 ## frame by _apply_state via the static state_luma_value() helper. Playtest
@@ -116,6 +137,63 @@ static func fa_hui_du_label(fhd: float) -> String:
 		s += ".0"
 	return "发挥 ×" + s
 
+## Inner-force cost label (UX-03, pure function): 0 -> "无消耗" (no cost
+## defined this round — the only shipped value), n > 0 -> "内力 <n>".
+## Chinese-only. Static so unit tests exercise it without a scene.
+static func cost_label_text(cost: int) -> String:
+	if cost > 0:
+		return "内力 " + str(cost)
+	return "无消耗"
+
+## Short on-face effect summary derived ONLY from existing SkillData numbers
+## (UX-03, pure function). Reads damage / heal_amount / aoe_shape / jump_tiles
+## — all via `in` guards because `skill` may be a SkillData Resource OR a plain
+## Dictionary (setup() accepts both; `in` on a Resource sees declared
+## properties, `in` on a Dictionary sees keys). Priority: heal > jump > shape.
+## Returns "" for null / no-damage-no-heal-no-jump skills (graceful undefined).
+## Numbers come verbatim from SkillData — presentation of existing values only.
+static func effect_summary(skill) -> String:
+	if skill == null:
+		return ""
+	var damage: int = 0
+	var heal: int = 0
+	var jump: int = 0
+	if "damage" in skill:
+		damage = int(skill["damage"])
+	if "heal_amount" in skill:
+		heal = int(skill["heal_amount"])
+	if "jump_tiles" in skill:
+		jump = int(skill["jump_tiles"])
+	if heal > 0:
+		return "回复 " + str(heal)
+	if jump > 0:
+		return "跳" + str(jump) + " · " + str(damage)
+	if damage > 0:
+		var shape: String = "单体"
+		if "aoe_shape" in skill:
+			shape = _shape_label(str(skill["aoe_shape"]))
+		return shape + " " + str(damage)
+	return ""
+
+## Map an aoe_shape string to its Chinese label (界面文字一律中文). Unknown or
+## missing -> "单体" (the default single-target shape).
+static func _shape_label(shape: String) -> String:
+	match shape:
+		"single":
+			return "单体"
+		"line":
+			return "直线"
+		"cross":
+			return "十字"
+		"square":
+			return "方形"
+		"adjacent":
+			return "相邻"
+		"global":
+			return "全场"
+		_:
+			return "单体"
+
 ## Configure this button with a skill, a hotkey label, and the fa hui du
 ## multiplier of the external art that produced the skill.
 ## hotkey is a string like "1".."8". fa_hui_du drives the FahuiLabel text via
@@ -162,6 +240,23 @@ func setup(skill, hotkey: String, fa_hui_du: float) -> void:
 	else:
 		text = "Empty"
 		tooltip_text = ""
+
+	# UX-03 info observables: inner-force cost + full effect description + short
+	# on-face summary. Written once at setup — these are static per battle. The
+	# cost/description reads use `in` guards (skill may be a Resource or a plain
+	# Dictionary), and CostLabel is resolved defensively (the scene task adds it).
+	var cost: int = 0
+	if skill != null and "cost" in skill:
+		cost = int(skill["cost"])
+	cost_text = cost_label_text(cost)
+	effect_text = ""
+	if skill != null and "description" in skill:
+		effect_text = str(skill["description"])
+	effect_summary_text = effect_summary(skill)
+
+	var cost_label: Label = get_node_or_null("CostLabel") as Label
+	if cost_label != null:
+		cost_label.text = cost_text
 
 
 ## Update the cooldown overlay's visual state.
@@ -411,6 +506,22 @@ func _apply_state(state: String) -> void:
 			_selected_marker = selected_marker
 	if selected_marker != null:
 		selected_marker.visible = selected
+
+	# Info line (UX-03/UX-04): the lock reason when locked, else the short effect
+	# summary. Refreshed at the END of every _apply_state so the info line flips
+	# in the same frame the lock/state flips.
+	_refresh_info_label()
+
+
+## Render the contextual info line: `lock_reason_text` when non-empty (UX-04),
+## else `effect_summary_text` (UX-03). Written every frame; the InfoLabel child
+## is resolved defensively via get_node_or_null (the scene task adds it, so a
+## current tree-less instance simply skips the write). No node allocation.
+func _refresh_info_label() -> void:
+	var info := lock_reason_text if not lock_reason_text.is_empty() else effect_summary_text
+	var info_label: Label = get_node_or_null("InfoLabel") as Label
+	if info_label != null:
+		info_label.text = info
 
 # ---------------------------------------------------------------------------
 # Signal handling
