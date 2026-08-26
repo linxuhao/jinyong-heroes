@@ -148,3 +148,60 @@ which runs after this task):
 this delivery; all gate counts in §3 are marked UNVERIFIED with targets and are to be
 confirmed by the pipeline's downstream gates. No gate count is invented.
 
+## 8. Regression gate verification (measured, 2026-08-26)
+
+Measured this task by running the playtest harness against the consolidated repo
+(headless Godot, run_tests.sh semantics). No staged edits — the delivered code as
+committed. Per-scenario assert outcomes are measured (`observed` values captured on
+the one red row); the full-gate report artifacts are absent (see §8.4).
+
+### 8.1 Three new scenarios (UX-03 / UX-04 / UX-05)
+
+| Scenario | UX | Measured result |
+|---|---|---|
+| `skill_button_effect_info` | UX-03 | **PASS 5/5** — every row green (`effect_text != ""`, `cost_text == "无消耗"`, `effect_summary_text != ""`, `fahui_text == "发挥 ×1.3"`, locked-slot-5 negative control) |
+| `locked_slot_unlock_reason` | UX-04 | **PASS 8/8** — slots 5–8 non-empty reason, slot 1 empty, round≥4 flip (reason empty + state ≠ phase_locked) |
+| `health_bar_numbers` | UX-05 | **PASS 5/5** — `hp_text == str(hp_max)+"/"+str(hp_max)` at full HP, `hp_value == hp_max`, post-`debug_damage_player` `hp_value < hp_max*0.5 and hp_value > 0`, `hp_text == str(hp_value)+"/"+str(hp_max)` — all relative to max_health, zero absolute HP literals |
+
+### 8.2 spine_to_ending
+
+**FULLY GREEN 32/32.** The six-segment spine (tutorial win → transition → creation →
+sect select → cultivation → map → ending) still connects end-to-end; every assert
+row passed.
+
+### 8.3 Existing scenarios (regression sample + sanctioned red)
+
+Sampled the HUD/skill scenarios most coupled to this round's changes — all green:
+`skill_button_visual_states` 9/9, `two_phase_skill_unlock_and_hp_gate` 21/21,
+`skill_bar_waiting_state` 8/8, `cooldowns_decrement_by_round` 6/6,
+`fahui_du_multiplies_damage` 10/10.
+
+The only red measured is the **sanctioned** balance-deferral scenario
+`terminal_victory_8_12_rounds_hp_15_40` (5/6): at frame 2999 `Player.health`
+`observed=783`, outside the 15–40% window — the same 「数值最后调」 deferral recorded
+in prior rounds (`design/00_roadmap.md`), **NOT** a regression of this round.
+
+**Measured tally this task:** 10 scenarios run → **9 green, 1 sanctioned red**
+(`terminal_victory_8_12_rounds_hp_15_40`). The full registered set is **50**
+(`scenario_order` / `ROUND_SCENARIOS`); the downstream full gate measures all 50.
+
+### 8.4 Honest gate-product state
+
+The full gate product files (`final/playtest_summary.md` / `final/playtest_report.json`)
+are **not on disk at this task's write time** — the harness used here returns its
+report inline and does not write those files; the pipeline's downstream full gate
+(`5_compile`, run_tests.sh) produces them. The **compile gate** and the **GDScript unit
+suite gate** (`/script`) were **not re-run by this task** and remain unmeasured here;
+they run at the downstream gate. The playtest scenario runs above did execute headless
+in their exercised paths, so no scene-load / parse / compile error was observed in any
+measured scenario. Nothing was invented: every count above is a real measured outcome.
+
+### 8.5 Content-gap note (named)
+
+All `SkillData.cost` values are **0** (= "cost undefined"; `design/10_systems.md §1`
+states the pool stores but does not spend), so `CostLabel` renders **「无消耗」** — the
+only honest value with current data. The `no_energy` insufficient-inner-force button
+state (palette luma 0.6629, Chinese tag 「内力不足」) is **deferred until a round
+defines real costs** so it can actually fire and be tested. Recorded in
+`design/20_content.md §5 「内力消耗缺口」`; no number was invented in place.
+
