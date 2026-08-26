@@ -42,6 +42,9 @@ ROUND_SCENARIOS: list[str] = [
     "portrait_visibility",
     "move_target_affordance",
     "event_travel_effects",
+    "skill_button_effect_info",
+    "locked_slot_unlock_reason",
+    "health_bar_numbers",
 ]
 
 
@@ -462,3 +465,52 @@ def test_event_content_surface_contract() -> None:
             line.strip().startswith(f"{unit}.portrait_covered_frac:")
             for line in pv_text.splitlines()
         ), f"portrait_visibility.yaml missing {unit}.portrait_covered_frac assert"
+
+
+def test_hud_info_surface_contract() -> None:
+    """Static contract pin for the jinyong-hud round (UX-03/04/05 info layer).
+
+    Pins the four new observable vars on every SkillButton block, the three new
+    HealthBar vars, the three new scenario files existing with ``name:`` equal to
+    their basename, single-integer timeline ``at:`` values, and a comparison
+    operator on every 4-space dotted assert line (the repo's
+    no-bare-scalar-silent-false rule).
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    for i in range(1, 13):
+        key = f"SkillButton{i}"
+        assert key in blocks, f"surface missing {key} block"
+        for var in ("cost_text", "effect_text", "effect_summary_text",
+                    "lock_reason_text"):
+            assert var in blocks[key], (
+                f"{key}.{var} not whitelisted on the surface"
+            )
+    health_items = blocks.get("HealthBar", [])
+    for var in ("hp_text", "hp_value", "hp_max"):
+        assert var in health_items, (
+            f"HealthBar.{var} not whitelisted on the surface"
+        )
+
+    for name in ("skill_button_effect_info", "locked_slot_unlock_reason",
+                 "health_bar_numbers"):
+        path = PLAYTEST_DIR / (name + ".yaml")
+        assert path.is_file(), f"{name}.yaml missing"
+        ftext = path.read_text(encoding="utf-8")
+        assert re.search(
+            rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+        ), f"{name}.yaml name: does not equal its basename"
+        for lineno, line in enumerate(ftext.splitlines(), start=1):
+            m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+            if m is not None:
+                assert m.group(1).isdigit(), (
+                    f"{name}.yaml line {lineno}: non-integer timeline "
+                    f"'at' value {m.group(1)!r}"
+                )
+            if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+                assert any(
+                    op in line for op in ["==", "!=", "<", ">", "and", "or"]
+                ), (
+                    f"{name}.yaml line {lineno} assert missing "
+                    f"comparison operator: {line.strip()}"
+                )

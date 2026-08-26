@@ -336,6 +336,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   - focus_mode
   SkillButton2:
   - visible
@@ -349,6 +353,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton3:
   - visible
   - text
@@ -361,6 +369,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton4:
   - visible
   - text
@@ -373,6 +385,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton5:
   - visible
   - text
@@ -385,6 +401,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton6:
   - visible
   - text
@@ -397,6 +417,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton7:
   - visible
   - text
@@ -409,6 +433,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton8:
   - visible
   - text
@@ -421,6 +449,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton9:
   - visible
   - text
@@ -433,6 +465,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton10:
   - visible
   - text
@@ -445,6 +481,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton11:
   - visible
   - text
@@ -457,6 +497,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   SkillButton12:
   - visible
   - text
@@ -469,6 +513,10 @@ surface:
   - state_tag_text
   - cooldown_label_text
   - state_luma
+  - cost_text
+  - effect_text
+  - effect_summary_text
+  - lock_reason_text
   Sparring_Partner:
   - health
   - max_health
@@ -508,6 +556,9 @@ surface:
   - bar_height
   - empty_area_px
   - empty_cap_px
+  - hp_text
+  - hp_value
+  - hp_max
   Battlefield:
   - board_aligned
   - grid_lines_visible
@@ -720,3 +771,6 @@ scenario_order:
 - portrait_visibility
 - move_target_affordance
 - event_travel_effects
+- skill_button_effect_info
+- locked_slot_unlock_reason
+- health_bar_numbers

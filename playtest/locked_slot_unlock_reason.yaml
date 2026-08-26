@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+# UX-04: the locked skill slots 5-8 surface WHY they are locked (non-empty
+# lock_reason_text) at round 1 (frame 30), while the unlocked slot 1 shows an
+# empty reason (derived, never a hardcoded always-on string). After advancing
+# turns to round >= 4 (frame 2600 — same end_turn cadence as
+# two_phase_skill_unlock_and_hp_gate) the reason disappears exactly when the
+# phase-lock does (lock_reason_text == "" and state_text != phase_locked).
+name: locked_slot_unlock_reason
+description: >-
+  UX-04: at round 1 the phase-locked slots 5-8 show a non-empty lock reason and
+  slot 1 shows an empty one; at round >= 4 the reason disappears exactly when
+  the lock does.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    SkillButton5.lock_reason_text: 'lock_reason_text != ""'
+    SkillButton6.lock_reason_text: 'lock_reason_text != ""'
+    SkillButton7.lock_reason_text: 'lock_reason_text != ""'
+    SkillButton8.lock_reason_text: 'lock_reason_text != ""'
+    SkillButton1.lock_reason_text: 'lock_reason_text == ""'
+- at: 40
+  actions:
+  - end_turn
+- at: 500
+  actions:
+  - end_turn
+- at: 1000
+  actions:
+  - end_turn
+- at: 1500
+  actions:
+  - end_turn
+- at: 1600
+  actions:
+  - end_turn
+- at: 2150
+  actions:
+  - end_turn
+- at: 2600
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 4
+    SkillButton5.lock_reason_text: 'lock_reason_text == ""'
+    SkillButton5.state_text: state_text != "phase_locked"

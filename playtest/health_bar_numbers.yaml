@@ -1,0 +1,51 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+# UX-05: the health bar renders numeric HP. At full HP (frame 30) hp_text is
+# non-empty and equals "<max>/<max>", hp_max > 0 and hp_value == hp_max — every
+# assert expressed against max_health, zero absolute HP literals. debug_damage_player
+# injects ~40% HP through the normal apply_damage pipeline at frame 40; at frame 140
+# the number tracks the live value (hp_value in (0, 0.5*max) and hp_text equals
+# "<value>/<max>"), still relative to max_health.
+name: health_bar_numbers
+description: >-
+  UX-05: at full HP the bar renders "<max>/<max>" with hp_value == hp_max (all
+  asserts relative to max_health); after debug_damage_player the number tracks
+  the live value, still relative to max_health.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    HealthBar.hp_text: 'hp_text != ""'
+    HealthBar.hp_text: 'hp_text == str(hp_max) + "/" + str(hp_max)'
+    HealthBar.hp_max: hp_max > 0
+    HealthBar.hp_value: hp_value == hp_max
+- at: 40
+  actions:
+  - debug_damage_player
+- at: 140
+  actions: []
+  assert:
+    HealthBar.hp_value: 'hp_value < hp_max * 0.5 and hp_value > 0'
+    HealthBar.hp_text: 'hp_text == str(hp_value) + "/" + str(hp_max)'

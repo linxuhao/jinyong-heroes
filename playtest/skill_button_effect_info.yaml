@@ -1,0 +1,45 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+# UX-03: the skill buttons surface their effect info. At the round-1 player turn
+# (frame 30) button 1 shows a non-empty effect description, the inner-force cost
+# (无消耗 — every tutorial cost is undefined => 0, the only honest value), a
+# non-empty effect summary, and its unchanged 发挥 ×1.3 tag (regression pin for
+# the narrowed FahuiLabel). Locked slot 5 still shows its effect info (negative
+# control — the info layer is independent of the lock state).
+name: skill_button_effect_info
+description: >-
+  UX-03: at the round-1 player turn button 1 surfaces a non-empty effect
+  description, the inner-force cost (无消耗 — all tutorial costs are undefined =>
+  0), a non-empty effect summary, and its unchanged 发挥 ×1.3 tag; locked slot 5
+  still shows its effect info.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 30
+  actions: []
+  assert:
+    SkillButton1.effect_text: 'effect_text != ""'
+    SkillButton1.cost_text: 'cost_text == "无消耗"'
+    SkillButton1.effect_summary_text: 'effect_summary_text != ""'
+    SkillButton1.fahui_text: 'fahui_text == "发挥 ×1.3"'
+    SkillButton5.effect_text: 'effect_text != ""'
