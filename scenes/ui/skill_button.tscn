@@ -29,7 +29,7 @@ text = "1"
 [node name="FahuiLabel" type="Label" parent="."]
 offset_left = 0.0
 offset_top = 34.0
-offset_right = 104.0
+offset_right = 56.0
 offset_bottom = 46.0
 theme_override_font_sizes/font_size = 10
 horizontal_alignment = 1
@@ -66,6 +66,30 @@ horizontal_alignment = 2
 mouse_filter = 2
 clip_text = false
 text_overrun_behavior = 0
+text = ""
+
+[node name="CostLabel" type="Label" parent="."]
+offset_left = 26.0
+offset_top = 2.0
+offset_right = 62.0
+offset_bottom = 14.0
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+clip_text = false
+text_overrun_behavior = 0
+mouse_filter = 2
+text = ""
+
+[node name="InfoLabel" type="Label" parent="."]
+offset_left = 56.0
+offset_top = 34.0
+offset_right = 102.0
+offset_bottom = 46.0
+theme_override_font_sizes/font_size = 8
+horizontal_alignment = 2
+clip_text = false
+text_overrun_behavior = 0
+mouse_filter = 2
 text = ""
 
 [node name="SelectedMarker" type="ColorRect" parent="."]
