@@ -24,3 +24,4 @@ extends Resource
 @export var hp_gate_below_ratio: float = 0.0        # usable only below this HP fraction (0.5 = Seventeen Forms)
 @export var target_friendly: bool = false           # heal/affect allies (e.g. Primal Breath)
 @export var is_finisher: bool = false               # 绝招 flag for display
+@export var cost: int = 0              # 内力消耗 (0 = 未定义/不消耗; the only shipped value this round)
