@@ -709,7 +709,33 @@ func _refresh_skill_button_states(player: Node) -> void:
 		# frame; skill_button.gd declares the var but never writes it.
 		if "hp_gated" in btn:
 			btn.hp_gated = hp_gated
-		btn.disabled = phase_locked or on_cooldown or hp_gated
+
+			# UX-04 lock reason (surface): derive from the SAME phase-lock
+			# predicate that disables the button (tutorial palm-art slots 5-8
+			# while current_round < 4), so the reason disappears exactly when
+			# the lock does. Written every frame at a general position in the
+			# loop (it flips at round 4 without a re-setup, and must survive
+			# the `waiting` override during enemy turns). Never a hardcoded
+			# always-on string — encounter battles and rounds >= 4 render "".
+			# Guarded with `if "lock_reason_text" in btn` so nodes without the
+			# observable (e.g. plain Buttons in headless tests) are skipped.
+			if "lock_reason_text" in btn:
+				btn.lock_reason_text = "第 4 轮解锁" if phase_locked else ""
+
+			btn.disabled = phase_locked or on_cooldown or hp_gated
+		# UX-04 lock reason (surface): derive from the SAME phase-lock
+			# predicate that disables the button (tutorial palm-art slots 5-8
+			# while current_round < 4), so the reason disappears exactly when
+			# the lock does. Written every frame at a general position in the
+			# loop (it flips at round 4 without a re-setup, and must survive
+			# the `waiting` override during enemy turns). Never a hardcoded
+			# always-on string — encounter battles and rounds >= 4 render "".
+			# Guarded with `if "lock_reason_text" in btn` so nodes without the
+			# observable (e.g. plain Buttons in headless tests) are skipped.
+			
+				
+
+			
 
 		# Cooldown overlay: remaining rounds / total rounds (ints).
 		var remaining: int = int(cooldowns[i]) if i < cooldowns.size() else 0
