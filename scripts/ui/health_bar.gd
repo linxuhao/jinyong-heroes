@@ -119,6 +119,20 @@ var _fill_sb: StyleBoxFlat = null
 ## a "normal" stylebox override so the label reads on any artwork behind it.
 var _name_backing_sb: StyleBoxFlat = null
 
+## The rendered HP number as "<current>/<max>" (no spaces). Written to max/max in
+## setup() and rewritten on every update_health() so it stays live on damage.
+## Exposed for the playtest surface so health asserts can be expressed relative
+## to max_health (never an absolute HP literal).
+var hp_text: String = ""
+
+## The live current-HP integer mirror (== the `current` argument of the most
+## recent update_health() call; max/max after setup()).
+var hp_value: int = 0
+
+## The live max-HP integer mirror (== the `max_hp` argument of the most recent
+## update_health() call).
+var hp_max: int = 0
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -129,6 +143,11 @@ var _name_backing_sb: StyleBoxFlat = null
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+## Render the HP number as "cur/max" (no spaces, no padding). Pure function —
+## does not touch the scene, so it is safely headless-testable.
+static func hp_label_text(current: int, max_hp: int) -> String:
+	return str(current) + "/" + str(max_hp)
 
 ## Initialise the health bar with character info and connect signals.
 ## char_node must have a `health_changed` signal and `health`/`max_health`
@@ -244,6 +263,19 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	# follow_character() returns early when _char_node is null.
 	total_height = size.y
 
+	# Record the HP-number observables to max/max unconditionally (outside the
+	# node guards) so the headless null-char path reads a valid "max/max" string
+	# even before any health_changed fires.
+	hp_text = hp_label_text(max_hp, max_hp)
+	hp_value = max_hp
+	hp_max = max_hp
+	# Guarded write to the additive HpLabel sibling node (child of Bar) so the
+	# number is visible the moment the battle spawns, not just after a damage
+	# event. get_node_or_null keeps this safe on the headless null-char path.
+	var hp_label: Label = _bar.get_node_or_null("HpLabel") as Label if _bar != null else null
+	if hp_label != null:
+		hp_label.text = hp_text
+
 	# Connect to the character's health_changed signal.
 	if char_node != null and is_instance_valid(char_node):
 		if char_node.has_signal("health_changed"):
@@ -257,6 +289,21 @@ func update_health(current: int, max_hp: int) -> void:
 		return
 
 	_bar.value = current
+
+	# Rewrite the HP-number observables on every update so the text stays live on
+	# damage. hp_max is the same max_hp passed by the caller, so playtest asserts
+	# can always express the number relative to max_health (never an absolute HP
+	# literal). The HpLabel sibling (child of Bar) is written guarded via
+	# get_node_or_null (same defensive-resolution pattern as the EmptyCap).
+	hp_text = hp_label_text(current, max_hp)
+	hp_value = current
+	hp_max = max_hp
+	var hp_label: Label = _bar.get_node_or_null("HpLabel") as Label
+	if hp_label != null:
+		hp_label.text = hp_text
+		# MOUSE_FILTER_IGNORE (2): re-asserted every update so the number label
+		# never blocks clicks on the HUD layer (root widget is also filter 2).
+		hp_label.mouse_filter = 2
 
 	# Re-pin the EmptyCap to the bar's right end on every update so the cap
 	# stays the visible "empty slot" at ANY fill level, including 100%. The

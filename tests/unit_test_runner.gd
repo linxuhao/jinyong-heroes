@@ -23,6 +23,7 @@ const TESTS: Array[String] = [
 	"res://tests/test_event_data.gd",
 	"res://tests/test_gongfa_cascade.gd",
 	"res://tests/test_health_bar.gd",
+	"res://tests/test_health_bar_text.gd",
 	"res://tests/test_map_data.gd",
 	"res://tests/test_player_profile.gd",
 	"res://tests/test_progression_gongfa_data.gd",

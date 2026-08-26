@@ -20,6 +20,21 @@ position = Vector2(50, 0)
 size = Vector2(14, 12)
 mouse_filter = 2
 
+[node name="HpLabel" type="Label" parent="Bar"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+horizontal_alignment = 1
+vertical_alignment = 1
+clip_text = false
+text_overrun_behavior = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_constants/outline_size = 2
+theme_override_constants/shadow_outline_size = 1
+theme_override_font_sizes/font_size = 9
+
 [node name="NameLabel" type="Label" parent="."]
 anchors_preset = 0
 position = Vector2(2, 0)
