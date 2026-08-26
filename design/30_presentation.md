@@ -110,13 +110,28 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 
 1. `hidden_in_tree` — `visible` 标志链
 2. `null_texture` — 纹理资源存在且非空
-3. `zero_rect` — 几何区域面积 > 0
-4. `off_viewport` — 与视口相交
-5. `clipped` — 不被祖先 `clip_contents` 裁剪
-6. `occluded` — 不被后绘制的 Control 遮挡
+3. `blank_texture` — 纹理资源里没有任何 alpha > 0 的像素(资产级扫描,fail-open 失败开放;NEW — jinyong-events 轮次新增)
+4. `zero_rect` — 几何区域面积 > 0
+5. `off_viewport` — 与视口相交
+6. `clipped` — 不被祖先 `clip_contents` 裁剪
+7. `occluded` — 不被后绘制的 Control 完全包住
+8. `covered` — 被后绘制的不透明 Control 部分遮挡 ≥ 25%(且 ≥ 64 px²;NEW — jinyong-events 轮次新增)
 
-六层全部通过,立绘才算「看得见」。`playtest/portrait_visibility.yaml`
+阈值常量:`COVERED_AREA_FRAC = 0.25`、`COVERED_MIN_PX = 64.0`。`covered` 层只在
+被后绘制的不透明 Control 部分遮挡墨迹区 **≥ 25%(且 ≥ 64 px² 绝对下限,压过抗锯齿
+噪声)** 时才红,取的是**最坏单个**后绘制不透明宿主的遮挡比例(**max-single-coverer
+语义**——重叠的覆盖者从不求和,简单、确定、单调)。公开辅助函数
+`VisibilityProbe.covered_fraction()` 返回该比例(0.0 = 无合格覆盖者),探针与
+`portrait_covered_frac < 0.25` 守卫读同一个数。
+
+八层全部通过,立绘才算「看得见」。`playtest/portrait_visibility.yaml`
 断言了全部六个单位的 `portrait_visible == true`。
+
+> **判据由六层扩到八层(2026-08-25, jinyong-events)。** 本轮在 `null_texture` 之后
+> 插入 `blank_texture`(资产级 alpha 扫描,失败开放——`get_image()` 拿不到就当通过),
+> 在 `occluded` 之后插入 `covered`(部分遮挡 ≥ 25% / ≥ 64 px²)。旧 `occluded` 只认
+> 完全包住,漏掉了被顶栏部分遮挡的王重阳立绘;`covered` 层修上后,
+> `portrait_visibility.yaml` 22/22 全绿。
 
 **为什么要六层(2026-08-25,jinyong-affordance)。** UX-01 报告「王重阳与杨过立绘不在画面上」,
 而 `visible` / `sprite_top` 等既有断言一直是绿的——`visible == true` 看不见裁剪、看不见

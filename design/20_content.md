@@ -163,3 +163,36 @@
 | 打狗棒法 | 长兵 | 阳 |
 | 先天功·全真 | 内功 | 阳 |
 | 全真剑法 | 剑 | 阳 |
+
+## 4. 游历事件池 (16 条)
+
+游历途中的 16 条纯数据事件,每条两条真实取舍的选项,只用到
+`silver` / `attr` / `item` / `practice` / `none` 五种效果类型。权威源
+`scripts/data/event_data.gd` 的 `EventData.TABLE`(本文只记取舍形状,不抄数据)。
+
+**银钱换物 (item-with-cost)。** `merchant` 行商路过——花钱买物,一物一价;
+`dali_market` 大理市集——二选一,花不同的钱买皮甲或快靴。
+
+**物品 vs 属性 (item-vs-attr)。** `tomb_bed` 古墓寒玉——床上练内力,还是床畔捡剑。
+
+**属性二选一 (attr-A-vs-attr-B)。** `ruins` 古墓残碑——悟性与身法二选一;
+`peach_maze` 桃花迷阵——闯阵的身法,还是观潮的悟性。
+
+**练功 vs 金钱 (growth-vs-money)。** `dragon_scrap` 降龙残谱——强记掌谱练功,还是卖给书贾换银两。
+
+**花钱练功/买属性 (paid-growth)。** `wounded_eagle` 神雕负伤——花银两施药换练功,
+还是静观换悟性;`quanzhen_scripture` 全真抄经——免费抄经涨悟性,还是花银两求教剑理
+换练功;`night_rain` 破庙夜雨——帮工换宿贴银两又涨根骨,还是檐下练剑。
+
+**花钱买属性 vs 白拿 (paid-attr-vs-free-attr)。** `snake_bile` 蛇胆奇效——重金购蛇胆
+涨根骨,还是掉头就走白拿一点福缘。
+
+**花钱过路 vs 自力 (pay-vs-effort)。** `bandits` 山道遇劫匪——花钱消灾,还是自力周旋;
+`flood_ferry` 渡口风波——付钱渡河,还是泅水而过换内力。
+
+**银两 vs 属性 (money-vs-attr)。** `escort_job` 镖行招募——接下镖单挣银两,还是婉拒独行换悟性。
+
+**道德·福缘 vs 银两 (moral fortune-vs-silver)。** `lost_purse` 遗落的褡裢——送还失主
+涨福缘,还是收起走人得银两;`gambling_den` 赌坊喧嚣——入局三把搏一把银两,还是袖手旁观涨福缘。
+
+**施舍 (charity)。** `beggar` 老丐乞食——施舍银两,得福缘回报。
