@@ -26,6 +26,7 @@ milliseconds offline and can never hit the gate's per-test time wall.
 """
 
 from pathlib import Path
+import json
 import re
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[1]
@@ -50,6 +51,8 @@ ROUND_SCENARIOS: list[str] = [
     "creation_confirm_summary",
     "qi_cost_blocks_cast_no_energy",
     "map_node_event_shaolin",
+    "map_node_event_mainline_east",
+    "map_node_event_mainline_return",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -790,3 +793,125 @@ def test_map_node_event_surface_contract() -> None:
     assert "HintLabel" in src and "visible = phase" in src.replace("\t", " "), (
         "map.gd must toggle HintLabel.visible from the phase (missing or renamed)"
     )
+
+
+def test_map_node_event_mainline_surface_contract() -> None:
+    """Static contract pin for the two new mainline map-node scenarios.
+
+    Pins ``map_node_event_mainline_east`` and ``map_node_event_mainline_return``
+    against ``playtest/_common.yaml`` and ``ROUND_SCENARIOS`` (two-place sync):
+    each file exists with ``name:`` equal to its basename, every timeline ``at:``
+    is a single integer, every 4-space dotted assert line carries a comparison
+    operator or the differential token changed/unchanged (the repo's
+    no-bare-scalar-silent-false rule), and each file carries at least one
+    differential ``: changed`` assert line (east: attr_wisdom; return:
+    attr_inner). Both names must appear in scenario_order AND in ROUND_SCENARIOS,
+    east before return in both (test_round_scenarios_present_on_disk_and_in_order
+    enforces the order match).
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    order = _items_under(text, "scenario_order")
+    expected_diff = {
+        "map_node_event_mainline_east": "MapScreen.attr_wisdom",
+        "map_node_event_mainline_return": "MapScreen.attr_inner",
+    }
+    for name in ("map_node_event_mainline_east", "map_node_event_mainline_return"):
+        # Two-place sync: present in scenario_order AND in ROUND_SCENARIOS.
+        assert name in order, (
+            f"{name} not in _common.yaml scenario_order (two-place sync)"
+        )
+        assert name in ROUND_SCENARIOS, (
+            f"{name} not in ROUND_SCENARIOS (two-place sync)"
+        )
+        path = PLAYTEST_DIR / (name + ".yaml")
+        assert path.is_file(), f"{name}.yaml missing"
+        ftext = path.read_text(encoding="utf-8")
+        assert re.search(
+            rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+        ), f"{name}.yaml name: does not equal its basename"
+        has_diff_line = False
+        for lineno, line in enumerate(ftext.splitlines(), start=1):
+            m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+            if m is not None:
+                assert m.group(1).isdigit(), (
+                    f"{name}.yaml line {lineno}: non-integer timeline "
+                    f"'at' value {m.group(1)!r}"
+                )
+            if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+                has_op = any(
+                    op in line for op in ["==", "!=", "<", ">", "and", "or"]
+                )
+                has_diff = "changed" in line or "unchanged" in line
+                assert has_op or has_diff, (
+                    f"{name}.yaml line {lineno} assert missing "
+                    f"comparison operator: {line.strip()}"
+                )
+                if line.rstrip().endswith(": changed"):
+                    has_diff_line = True
+        # Each scenario must carry its own differential `: changed` assert line
+        # (the round's relative-numeric-assert rule).
+        assert has_diff_line, (
+            f"{name}.yaml missing a line ending `: changed` "
+            f"(expected {expected_diff[name]})"
+        )
+
+
+def _normalize_assert(s: str) -> str:
+    """Apply the superset matching rule's normalizer to an assert RHS.
+
+    Strips leading/trailing whitespace, strips a YAML single-quote wrapper when
+    it spans the whole RHS, and collapses any internal whitespace run to one
+    space. All 42 baseline expressions in the fixture are stored WITHOUT the
+    single-quote wrapper, so this must run against the FILE RHS to strip the
+    same wrapper the current (post-edit) yaml files carry.
+    """
+    s = s.strip()
+    if len(s) >= 2 and s[0] == "'" and s[-1] == "'":
+        s = s[1:-1]
+    return re.sub(r"\s+", " ", s)
+
+
+def test_edited_scenarios_assert_superset() -> None:
+    """Machine proof of 只许加,不许减 for the two authorized-edited scenarios.
+
+    Loads the frozen PRE-EDIT baseline fixture
+    (tests/fixtures/playtest_assert_superset.json) and asserts every baseline
+    assert line still appears (node-key + var + expression pair, >= once) in the
+    CURRENT edited files ``playtest/spine_to_ending.yaml`` and
+    ``playtest/map_node_event_shaolin.yaml``. The single sanctioned exception
+    (shaolin events_resolved_count == 1 -> == 2) is baked into the fixture as
+    the post-edit expression, so a dropped or renamed pre-edit assert reddens
+    here — a whole-file rewrite that drops an assert is caught by pytest, not
+    just code review.
+    """
+    fixture = REPO_ROOT / "tests" / "fixtures" / "playtest_assert_superset.json"
+    assert fixture.is_file(), (
+        "tests/fixtures/playtest_assert_superset.json missing"
+    )
+    data = json.loads(fixture.read_text(encoding="utf-8"))
+    assert set(data["baselines"]) == {"spine_to_ending", "map_node_event_shaolin"}, (
+        "superset fixture payload must cover exactly the two authorized scenarios"
+    )
+    for scenario, entries in data["baselines"].items():
+        file_path = PLAYTEST_DIR / (scenario + ".yaml")
+        assert file_path.is_file(), f"{scenario}.yaml missing"
+        text = file_path.read_text(encoding="utf-8")
+        for entry in entries:
+            node = entry["node"]
+            var = entry["var"]
+            expression = entry["expression"]
+            regex = re.compile(
+                r"^\s*" + re.escape(node) + r"\." + re.escape(var) + r":\s*(.*)$",
+                re.MULTILINE,
+            )
+            candidates = [
+                _normalize_assert(m.group(1)) for m in regex.finditer(text)
+            ]
+            assert candidates, (
+                f"{scenario}.yaml: no assert line for baseline {node}.{var}"
+            )
+            normalized = _normalize_assert(expression)
+            assert any(c == normalized for c in candidates), (
+                f"{scenario}.yaml: pre-edit baseline {node}.{var}: "
+                f"{expression!r} no longer present in the current file"
+            )

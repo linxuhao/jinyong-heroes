@@ -813,3 +813,5 @@ scenario_order:
 - creation_confirm_summary
 - qi_cost_blocks_cast_no_energy
 - map_node_event_shaolin
+- map_node_event_mainline_east
+- map_node_event_mainline_return

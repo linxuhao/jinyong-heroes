@@ -1,0 +1,59 @@
+{
+  "description": "Frozen PRE-EDIT assertion baselines of the two authorized-edited playtest scenarios (spine_to_ending: 24 entries; map_node_event_shaolin: 18 entries), transcribed from their pre-edit state. The spine_rebudget / shaolin_rebudget tasks have since changed the files — never reconstruct these baselines from the current yaml files. Consumed by test_edited_scenarios_assert_superset in tests/test_playtest_contract_smoke.py to machine-enforce 只许加,不许减 for those two files: every baseline line must still appear (node-key + expression pair, >= once) in the current edited file.",
+  "sanctioned_exception": {
+    "scenario": "map_node_event_shaolin",
+    "node": "MapScreen",
+    "var": "events_resolved_count",
+    "pre_edit_expression": "events_resolved_count == 1",
+    "post_edit_expression": "events_resolved_count == 2",
+    "note": "The single sanctioned literal re-base: the shaolin events_resolved_count assert went from == 1 to == 2 because 洛阳 now resolves a deterministic merchant event on the outbound leg before 少林's night_rain resolves, so the session counter is 2 at the shaolin resolution. It stays an exact equality, never >=. spine_to_ending has NO exception."
+  },
+  "baselines": {
+    "spine_to_ending": [
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"WON\""},
+      {"node": "GameManager", "var": "end_overlay_text", "expression": "end_overlay_text.contains(\"胜利\") and not end_overlay_text.contains(\"...\") and not end_overlay_text.contains(\"…\")"},
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"TRANSITION\""},
+      {"node": "TransitionScreen", "var": "visible", "expression": "true"},
+      {"node": "TransitionScreen", "var": "size", "expression": "size.x > 0 and size.y > 0"},
+      {"node": "Backdrop", "var": "visible", "expression": "true"},
+      {"node": "Backdrop", "var": "size", "expression": "size.x > 0 and size.y > 0"},
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"CHARACTER_CREATION\""},
+      {"node": "CreationScreen", "var": "visible", "expression": "true"},
+      {"node": "CreationScreen", "var": "size", "expression": "size.x > 0 and size.y > 0"},
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"SECT_SELECTION\""},
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"CULTIVATION\""},
+      {"node": "CultivationScreen", "var": "year", "expression": "1"},
+      {"node": "CultivationScreen", "var": "month", "expression": "1"},
+      {"node": "CultivationScreen", "var": "gongfa_count", "expression": "2"},
+      {"node": "CultivationScreen", "var": "visible", "expression": "true"},
+      {"node": "CultivationScreen", "var": "size", "expression": "size.x > 0 and size.y > 0"},
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"MAP\""},
+      {"node": "MapScreen", "var": "visible", "expression": "true"},
+      {"node": "MapScreen", "var": "size", "expression": "size.x > 0 and size.y > 0"},
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"ENDING\""},
+      {"node": "EndingScreen", "var": "tier", "expression": "tier >= 1 and tier <= 3"},
+      {"node": "EndingScreen", "var": "visible", "expression": "true"},
+      {"node": "EndingScreen", "var": "size", "expression": "size.x > 0 and size.y > 0"}
+    ],
+    "map_node_event_shaolin": [
+      {"node": "GameManager", "var": "current_state", "expression": "current_state == \"MAP\""},
+      {"node": "MapScreen", "var": "visible", "expression": "visible == true"},
+      {"node": "MapScreen", "var": "phase", "expression": "phase == \"EVENT\""},
+      {"node": "MapScreen", "var": "event_id", "expression": "event_id == \"night_rain\""},
+      {"node": "MapScreen", "var": "current_node_id", "expression": "current_node_id == \"shaolin\""},
+      {"node": "HintLabel", "var": "visible", "expression": "visible == false"},
+      {"node": "MapScreen", "var": "event_focus", "expression": "event_focus == 1"},
+      {"node": "MapScreen", "var": "phase", "expression": "phase == \"EVENT\""},
+      {"node": "MapScreen", "var": "phase", "expression": "phase == \"TRAVEL\""},
+      {"node": "MapScreen", "var": "event_id", "expression": "event_id == \"\""},
+      {"node": "MapScreen", "var": "last_effect_types", "expression": "last_effect_types == [\"silver\", \"attr\"]"},
+      {"node": "MapScreen", "var": "attr_bone", "expression": "changed"},
+      {"node": "MapScreen", "var": "events_resolved_count", "expression": "events_resolved_count == 2"},
+      {"node": "MapScreen", "var": "entry_declared_gap_types", "expression": "entry_declared_gap_types.has(\"battle\") and entry_declared_gap_types.has(\"facility\")"},
+      {"node": "HintLabel", "var": "visible", "expression": "visible == true"},
+      {"node": "MapScreen", "var": "current_node_id", "expression": "current_node_id == \"luoyang\""},
+      {"node": "MapScreen", "var": "phase", "expression": "phase == \"TRAVEL\""},
+      {"node": "MapScreen", "var": "event_id", "expression": "event_id == \"\""}
+    ]
+  }
+}
