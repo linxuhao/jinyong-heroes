@@ -181,7 +181,7 @@ func _sync_surface() -> void:
 
 
 ## Single-operation-hint invariant: the bottom travel hint is the map's own
-## promise ("左右选择 · 回车启程") and must NOT survive into a modal event panel
+## promise ("左右/上下选择相邻去处，回车启程") and must NOT survive into a modal event panel
 ## that asks for 上下选择. The event panel's own prompt is the only hint that may
 ## show while phase == "EVENT"; the travel hint is restored whenever phase is
 ## anything else (TRAVEL today, and any future phase) so it can never silently

@@ -46,4 +46,4 @@ offset_right = 200.0
 offset_bottom = -16.0
 mouse_filter = 2
 horizontal_alignment = 1
-text = "左右选择 · 回车启程"
+text = "左右/上下选择相邻去处，回车启程"
