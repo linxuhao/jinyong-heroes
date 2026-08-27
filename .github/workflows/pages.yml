@@ -67,20 +67,28 @@ jobs:
           test -f build/web/index.html
           test -f build/web/index.wasm
 
-      - name: Report cross-origin-isolation requirement
+      - name: Assert the build needs no cross-origin isolation
         # Pages cannot send COOP/COEP, so a THREADED build (which needs
-        # SharedArrayBuffer) white-screens with nothing in any log. A bare grep
-        # for SharedArrayBuffer is the wrong test: Godot's engine.js carries a
-        # feature-DETECTION branch for it in every build. Print the evidence,
-        # pin the real signal on the next pass.
+        # SharedArrayBuffer) white-screens with nothing in any log.
+        #
+        # Grepping for SharedArrayBuffer is NOT the test — engine.js carries
+        # Features.isSharedArrayBufferAvailable() in every build, guarded by
+        # `if (supportsThreads)`. The first run failed on exactly that and
+        # proved nothing. The signal that cannot lie is which template the
+        # loader was linked against: a single-threaded export resolves
+        # `godot.web.template_release.wasm32.nothreads.wasm`.
         run: |
-          echo "--- emitted files ---"; ls -la build/web
-          echo "--- THREAD-related lines ---"
-          grep -n -i -o '.\{0,80\}thread.\{0,80\}' build/web/index.js | head -20 || true
-          echo "--- SharedArrayBuffer occurrences ---"
-          grep -n -o '.\{0,100\}SharedArrayBuffer.\{0,100\}' build/web/index.js | head -10 || true
-          echo "--- worker file present? (threaded emscripten emits one) ---"
-          test -f build/web/index.worker.js && echo "YES — threaded" || echo "no"
+          if ! grep -q 'nothreads\.wasm' build/web/index.js; then
+            echo "::error::export is threaded — it needs SharedArrayBuffer and GitHub Pages cannot send COOP/COEP (set variant/thread_support=false in export_presets.cfg)"
+            grep -o 'godot\.web\.template_release[^"]*' build/web/index.js | head -1
+            exit 1
+          fi
+          # Belt and braces: threaded emscripten also emits a worker file.
+          if [ -f build/web/index.worker.js ]; then
+            echo "::error::index.worker.js present — this is a threaded build"
+            exit 1
+          fi
+          echo "single-threaded export — servable from plain static hosting"
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
