@@ -336,14 +336,18 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 
 | 节点 id | 名称 | event 槽 | battle 槽 | facility 槽 |
 |---|---|---|---|---|
-| `wuming_valley` | 无名谷 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `luoyang` | 洛阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `wudang` | 武当 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `xiangyang` | 襄阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `wuming_valley` | 无名谷 | `active` / `tomb_bed` | `declared` / `""` | `declared` / `""` |
+| `luoyang` | 洛阳 | `active` / `merchant` | `declared` / `""` | `declared` / `""` |
+| `wudang` | 武当 | `active` / `quanzhen_scripture` | `declared` / `""` | `declared` / `""` |
+| `xiangyang` | 襄阳 | `active` / `dragon_scrap` | `declared` / `""` | `declared` / `""` |
 | `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
 | `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `declared` / `""` |
 
-(行序 = `map_data.gd` 的 `NODES` 顺序。)可观测语义:`declared_gap_types(id)` =
+(行序 = `map_data.gd` 的 `NODES` 顺序;`wuming_valley` 的 `tomb_bed` 是 `active`
+且诚实——它**只在经 return travel 到达时**触发,开机 / 读档不触发。2026-08-29
+`jinyong-nodes(主线事件)` 轮把主线 event 槽从「全部 `declared`」转为「4/5 live」,
+昆仑保持 `declared`(终点保证,见 §8.3 第 3 条);battle / facility 两槽六节点仍
+全为 `declared`。)可观测语义:`declared_gap_types(id)` =
 该节点所有 `status == "declared"` 的槽类型列表——「已声明未实现」因此是可断言
 的事实,不只是文档里的一句话;`active_event_id(id)` = 仅当 event 槽
 `status == "active"` 且 `EventData.def(event_id) != null` 时返回该 id,否则返回
@@ -365,18 +369,77 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 可能抽到它(两条通道相互独立,互不读写 `flags["events_seen"]`)。若团队日后想
 换一行,改的只是 `map_data.gd` 里 `event_id` 这个值,机制不动。
 
+### 8.2b 主线四节点的绑定:`tomb_bed` / `merchant` / `quanzhen_scripture` / `dragon_scrap`(2026-08-29,取自既有池,零新文案)
+
+承接 §8.2 少林的同一纪律:每个主线节点用**确定性绑定**(字面 `event_id`,不是
+池抽取)挂上一行既有事件,文案逐字取自 `scripts/data/event_data.gd` 的
+`EventData.TABLE`,零新文案。四条绑定按内容合理性选行,各自理由如下。
+
+**无名谷 → `tomb_bed`(标题「古墓寒玉」)。** 无名谷是隐藏幽谷的起点节点;一行
+写「荒山之中藏着一座古墓」——幽谷藏古墓,是全池与无名谷意象最近的场景。
+
+> `荒山之中藏着一座古墓，\n石室中央横着一张寒玉床。`
+
+(text 逐字引自 `event_data.gd`。)两个选项同样是既有数据:「卧床练气」涨内力 +2,
+「床畔拾剑」得剑(`eq_sword_2`)。**触发时机**:无名谷是起点,`map.gd::_ready()`
+落在 `start_node()`,而节点事件**只在经 travel 到达时**触发、开机 / 读档不触发——
+故 `active` 诚实:它在**洛阳→无名谷的 return travel** 上触发,新追加场景
+`map_node_event_mainline_return` 钉住「开机 `event_id == ""`」与「return 到达即开
+`tomb_bed`」两面。
+
+**洛阳 → `merchant`(标题「行商路过」)。** 洛阳是帝都级的通都大邑、三条边的枢纽;
+一行写行商赶着满载刀剑的马车路过——正是交通枢纽该发生的事。
+
+> `一位行商赶着马车路过，\n车上满载刀剑兵刃，正愁销路。`
+
+两个选项:「买下长剑」贴银两 −20 又得长剑(`eq_sword_3`),「婉拒」无效果。
+**选它的决定性技术理由**:它的 option A 是 **`silver` + `item`、没有 `attr` 效果**。
+少林场景 `map_node_event_shaolin.yaml` 的时间线会**经过洛阳**才到少林,而少林那一
+腿钉着 `attr_bone: changed`(差分)与 `last_effect_types == ["silver", "attr"]`
+(尾块);洛阳的解析发生在少林**之前**,若洛阳绑定带 attr,就会**伪造或掩盖**少林的
+`attr_bone` 差分。选一行无 attr 的绑定,使这两个既有钉保持其精确含义。
+
+**武当 → `quanzhen_scripture`(标题「全真抄经」)。** 武当是道教门派之山;一行写
+「全真宫外老道伏案抄经……递来一卷道德经」——全池唯一与道教宫观清修直接对应的场景,
+武当最强贴合。
+
+> `全真宫外老道伏案抄经，\n见你驻足，递来一卷道德经。`
+
+两个选项:「随他抄经」涨智慧 +2,「求教剑理」贴银两 −5 又涨练功 +3。护线时间线在
+武当解算 option A(智慧 +2),其 `tier >= 1 and tier <= 3` 的范围断言吸收这一增量。
+
+**襄阳 → `dragon_scrap`(标题「降龙残谱」)。** 襄阳是《神雕侠侣》的高潮之城;一行
+写书摊上一册残破掌谱、隐见「降龙」二字——侠义之城里捡到一册残谱,贴合该城气质。
+
+> `书摊上一册残破掌谱，\n隐见「降龙」二字，纸色发黄。`
+
+两个选项:「强记于心」涨练功 +4,「卖与书贾」得银两 +25。护线时间线解算 option A
+(纯 practice +4)——**零属性耦合**,对 `attr_*` 类差分钉完全中性。
+
+**四行共同的技术前提(为何不抽池)**:节点事件通道走 `MapData.active_event_id(id)`
+的确定性绑定,没有无重复袋子;若改走 `EventLogic.draw_unseen_id`,它会读写
+`profile.flags["events_seen"]`,与 §8.2 末尾所述「两条通道相互独立、互不读写
+`flags["events_seen"]`」直接冲突,并让两条重排时间线变成 RNG 依赖。`EventLogic.apply_option_effects`
+(节点事件走这条路)**零 RNG 调用**,故种子流逐字节不变、`event_travel_effects`
+(19/19)与 `save_load_roundtrip`(14/14)按构造保持绿。
+
 ### 8.3 已声明未实现缺口(照 §5 的纪律:不许假装实现,也不许悄悄不提)
 
 1. **battle 槽:已声明、未实现。** 6 个节点的 battle 槽全部是 `declared`、
    `battle_id` 保持空串;本轮没有任何「进节点触发战斗遭遇」的接线。
 2. **facility(门派设施)槽:已声明、未实现。** 全部节点 `facility_id` 空串;
    「门派设施」这一内容类型本轮不存在,只有槽位。
-3. **主线 5 节点的 event 槽:已声明、本轮惰性。** 无名谷 / 洛阳 / 武当 / 襄阳 /
-   昆仑的 event 槽是 `declared`(空 `event_id`),**理由写全,不静默**:不可修改的
-   `playtest/spine_to_ending.yaml` 时间线在 f420–f490 只有 4 对
-   `move_right`/`ui_accept`,并在 f520 断言 ENDING——它没有为主线节点上一个
-   阻塞式交互事件留输入预算;而既有 yaml 本轮不允许编辑。故主线节点只声明、
-   不生效,本轮唯一可交互的节点事件在少林(支线、不在护线时间线上)。
+3. **主线 event 槽:本轮 4/5 live,昆仑保持 `declared`(终点保证,非上轮的护线惰性)。**
+   无名谷 / 洛阳 / 武当 / 襄阳的 event 槽本轮转为 `active`(§8.1 表 / §8.2b 绑定),
+   主线每一站在经 travel 到达时都触发内容。**唯昆仑仍 `declared` / `""`,理由已不是
+   上轮的「护线预算不可改 yaml」,而是终点保证**:`map.gd::_travel()` 对终点节点先做
+   到 ENDING 的路由(并置 `ended = true`),**先于** `_maybe_start_entry_event()`——
+   在昆仑绑一行事件是**结构性死绑定**,永不触发;结局本身就是终点节点的内容。上轮
+   的「主线 5 槽位惰性以保护不可修改的 spine_to_ending 时间线」这一理由,本轮由轮次
+   所有者**有条件解除**:`playtest/spine_to_ending.yaml` 允许重排按键/帧预算(断言只加
+   不减、先写理由再动 yaml),使主线站点的 event 可开可解、结局仍然走得到。理由与
+   before/after 帧表见本节 2026-08-29 记录 (a)。battle / facility 两槽六个节点**仍全
+   `declared`**(见本节前两条),「打听」行动仍**未实现**(见第 6 条)。
 4. **本轮不新编少林专属事件文案。** 「去的理由」用的是 §8.2 的既有池绑定。
    未来若要**新写**一段少林专属行(例如山门场景),那是**内容缺口**:
    必须先按本节风格记缺口,且新行只能写进 `event_data.gd` 的 `EventData.TABLE`
@@ -400,4 +463,114 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 缺口**一条也未因实测而关闭**:实测绿证明的是「event 类型做通了、声明与
 惰性行为如实」,battle / facility / 主线 event 槽仍是已声明未实现,待后续
 轮次实现时才关闭。
+
+---
+
+## 9. `jinyong-nodes(主线事件)` 轮次记录 (2026-08-29)
+
+本轮单一杠杆 = **主线节点事件接入**:给主线 5 节点接上事件(4 个 live 确定性绑定 +
+昆仑终点非触发),把结局保持可达,统一地图页底部提示,并补上一轮没落地的常驻文本
+排查记录。以下 (a)–(d) 是本轮改动的可核查记录。
+
+**(a) 两处 yaml 重排(before/after 帧表)。** 本轮授权编辑的既有场景**仅此两文件**
+(`spine_to_ending.yaml`、`map_node_event_shaolin.yaml`),其余 53 条不动(改动范围经
+grep 核实:只有这两条含 `current_state == "MAP"` / 会走地图,故无第三条会因主线事件
+变红)。**断言只加不减、不放宽;变的是帧/按键预算,不是每条场景所证明的性质。**
+
+`spine_to_ending.yaml` — 地图腿(昆仑腿 0 次额外按键,洛阳/武当/襄阳各 1 次解析按键):
+
+| 帧 | before | after |
+|---|---|---|
+| f400 | assert `current_state == "MAP"` … | **逐字节不变** |
+| 420 | `move_right` | `move_right`(无名谷→洛阳) |
+| 430 | `ui_accept` | `ui_accept`(到达洛阳,`merchant` EVENT 开) |
+| 440 | `move_right` | **assert NEW**(`phase=="EVENT"`、`event_id=="merchant"`、`current_node_id=="luoyang"`) |
+| 450 | `ui_accept` | `ui_accept`(解 option A → TRAVEL) |
+| 460 | `move_right` | `move_right`(洛阳→武当) |
+| 470 | `ui_accept` | `ui_accept`(到达武当,`quanzhen_scripture` EVENT 开) |
+| 480 | `move_right` | **assert NEW**(武当) |
+| 490 | `ui_accept` | `ui_accept`(解 option A → TRAVEL) |
+| 500 | `move_right` | `move_right`(武当→襄阳) |
+| 510 | `ui_accept` | `ui_accept`(到达襄阳,`dragon_scrap` EVENT 开) |
+| 520 | **assert ENDING**(f520) | **assert NEW**(襄阳 + `events_resolved_count == 2`) |
+| 530 | — | `ui_accept`(解 option A → TRAVEL) |
+| 540 | — | `move_right`(襄阳→昆仑) |
+| 550 | — | `ui_accept`(到达昆仑:终点路由先到 ENDING、`ended=true`,不触发事件) |
+| 580 | — | **assert ENDING**(既有 6 行原样,f520→f580 只移帧不改字) |
+
+既有 ENDING 断言行逐字节保留,仅 `at:` 由 520 移到 580(末断言 580 ≤ 2900 spine 上限、
+≤ 2999 硬上限)。`description:` 里的「4 moves to 昆仑」旧述本轮改写(它若不改便成假)。
+场景仍是六段连通证明:tutorial→transition→creation→sect→cultivation→map→ending。
+
+`map_node_event_shaolin.yaml` — 洛阳去/返两站各插入 1 次解析按键,插入落在**每次聚焦
+循环之前**(洛阳是三条边枢纽,EVENT 中被吞的 `move_right` 会**静默改变聚焦节点**):
+
+| 帧 | before | after |
+|---|---|---|
+| f400 | assert MAP … | **逐字节不变** |
+| 420 | `move_right` | `move_right`(无名谷→洛阳) |
+| 430 | `ui_accept` | `ui_accept`(到达洛阳(去程),`merchant` EVENT 开) |
+| 440 | `move_right` | **assert NEW**(`phase=="EVENT"`、`event_id=="merchant"`、`current_node_id=="luoyang"`、`HintLabel.visible==false`) |
+| 450 | `move_right` | `ui_accept`(解 option A: silver+item,无 attr → TRAVEL) |
+| 460 | `ui_accept` | **assert NEW**(`phase=="TRAVEL"`、`event_id==""`、`events_resolved_count == 1`(D2 新增阶梯钉)、少林 gap 槽 `has("battle") and has("facility")`) |
+| 470 | `move_right` | `move_right`(洛阳→武当) |
+| 480 | `assert` EVENT(少林,f470→此处下移) | `move_right`(武当→少林) |
+| 490 | `move_right` | `ui_accept`(到达少林,`night_rain` EVENT 开) |
+| 500 | `assert` event_focus… | **assert EXISTING**(原 f470 块:EVENT/night_rain/shaolin/Hint false) |
+| 510 | `ui_accept` | `move_right`(event_focus→1) |
+| 520 | `move_left` | **assert EXISTING**(原 f490 块:`event_focus==1`、`phase=="EVENT"`) |
+| 530 | `assert` TRAVEL…(f530) | `move_left`(event_focus→0) |
+| 540 | — | `ui_accept`(解 `night_rain` option A:silver −6,attr bone +1) |
+| 560 | — | **assert EXISTING**(原 f530 块,一处重基线见 (b):`events_resolved_count == 2`) |
+| 590 | `move_right` | `move_right`(少林→洛阳) |
+| 600 | `ui_accept` | `ui_accept`(到达洛阳(返程),`merchant` **re-fire**,重复到访政策) |
+| 610 | `assert` TRAVEL(洛阳,f600) | **assert NEW**(EVENT/merchant/luoyang) |
+| 620 | — | `ui_accept`(再解 option A) |
+| 630 | — | **assert NEW**(TRAVEL/`event_id==""`/`events_resolved_count == 3`) |
+| 660 | — | **assert EXISTING**(原 f600 块:`current_node_id=="luoyang"`、TRAVEL、`event_id==""`,f600→f660 只移帧) |
+
+`description:` 原称「主线节点保持惰性(声明槽、无事件)」——本轮改写(见 (a) 末)。
+`last_effect_types == ["silver","attr"]` 与 `attr_bone: changed` 两钉在 f560 保持绿:
+洛阳 option A 无 attr,且 `night_rain` 是 f560 前最后一次解算(既有邻居断言不受扰)。
+末断言 660 ≤ 2999。✓
+
+**(b) 单一重基线(本轮唯一一处既有断言的字面改动)。** 少林场景 f530 的
+`MapScreen.events_resolved_count == 1` → `== 2`:洛阳在去程解析一次事件后,到少林的
+`night_rain` 解算完,会话计数器已是 2。**辩护:它仍是精确相等(`==`),绝不用 `>=`,
+故阶梯被钉得更紧、不是放松。** 为使改动纯加性,在洛阳去程解算后(f460)**新增**一个
+`events_resolved_count == 1` 的阶梯钉,配对 `{==1 于洛阳, ==2 于少林}` 比原来单个
+`== 1` 更严格地钉住「每解算一次 +1」的阶梯。这是被机器 superset 钉(见
+`tests/test_playtest_contract_smoke.py`)记录的**唯一例外**;除此之外两场景的每条既有
+断言行都必须在改后文件里存在(「只加不减」的机器证明)。
+
+**(c) 地图页底部提示统一。** `scenes/segments/map.tscn` 的 `HintLabel.text` 原为
+`左右选择 · 回车启程`(残缺版,只提左右),而面板 `map.gd::_render()` 打印
+`左右/上下选择相邻去处，回车启程`。本轮把 `HintLabel.text` 改为与面板**逐字节相同**
+(含全角逗号 `，`)的字符串,只看底部提示的玩家也能知道上下可选相邻去处。宽度安全:
+统一串约 17 个 CJK 字 ≈ 272 px,落在 400 px 居中矩形内,几何不动。可断言性:
+`HintLabel: visible, text` 已在 `playtest/_common.yaml` 白名单里,**无需改 surface 白名单**;
+新追加的 `map_node_event_mainline_return.yaml` 在 boot 帧钉 `HintLabel.text ==
+左右/上下选择相邻去处，回车启程`(「两处一文本」的 UI 文本契约)——这是**文本契约**,
+不是数值断言,不违反「数值断言一律相对」的规矩。同提交内更新 `map.gd::
+_apply_hint_visibility()` 引用旧提示串的两处 docstring/注释;可见性切换逻辑不动
+(`phase != "EVENT"` 是按否定的白名单,天然适应任何未来相位)。
+
+**(d) 重复到访 re-fire 政策扩展到主线 4 节点。** 上轮 §8.3 第 5 条记录的「少林事件在
+每次经 travel 到达时触发、无 per-profile 一次性标记」政策,本轮原样适用于新转 `active`
+的无名谷 / 洛阳 / 武当 / 襄阳——它们是**可重复访问的内容点**,option-A 效果每次到达
+重新施加(洛阳返程在少林场景里 re-fire 正是此政策的体现,并被 f600–f630 钉住,而不再
+是静默吃掉一次按键)。**正因效果可重复施加、且绝对值随 RNG/存档漂移,本轮新增的每条
+数值断言一律差分/相对**(`attr_bone`/`attr_wisdom`/`attr_inner`: changed、`events_resolved_count`
+阶梯 `==1/==2/==3`、`tier >= 1 and <= 3` 范围),绝不钉绝对游戏值。
+
+**常驻文本排查(本轮补记,详见 `final/delivery_notes.md`):** 排查 `scenes/segments/
+map.tscn` 的 MAP 段 TRAVEL↔EVENT 切换——该段恰有两个常驻 Label:`BodyLabel`(每相位
+由 `_render()` 完整重绘,含 EVENT 分支)与 `HintLabel`(由 `_apply_hint_visibility()`
+以 `phase != "EVENT"` 切换可见)。两处都在 EVENT→TRAVEL 后让位。**结论:查过,只此
+一处**(上一轮唯一「相位切换后未让位的常驻文本」即 HintLabel 的残缺旧串,已在本轮 (c)
+统一并被新场景钉住)。其它段的相位切换在本轮单一杠杆之外。
+
+**本轮结果(诚实边界):** 5/5 主线站有内容——4 个 live 绑定 + 昆仑经论证的终点非触发;
+结局仍可达(routing-first + 重排后时间线,既有 ENDING 断言逐行存活)。实测 PASS 计数
+属下游 `5_compile`/`5_test` 闸门产物,本轮不预设。
 

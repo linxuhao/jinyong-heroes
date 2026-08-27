@@ -71,3 +71,14 @@
 **所有权切分契约**:cultivation 保留 `_sync_surface()`、`flags["events_seen"]` 已见标记、phase / `event_id` 管理;EventLogic 只拥有纯抽 / 纯应用 / 纯加修习核心,不持有实例状态、无场景引用。
 
 动因(doc-first 纪录:"如果解算逻辑需要挪位置或共享,先改设计档案说明理由,再动代码"):大地图节点内容轮(map 段)要复用既有解算路径而非另起一套并行系统;共享实例耦合代码而不回归 cultivation 既有钉住的测试,唯一办法是**一次性把纯核心搬进共享模块**,故先记档再动代码。
+
+2026-08-29 `jinyong-nodes(主线事件)`:**主线节点事件全部走确定性字面 `event_id` 绑定,不走池抽取;昆仑保持 `declared`;`playtest/` yaml 编辑例外仅两文件;单一重基线。**
+
+- **确定性字面 event_id 绑定(不用池抽取)**:主线五节点接事件一律用 `MapData.active_event_id(id)` 的字面绑定,不调 `EventLogic.draw_unseen_id`。理由:`draw_unseen_id` 会读写 `profile.flags["events_seen"]`,把「养成游历无重复袋子」与「大地图节点事件」两条通道耦合——而 `design/20_content.md §8.2` 明写两条通道相互独立、互不读写 `flags["events_seen"]`;且抽池会让本轮重排的两条固定帧时间线(spine、shaolin)变成 RNG 依赖,按键预算不再确定。绑定写错读作惰性(`def(event_id) == null` 即返回 `""`),不崩。
+- **4/5 live + 昆仑终点保证**:无名谷/洛阳/武当/襄阳转 `active`(绑定 `tomb_bed`/`merchant`/`quanzhen_scripture`/`dragon_scrap`,逐字取自 `event_data.gd`,零新文案);**昆仑 `event` 槽保持 `declared` / `""`**——`_travel()` 对终点节点先路由到 ENDING(`ended = true`)、运行在 `_maybe_start_entry_event()` 之前,昆仑绑事件是结构性死路,结局本身就是终点的内容;既有机器钉 `active_event_id("kunlun") == ""` 因此保持绿、保持不动(这是本轮终点规则的可读形式)。
+- **yaml 编辑例外仅两文件**:解除「既有 yaml 不许改」的限制**只**给 `playtest/spine_to_ending.yaml` 与 `playtest/map_node_event_shaolin.yaml`(两条经 grep 核实会走地图、因而被主线 live 事件改变按键预算的场景),其余 53 条既有场景一律不动。条件:先在 `design/` 写理由(本卡)再动 yaml、断言只加不减不放宽、改的是帧/按键预算而非每条场景所证明的性质;两条改完仍全绿且 `spine_to_ending` 仍是「六段连着、走得到结局」的证明。
+- **单一重基线**:少林场景 `MapScreen.events_resolved_count == 1` → `== 2`(洛阳去程先解一次事件)。它是本轮唯一一处既有断言的字面改动,辩护 = 仍为**精确相等**(绝不用 `>=`),并在洛阳去程解算后**新增** `== 1` 阶梯钉,使配对 `{==1 于洛阳, ==2 于少林}` 比原单个 `== 1` 钉得更紧(纯加性精神)。此例外由 `tests/test_playtest_contract_smoke.py` 的 superset 钉作为唯一记录项机器化。
+- **提示统一(顺带补上一轮不完整)**:地图页底部 `HintLabel.text` 由残缺的「左右选择 · 回车启程」改为与面板逐字节相同的「左右/上下选择相邻去处，回车启程」(全角逗号照抄),`HintLabel: visible, text` 已在白名单,无需改 surface。
+- **常驻文本排查落产出物**:上轮「排查同段相位切换后未让位的常驻文本」这条要求没落到任何产出物;本轮补上并记入 `final/delivery_notes.md`——MAP 段仅 `BodyLabel`/`HintLabel` 两处常驻 Label,均在 EVENT→TRAVEL 后让位,结论「查过,只此一处」。
+
+一次一杠杆:本轮只做主线节点事件接入,不调数值、不改战斗、不动养成的月循环、不新增美术资产、不写新事件文案(超出 16 行池的一律记缺口)。

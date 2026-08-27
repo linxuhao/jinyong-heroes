@@ -356,10 +356,10 @@ implemented" —— 不实现它,推 36 个月和推 0 个月没有任何区别,
 
 | 节点 id | 名称 | event 槽 | battle 槽 | facility 槽 |
 |---|---|---|---|---|
-| `wuming_valley` | 无名谷 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `luoyang` | 洛阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `wudang` | 武当 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `xiangyang` | 襄阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `wuming_valley` | 无名谷 | `active` / `tomb_bed` | `declared` / `""` | `declared` / `""` |
+| `luoyang` | 洛阳 | `active` / `merchant` | `declared` / `""` | `declared` / `""` |
+| `wudang` | 武当 | `active` / `quanzhen_scripture` | `declared` / `""` | `declared` / `""` |
+| `xiangyang` | 襄阳 | `active` / `dragon_scrap` | `declared` / `""` | `declared` / `""` |
 | `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
 | `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `declared` / `""` |
 
@@ -367,11 +367,16 @@ implemented" —— 不实现它,推 36 个月和推 0 个月没有任何区别,
 的表同一事实源。少林是洛阳的支线、原本是没有理由去的死胡同,本轮以**既有**
 事件池行 `night_rain` 的确定性绑定作为去它的理由——见 `20_content.md` §8.2。)
 
-**主线 5 节点的 event 槽本轮保持惰性,理由是护线(不是遗忘):**
-不可修改的 `playtest/spine_to_ending.yaml` 时间线在 f420–f490 只有 4 对
-`move_right`/`ui_accept`,并在 f520 断言 ENDING——它没有为主线节点上一个
-阻塞式交互事件留输入预算;而既有 yaml 本轮不允许编辑。故主线节点只声明
-槽位、不生效,已声明未实现一事如实记进 `20_content.md` §8.3。
+**主线 5 节点的 event 槽:4/5 live,昆仑保持 `declared` 是终点保证。** 无名谷 /
+洛阳 / 武当 / 襄阳的 event 槽本轮以确定性绑定(字面 `event_id`,不抽池)转 `active`,
+各经 travel 到达时触发一行既有事件(`tomb_bed` / `merchant` / `quanzhen_scripture` /
+`dragon_scrap`,绑定理由与逐字文案见 `20_content.md` §8.2b)。结局仍可达,靠的是**两件事**:
+(1)`_travel()` 对终点节点**先路由到 ENDING、后进入内容**——`ended = true` 在
+`_maybe_start_entry_event()` 之前发生,故昆仑绑任何事件都是结构性死路,它保持
+`declared`,结局本身就是终点的内容(终点保证);(2)`playtest/spine_to_ending.yaml`
+的地图腿按键预算按新事件站点重排(洛阳/武当/襄阳各插一次解析按键,昆仑腿 0 次),
+既有 ENDING 断言行逐字保留、只移帧不改字,仍是「六段连着、走得到结局」的证明。上轮
+「主线 event 槽仅声明、不生效」一事已在 `20_content.md` §8.3 第 3 条改写为本轮现状。
 
 **有主线,极简:查明自己为何穿越。** 若干节点串成一条线,走完即**结局**。
 结局按最终属性 / 功法成就分级——这是"游戏结局"这四个字在本阶段的兑现。
