@@ -34,9 +34,21 @@ var fahui_text: String = ""
 ## Independent of phase lock / cooldown — observable for the playtest surface.
 var hp_gated: bool = false
 
-## Observable four-state button state, written EVERY frame by the HUD
+## Pure insufficient-inner-force predicate observable (GOAL 4). True when this
+## button's skill has an inner-force cost > 0 AND the player's energy < cost.
+## Written EVERY frame by the HUD (_refresh_skill_button_states); never assigned
+## here (mirror hp_gated). With current content every SkillData.cost == 0 (no
+## technique spends energy this run — player.gd:110 / enemy.gd:83 say "display
+## only — no technique costs this run"), so it stays false in live play: real,
+## palette-distinct presentation machinery proven by unit test, which activates
+## naturally when a future round defines real per-skill costs.
+var no_energy: bool = false
+
+## Observable five-state button state, written EVERY frame by the HUD
 ## (_refresh_skill_button_states): "ready" | "cooldown" | "phase_locked" |
-## "hp_gated". Never assigned here — this script only renders from it.
+## "hp_gated" | "no_energy". Never assigned here — this script only renders
+## from it. (The "waiting" override is a sixth render state derived from the
+## turn phase — see _apply_state.)
 var state_text: String = ""
 
 ## Observable remaining cooldown rounds (0 = ready), written every frame by
@@ -144,6 +156,37 @@ static func cost_label_text(cost: int) -> String:
 	if cost > 0:
 		return "内力 " + str(cost)
 	return "无消耗"
+
+## Insufficient-inner-force predicate (GOAL 4, pure function): a skill button
+## reads "内力不足" when the skill costs inner force (cost > 0) and the player
+## has less than that cost (energy < cost). With current content every
+## SkillData.cost == 0 (no technique spends energy this run — player.gd:110 /
+## enemy.gd:83 say "display only — no technique costs this run"), so this always
+## returns false in live play: real presentation machinery that is unreachable
+## now and activates naturally when a future round defines real per-skill costs.
+static func no_energy_predicate(cost: int, energy: int) -> bool:
+	return cost > 0 and energy < cost
+
+## Single source of truth for the skill-button state priority chain. Priority:
+##   phase_locked > cooldown > hp_gated > no_energy > ready
+## and `waiting` is the LAST override — while the battle is live but it is not
+## the player's turn, EVERY visible button renders "waiting" regardless of the
+## derived four-state/five-state chain (design/30_presentation.md #3). With
+## current data (all costs 0) no_energy is always false, so this is byte-identical
+## to the old inline chain on every existing frame.
+static func derive_state(phase_locked: bool, on_cooldown: bool, hp_gated: bool,
+		no_energy: bool, waiting: bool) -> String:
+	if phase_locked:
+		return "phase_locked"
+	if on_cooldown:
+		return "cooldown"
+	if hp_gated:
+		return "hp_gated"
+	if no_energy:
+		return "no_energy"
+	if waiting:
+		return "waiting"
+	return "ready"
 
 ## Short on-face effect summary derived ONLY from existing SkillData numbers
 ## (UX-03, pure function). Reads damage / heal_amount / aoe_shape / jump_tiles
@@ -312,6 +355,9 @@ func update_cooldown(remaining: int, total: int) -> void:
 ##   hp_gated:     bg (0.58,0.10,0.10) border (0.85,0.28,0.28) w2 tag "气血"
 ##   waiting:      bg (0.12,0.16,0.22) border (0.30,0.36,0.44) w1 tag "等待中"
 ##                 (bg luma 0.155828)
+##   no_energy:    bg (0.72,0.62,0.92) border (0.45,0.35,0.75) w2 tag "内力不足"
+##                 (bg luma 0.6629; GOAL 4 — light purple, pairwise >= 0.10 from
+##                 every other state's luma, tag differs from 锁定)
 ## Unknown state -> ready palette.
 static func state_palette(state: String) -> Dictionary:
 	match state:
@@ -352,6 +398,21 @@ static func state_palette(state: String) -> Dictionary:
 				"border_color": Color(0.30, 0.36, 0.44),
 				"border_width": 1,
 				"tag_text": "等待中",
+			}
+		"no_energy":
+			# "Insufficient inner force" — GOAL 4: the state must stay visually
+			# distinct from phase_locked (锁定). Light purple bg, bg luma 0.6629
+			# (raw BT.709: 0.2126*0.72 + 0.7152*0.62 + 0.0722*0.92 = 0.66292),
+			# pairwise >= 0.10 from every existing state (ready 0.3874, cooldown
+			# 0.0814, phase_locked 0.5306, hp_gated 0.2020, waiting 0.1558).
+			# Tag 内力不足 differs from 锁定. Unreachable with current data (all
+			# costs 0) but real, palette-distinct presentation machinery proven
+			# by test_skill_button_no_energy.gd.
+			return {
+				"bg_color": Color(0.72, 0.62, 0.92),
+				"border_color": Color(0.45, 0.35, 0.75),
+				"border_width": 2,
+				"tag_text": "内力不足",
 			}
 		_:
 			return {
@@ -415,6 +476,8 @@ func _stylebox_for(state: String) -> StyleBoxFlat:
 ##                   tag, no cooldown number (accepted side effect: the big
 ##                   number hides while the round-fill overlay stays — the
 ##                   whole bar reads as dimmed/waiting during enemy turns)
+##   no_energy    -> light purple fill + 2px purple border + 内力不足 tag
+##                   (GOAL 4 — visually distinct from phase_locked's 锁定)
 ## The golden selected border (已选中) is layered on top of any state and never
 ## changes state_text. `modulate` is NOT used (theme stylebox overrides
 ## restyle the button) and `disabled` is never touched (HUD-owned).

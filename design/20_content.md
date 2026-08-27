@@ -223,10 +223,13 @@
 
 (12 格技能栏其余槽位同样「消耗未定义(0)」。)
 
-**连带后果(如实记录):** 内力不足(`no_energy`)按钮状态本轮**整体推迟、未落地**——
-代码里不存在该状态:`skill_button.gd` 的调色板仍只有 ready / cooldown / phase_locked /
-hp_gated / waiting 五个状态,`hud.gd` 的 disabled 推导仍是 phase_locked or on_cooldown
-or hp_gated,没有「内力不足」标签,也没有对应单元测试。待养成那一轮定义真实消耗后,
-再实现一个与「已锁定」视觉可区分的该状态、并配可实测的单元测试。本轮就内力消耗只
-落地两件事:`SkillData.cost: int = 0`(schema 默认 0)与 `CostLabel` 渲染「无消耗」。
+**连带后果(如实记录):** 内力不足(`no_energy`)按钮状态**本轮已实现、但当前内容不可达**——
+不是「推迟、未落地」:`skill_button.gd` 的调色板**已加第 6 个状态**「内力不足」(浅紫
+`bg (0.72,0.62,0.92)`,raw BT.709 亮度 **0.6629**,与 ready / cooldown / phase_locked /
+hp_gated / waiting 五个状态亮度差均 **≥ 0.10**,标签「内力不足」区别于「锁定」),`hud.gd`
+的 disabled 推导已含 `no_energy` 项,并有对应单元测试 `tests/test_skill_button_no_energy.gd`
+钉住亮度分离与 `cost > energy ⇒ no_energy`。它之所以在实战中**不可达**,是因为本轮**每一
+个 `SkillData.cost == 0`**(`10_systems.md §1` 仍写「内力池只存不耗」)——这是预期,不是缺陷:
+状态是真实的呈现机制,当养成那一轮定义了真实招式消耗后会自然激活。本轮就内力消耗落地
+两件事:`SkillData.cost: int = 0`(schema 默认 0)与 `CostLabel` 渲染「无消耗」。
 

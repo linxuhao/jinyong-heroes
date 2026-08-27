@@ -575,11 +575,15 @@ HotkeyLabel / StateTag / CooldownLabel 等被钉住的子节点矩形):
 | `CostLabel`(新增) | 顶部带 (26,2)-(62,14) | 9 | 居中 | 内力消耗:`cost == 0` → 「无消耗」;`cost > 0` → 「内力 N」。数值只取自既有 `SkillData` |
 | `InfoLabel`(新增) | 右下 (56,34)-(102,46) | 8 | 右 | 上下文案切换:锁定(5–8 格,第 4 轮前)→ 锁定原因「第 4 轮解锁」;否则 → 效果摘要 `effect_summary_text` |
 
-- **内力不足(`no_energy`)按钮状态:本轮推迟、未落地。** 代码中不存在该状态——调色板
-  仍只有 ready / cooldown / phase_locked / hp_gated / waiting 五个状态(亮度 0.3874 /
-  0.0814 / 0.5306 / 0.2020 / 0.1558),无「内力不足」标签,`hud.gd` 的 disabled 推导
-  不含 no_energy 项。待真实招式消耗定义后,再实现一个与「已锁定」(phase_locked)亮度差
-  ≥ 0.10 的视觉可区分状态。
+- **内力不足(`no_energy`)按钮状态:本轮已实现、当前内容不可达。** 调色板**已加第 6 个状态**
+  「内力不足」——浅紫 `bg (0.72,0.62,0.92)`,raw BT.709 亮度 **0.6629**,与 ready (0.3874) /
+  cooldown (0.0814) / phase_locked (0.5306) / hp_gated (0.2020) / waiting (0.1558) 五个状态
+  亮度差均 **≥ 0.10**;标签「内力不足」区别于「锁定」。`hud.gd` 的 disabled 推导已含
+  `no_energy` 项(`phase_locked or on_cooldown or hp_gated or no_energy`),state 优先级链
+  `phase_locked > cooldown > hp_gated > no_energy > ready`(waiting 覆盖最后)由
+  `skill_button.gd::derive_state()` 单一事实源实现。**当前内容下不可达**(每一 `SkillData.cost == 0`),
+  仅由单元测试 `tests/test_skill_button_no_energy.gd` 证明——刻意不写任何伪装它在实战中触发的
+  playtest 断言。当养成轮定义真实招式消耗后自然激活。
 - **锁定原因派生自同一谓词**:只有 `CombatManager.tutorial_battle and i >= 4 and
   current_round < 4` 时 `lock_reason_text` 非空;遭遇战 / 第 4 轮起为空,绝不写死一条
   常显字符串。

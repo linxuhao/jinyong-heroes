@@ -28,6 +28,7 @@ const TESTS: Array[String] = [
 	"res://tests/test_player_profile.gd",
 	"res://tests/test_progression_gongfa_data.gd",
 	"res://tests/test_skill_button_info.gd",
+	"res://tests/test_skill_button_no_energy.gd",
 	"res://tests/test_skill_button_states.gd",
 	"res://tests/test_settings_title_overlap.gd",
 	"res://tests/test_theme_font.gd",

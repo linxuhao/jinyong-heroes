@@ -7,6 +7,7 @@
 extends Control
 
 const SkillData = preload("res://scripts/data/skill_data.gd")
+const SkillButtonScript = preload("res://scripts/ui/skill_button.gd")
 
 ## Display aliases for health-bar name labels: Chinese display names
 ## (design §2.1 — every rendered string ships in Chinese; the names are short
@@ -764,6 +765,26 @@ func _refresh_skill_button_states(player: Node) -> void:
 		if "hp_gated" in btn:
 			btn.hp_gated = hp_gated
 
+		# GOAL 4 no_energy derivation: insufficient inner force. Reads the
+		# skill's cost (0 when skill data is missing/absent — same guard as the
+		# hp_gate_below_ratio read above) and the player's energy (0 when the
+		# player exposes no `energy`, same pattern as the EnergyLabel write in
+		# setup()). With current content every SkillData.cost == 0 (no technique
+		# spends energy this run — player.gd:110 / enemy.gd:83 say "display only
+		# — no technique costs this run"), so no_energy is always false in live
+		# play: real presentation machinery that activates naturally when a future
+		# round defines real per-skill costs.
+		var cost: int = 0
+		if "_skill_data" in btn and btn._skill_data != null:
+			cost = int(btn._skill_data.cost)
+		var energy: int = int(player.energy) if "energy" in player else 0
+		var no_energy: bool = SkillButtonScript.no_energy_predicate(cost, energy)
+		# Expose the pure predicate on the button (drives `disabled` below and is
+		# the observable the unit test checks); skill_button.gd declares the var
+		# but never writes it (mirror hp_gated).
+		if "no_energy" in btn:
+			btn.no_energy = no_energy
+
 		# UX-04 lock reason (surface): derive from the SAME phase-lock
 		# predicate that disables the button (tutorial palm-art slots 5-8
 		# while current_round < 4), so the reason disappears exactly when
@@ -776,7 +797,7 @@ func _refresh_skill_button_states(player: Node) -> void:
 		if "lock_reason_text" in btn:
 			btn.lock_reason_text = "第 4 轮解锁" if phase_locked else ""
 
-		btn.disabled = phase_locked or on_cooldown or hp_gated
+		btn.disabled = phase_locked or on_cooldown or hp_gated or no_energy
 
 		# Cooldown overlay: remaining rounds / total rounds (ints).
 		var remaining: int = int(cooldowns[i]) if i < cooldowns.size() else 0
@@ -786,30 +807,18 @@ func _refresh_skill_button_states(player: Node) -> void:
 		if btn.has_method("update_cooldown"):
 			btn.update_cooldown(remaining, total)
 
-			# Four-state derivation (priority: phase_locked > cooldown >
-			# hp_gated > ready), written every frame as observables and applied
-			# visually via _apply_state. The `disabled` computation above stays
-			# untouched — the states are the data the visuals are built from.
-			var state := "ready"
-			if phase_locked:
-				state = "phase_locked"
-			elif on_cooldown:
-				state = "cooldown"
-			elif hp_gated:
-				state = "hp_gated"
-			# turn-to-whom visible (design/30_presentation.md #3 / vision Q3): while
-			# the battle is live but it is NOT the player's turn, EVERY visible
-			# button renders the distinct "waiting" presentation so the skill bar
-			# visibly changes across player -> enemy -> player turn frames.
-			# Presentation-only override of the derived four-state: the derivation
-			# above stays byte-identical, `disabled` is untouched, and every
-			# existing state_text assert fires during PLAYER_TURN frames where
-			# this gate is false. NOT nested inside the hp_gated branch — it
-			# applies to every button AFTER the chain (the Q3 bug: ready buttons
-			# never entered that branch). Not tutorial-scoped — encounter battles
-			# show it too.
-			if CombatManager.phase != "IDLE" and not CombatManager.is_player_turn():
-				state = "waiting"
+			# State derivation via the shared skill_button.gd single source of
+			# truth (priority: phase_locked > cooldown > hp_gated > no_energy >
+			# ready; `waiting` is the LAST override — while the battle is live but
+			# it is NOT the player's turn, EVERY visible button renders "waiting",
+			# design/30_presentation.md #3). Written every frame as observables and
+			# applied visually via _apply_state. The `disabled` computation above
+			# stays untouched. With current data (all costs 0) no_energy is always
+			# false, so this is byte-identical to the old inline four-state chain
+			# on every existing frame.
+			var waiting: bool = CombatManager.phase != "IDLE" and not CombatManager.is_player_turn()
+			var state: String = SkillButtonScript.derive_state(
+				phase_locked, on_cooldown, hp_gated, no_energy, waiting)
 			if "state_text" in btn:
 				btn.state_text = state
 			if "cooldown_remaining" in btn:
