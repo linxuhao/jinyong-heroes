@@ -1,0 +1,86 @@
+# Every green round the DPE pipeline pushes gets exported to the web and served
+# on GitHub Pages. Pages only SERVES static files — it cannot run Godot — so the
+# export has to happen here.
+#
+# GODOT_VERSION is pinned to the engine the gates actually use (AItelier's
+# Dockerfile.godot: ARG GODOT_VERSION=4.4-stable). Deploying a different engine
+# than the one that compiled and play-tested the build would put something on
+# the web that no gate ever verified. Bump both together or neither.
+name: Deploy web build to Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A round can push several times in a row; only the last one needs to reach the
+# web, and Pages allows one deployment at a time anyway.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.4-stable
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot + web export template
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}"
+          wget -q "${base}/Godot_v${GODOT_VERSION}_linux.x86_64.zip" -O godot.zip
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}_linux.x86_64" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          wget -q "${base}/Godot_v${GODOT_VERSION}_export_templates.tpz" -O templates.tpz
+          unzip -q templates.tpz -d /tmp/tpl
+          # Godot looks for templates under <version-with-dots>/, e.g. 4.4.stable
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          mv /tmp/tpl/templates "$HOME/.local/share/godot/export_templates/${GODOT_VERSION/-/.}"
+          godot --version
+
+      - name: Import resources
+        # Same double --import the compile gate uses: one pass does not resolve
+        # every dependency, and the export needs .godot/ populated.
+        run: |
+          godot --headless --path . --import || true
+          godot --headless --path . --import || true
+
+      - name: Export Web
+        run: |
+          set -euo pipefail
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          ls -la build/web
+          test -f build/web/index.html
+          test -f build/web/index.wasm
+
+      - name: Assert the build needs no cross-origin isolation
+        # Pages cannot send COOP/COEP headers, so a threaded build (which needs
+        # SharedArrayBuffer) white-screens with no error anyone would see. The
+        # preset sets variant/thread_support=false; this makes that stick.
+        run: |
+          if grep -q 'SharedArrayBuffer' build/web/index.js; then
+            echo "::error::the export references SharedArrayBuffer — GitHub Pages cannot serve it (check variant/thread_support in export_presets.cfg)"
+            exit 1
+          fi
+          echo "no SharedArrayBuffer — servable from plain static hosting"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+      - id: deploy
+        uses: actions/deploy-pages@v4

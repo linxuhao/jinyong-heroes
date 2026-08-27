@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="Huashan Sword Tournament"
 config/description="Huashan Sword Tournament — turn-based grid combat: move on a per-turn budget, press 1-8 to select a technique, J to execute, Space to end the turn, Escape to pause."
 run/main_scene="res://scenes/menu.tscn"
-config/features=PackedStringArray("4.7")
+config/features=PackedStringArray("4.4")
 
 [autoload]
 
