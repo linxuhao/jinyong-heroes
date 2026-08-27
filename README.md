@@ -26,7 +26,7 @@ cooldown, or enemy-strength value changed.
 
   | Move (button) | Art | Cost (qi) | Tier |
   |---|---|---|---|
-  | 重剑无锋 (1) | 玄铁剑法 | **0** | free basic - the player is never fully disarmed (§7.3 rationale: existing 「无消耗」 pin + never-disarmed design property) |
+  | 重剑无锋 (1) | 玄铁剑法 | **0** | free basic - the plainest move of the art, kept free by the existing 「无消耗」 pin (§7.3; the never-fully-disarmed guarantee itself belongs to the cost-0 basic attack, not this move) |
   | 大巧不工 (2) | 玄铁剑法 | 15 | light line AoE |
   | 力斩千钧 (3) | 玄铁剑法 | 20 | mid cross AoE |
   | 四海无量 (4) | 玄铁剑法 | 25 | 绝招, cd 6 |
@@ -168,12 +168,15 @@ The only authoritative gate evidence is the pipeline step products -
 `5_compile`'s `compile_report.json` / `playtest_report.json` /
 `playtest_summary.md`, `5_vision`'s `vision_report.json`, `5_test`'s
 `test_report.json` - pipeline artifacts, not repo files; none is on disk at
-the verifier step (the gates run after it). The repo file
-`final/verify_report.json` is deliberately NOT a delivery verdict: it is a
-tombstone pointer note (`superseded_pointer_note`,
-`represents_current_delivery: false`) stating it does not represent the
-current delivery state, because the pipeline's `repo_apply` ignores `final/*`
-and can never refresh it. In short:
+the verifier step (the gates run after it). The verifier's own round verdict
+is written fresh to `final/verify_report.json` this step (the
+jinyong-clarity-era tombstone pointer note was archived with a numeric
+suffix on replace): `all_goals_met = false` / `ready_for_deploy = false`,
+**solely because the measured regression pass awaits the gate products
+listed above** - every implementation-level goal is direct-read verified.
+Per the decision recorded in `design/90_decisions.md`, `repo_apply` ignores
+`final/*`, so any repo copy is never refreshed by a run: gate reports, not
+any `final/` file, are the authoritative evidence. In short:
 
 - The cost table is documented in `design/20_content.md` (§1 move tables +
   §7, landed docs-first) and byte-identical in code
@@ -216,5 +219,8 @@ and can never refresh it. In short:
   inner-qi cost table (source of truth; §5's old cost gap is closed, §7.4
   records the no-regen gap)
 - `final/` - per-round delivery notes and probe notes;
-  `verify_report.json` is a tombstone pointer note, not a verdict
+  `verify_report.json` carries the verifier step's round verdict (the old
+  tombstone pointer note was archived on replace) - per
+  `design/90_decisions.md` it is never refreshed by `repo_apply`, so the
+  gate products, not `final/` files, are the authoritative evidence
 - `assets/` - color-block textures, NotoSansSC font, audio, seed portraits
