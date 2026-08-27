@@ -808,13 +808,13 @@ func _refresh_skill_button_states(player: Node) -> void:
 			btn.update_cooldown(remaining, total)
 
 			# State derivation via the shared skill_button.gd single source of
-			# truth (priority: phase_locked > cooldown > hp_gated > no_energy >
-			# ready; `waiting` is the LAST override — while the battle is live but
+			# truth (`waiting` is checked FIRST and is the true override; for waiting == false the priority is phase_locked > cooldown > hp_gated >
+			# no_energy > ready; while the battle is live but
 			# it is NOT the player's turn, EVERY visible button renders "waiting",
 			# design/30_presentation.md #3). Written every frame as observables and
 			# applied visually via _apply_state. The `disabled` computation above
 			# stays untouched. With current data (all costs 0) no_energy is always
-			# false, so this is byte-identical to the old inline four-state chain
+			# false, so the restored chain matches the old inline chain
 			# on every existing frame.
 			var waiting: bool = CombatManager.phase != "IDLE" and not CombatManager.is_player_turn()
 			var state: String = SkillButtonScript.derive_state(

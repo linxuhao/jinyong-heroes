@@ -59,7 +59,11 @@ static func run() -> bool:
 	ok = _expect(ok, SkillButtonScript.derive_state(false, false, true, true, false) == "hp_gated",
 			"derive_state hp_gated wins over no_energy")
 	ok = _expect(ok, SkillButtonScript.derive_state(false, false, false, true, true) == "waiting",
-			"derive_state waiting override is LAST")
+			"derive_state waiting override wins over no_energy")
+	ok = _expect(ok, SkillButtonScript.derive_state(false, true, false, false, true) == "waiting",
+			"derive_state waiting override wins over cooldown (skill_bar_waiting_state shape)")
+	ok = _expect(ok, SkillButtonScript.derive_state(true, false, false, false, true) == "waiting",
+			"derive_state waiting override wins over phase_locked")
 	ok = _expect(ok, SkillButtonScript.derive_state(false, false, false, false, false) == "ready",
 			"derive_state all false == ready (cost 0 => never no_energy)")
 

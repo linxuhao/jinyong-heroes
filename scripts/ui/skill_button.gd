@@ -167,15 +167,20 @@ static func cost_label_text(cost: int) -> String:
 static func no_energy_predicate(cost: int, energy: int) -> bool:
 	return cost > 0 and energy < cost
 
-## Single source of truth for the skill-button state priority chain. Priority:
+## Single source of truth for the skill-button state priority chain. `waiting`
+## is checked FIRST and is a true override — while the battle is live but it is
+## NOT the player's turn, EVERY visible button renders "waiting" regardless of
+## phase_locked / cooldown / hp_gated / no_energy (design/30_presentation.md #3).
+## For waiting == false the priority is:
 ##   phase_locked > cooldown > hp_gated > no_energy > ready
-## and `waiting` is the LAST override — while the battle is live but it is not
-## the player's turn, EVERY visible button renders "waiting" regardless of the
-## derived four-state/five-state chain (design/30_presentation.md #3). With
-## current data (all costs 0) no_energy is always false, so this is byte-identical
-## to the old inline chain on every existing frame.
+## With current data (all costs 0) no_energy is always false, so after the
+## waiting-first reorder the restored behavior matches the old inline chain on
+## every existing frame (waiting still overrides during enemy turns exactly as
+## before).
 static func derive_state(phase_locked: bool, on_cooldown: bool, hp_gated: bool,
 		no_energy: bool, waiting: bool) -> String:
+	if waiting:
+		return "waiting"
 	if phase_locked:
 		return "phase_locked"
 	if on_cooldown:
@@ -184,8 +189,6 @@ static func derive_state(phase_locked: bool, on_cooldown: bool, hp_gated: bool,
 		return "hp_gated"
 	if no_energy:
 		return "no_energy"
-	if waiting:
-		return "waiting"
 	return "ready"
 
 ## Short on-face effect summary derived ONLY from existing SkillData numbers
