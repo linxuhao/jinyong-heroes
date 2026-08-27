@@ -26,6 +26,8 @@ static func run() -> bool:
 	ok = _expect(ok, bar.hp_label_text(500, 500) == "500/500", 'hp_label_text(500,500) == "500/500"')
 	ok = _expect(ok, bar.hp_label_text(200, 500) == "200/500", 'hp_label_text(200,500) == "200/500"')
 	ok = _expect(ok, bar.hp_label_text(0, 500) == "0/500", 'hp_label_text(0,500) == "0/500"')
+	ok = _expect(ok, bar.hp_label_text(1000, 1000) == "1000/1000",
+			'hp_label_text(1000,1000) == "1000/1000"')
 
 	bar.setup("测试", 500, null)
 
@@ -34,6 +36,7 @@ static func run() -> bool:
 	ok = _expect(ok, bar.hp_text == "500/500", 'setup() hp_text == "500/500"')
 	ok = _expect(ok, bar.hp_value == 500, "setup() hp_value == 500")
 	ok = _expect(ok, bar.hp_max == 500, "setup() hp_max == 500")
+	ok = _expect(ok, bar.hp_text_width_ok == true, "setup(500) hp_text_width_ok == true")
 
 	# The additive HpLabel (child of Bar) receives the text in setup() too.
 	var hp_label: Label = bar.get_node("Bar/HpLabel") as Label
@@ -50,6 +53,20 @@ static func run() -> bool:
 		ok = _expect(ok, hp_label.text == "200/500", 'Bar/HpLabel.text == "200/500" after update_health()')
 		ok = _expect(ok, hp_label.mouse_filter == 2,
 				"Bar/HpLabel.mouse_filter == 2 (never blocks HUD clicks)")
+	ok = _expect(ok, bar.hp_text_width_ok == true, "update_health(200,500) hp_text_width_ok == true")
+
+	# --- Worst-case width: "1000/1000" must fit the 64px bar -----------------
+	# max_health is 1000 since the 2026-08-24 balance change, so the longest
+	# string the bar can ever carry is "1000/1000". The fit observable must be
+	# true for it (font_size/outline chosen so the MEASURED rendered width,
+	# string_size + 2*outline_size, is <= 64.0).
+	bar.setup("测试", 1000, null)
+	bar.update_health(1000, 1000)
+	ok = _expect(ok, bar.hp_text == "1000/1000", 'update_health(1000,1000) hp_text == "1000/1000"')
+	ok = _expect(ok, bar.hp_value == 1000, "update_health(1000,1000) hp_value == 1000")
+	ok = _expect(ok, bar.hp_max == 1000, "update_health(1000,1000) hp_max == 1000")
+	ok = _expect(ok, bar.hp_text_width_ok == true,
+			"worst-case '1000/1000' fits 64px (hp_text_width_ok == true)")
 
 	# --- Scene structure of the additive HpLabel --------------------------
 	if hp_label != null:
@@ -64,10 +81,15 @@ static func run() -> bool:
 				"HpLabel horizontal_alignment == center")
 		ok = _expect(ok, hp_label.vertical_alignment == VERTICAL_ALIGNMENT_CENTER,
 				"HpLabel vertical_alignment == center")
-		ok = _expect(ok, hp_label.get_theme_font_size("font_size") == 9,
-				"HpLabel font_size == 9")
-		ok = _expect(ok, hp_label.get_theme_color("font_color").is_equal_approx(
-				Color(0.95, 0.95, 0.95)), "HpLabel font_color == light")
+		ok = _expect(ok, hp_label.get_theme_font_size("font_size") <= 8,
+				"HpLabel font_size <= 8 (fits the 64px bar)")
+		ok = _expect(ok, hp_label.get_theme_constant("outline_size") >= 3,
+				"HpLabel outline_size >= 3 (legible on bright fill)")
+		var hp_fc: Color = hp_label.get_theme_color("font_color")
+		ok = _expect(ok, not hp_fc.is_equal_approx(Color(0.95, 0.95, 0.95)),
+				"HpLabel font_color no longer near-white")
+		ok = _expect(ok, hp_fc.get_luminance() >= 0.25 and hp_fc.get_luminance() <= 0.75,
+				"HpLabel font_color luminance in [0.25, 0.75] (mid-gray)")
 		ok = _expect(ok, hp_label.get_theme_color("font_outline_color").is_equal_approx(
 				Color(0.05, 0.05, 0.05)), "HpLabel font_outline_color == dark")
 
@@ -89,6 +111,27 @@ static func run() -> bool:
 	ok = _expect(ok, is_equal_approx(bar.bar_height, 12.0), "bar.bar_height == 12.0 (frozen)")
 	ok = _expect(ok, is_equal_approx(bar.empty_area_px, 168.0), "bar.empty_area_px == 168.0 (frozen)")
 	ok = _expect(ok, is_equal_approx(bar.empty_cap_px, 14.0), "bar.empty_cap_px == 14.0 (frozen)")
+
+	# --- DEFECT 2: nameplate backing seam -----------------------------------
+	# The semi-transparent name backing is a StyleBoxFlat on NameLabel; its
+	# horizontal content margins inset the DRAWN backing box (StyleBoxFlat draws
+	# within get_stylebox_rect, which shrinks by the content margins), creating a
+	# visible seam (>= 2px) between adjacent units' nameplates. Adjacent widgets
+	# differ by exactly one 64px cell, so seam = left + right, position-independent.
+	var name_label: Label = bar.get_node("NameLabel") as Label
+	if name_label != null:
+		var nb: StyleBoxFlat = name_label.get_theme_stylebox("normal") as StyleBoxFlat
+		ok = _expect(ok, nb != null, "NameLabel normal stylebox is a StyleBoxFlat")
+		if nb != null:
+			ok = _expect(ok, nb.get_content_margin_left() + nb.get_content_margin_right() >= 2.0,
+					"name backing left+right margins >= 2.0 (visible seam)")
+			ok = _expect(ok, is_equal_approx(nb.get_content_margin_left(), 3.0) \
+					and is_equal_approx(nb.get_content_margin_right(), 3.0),
+					"name backing horizontal margins == 3.0 (6px seam)")
+			ok = _expect(ok, is_equal_approx(bar.name_backing_alpha, 0.7),
+					"name_backing_alpha still 0.7")
+			ok = _expect(ok, nb.bg_color.is_equal_approx(Color(0.05, 0.05, 0.08, 0.7)),
+					"name backing bg_color still (0.05,0.05,0.08,0.7)")
 
 	if ok:
 		print("PASS: test_health_bar_text")

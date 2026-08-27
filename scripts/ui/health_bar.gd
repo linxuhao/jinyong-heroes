@@ -133,6 +133,14 @@ var hp_value: int = 0
 ## update_health() call).
 var hp_max: int = 0
 
+## True when the MEASURED rendered ink width of the HpLabel text fits within the
+## Bar width (64 px), so the worst-case "cur/max" string never overflows the bar
+## on either side. Recomputed at the end of setup() and update_health() (right
+## after hp_text is written) via _hp_rendered_width(). Additive observable —
+## deliberately kept OUT of the playtest surface; verified by the headless unit
+## test only.
+var hp_text_width_ok: bool = false
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -148,6 +156,21 @@ var hp_max: int = 0
 ## does not touch the scene, so it is safely headless-testable.
 static func hp_label_text(current: int, max_hp: int) -> String:
 	return str(current) + "/" + str(max_hp)
+
+## Measure the RENDERED ink width of `text` in `hp_label`, INCLUDING the outline
+## expansion (the outline widens glyphs ~outline_size px per side, so the drawn
+## width is string_width + 2*outline_size). Returns 0.0 if the label or its font
+## cannot be resolved (never crashes) — under which the fit check reports ok.
+## Pure/headless-safe: theme lookups fall back to the project default font.
+static func _hp_rendered_width(hp_label: Label, text: String) -> float:
+	if hp_label == null:
+		return 0.0
+	var f: Font = hp_label.get_theme_font("font")
+	if f == null:
+		return 0.0
+	var fs: int = hp_label.get_theme_font_size("font_size")
+	var os: int = hp_label.get_theme_constant("outline_size")
+	return f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 2.0 * float(os)
 
 ## Initialise the health bar with character info and connect signals.
 ## char_node must have a `health_changed` signal and `health`/`max_health`
@@ -246,7 +269,17 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		_name_backing_sb.corner_radius_top_right = 2
 		_name_backing_sb.corner_radius_bottom_right = 2
 		_name_backing_sb.corner_radius_bottom_left = 2
-		_name_backing_sb.set_content_margin_all(2.0)
+		# Horizontal insets left/right = 3.0 create a visible ~6px seam between
+		# adjacent units' nameplates: two adjacent widgets differ by exactly one
+		# 64px cell, so the backing seam = content_margin_left + content_margin_right,
+		# independent of absolute position. Top/bottom stay 2.0. The NameLabel rect
+		# (64x9), widget 68x24, Bar 64x12 and all other frozen geometry are
+		# untouched — this only insets the DRAWN backing box (StyleBox.get_stylebox_rect
+		# shrinks the draw rect by the content margins).
+		_name_backing_sb.set_content_margin(SIDE_TOP, 2.0)
+		_name_backing_sb.set_content_margin(SIDE_BOTTOM, 2.0)
+		_name_backing_sb.set_content_margin(SIDE_LEFT, 3.0)
+		_name_backing_sb.set_content_margin(SIDE_RIGHT, 3.0)
 		label.add_theme_stylebox_override("normal", _name_backing_sb)
 		name_backing_alpha = 0.7
 
@@ -275,6 +308,10 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	var hp_label: Label = _bar.get_node_or_null("HpLabel") as Label if _bar != null else null
 	if hp_label != null:
 		hp_label.text = hp_text
+		# Fit observable valid the moment the battle spawns. bar_width was set
+		# above in the bar block (64.0); the <=0 guard covers a hypothetical
+		# absent-bar path so the check never misfires.
+		hp_text_width_ok = _hp_rendered_width(hp_label, hp_text) <= (bar_width if bar_width > 0.0 else 64.0)
 
 	# Connect to the character's health_changed signal.
 	if char_node != null and is_instance_valid(char_node):
@@ -304,6 +341,9 @@ func update_health(current: int, max_hp: int) -> void:
 		# MOUSE_FILTER_IGNORE (2): re-asserted every update so the number label
 		# never blocks clicks on the HUD layer (root widget is also filter 2).
 		hp_label.mouse_filter = 2
+		# Recomputed on every update so the fit observable tracks the live text
+		# (bar_width is the live bar size from the last frame / setup()).
+		hp_text_width_ok = _hp_rendered_width(hp_label, hp_text) <= (bar_width if bar_width > 0.0 else 64.0)
 
 	# Re-pin the EmptyCap to the bar's right end on every update so the cap
 	# stays the visible "empty slot" at ANY fill level, including 100%. The
