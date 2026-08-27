@@ -37,6 +37,12 @@ var focus_index: int = 0
 ## and deliberately bypasses the signal link.
 var pressed_connected: Array[bool] = []
 
+## Surface: true when the Title label's GLOBAL rect intersects ANY option row
+## (SettingsBox itself, or Button0..Button3), each rect inset 1px via grow(-1.0)
+## so a shared edge is never an overlap. false = title disjoint from every option
+## row. Recomputed on every _render() and every _process() frame.
+var title_rows_overlap: bool = false
+
 
 func _ready() -> void:
 	# No boot-claim / HUD / state-emission code: the swap protocol already hid
@@ -77,6 +83,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	# Fresh geometry truth at every asserted frame — cheap and unconditional so the
+	# observable never reports a stale value (hud.gd _inset_overlap precedent: a
+	# pair overlaps iff both rects intersect after a 1px grow(-1.0) inset).
+	_refresh_title_overlap()
 	# Harness-only actions (unbound empty-event lists in project.godot [input];
 	# an absent action just returns false from is_action_just_pressed, never
 	# crashes). debug_click_settings_row drives the SAME _activate_row the
@@ -142,3 +152,29 @@ func _render() -> void:
 	(get_node("SettingsBox/Button1") as Button).text = "音乐音量: %d dB" % int(round(SettingsManager.music_volume_db))
 	(get_node("SettingsBox/Button2") as Button).text = "全屏: 开" if SettingsManager.fullscreen else "全屏: 关"
 	(get_node("SettingsBox/Button3") as Button).text = "返回"
+	_refresh_title_overlap()
+
+
+## Recompute title_rows_overlap: true iff the Title label's global rect (inset
+## 1px via grow(-1.0)) intersects the global rect (also inset 1px) of ANY of
+## SettingsBox or Button0..Button3. Missing nodes are skipped and the last value
+## is kept (defensive, matches hud.gd's get_node_or_null pattern).
+func _refresh_title_overlap() -> void:
+	var title := get_node_or_null("Title") as Control
+	if title == null:
+		return  # keep last value; node not yet in tree
+	var tr: Rect2 = title.get_global_rect().grow(-1.0)
+	for node_path in [
+		"SettingsBox",
+		"SettingsBox/Button0",
+		"SettingsBox/Button1",
+		"SettingsBox/Button2",
+		"SettingsBox/Button3",
+	]:
+		var other := get_node_or_null(node_path) as Control
+		if other == null:
+			continue
+		if tr.intersects(other.get_global_rect().grow(-1.0)):
+			title_rows_overlap = true
+			return
+	title_rows_overlap = false
