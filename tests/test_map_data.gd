@@ -96,13 +96,16 @@ static func _test_entry_content(ok: bool) -> bool:
 			var status: String = slot.get("status", "")
 			ok = _expect(ok, status == "active" or status == "declared",
 				nid + " slot " + slot_type + " status in {active,declared}")
-	# exactly one active slot across the whole table (shaolin's event slot)
+	# exactly five ACTIVE slots across the whole table — the five active EVENT
+	# slots (shaolin + the four mainline event slots: wuming_valley/luoyang/
+	# wudang/xiangyang). battle/facility slots stay declared everywhere, so the
+	# total active count equals the active event-slot count.
 	var active_count := 0
 	for nid in NODE_IDS:
 		for slot_type in ["event", "battle", "facility"]:
 			if MapData.entry_content(nid)[slot_type].get("status", "") == "active":
 				active_count += 1
-	ok = _expect(ok, active_count == 1, "exactly one active slot across the table")
+	ok = _expect(ok, active_count == 5, "exactly five active event slots across the table (shaolin + the four mainline)")
 	# shaolin binding: shape + resolves in the pool + deep copy
 	var shaolin_event: Dictionary = MapData.entry_content("shaolin")["event"]
 	ok = _expect(ok, shaolin_event == {"status": "active", "event_id": "night_rain"},
@@ -118,13 +121,20 @@ static func _test_entry_content(ok: bool) -> bool:
 	ok = _expect(ok, reread.has("event"), "entry_content deep copy: event key survives caller mutation")
 	ok = _expect(ok, reread["event"] == {"status": "active", "event_id": "night_rain"},
 		"entry_content deep copy: value intact")
-	# mainline nodes: active_event_id "" (inert), declared gaps present
-	for nid in ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun"]:
-		ok = _expect(ok, MapData.active_event_id(nid) == "", "active_event_id " + nid + " inert")
-	ok = _expect(ok, MapData.declared_gap_types("luoyang") == ["event", "battle", "facility"],
-		"luoyang declared gap types (fixed order)")
-	ok = _expect(ok, MapData.declared_gap_types("wuming_valley") == ["event", "battle", "facility"],
-		"wuming_valley declared gap types (fixed order)")
+	# mainline nodes: four carry live deterministic bindings; the end node
+	# (kunlun) stays inert. Its event slot is declared because _travel() routes
+	# an end node to ENDING BEFORE _maybe_start_entry_event() runs — a structural
+	# non-trigger, so the terminal pin below is the machine-readable form of the
+	# terminal-node rule (the ending can never be blocked by node content).
+	ok = _expect(ok, MapData.active_event_id("wuming_valley") == "tomb_bed", "active_event_id wuming_valley bound to tomb_bed")
+	ok = _expect(ok, MapData.active_event_id("luoyang") == "merchant", "active_event_id luoyang bound to merchant")
+	ok = _expect(ok, MapData.active_event_id("wudang") == "quanzhen_scripture", "active_event_id wudang bound to quanzhen_scripture")
+	ok = _expect(ok, MapData.active_event_id("xiangyang") == "dragon_scrap", "active_event_id xiangyang bound to dragon_scrap")
+	ok = _expect(ok, MapData.active_event_id("kunlun") == "", "active_event_id kunlun stays inert (terminal guarantee)")
+	ok = _expect(ok, MapData.declared_gap_types("luoyang") == ["battle", "facility"],
+		"luoyang declared gap types (event slot now live -> fixed order [battle, facility])")
+	ok = _expect(ok, MapData.declared_gap_types("wuming_valley") == ["battle", "facility"],
+		"wuming_valley declared gap types (event slot now live -> fixed order [battle, facility])")
 	ok = _expect(ok, MapData.declared_gap_types("shaolin") == ["battle", "facility"],
 		"shaolin declared gap types (no event)")
 	# unknown node degrades inert

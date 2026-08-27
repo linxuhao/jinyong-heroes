@@ -69,8 +69,11 @@ static func _test_map_data_schema(ok: bool) -> bool:
 			ok = _expect(ok, status == "active" or status == "declared",
 					"%s/%s: status '%s' in {active, declared}" % [nid, slot_type, str(status)])
 
-	# (b) exactly one ACTIVE event slot across the whole table — shaolin's —
-	#     and it resolves inside the sanctioned pool (zero new prose).
+	# (b) exactly five ACTIVE event slots across the whole table — the four
+	#     live mainline nodes (wuming_valley/luoyang/wudang/xiangyang) plus
+	#     shaolin's branch — each resolving inside the sanctioned pool (zero new
+	#     prose). battle/facility slots stay declared everywhere, so the total
+	#     active-slot count equals the active-event-slot count.
 	var active_event_nodes: Array[String] = []
 	var active_slot_total: int = 0
 	for nid in NODE_IDS:
@@ -81,19 +84,26 @@ static func _test_map_data_schema(ok: bool) -> bool:
 				active_slot_total += 1
 				if slot_type == "event":
 					active_event_nodes.append(nid)
-	ok = _expect(ok, active_slot_total == 1, "exactly one active slot across the table (got %d)" % active_slot_total)
-	ok = _expect(ok, active_event_nodes.size() == 1 and active_event_nodes[0] == "shaolin",
-			"the only active event slot is shaolin's (got %s)" % str(active_event_nodes))
+	ok = _expect(ok, active_slot_total == 5, "exactly five active event slots across the table (got %d)" % active_slot_total)
+	ok = _expect(ok, active_event_nodes == ["wuming_valley", "luoyang", "wudang", "xiangyang", "shaolin"],
+			"the active event slots are the four live mainline nodes + shaolin, in NODE_IDS order (got %s)" % str(active_event_nodes))
 	var shaolin_id: String = MapData.active_event_id("shaolin")
 	ok = _expect(ok, shaolin_id != "", "active_event_id(shaolin) is non-empty")
 	ok = _expect(ok, EventData.def(shaolin_id) != null,
 			"shaolin's binding '%s' resolves in EventData (pool-only text)" % shaolin_id)
 
-	# (c) every mainline node stays inert (the spine_to_ending protection: an
-	#     interactive event on the main path would eat presses the timeline
-	#     budget does not have — declared slots only, see design/20_content.md §8).
-	for nid in MAINLINE_IDS:
-		ok = _expect(ok, MapData.active_event_id(nid) == "", "active_event_id(%s) stays inert" % nid)
+	# (c) MAINLINE node events are LIVE (4 of 5), not inert. The spine is still
+	#     protected — but by STRUCTURE, not by leaving slots empty:
+	#     _travel() routes an END node to ENDING (ended = true) BEFORE
+	#     _maybe_start_entry_event() runs, so kunlun's declared slot is a
+	#     structural non-trigger and the ending can never be blocked by node
+	#     content. The other four mainline nodes each bind a deterministic
+	#     pool row; their declared-gap observable drops 'event' accordingly.
+	ok = _expect(ok, MapData.active_event_id("wuming_valley") == "tomb_bed", "mainline wuming_valley binds tomb_bed")
+	ok = _expect(ok, MapData.active_event_id("luoyang") == "merchant", "mainline luoyang binds merchant")
+	ok = _expect(ok, MapData.active_event_id("wudang") == "quanzhen_scripture", "mainline wudang binds quanzhen_scripture")
+	ok = _expect(ok, MapData.active_event_id("xiangyang") == "dragon_scrap", "mainline xiangyang binds dragon_scrap")
+	ok = _expect(ok, MapData.active_event_id("kunlun") == "", "kunlun stays inert (routing-first guarantee: end node -> ENDING before entry content)")
 
 	# (d) declared_gap_types: the honesty observable (gap = not implemented,
 	#     never faked — so it must be assertable, not just documented).
@@ -101,10 +111,14 @@ static func _test_map_data_schema(ok: bool) -> bool:
 	ok = _expect(ok, gaps_shaolin.has("battle") and gaps_shaolin.has("facility"),
 			"shaolin declares battle + facility as unimplemented gaps")
 	ok = _expect(ok, not gaps_shaolin.has("event"), "shaolin's implemented event is NOT a gap")
+	# luoyang's event slot is now LIVE, so its only remaining declared gaps are
+	# battle + facility (2 slot types, fixed order) — the honesty observable
+	# shrinks exactly as a slot becomes implemented, never faked.
 	var gaps_luoyang: Array = MapData.declared_gap_types("luoyang")
-	for slot_type in SLOT_TYPES:
-		ok = _expect(ok, gaps_luoyang.has(slot_type), "luoyang declares '%s' as an unimplemented gap" % slot_type)
-	ok = _expect(ok, gaps_luoyang.size() == SLOT_TYPES.size(), "luoyang's gap list is exactly the 3 slot types")
+	ok = _expect(ok, gaps_luoyang == ["battle", "facility"],
+			"luoyang's gap list is exactly [battle, facility] now its event slot is live (got %s)" % str(gaps_luoyang))
+	ok = _expect(ok, gaps_luoyang.size() == 2, "luoyang's gap list is exactly 2 slot types")
+	ok = _expect(ok, not gaps_luoyang.has("event"), "luoyang's implemented event is NOT a gap")
 
 	# (e) unknown node degrades inert (never crashes).
 	ok = _expect(ok, MapData.entry_content("nope_node").is_empty(), "entry_content(unknown) -> {}")
@@ -228,6 +242,26 @@ static func _test_event_logic_parity(ok: bool) -> bool:
 	var snap_a: String = JSON.stringify(p_none.to_dict())
 	EventLogic.apply_option_effects(p_none, none_opt)
 	ok = _expect(ok, JSON.stringify(p_none.to_dict()) == snap_a, "a 'none' option changes nothing at all")
+
+	# --- D6 bag independence (node-event channel) ---
+	# The node-event channel shares EventLogic.apply_option_effects with the
+	# cultivation bag draw, but that shared core must NEVER read/write
+	# flags["events_seen"] (only draw_unseen_id does, and node events never call
+	# it). merchant.option_a = silver -20 + item eq_sword_3; on a fresh profile
+	# the silver delta clamps at 0, so the ITEM is the only non-vacuous proof the
+	# resolution actually landed. Together with the shaolin leg's bag check in
+	# _test_map_event_phase, this covers channel independence for BOTH a mainline
+	# binding and the branch binding — no RNG enters either.
+	var p_bag = PlayerProfileScript.new()
+	ok = _expect(ok, (p_bag.flags.get("events_seen", []) as Array).is_empty(),
+			"D6 fixture: a fresh profile's events_seen bag starts empty")
+	ok = _expect(ok, not p_bag.inventory.has("eq_sword_3"),
+			"D6 fixture: the fresh profile does not already own merchant's item")
+	EventLogic.apply_option_effects(p_bag, merchant.option_a)
+	ok = _expect(ok, p_bag.inventory.has("eq_sword_3"),
+			"D6: merchant/option_a really applied (item landed — non-vacuous proof, silver clamps at 0)")
+	ok = _expect(ok, (p_bag.flags.get("events_seen", []) as Array).is_empty(),
+			"D6: apply_option_effects never touches flags['events_seen'] (bag independence)")
 
 	# --- add_practice with an empty gongfa list: no-op, no crash ---
 	var p_empty = PlayerProfileScript.new()
@@ -385,19 +419,26 @@ static func _test_map_event_phase(ok: bool) -> bool:
 			"the node-event channel leaves flags['events_seen'] untouched (bag independence)")
 	map.free()
 
-	# --- the MAINLINE leg stays inert (the spine path is not blocked) ---
+	# --- the MAINLINE leg now opens its bound event (洛阳 is live) ---
+	# The spine is protected by routing-first order (kunlun below), not by mainline
+	# inertness. On a fresh main_map instance events_resolved_count starts at 0, so
+	# resolving exactly one merchant event lands on the deterministic value 1 — a
+	# relative ladder step, not an absolute game value.
 	sm.profile = PlayerProfileScript.new()
 	var main_map = MapScene.instantiate()
 	main_map.current_node_id = "wuming_valley"
 	main_map.focus_id = "luoyang"
 	main_map._travel()
-	ok = _expect(ok, main_map.phase == "TRAVEL", "mainline arrival (无名谷->洛阳) stays in TRAVEL")
-	ok = _expect(ok, main_map.event_id == "", "no event opened on a declared (inert) slot")
+	ok = _expect(ok, main_map.phase == "EVENT", "mainline arrival (无名谷->洛阳) opens the bound event")
+	ok = _expect(ok, main_map.event_id == "merchant", "the opened event is luoyang's deterministic merchant binding (got %s)" % main_map.event_id)
 	ok = _expect(ok, main_map.current_node_id == "luoyang", "the mainline move still happens")
-	ok = _expect(ok, main_map.last_effect_types.is_empty() and int(main_map.events_resolved_count) == 0,
-			"an inert node resolves nothing")
 	ok = _expect(ok, not main_map.entry_declared_gap_types.is_empty(),
-			"the inert node still exposes its declared gaps (honesty observable)")
+			"the live node still exposes its remaining declared gaps (honesty observable)")
+	main_map._resolve_node_event()
+	ok = _expect(ok, main_map.phase == "TRAVEL", "resolving luoyang's event returns the map to TRAVEL")
+	ok = _expect(ok, main_map.event_id == "", "the opened event closes (event_id == \"\")")
+	ok = _expect(ok, int(main_map.events_resolved_count) == 1,
+			"the mainline resolution steps the ladder once (0 -> 1, fresh instance)")
 	main_map.free()
 
 	# --- the END node: content must never block the ending (data-only pin;
