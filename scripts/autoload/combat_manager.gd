@@ -1318,6 +1318,12 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 			if int(unit.max_health) > 0 else 1.0
 		if hp_ratio >= skill.hp_gate_below_ratio:
 			return null
+		# --- Insufficient inner force (failure -> skill NOT consumed). The
+		# cost > 0 guard inside insufficient_energy means a cost-0 skill never
+		# gates and never deducts, so enemies (energy 0, all techniques free)
+		# and the free basic are byte-identical. ---
+		if "energy" in unit and SkillData.insufficient_energy(int(skill.cost), int(unit.energy)):
+			return null
 
 	# --- Jump displacement (landing tile becomes the AoE origin) ---
 	var origin: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
