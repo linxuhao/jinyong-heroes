@@ -348,6 +348,31 @@ implemented" —— 不实现它,推 36 个月和推 0 个月没有任何区别,
 事件或门派设施。不做格子移动(那是战斗的词汇),也不做自由移动(要碰撞、
 要寻路,买不到相应的玩法)。
 
+**每个节点数据先行声明自己的进入内容。** 后半句(节点上触发什么)不写在
+`scripts/segments/map.gd` 的流程里,而是每个节点在 `scripts/data/map_data.gd`
+的 `entry_content` 里声明三类槽位——`event` / `battle` / `facility`;每槽形状
+`{"status": ..., "<type>_id": ...}`,`status` 只有两个取值:`active`(已实现且
+生效)与 `declared`(仅声明槽位,本轮未实现)。
+
+| 节点 id | 名称 | event 槽 | battle 槽 | facility 槽 |
+|---|---|---|---|---|
+| `wuming_valley` | 无名谷 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `luoyang` | 洛阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `wudang` | 武当 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `xiangyang` | 襄阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `declared` / `""` |
+
+(节点顺序 = `map_data.gd` 的 `NODES` 顺序;槽位值与 `design/20_content.md` §8
+的表同一事实源。少林是洛阳的支线、原本是没有理由去的死胡同,本轮以**既有**
+事件池行 `night_rain` 的确定性绑定作为去它的理由——见 `20_content.md` §8.2。)
+
+**主线 5 节点的 event 槽本轮保持惰性,理由是护线(不是遗忘):**
+不可修改的 `playtest/spine_to_ending.yaml` 时间线在 f420–f490 只有 4 对
+`move_right`/`ui_accept`,并在 f520 断言 ENDING——它没有为主线节点上一个
+阻塞式交互事件留输入预算;而既有 yaml 本轮不允许编辑。故主线节点只声明
+槽位、不生效,已声明未实现一事如实记进 `20_content.md` §8.3。
+
 **有主线,极简:查明自己为何穿越。** 若干节点串成一条线,走完即**结局**。
 结局按最终属性 / 功法成就分级——这是"游戏结局"这四个字在本阶段的兑现。
 

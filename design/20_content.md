@@ -321,3 +321,71 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 内力池**一场战斗内不回复**——回复机制(调息、内功被动回蓝等)留待后续轮次,
 本轮不发明。
 
+## 8. 大地图节点进入内容 (2026-08-28, jinyong-map-events 轮)
+
+`design/40_progression.md §5`(第 6 段 · 大地图)写着「点击相邻节点移动,**节点上
+触发战斗、事件或门派设施**」——后半句此前没有实现:走到昆仑就看结局,进任何
+节点什么都不发生。本轮把「事件」这一种做通,其余两种只留声明位。本节与
+§5 的表**同一事实源**,两份文档必须一致。
+
+### 8.1 六节点进入内容声明表(镜像 `scripts/data/map_data.gd`)
+
+每节点声明三槽 `event` / `battle` / `facility`,槽形状
+`{"status": "active"|"declared", "<type>_id": String}`:`active` = 已实现且生效,
+`declared` = 仅声明槽位、本轮未实现。
+
+| 节点 id | 名称 | event 槽 | battle 槽 | facility 槽 |
+|---|---|---|---|---|
+| `wuming_valley` | 无名谷 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `luoyang` | 洛阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `wudang` | 武当 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `xiangyang` | 襄阳 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+| `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `declared` / `""` |
+
+(行序 = `map_data.gd` 的 `NODES` 顺序。)可观测语义:`declared_gap_types(id)` =
+该节点所有 `status == "declared"` 的槽类型列表——「已声明未实现」因此是可断言
+的事实,不只是文档里的一句话;`active_event_id(id)` = 仅当 event 槽
+`status == "active"` 且 `EventData.def(event_id) != null` 时返回该 id,否则返回
+`""`(绑定写错读作惰性,不崩)。
+
+### 8.2 少林的绑定:`night_rain` 破庙夜雨(取自既有池,零新文案)
+
+少林是洛阳的一条支线,此前**没有任何去的理由**。本轮给它的理由是**确定性绑定**
+一行既有事件:在 `scripts/data/event_data.gd` 的 `EventData.TABLE` 16 行里,
+`night_rain`(标题「破庙夜雨」)是**唯一一行老僧在庙里的场景**——
+
+> `夜雨滂沱，破庙漏得厉害，\n老僧独坐，就着灯火补屋檐。`
+
+(text 逐字引自 `event_data.gd`,全角标点与换行转义照源文件;它就是「去一座
+寺院」在现有池子里最近的场景:到了,帮老僧补漏雨的屋檐,或就在檐下练剑。)
+两个选项同样是既有数据:「帮工换宿」贴银两 −6 又涨根骨 +1,「檐下练剑」
+练功 +2。本节**不新增任何文案**——「少林专属」指的是**机制专属**:只有少林的
+节点进入会确定性地触发这一行;行本身仍留在共享池里,养成游历的无重复袋子照旧
+可能抽到它(两条通道相互独立,互不读写 `flags["events_seen"]`)。若团队日后想
+换一行,改的只是 `map_data.gd` 里 `event_id` 这个值,机制不动。
+
+### 8.3 已声明未实现缺口(照 §5 的纪律:不许假装实现,也不许悄悄不提)
+
+1. **battle 槽:已声明、未实现。** 6 个节点的 battle 槽全部是 `declared`、
+   `battle_id` 保持空串;本轮没有任何「进节点触发战斗遭遇」的接线。
+2. **facility(门派设施)槽:已声明、未实现。** 全部节点 `facility_id` 空串;
+   「门派设施」这一内容类型本轮不存在,只有槽位。
+3. **主线 5 节点的 event 槽:已声明、本轮惰性。** 无名谷 / 洛阳 / 武当 / 襄阳 /
+   昆仑的 event 槽是 `declared`(空 `event_id`),**理由写全,不静默**:不可修改的
+   `playtest/spine_to_ending.yaml` 时间线在 f420–f490 只有 4 对
+   `move_right`/`ui_accept`,并在 f520 断言 ENDING——它没有为主线节点上一个
+   阻塞式交互事件留输入预算;而既有 yaml 本轮不允许编辑。故主线节点只声明、
+   不生效,本轮唯一可交互的节点事件在少林(支线、不在护线时间线上)。
+4. **本轮不新编少林专属事件文案。** 「去的理由」用的是 §8.2 的既有池绑定。
+   未来若要**新写**一段少林专属行(例如山门场景),那是**内容缺口**:
+   必须先按本节风格记缺口,且新行只能写进 `event_data.gd` 的 `EventData.TABLE`
+   ——绝不在 `map_data.gd` / `map.gd` 里就地编一段江湖轶事。
+5. **节点事件重触发策略(记录,而非静默缺失):** 少林事件在**每次经 travel
+   到达时**触发,本轮没有 per-profile 一次性标记(扩展 `PlayerProfile.flags`
+   的持久化/清洗不在本轮范围)。即少林是一个**可重复访问的内容点**——这是
+   有意记录的政策,不是漏做。
+6. **「打听」行动:档案已声明、未实现。** `design/40_progression.md §2.2` 正面
+   特质「江湖阅历」写着「大地图多一个行动:**打听**,揭示相邻节点的内容」——
+   该行动本轮未实现、也在本轮范围之外;记在此处以免被读成遗忘。
+
