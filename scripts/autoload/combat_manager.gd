@@ -411,6 +411,34 @@ func debug_damage_player() -> void:
 	apply_damage(player, delta, null, false, true)
 
 
+## DEBUG hook (unbound harness action, consumed by GameManager._process): drain
+## the player's WHOLE remaining inner-qi pool through the shared spend path
+## (spend_unit_energy), so every costed move becomes insufficient regardless of
+## how costs are retuned later. Fixture for the no_energy scenario: after a
+## drain-to-zero, any non-free skill is blocked by the energy gate. No-op when
+## no battle is running, or when the player is missing.
+func debug_spend_player_qi() -> void:
+	if not _battle_active():
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	spend_unit_energy(player, int(player.energy))
+
+
+## Spend `cost` inner force from `unit` through the ONE spend path every cast
+## (and the debug drain) uses. Clamped at 0 (SkillData.spend). Returns the new
+## pool value, or -1 when the unit is invalid / gone / exposes no energy
+## (nothing spent). cost <= 0 is a no-op (returns the current pool unchanged).
+func spend_unit_energy(unit: Node, cost: int) -> int:
+	if unit == null or not is_instance_valid(unit) or not ("energy" in unit):
+		return -1
+	if int(cost) <= 0:
+		return int(unit.energy)
+	unit.energy = SkillData.spend(int(unit.energy), int(cost))
+	return int(unit.energy)
+
+
 ## True while a battle is actually running: the player exists, the engine is
 ## past IDLE, and the battle is not already decided.
 func _battle_active() -> bool:
@@ -1318,12 +1346,12 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 			if int(unit.max_health) > 0 else 1.0
 		if hp_ratio >= skill.hp_gate_below_ratio:
 			return null
-		# --- Insufficient inner force (failure -> skill NOT consumed). The
-		# cost > 0 guard inside insufficient_energy means a cost-0 skill never
-		# gates and never deducts, so enemies (energy 0, all techniques free)
-		# and the free basic are byte-identical. ---
-		if "energy" in unit and SkillData.insufficient_energy(int(skill.cost), int(unit.energy)):
-			return null
+	# --- Insufficient inner force (failure -> skill NOT consumed). The
+	# cost > 0 guard inside insufficient_energy means a cost-0 skill never
+	# gates and never deducts, so enemies (energy 0, all techniques free)
+	# and the free basic are byte-identical. ---
+	if "energy" in unit and SkillData.insufficient_energy(int(skill.cost), int(unit.energy)):
+		return null
 
 	# --- Jump displacement (landing tile becomes the AoE origin) ---
 	var origin: Vector2i = unit.grid_pos if "grid_pos" in unit else Vector2i.ZERO
@@ -1426,6 +1454,8 @@ func _execute_skill(unit: Node, target: Node, params: Dictionary) -> Tween:
 		unit.cooldowns_updated.emit(unit.skill_cooldowns.duplicate())
 	if "acted" in unit:
 		unit.acted = true
+	# --- Spend inner force (only on successful execution, clamped >= 0) ---
+	spend_unit_energy(unit, int(skill.cost))
 
 	# Return the primary tween (jump displacement if any, else damage flash).
 	if jump_tween != null:

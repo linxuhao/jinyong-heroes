@@ -512,6 +512,8 @@ func _process(_delta: float) -> void:
 		CombatManager.debug_poison_player()
 	if Input.is_action_just_pressed("debug_damage_player"):
 		CombatManager.debug_damage_player()
+		if Input.is_action_just_pressed("debug_spend_player_qi"):
+			CombatManager.debug_spend_player_qi()
 	# DEBUG save fixtures (harness-only; actions registered by project.godot
 	# [input] as empty-event lists). debug_seed_save walks the real atomic save
 	# pipeline (autosave -> save_slot) with a temporary state swap to

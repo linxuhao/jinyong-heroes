@@ -133,6 +133,7 @@ actions:
 - debug_seed_save
 - debug_delete_save
 - debug_reset_settings
+- debug_spend_player_qi
 surface:
   CombatManager:
   - current_round
