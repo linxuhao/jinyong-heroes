@@ -17,6 +17,35 @@ var focus_id: String = "wuming_valley"
 ## Surface: true after the end node routed to ENDING.
 var ended: bool = false
 
+## Node-entry content phase (design/20_content.md §8): "TRAVEL" is the existing
+## focus/travel flow; "EVENT" while a modal node-entry event is up. A node whose
+## event slot is not "active" never enters EVENT — byte-identical TRAVEL behavior.
+var phase: String = "TRAVEL"
+
+## Surface: id of the active node-entry event ("" when none is up).
+var event_id: String = ""
+
+## Surface: which event option the ▶ marks (0 = option_a, 1 = option_b).
+var event_focus: int = 0
+
+## Surface: declared-but-unimplemented entry-content slot types at the current
+## node (the honesty observable — gaps are assertable, not just documented).
+var entry_declared_gap_types: Array[String] = []
+
+## Profile mirrors (differential playtest asserts — before/after, never literals).
+var silver: int = 0
+var attr_bone: int = 10
+var attr_inner: int = 10
+var attr_agility: int = 10
+var attr_wisdom: int = 10
+var attr_fortune: int = 10
+
+## Surface: effect "type"s of the last resolved node-event option, in order.
+var last_effect_types: Array[String] = []
+
+## Surface: session count of resolved node-entry events (ladder 0 -> 1, ...).
+var events_resolved_count: int = 0
+
 
 func _ready() -> void:
 	# Save-integrity fallback: a hand-edited or legacy save may carry an empty /
@@ -26,11 +55,25 @@ func _ready() -> void:
 		current_node_id = MapData.start_node()
 		SaveManager.profile.map_node = current_node_id
 	focus_id = current_node_id
+	_sync_surface()
 	_render()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if ended:
+		return
+	if phase == "EVENT":
+		if event.is_action_pressed("move_up") or event.is_action_pressed("move_left"):
+			get_viewport().set_input_as_handled()
+			event_focus = 0
+			_render()
+		elif event.is_action_pressed("move_down") or event.is_action_pressed("move_right"):
+			get_viewport().set_input_as_handled()
+			event_focus = 1
+			_render()
+		elif event.is_action_pressed("ui_accept"):
+			get_viewport().set_input_as_handled()
+			_resolve_node_event()
 		return
 	if event.is_action_pressed("ui_accept"):
 		get_viewport().set_input_as_handled()
@@ -77,17 +120,78 @@ func _travel() -> void:
 	current_node_id = focus_id
 	SaveManager.profile.map_node = current_node_id
 	SaveManager.autosave()
-	_render()
+	_sync_surface()
 	if MapData.is_end_node(current_node_id):
 		ended = true
 		if not SceneManager.pending_swap:
 			GameManager.enter_segment("ENDING")
 			return
+	_maybe_start_entry_event()
+	_render()
+
+
+## Start the node-entry event for the current node, if its event slot is active.
+## Fires ONLY on arrival by travel (called from _travel) — never on boot/load, so
+## a save→load at an active node does not re-trigger (save_load_roundtrip stays
+## green). End-node routing already ran first, so node content never blocks the
+## ending.
+func _maybe_start_entry_event() -> void:
+	var eid: String = MapData.active_event_id(current_node_id)
+	if eid == "":
+		return
+	phase = "EVENT"
+	event_id = eid
+	event_focus = 0
+	_sync_surface()
+	_render()
+
+
+## Resolve the modal node-event: pick the option by event_focus, apply its effects
+## through the shared EventLogic path, and return to TRAVEL. Deterministic binding
+## channel — does NOT read/write flags["events_seen"] (bag independence).
+func _resolve_node_event() -> void:
+	var def = EventData.def(event_id)
+	if def == null:
+		phase = "TRAVEL"
+		event_id = ""
+		_render()
+		return
+	var opt = def.option_a if event_focus == 0 else def.option_b
+	last_effect_types = []
+	for eff in opt.effects:
+		last_effect_types.append(eff.get("type", "none") as String)
+	EventLogic.apply_option_effects(SaveManager.profile, opt)
+	events_resolved_count += 1
+	event_id = ""
+	phase = "TRAVEL"
+	SaveManager.autosave()
+	_sync_surface()
+	_render()
+
+
+## Mirror the profile + node content state into the playtest surface observables.
+func _sync_surface() -> void:
+	silver = SaveManager.profile.silver
+	attr_bone = SaveManager.profile.get_attr("bone")
+	attr_inner = SaveManager.profile.get_attr("inner")
+	attr_agility = SaveManager.profile.get_attr("agility")
+	attr_wisdom = SaveManager.profile.get_attr("wisdom")
+	attr_fortune = SaveManager.profile.get_attr("fortune")
+	entry_declared_gap_types = MapData.declared_gap_types(current_node_id)
 
 
 func _render() -> void:
 	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
+		return
+	if phase == "EVENT":
+		var def = EventData.def(event_id)
+		if def == null:
+			body.text = ""
+			return
+		var ea = "▶ %s" % def.option_a.label if event_focus == 0 else "  %s" % def.option_a.label
+		var eb = "▶ %s" % def.option_b.label if event_focus == 1 else "  %s" % def.option_b.label
+		body.text = "【%s】\n\n%s\n\n%s\n%s\n\n上下选择,回车定夺" % [def.title, def.text, ea, eb]
 		return
 	var text: String = "【江湖行路】\n\n"
 	for node in MapData.node_ids():
