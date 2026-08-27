@@ -11,6 +11,7 @@ script = ExtResource("1")
 anchors_preset = 0
 position = Vector2(2, 12)
 size = Vector2(64, 12)
+mouse_filter = 2
 max_value = 100
 value = 100
 show_percentage = false

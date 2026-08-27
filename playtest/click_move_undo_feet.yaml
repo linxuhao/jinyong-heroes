@@ -1,0 +1,78 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan.
+#
+# Right-click undo aimed at the player's OWN FEET TILE — the point a player
+# actually aims at to retreat, and the one point the existing
+# `click_move_undo_right` never tests: it right-clicks `Player +64,0`, one tile
+# to the side, so it stayed green for as long as the bug existed.
+#
+# The bug: `scenes/ui/health_bar.tscn`'s `Bar` (ProgressBar) set no
+# `mouse_filter` and so inherited STOP. Its live rect is 64x22 sitting at
+# y in [feet-20, feet+2] — the bottom of the unit's own tile. Measured before
+# the fix: the right-press reached the player's `_input` (raw count +1) and
+# NEVER reached `_unhandled_input` (count 0), so `handle_world_right_click` was
+# never called and grid_pos stayed put; the same press one tile to the side
+# undid the move normally.
+#
+# Round 1 start: player (7,5), moves_left 4.
+#   * Player +0,-64 -> walk one tile up to (7,4) (moves_left 3, undo_available).
+#   * Player +0,0 right -> the whole turn's movement is undone: back to (7,5),
+#     budget refunded to 4, moved false, undo_available false.
+name: click_move_undo_feet
+description: >-
+  Right-click undo aimed at the player's OWN FEET (Player +0,0 right), the
+  point the floating HealthBar's ProgressBar used to swallow: walk up one tile
+  (7,5)->(7,4) with a left click, then right-click the feet tile and land back
+  on (7,5) with moves_left 4, moved false, undo_available false. The existing
+  click_move_undo_right aims one tile to the side and cannot see this.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 40
+  actions: []
+  clicks:
+  - Player +0,-64
+- at: 90
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 4)
+    Player.moves_left: moves_left == 3
+    Player.undo_available: undo_available == true
+- at: 95
+  actions: []
+  clicks:
+  - Player +0,0 right
+- at: 140
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
+    Player.moves_left: moves_left == 4
+    Player.moved: moved == false
+    Player.undo_available: undo_available == false

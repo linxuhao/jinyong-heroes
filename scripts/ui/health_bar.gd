@@ -344,6 +344,16 @@ func update_health(current: int, max_hp: int) -> void:
 	hp_text = hp_label_text(current, max_hp)
 	hp_value = current
 	hp_max = max_hp
+	# MOUSE_FILTER_IGNORE (2) on the BAR ITSELF. Its two children were already
+	# re-asserted below and the root widget is filter 2 in the scene, but the
+	# ProgressBar carrying them set nothing and therefore inherited Godot's
+	# Control default, STOP. Measured: a right-click on the player's own feet
+	# tile reached `_input` and never reached `_unhandled_input` — the GUI phase
+	# handed it to this node — so "右键退回", which the on-screen hint promises,
+	# did nothing. The live rect is 64x22 at y in [feet-20, feet+2], i.e. the
+	# bottom of every unit's own tile, which is exactly where a player aims to
+	# retreat. No descendant of a floating HUD widget may be STOP.
+	_bar.mouse_filter = 2
 	var hp_label: Label = _bar.get_node_or_null("HpLabel") as Label
 	if hp_label != null:
 		hp_label.text = hp_text

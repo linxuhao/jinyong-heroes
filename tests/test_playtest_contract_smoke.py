@@ -37,6 +37,7 @@ ROUND_SCENARIOS: list[str] = [
     "battle_focus_arrow_keys",
     "click_move_to_tile",
     "click_move_undo_right",
+    "click_move_undo_feet",
     "click_move_commit_lock",
     "creation_single_ui",
     "creation_layout_readability",
