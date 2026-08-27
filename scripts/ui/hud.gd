@@ -368,17 +368,10 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	# --- Pause button ---
 	# pause_button.gd handles its own wiring via _ready().
 
-	# --- Energy label (display only; no technique costs this run) ---
-	var energy_label: Label = _energy_label
-	if energy_label == null:
-		# Safe: get_node_or_null re-resolves the path each call; null for
-		# freed nodes — never a freed-object cast.
-		energy_label = get_node_or_null("EnergyLabel") as Label
-		if energy_label != null:
-			_energy_label = energy_label
-	if energy_label != null:
-		var qi: int = int(player.energy) if "energy" in player else 0
-		energy_label.text = "内力: %d" % qi
+	# --- Energy label: keep the top-strip number in sync with the live pool
+	# (jinyong-spend-qi — casting deducts inner force, so a setup()-only write
+	# would freeze the number at the starting pool). ---
+	_refresh_energy_label(player)
 
 	# Wire the player's action_hint signal to the hint line (idempotent:
 	# disconnects any stale connection first, so repeated setup() calls are safe).
@@ -391,6 +384,30 @@ func setup(player: Node, enemies: Array[Node]) -> void:
 	# Battle action buttons: wire EndTurnButton / AttackButton to their
 	# handlers (idempotent disconnect-first) and snapshot the wiring proof.
 	_wire_battle_action_buttons()
+
+
+## Keep the top-strip EnergyLabel ("内力: %d") in sync with the LIVE inner-force
+## pool. Casting deducts inner force (jinyong-spend-qi), so this is refreshed
+## every frame from the real `player.energy` — a setup()-only write would freeze
+## the number at the starting pool once casts start deducting. Called from
+## setup() (player guaranteed non-null there) and from _process's per-frame
+## refresh (after the player null-guard). Defensive: silently returns when the
+## player or label is null / freed, and when the player exposes no `energy`
+## property falls back to 0. Pure text write — no rect / node / geometry change.
+func _refresh_energy_label(player: Node) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var energy_label: Label = _energy_label
+	if energy_label == null or not is_instance_valid(energy_label):
+		# Safe: get_node_or_null re-resolves the path each call; null for
+		# freed nodes — never a freed-object cast.
+		energy_label = get_node_or_null("EnergyLabel") as Label
+		if energy_label != null:
+			_energy_label = energy_label
+	if energy_label == null:
+		return
+	var qi: int = int(player.energy) if "energy" in player else 0
+	energy_label.text = "内力: %d" % qi
 
 
 ## Battle-exit cleanup: drop every per-battle reference so a scene swap never
@@ -698,12 +715,17 @@ func _process(_delta: float) -> void:
 			CombatManager.active_unit_name,
 			CombatManager.turn_order)
 
-	# Skill button states (phase lock / cooldown / HP gate) + cooldown overlays
-	# refresh every frame. Skip until the player exists (pre-battle safety).
+	# Skill button states (phase lock / cooldown / HP gate / inner-force) +
+	# cooldown overlays refresh every frame. Skip until the player exists
+	# (pre-battle safety).
 	var player: Node = GameManager.get_player()
 	if player == null or not is_instance_valid(player):
 		return
 	_refresh_skill_button_states(player)
+	# Energy label: refresh the live inner-force number every frame — casting
+	# deducts the pool (jinyong-spend-qi), so a setup()-only write would freeze
+	# it at the starting value.
+	_refresh_energy_label(player)
 	# Skill description label: keep in sync with the LIVE selection. Hotkeys
 	# 1-12 call player.select_skill() directly (bypassing _on_skill_selected)
 	# and the engine auto-deselects after an attack — refresh every frame from
@@ -769,11 +791,10 @@ func _refresh_skill_button_states(player: Node) -> void:
 		# skill's cost (0 when skill data is missing/absent — same guard as the
 		# hp_gate_below_ratio read above) and the player's energy (0 when the
 		# player exposes no `energy`, same pattern as the EnergyLabel write in
-		# setup()). With current content every SkillData.cost == 0 (no technique
-		# spends energy this run — player.gd:110 / enemy.gd:83 say "display only
-		# — no technique costs this run"), so no_energy is always false in live
-		# play: real presentation machinery that activates naturally when a future
-		# round defines real per-skill costs.
+		# setup()). Real per-skill costs are now defined (jinyong-spend-qi,
+		# design/20_content.md cost table), so no_energy fires in live play
+		# whenever the pool drops below a move's cost — including the tutorial's
+		# skill_2/3/4/5/6/7/8 once qi is spent down.
 		var cost: int = 0
 		if "_skill_data" in btn and btn._skill_data != null:
 			cost = int(btn._skill_data.cost)
@@ -813,9 +834,9 @@ func _refresh_skill_button_states(player: Node) -> void:
 			# it is NOT the player's turn, EVERY visible button renders "waiting",
 			# design/30_presentation.md #3). Written every frame as observables and
 			# applied visually via _apply_state. The `disabled` computation above
-			# stays untouched. With current data (all costs 0) no_energy is always
-			# false, so the restored chain matches the old inline chain
-			# on every existing frame.
+			# stays untouched. With real per-skill costs (jinyong-spend-qi)
+			# no_energy can fire; the priority chain (phase_locked > cooldown >
+			# hp_gated > no_energy > ready) still matches the HUD derivation.
 			var waiting: bool = CombatManager.phase != "IDLE" and not CombatManager.is_player_turn()
 			var state: String = SkillButtonScript.derive_state(
 				phase_locked, on_cooldown, hp_gated, no_energy, waiting)

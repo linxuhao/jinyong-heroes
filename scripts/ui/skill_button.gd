@@ -37,11 +37,9 @@ var hp_gated: bool = false
 ## Pure insufficient-inner-force predicate observable (GOAL 4). True when this
 ## button's skill has an inner-force cost > 0 AND the player's energy < cost.
 ## Written EVERY frame by the HUD (_refresh_skill_button_states); never assigned
-## here (mirror hp_gated). With current content every SkillData.cost == 0 (no
-## technique spends energy this run — player.gd:110 / enemy.gd:83 say "display
-## only — no technique costs this run"), so it stays false in live play: real,
-## palette-distinct presentation machinery proven by unit test, which activates
-## naturally when a future round defines real per-skill costs.
+## here (mirror hp_gated). Real per-skill costs are now defined
+## (jinyong-spend-qi, design/20_content.md cost table), so this fires in live
+## play once the pool drops below a move's cost.
 var no_energy: bool = false
 
 ## Observable five-state button state, written EVERY frame by the HUD
@@ -149,9 +147,11 @@ static func fa_hui_du_label(fhd: float) -> String:
 		s += ".0"
 	return "发挥 ×" + s
 
-## Inner-force cost label (UX-03, pure function): 0 -> "无消耗" (no cost
-## defined this round — the only shipped value), n > 0 -> "内力 <n>".
-## Chinese-only. Static so unit tests exercise it without a scene.
+## Inner-force cost label (UX-03, pure function): 0 -> "无消耗" (free basic /
+## undefined), n > 0 -> "内力 <n>". Real per-skill costs are now defined
+## (jinyong-spend-qi) — 7 of the 8 tutorial moves render "内力 N", the free
+## basic stays "无消耗". Chinese-only. Static so unit tests exercise it
+## without a scene.
 static func cost_label_text(cost: int) -> String:
 	if cost > 0:
 		return "内力 " + str(cost)
@@ -159,13 +159,14 @@ static func cost_label_text(cost: int) -> String:
 
 ## Insufficient-inner-force predicate (GOAL 4, pure function): a skill button
 ## reads "内力不足" when the skill costs inner force (cost > 0) and the player
-## has less than that cost (energy < cost). With current content every
-## SkillData.cost == 0 (no technique spends energy this run — player.gd:110 /
-## enemy.gd:83 say "display only — no technique costs this run"), so this always
-## returns false in live play: real presentation machinery that is unreachable
-## now and activates naturally when a future round defines real per-skill costs.
+## has less than that cost (energy < cost). One-line delegation to
+## SkillData.insufficient_energy (the single source of truth for the whole
+## jinyong-spend-qi pipeline — executor gate + select-time rejection + this
+## predicate all share it). Real per-skill costs are now defined
+## (design/20_content.md cost table), so this returns true in live play when
+## the pool drops below a move's cost.
 static func no_energy_predicate(cost: int, energy: int) -> bool:
-	return cost > 0 and energy < cost
+	return SkillData.insufficient_energy(cost, energy)
 
 ## Single source of truth for the skill-button state priority chain. `waiting`
 ## is checked FIRST and is a true override — while the battle is live but it is
@@ -173,10 +174,9 @@ static func no_energy_predicate(cost: int, energy: int) -> bool:
 ## phase_locked / cooldown / hp_gated / no_energy (design/30_presentation.md #3).
 ## For waiting == false the priority is:
 ##   phase_locked > cooldown > hp_gated > no_energy > ready
-## With current data (all costs 0) no_energy is always false, so after the
-## waiting-first reorder the restored behavior matches the old inline chain on
-## every existing frame (waiting still overrides during enemy turns exactly as
-## before).
+## With real per-skill costs (jinyong-spend-qi) no_energy can now fire in live
+## play; the priority chain above means a phase-locked or cooling button still
+## masks it (as the HUD's derivation order requires).
 static func derive_state(phase_locked: bool, on_cooldown: bool, hp_gated: bool,
 		no_energy: bool, waiting: bool) -> String:
 	if waiting:
@@ -408,9 +408,10 @@ static func state_palette(state: String) -> Dictionary:
 			# (raw BT.709: 0.2126*0.72 + 0.7152*0.62 + 0.0722*0.92 = 0.66292),
 			# pairwise >= 0.10 from every existing state (ready 0.3874, cooldown
 			# 0.0814, phase_locked 0.5306, hp_gated 0.2020, waiting 0.1558).
-			# Tag 内力不足 differs from 锁定. Unreachable with current data (all
-			# costs 0) but real, palette-distinct presentation machinery proven
-			# by test_skill_button_no_energy.gd.
+			# Tag 内力不足 differs from 锁定. Now reachable in live play once
+			# real per-skill costs (jinyong-spend-qi) spend the pool below a
+			# move's cost; palette-distinct machinery proven by
+			# test_skill_button_no_energy.gd.
 			return {
 				"bg_color": Color(0.72, 0.62, 0.92),
 				"border_color": Color(0.45, 0.35, 0.75),
