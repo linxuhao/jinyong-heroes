@@ -161,3 +161,92 @@ content remains recoverable via git history. All other `final/*` files were left
 untouched. UX-06/07/08 stay **OPEN**; `CLOSED(jinyong-clarity)` is written only by the
 post-gate `5_design` evidence step from measured `playtest_summary.md` counts.
 
+---
+
+# Delivery notes — jinyong-nodes(主线事件) (2026-08-29)
+
+## Round record — main story node events wired
+
+This round wires content events into the five main story nodes (无名谷 / 洛阳 / 武当 /
+襄阳 / 昆仑) so every stop on the journey has content, keeps the ending reachable,
+unifies the map-page bottom hint with the panel text, and records the persistent-text
+audit. Single lever: mainline node event binding. No numeric/balance tuning, no combat
+change, no monthly-cultivation-loop change, no new art, no new event prose (all text is
+verbatim from the existing 16-row `event_data.gd` pool).
+
+### 1. Binding result — 4 of 5 mainline nodes carry live deterministic content
+
+`scripts/data/map_data.gd` `NODES` event slots (all `status: "active"`, literal
+`event_id` rows — never a pool draw, keeping the two channels' `events_seen`
+independent):
+
+| Node id | Node | event_id (verbatim pool row) | option A |
+|---|---|---|---|
+| `wuming_valley` | 无名谷 | `tomb_bed` 古墓寒玉 | attr inner +2 |
+| `luoyang` | 洛阳 | `merchant` 行商路过 | silver −20 + item (no attr) |
+| `wudang` | 武当 | `quanzhen_scripture` 全真抄经 | attr wisdom +2 |
+| `xiangyang` | 襄阳 | `dragon_scrap` 降龙残谱 | practice +4 |
+
+`kunlun` (昆仑) is an explicit, argued **NON-trigger**: its event slot stays
+`{"status": "declared", "event_id": ""}`. The ending IS the terminal's content, and the
+structural guarantee is routing-first order in `map.gd::_travel()` — it routes an end
+node to ENDING (and sets `ended = true`) BEFORE `_maybe_start_entry_event()`, so a
+future end-node event can never silently break the ending. The pre-existing branch
+binding `shaolin=night_rain` is unchanged from the previous round.
+
+Result: **4 of 5** mainline nodes live; 昆仑 is a deliberate, argued non-trigger.
+
+### 2. The two authorized yaml re-budgets + the single literal re-base
+
+Only **two** existing scenario yamls were modified (the round owner's exception, written
+up first in `design/`): `playtest/spine_to_ending.yaml` and
+`playtest/map_node_event_shaolin.yaml`. The other **53** scenario yamls were untouched;
+only the two new scenarios were appended (55 → 57 total).
+
+- **`spine_to_ending.yaml`** — the map leg now resolves the 洛阳/武当/襄阳 node entry
+  events en route to 昆仑: `move_right`/`ui_accept` pairs at f420/f430 (洛阳, asserts
+  `phase == "EVENT"` / `event_id == "merchant"` at f440), f460/f470 (武当, f480), f500/f510
+  (襄阳, f520 + `events_resolved_count == 2`), f540/f550 (昆仑 — end-node routing to ENDING
+  runs before entry content), and the ENDING block moved f520 → **f580** with its assert
+  lines verbatim (`current_state == "ENDING"`, `tier >= 1 and tier <= 3`, EndingScreen /
+  Backdrop visible+size). Everything at f400 and earlier is byte-unchanged. The scenario
+  remains the six-segment connectivity proof with the ending reachable.
+- **`map_node_event_shaolin.yaml`** — the 洛阳 outbound stop and the return-leg re-fire
+  each cost one inserted resolve press. The `events_resolved_count` ladder is now pinned
+  1 (f460, 洛阳 outbound) → 2 (f560, 少林) → 3 (f630, 洛阳 return); last assert f660.
+- **The single literal re-base:** `MapScreen.events_resolved_count: events_resolved_count
+  == 1` → `== 2` at 少林 (f560), counterbalanced by the NEW `== 1` ladder pin at 洛阳
+  outbound (f460) — still an exact equality, never `>=`, so the ladder is tightened, not
+  relaxed. The superset pin in the smoke test machine-enforces that every pre-edit assert
+  line of both edited scenarios still exists.
+
+### 3. Hint unification
+
+`scenes/segments/map.tscn` `HintLabel.text` is now byte-identical to the
+`map.gd::_render()` panel string: `左右/上下选择相邻去处，回车启程` (full-width `，`
+U+FF0C). Pinned at f30 of `playtest/map_node_event_mainline_return.yaml`
+(`HintLabel.text == "左右/上下选择相邻去处，回车启程"`), which also proves the active
+无名谷 binding does NOT fire at boot.
+
+### 4. Persistent-text audit
+
+Audited: only one site. The MAP segment has exactly two persistent Label text nodes —
+BodyLabel (fully re-rendered on every phase by map.gd::_render(), including the EVENT
+branch) and HintLabel (visibility toggled by _apply_hint_visibility(), whose phase !=
+'EVENT' allow-list-by-negation already yields for any future phase). No other persistent
+text exists in the segment; the only phase-switch stale-promise site was HintLabel, fixed
+and re-pinned this round.
+
+The audit is scoped to the MAP segment's TRAVEL↔EVENT switch (this round's single lever);
+other segments' phase switches are outside this round's scope.
+
+### 5. Honest gate-evidence stance
+
+This note records design intent, the on-disk binding/frame facts, and the audit result —
+nothing is invented. The compile / unit / playtest / vision verdicts are all **pending /
+not measured by this task**; measured PASS/FAIL counts belong to the downstream
+`5_compile` (`compile_report.json` / `playtest_report.json` / `playtest_summary.md`),
+`5_test` (`test_report.json`) and `5_vision` (`vision_report.json`) gate artifacts, which
+do not exist when this task runs. No `N/N PASS` count is asserted for any scenario here.
+
+
