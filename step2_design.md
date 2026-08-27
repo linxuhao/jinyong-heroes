@@ -1,374 +1,531 @@
-# Technical Architecture Design - Battle HUD Information Presentation (jinyong-hud)
+# Technical Architecture Design - Character Creation Clarity Pass (UX-06/07/08)
 
-Round scope: close **UX-03 / UX-04 / UX-05** on the battle HUD. Presentation-only:
-no combat rule changes, no value changes, no art assets, no geometry-constant edits
-to `health_bar.*`. Roadmap position: stage 2 (interaction) - "the player can read it,
-click it, and know what to press next".
+**Round id:** `jinyong-clarity` · **Family:** presentation-only information round (same class as `jinyong-hud`) · **Stage 2 of the roadmap (交互: 玩家看得懂).**
+**Baseline:** 50 playtest scenarios (all green at last measured gate), 73 compiled scripts, 17-file GDScript unit suite, `spine_to_ending` 32/32.
 
-Everything below reuses the in-repo patterns surfaced by `step1_sota.md`:
-the skill-button state machine (`state_palette` / `state_luma_value` /
-`_apply_state`), the HUD per-frame derivation (`_refresh_skill_button_states`),
-the append-only playtest contract (`playtest/_common.yaml` + one-file-per-scenario
-+ `ROUND_SCENARIOS` two-place sync), and the probe-notes / backlog-closure doc
-discipline. No new frameworks, no new dependencies.
+Scope: three information-missing findings on the character-creation screen (UX-06 / UX-07 / UX-08) plus removal of the fossil `final/verify_report.json`. **Zero game-rule or numeric-value changes; zero content invention; zero edits to frozen layout constants.**
 
 ---
 
-## 1. Overview / Architecture Diagram
+## 0. The three findings and the one-line answer to each
 
-```
-DATA LAYER (read-only sources; NO value changes)
-  scripts/data/skill_data.gd        + @export var cost: int = 0   (schema only)
-  scripts/battlefield.gd            existing _skill() descriptions (Chinese, authoritative)
-  scripts/characters/player.gd      energy (display only, 180)
-  CombatManager.tutorial_battle / current_round   (existing phase-lock predicate)
-  design/20_content.md              unlock condition: round 4 opens 黯然销魂掌
+| id | finding (design/40_ux_backlog.md, OPEN) | design answer |
+|---|---|---|
+| UX-06 | ATTRS page: 内力/身法/悟性/福缘 rows show only name+value; no effect explanation -> cannot decide where to spend points | The existing `AttrDescLabel` slot **stops following focus and lists ALL FIVE attribute effects** (name-prefixed, strings verbatim from `_ATTR_DESCS`), always visible during ATTRS |
+| UX-07 | ATTRS page shows the formula 「气血 = 根骨 × 5」 but not the current HP -> player must do mental math | New additive `HpValueLabel` directly below the effects list, `text = "当前气血 %d"`, value = `attrs["bone"] * 5` (`design/40_progression.md §7` formula for player-created characters) |
+| UX-08 | CONFIRM page shows only 剩余点数 + two buttons; no final attribute values -> cannot review the build before committing | New additive `ConfirmSummaryLabel` as the FIRST child of `ConfirmBox`, one `名 值` line per attribute, above 确认踏上江湖 |
+| (housekeeping) | `final/verify_report.json` is a jinyong-events-era fossil that `repo_apply` (`final/*` ignore) can never refresh, yet presents itself as a delivery verdict | **Replace** with a pointer/tombstone note (gate results live in pipeline step products); decision recorded in `design/90_decisions.md` + `design/99_changelog.md`; README's citation re-pointed |
 
-DERIVATION LAYER (scripts/ui/hud.gd - _refresh_skill_button_states, every frame)
-  phase_locked > cooldown > hp_gated > no_energy(NEW) > ready   -> waiting override (unchanged)
-  + lock_reason_text  ("" unless the SAME phase-lock predicate fires)
-  + no_energy         (cost > 0 AND player.energy < cost - never true with current data)
-
-RENDER LAYER (scripts/ui/skill_button.gd + scenes/ui/skill_button.tscn)
-  state_palette() += "no_energy" entry (luma 0.6629, pairwise >= 0.10 from all 5 states)
-  + CostLabel   (NEW node, top band)  <- cost_text
-  + InfoLabel   (NEW node, bottom-right) <- lock_reason_text OR effect summary
-  + effect_text observable (= skill.description; also the tooltip)
-
-HEALTH BAR (scripts/ui/health_bar.gd + scenes/ui/health_bar.tscn - FROZEN GEOMETRY)
-  + HpLabel (NEW Label, child of Bar, full-rect anchors, mouse_filter 2)
-  + hp_text / hp_value / hp_max observables, written in update_health()
-  NO existing constant touched (68x24 widget, Bar 64x12 @(2,12), EMPTY_CAP_PX,
-  expand margins, STRIP_BOTTOM all byte-identical)
-
-CONTRACT LAYER (playtest + smoke + unit)
-  playtest/_common.yaml          surface += 4 vars x SkillButton1..12, +3 vars HealthBar
-  playtest/<3 new scenario>.yaml one per UX item (name == basename, int at:, operator asserts)
-  tests/test_playtest_contract_smoke.py  ROUND_SCENARIOS += 3, +1 additive test function
-  tests/test_skill_button_info.gd (NEW)  palette separation + label formatters (headless)
-  tests/test_health_bar_text.gd  (NEW)  hp_text format + pinned geometry unchanged
-
-DOC / EVIDENCE LAYER
-  design/40_ux_backlog.md        UX-03/04/05 -> CLOSED(jinyong-hud) + evidence paths
-  design/20_content.md           new section: inner-force cost content gap (recorded, not invented)
-  design/30_presentation.md      new label rows (append)
-  design/99_changelog.md         jinyong-hud row
-  final/hud_info_probe_notes.md  (NEW) pre-fix probe evidence
-  final/delivery_notes.md        names the missing-cost gap
-```
-
-Data flow is strictly one-way: data -> HUD derivation -> button/bar render ->
-playtest observables. Nothing in this round writes game state.
+Everything below exists to make those four answers land **without moving a single frozen constant** and with every new displayed fact pinned by a playtest assertion.
 
 ---
 
-## 2. Component List
+## 1. Key design decisions (with rejected alternatives)
 
-### 2.1 `scripts/data/skill_data.gd` - additive cost field (schema only)
+### D1 - UX-06: the desc slot becomes the all-five effects list (decision)
 
-- **Responsibility**: carry a per-skill inner-force cost so the button can render it.
-- **Interface**: ONE new line, `@export var cost: int = 0` (0 = "no cost defined").
-- **Hard constraint honored**: `design/10_systems.md §1` states the pool "stores but
-  does not spend" and NO technique defines a cost. Therefore the default 0 is the
-  only value shipped; `battlefield.gd` `_skill()` call sites are **NOT** modified
-  (no invented numbers). The gap is recorded in `design/20_content.md` §5 (2.10)
-  and named in the delivery notes.
-- `progression_gongfa_data.gd` techniques keep cost 0 (default) - same rule.
+`AttrDescLabel.text` changes from "the focused attribute's description" (`_attr_desc(ATTR_KEYS[attr_index])`) to "all five effects, name-prefixed" (`attr_effects_text()`). `attr_index` still drives the row focus highlight (modulate) and the +/- target - only the desc channel's content semantics change.
 
-### 2.2 `scripts/ui/hud.gd` - derivation extension (UX-03/04 state + reason)
+**Why at-rest all-five, not focus-to-see:** the finding was recorded from the at-rest page (its text even quotes seeing the bone formula, i.e. the desc slot with default focus). A fix that keeps four rows bare until the player focuses each one leaves the at-rest page unchanged and the finding would be re-reported by the next frame review. The jinyong-hud precedent (UX-03) fixed "buttons show only name + 发挥度" by displaying effect text at rest, not by hiding it behind hover.
 
-All changes live inside the existing per-frame `_refresh_skill_button_states(player)`
-(the single derivation site). The existing priority chain, `disabled` semantics and
-the `waiting` override stay byte-identical for current data.
+**Why not per-row effect text (rejected on frozen-geometry grounds, keep this record):**
+- An extra Label inside each `AttrRow` (left or right of the value cluster) shifts `_row_ink_union(i)`'s x-center by ~W/2 of the new label's width; `attr_cluster_center_ok` pins the ink center to ±6px of viewport center 480 - any per-row label wider than ~12px reddens it.
+- Interleaving 5 effect lines between the rows inside `AttrBox` grows the box past the `creation_box_fits` budget (5×44px rows + 48px desc + 44px nav + separation 10 already total 372px of the 480px `MouseBox`; five extra ~17px lines + 5 gaps ≈ +135px -> bottom ≈ 614px > 584px ceiling).
+- Extending each row label's text (`内力 10(效果...)`) breaks the pinned rhythm "数值右对齐贴住本行的 -/+ 簇" (the value would no longer hug the cluster).
+- These rejections are recorded in `design/30_presentation.md` so a future round knows it was a decision, not an oversight.
 
-- **no_energy derivation** (inserted after `hp_gated`, before `ready`):
-  `cost = int(btn._skill_data.cost)` (0 when skill data missing);
-  `no_energy = cost > 0 and "energy" in player and int(player.energy) < cost`.
-  With current data (all costs 0, energy 180) this is always false -> every existing
-  `state_text` / `state_tag_text` / `state_luma` assert fires unchanged.
-  `disabled` becomes `phase_locked or on_cooldown or hp_gated or no_energy`
-  (presentation machinery; the engine's own use-gate is untouched - player.gd never
-  checks energy this round, and we do not add a check).
-- **lock_reason derivation** (UX-04), from the SAME predicate that phase-locks:
-  `phase_locked = CombatManager.tutorial_battle and i >= 4 and CombatManager.current_round < 4`
-  -> when true: `btn.lock_reason_text = "第 4 轮解锁"` (unlock condition source:
-  `design/20_content.md §1` - round 4 opens 黯然销魂掌); when false: `""`.
-  Never a hardcoded always-on string: encounter battles and rounds >= 4 render "".
-- **Per-frame observable writes** (guarded with `if "var" in btn`, same as hp_gated):
-  `btn.cost_text` is written once in `skill_button.setup()` (static per battle) -
-  the HUD does NOT rewrite it. `lock_reason_text` IS rewritten every frame (it flips
-  at round 4 without a re-setup).
+**Height budget (theme `default_font_size = 12`, NotoSansSC, line ≈ 17px):** the joined effects text ≈ 980px unwrapped -> wraps to **2 lines (~34px) inside the 560px-wide slot, i.e. under the 48px `custom_minimum_size`, so the label does not even grow** (worst case 3 lines = 51px, +3px). `AttrBox` total ≈ 220 (rows) + 48 (desc) + 17 (HP line) + 44 (nav) + 70 (7 gaps × 10) = 399px -> content bottom ≈ y 511 vs the `creation_box_fits` ceiling y 584: **~73px slack**.
 
-### 2.3 `scripts/ui/skill_button.gd` - render + observables
+### D2 - UX-07: a separate always-visible `HpValueLabel`, not a formula edit
 
-- **New state palette entry** (constraint 3: visually distinct from 锁定):
-  `"no_energy"`: bg `Color(0.72, 0.62, 0.92)` (light purple), border
-  `Color(0.45, 0.35, 0.75)` width 2, tag `"内力不足"`.
-  bg luma (raw BT.709, `Color.get_luminance()`) = **0.6629**. Pairwise distances:
-  vs phase_locked 0.5306 -> 0.1323; vs ready 0.3874 -> 0.2755; vs hp_gated 0.2020
-  -> 0.4609; vs waiting 0.1558 -> 0.5071; vs cooldown 0.0814 -> 0.5815.
-  **All >= 0.10** - the documented luma-spread contract holds for all six states.
-  (0.6629 is the only viable band: every luma below 0.6306 collides with an
-  existing state's +/-0.10 window; the computation is pinned in the unit test.)
-  Goes through the EXISTING `state_palette()` / `state_luma_value()` /
-  `_apply_state()` machinery - no fork.
-- **New observables** (all declared here, values written by setup()/HUD as noted):
-  - `cost_text: String` - rendered cost line. Written in `setup()` from
-    `skill.cost` via the new static formatter (below). Chinese-only.
-  - `effect_text: String` - the skill's full Chinese description
-    (`skill.description`); "" for placeholder/empty skills. Written in `setup()`.
-    Also surfaced as `tooltip_text` (hover = read the effect without selecting).
-  - `effect_summary_text: String` - short on-face summary derived ONLY from
-    existing SkillData numbers by the new static `effect_summary()` (below).
-  - `lock_reason_text: String` - "" or the unlock condition; written every frame
-    by the HUD (2.2). Rendered by InfoLabel (2.4) only while phase-locked.
-- **New pure static functions** (unit-testable headless, no scene):
-  - `cost_label_text(cost: int) -> String`: `0 -> "无消耗"`, `n > 0 -> "内力 " + str(n)`.
-  - `effect_summary(skill) -> String`: reads `damage / heal_amount / aoe_shape /
-    aoe_size / jump_tiles / dot_damage` and renders a <= 6-CJK-char line, e.g.
-    `"单体 45"`, `"十字 34"`, `"跳3 · 20"`, `"回复 35"`. Numbers come verbatim
-    from SkillData (presentation of existing values, never new values).
-    Empty skill -> `""` (graceful undefined case).
-  - `hp_label_text(...)` lives in health_bar.gd (2.6), not here.
-- **Render wiring**: `_apply_state()` unchanged except it already renders any
-  palette state generically (no_energy needs zero _apply_state edits - the tag,
-  stylebox and luma all flow from `state_palette`). The two new labels are driven
-  from `setup()` (cost/effect) and a small `_refresh_info_label()` called at the
-  end of `_apply_state()` (info line = `lock_reason_text` when non-empty, else
-  `effect_summary_text`), so the info line flips in the same frame the lock flips.
+`_ATTR_DESCS` is documented as "verbatim, never paraphrased" - the formula string stays byte-identical inside the effects list ("根骨:气血 = 根骨 × 5 · ..."). The **current value is a different kind of content** (dynamic, derived) and gets its own additive node + its own observable + its own assert:
 
-### 2.4 `scenes/ui/skill_button.tscn` - two additive labels
+- Node: `HpValueLabel`, new Label in `AttrBox`, placed **directly after `AttrDescLabel`** (below the effects list - the value reads as the resolution of the formula just above it), phase-gated to ATTRS.
+- `CreationScreen.hp_value: int` = `hp_from_bone(int(attrs["bone"]))` = `attrs["bone"] * 5` (the §7 formula operand 5 IS the contract, same as the HUD round's `max_health`-relative discipline: **zero absolute HP literals in any assert**).
+- `CreationScreen.hp_text: String` = `"当前气血 %d" % hp_value` - the exact rendered format, assertable as `hp_text == "当前气血 " + str(hp_value)`.
+- Recomputed in `_render()` (every `attrs` mutation path ends in `_render` - verified: `_cycle_attr_or_trait`, `_on_move_left/right`, `_on_accept`, `_on_trait_toggle_pressed`, `debug_click_creation_widget` all route there).
 
-Button stays 104x48; HotkeyLabel / StateTag / CooldownLabel / CooldownOverlay /
-SelectedMarker / FahuiLabel **node names, paths and the Button's own text pipeline
-are unchanged**. Only FahuiLabel's *rect* is narrowed (nothing pins it: the pinned
-geometry is the Button size and `skill8_right_edge`; the no-ellipsis asserts read
-the `text` vars, not label rects). Probe-first fallback below.
+### D3 - UX-08: `ConfirmSummaryLabel` above the buttons + one honest observable re-point
 
-| Node | rect (x1,y1)-(x2,y2) | font | align | notes |
-|---|---|---|---|---|
-| `CostLabel` (NEW) | (26,2)-(62,14) | 9 | center | top band, between HotkeyLabel (ends 24) and StateTag text (~starts 72); `clip_text=false`, `text_overrun_behavior=0`, `mouse_filter=2` |
-| `InfoLabel` (NEW) | (56,34)-(102,46) | 8 | right | bottom-right; shows lock reason while locked, else effect summary |
-| `FahuiLabel` (rect narrowed only) | (0,34)-(56,46) | 10 (unchanged) | center | text "发挥 ×1.3" ≈ 50px fits the 56px half |
+`ConfirmBox` is a `VBoxContainer` (separation 12) holding only `ConfirmButton` (240×44) + `BackButton` (160×44) = 100px of the 480px `MouseBox`. The summary becomes its **first child** (read before you commit), one line per attribute, explicit `\n` (no autowrap needed - longest line ≈ 60px):
 
-- Discipline: **never** re-widen either new label into HotkeyLabel / StateTag /
-  CooldownLabel rects; if a frame probe (see 6) shows ink overlap, shorten the
-  summary (effect_summary cap) or drop InfoLabel font to 8 - never an ellipsis
-  (no-ellipsis rule, `design/30_presentation.md`).
-- `fahui_text` format and the `SkillButtonN.fahui_text` surface var are
-  byte-identical ("发挥 ×N.N").
+```
+根骨 12
+内力 10
+身法 14
+悟性 10
+福缘 10
+确认踏上江湖
+返回
+```
 
-### 2.5 `scripts/ui/hud.gd` - energy already visible (no work)
+Height ≈ 5 × 17 + 12 + 44 + 12 + 44 = 197px -> content bottom ≈ y 309, **~275px slack** against the `creation_box_fits` ceiling. `phase_skeleton_same` still holds (`ConfirmBox` remains `MouseBox`'s first visible child, top = 112), `nav_cluster_center_ok` still holds (both buttons still shrink-centered, union 240px).
 
-`EnergyLabel` already renders "内力: 180" in the top strip - the "how much inner
-force is left" half of UX-03 is satisfied by the existing label; the round only
-adds the per-button cost. No change.
+**The one necessary observable change (declared, not silent):** `_update_geometry_observables()`'s `points_attrs_gap_ok` CONFIRM branch currently resolves the phase's first-row ink cluster as **`ConfirmButton`'s rect**. With the summary above the button, ConfirmButton moves down ~127px and that arm would read `gap ≈ 133 > 24` - silently flipping a measured-green fact (the pre-fix probe recorded it true at f150). The fix re-points the CONFIRM cluster to **`ConfirmSummaryLabel.get_global_rect()`**:
 
-### 2.6 `scripts/ui/health_bar.gd` + `scenes/ui/health_bar.tscn` - HP numbers (UX-05)
+- Same observable name, **same yaml assert lines** - `creation_layout_readability.yaml` f30 and f90 lines `CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true` stay byte-identical, and that file's f150 CONFIRM block (which does not assert the gap) is untouched. This is the exact precedent of the jinyong-layout-r2 Round-3 rework ("measured quantities changed... same var name, same yaml assert lines"), logged in `design/30_presentation.md` + `design/99_changelog.md`.
+- Honesty argument (put in the code comment): the summary label's rect top == its first ink line's top (the label height equals its text block height in the VBox), and rect center-x == ink center-x because `horizontal_alignment = 1` centers every line - both conjuncts the gap check reads (top y, center x) are true ink facts, same class as the button-rect arms the code comment already documents.
+- New measured value: PointsLabel text bottom ≈ y 102.5 -> summary top y 112 -> **gap ≈ 9.5 ∈ [4, 24]** ✓. The new `creation_confirm_summary` scenario asserts `points_attrs_gap_ok == true` AT the CONFIRM frame, pinning the re-point.
+- Fallback: if `ConfirmSummaryLabel` is missing, fall back to the old `ConfirmButton` rect lookup (both `get_node_or_null`; zero-size cluster keeps the previous value - the existing sentinel convention).
 
-**Frozen geometry honored**: 68x24 widget, Bar 64x12 @(2,12), NameLabel 9px,
-`EMPTY_CAP_PX`, expand margins, `STRIP_BOTTOM`, hover offset - all untouched.
-`tests/test_health_bar.gd`'s pinned values (`size==(68,24)`, `bar_width==64`,
-`bar_height==12`, `empty_area_px==168`...) are never edited; new assertions are
-ADDITIVE (new test file 2.9, plus optionally appended cases - pinned lines
-byte-identical).
+### D4 - `final/verify_report.json`: replace with a tombstone pointer note (decision)
 
-- **New node**: `HpLabel` (Label) as a **child of `Bar`** (EmptyCap precedent),
-  anchors full-rect `(0,0)-(64,12)`, centered, font 9, `clip_text=false`,
-  `text_overrun_behavior=0`, `mouse_filter=2`, drawn as Bar's LAST child so it
-  paints above the fill and the EmptyCap. "500/500" at font 9 ≈ 40px < 64px.
-  Text color light with dark outline (same recipe as NameLabel) so it reads on
-  both green fill and dark track.
-- **New observables** on health_bar.gd:
-  - `hp_text: String` - `str(current) + "/" + str(max_hp)`; initialized in
-    `setup()` (max/max) so the headless null-char path reads it, rewritten in
-    `update_health()` (the health_changed signal path - stays live on damage).
-  - `hp_value: int`, `hp_max: int` - numeric mirrors for max_health-relative
-    playtest asserts.
-- **New pure static**: `static func hp_label_text(current: int, max_hp: int) -> String`
-  (unit-tested headless; format pinned: "cur/max", no spaces).
-- `update_health()` additionally writes `HpLabel.text` (guarded by
-  `get_node_or_null`, same defensive-resolution pattern) and re-asserts
-  `mouse_filter=2`. Nothing else in update_health / setup / follow_character
-  changes.
+Chosen over deletion because: (a) the path is cited by `README.md` ("Verification status"), `design/30_presentation.md`'s Q5 note, and append-only changelog rows that can never be edited - a tombstone keeps those references resolving to the truth instead of dangling; (b) it converts the lie into an explicit statement ("this file does not represent current delivery") for every future reader; (c) the decision is what actually guards the future, and it goes in `design/90_decisions.md`.
 
-### 2.7 Playtest contract (architect-owned surface + skeletons; PM fills thresholds)
+The replacement carries **no verdict fields at all** (no `all_goals_met`, no `ready_for_deploy`, no `verified_subtasks` - those are themselves verdicts) - only `status`, a `note` naming the pipeline step products (`5_compile`: `compile_report.json` / `playtest_report.json` / `playtest_summary.md`; `5_vision`: `vision_report.json`; `5_test`: `test_report.json`) as the only authoritative gate evidence, and `represents_current_delivery: false`.
 
-**Surface append (append-only, `playtest/_common.yaml`):**
-- `SkillButton1` .. `SkillButton12` blocks each append: `cost_text`, `effect_text`,
-  `effect_summary_text`, `lock_reason_text` (48 new surface vars total).
-- `HealthBar` block appends: `hp_text`, `hp_value`, `hp_max`.
-- `actions:` unchanged (new scenarios use only declared actions).
-- `scenario_order` appends, in order: `skill_button_effect_info`,
-  `locked_slot_unlock_reason`, `health_bar_numbers` (same order as
-  `ROUND_SCENARIOS` - the order test requires sorted indices).
+**Safety order (irreversible-content replacement -> backup/verify pattern):** (1) write the decision rows into `design/90_decisions.md` and `design/99_changelog.md` FIRST; (2) replace the file; (3) verify the new file parses as JSON and contains none of the old verdict fields; (4) the pre-replacement content remains recoverable via git history (the changelog row says so explicitly). Rollback = `git revert`. See §8.
 
-**Scenario skeletons** (name == basename, single-integer `at:`, every assert
-carries a comparison operator; frame numbers are calibrated by probe - the
-7x `ui_accept` boot prefix mirrors `skill_button_visual_states.yaml`):
+`README.md`'s "Verification status (honest)" section (which today claims "final/verify_report.json records this round's verdict") is re-pointed to the pipeline gate products in the same task (it is rewritten by the final verifier step each round anyway, but the re-point is on the task list so the fossil citation cannot survive).
 
-1. `playtest/skill_button_effect_info.yaml` (UX-03) - boot to battle (7x
-   `ui_accept`), then at a player-turn frame:
-   - `SkillButton1.effect_text: effect_text != ""` (non-empty effect description)
-   - `SkillButton1.cost_text: cost_text == "无消耗"` (cost surfaced; the only
-     honest value with current data - all costs undefined => 0)
-   - `SkillButton1.effect_summary_text: effect_summary_text != ""`
-   - `SkillButton1.fahui_text: fahui_text == "发挥 ×1.3"` (regression pin: the
-     narrowed FahuiLabel still renders the same text)
-   - negative control: `SkillButton5.effect_text: effect_text != ""` (locked
-     slots still show their effect info)
-2. `playtest/locked_slot_unlock_reason.yaml` (UX-04) - same boot, at a round<4
-   player-turn frame:
-   - `SkillButton5.lock_reason_text: lock_reason_text != ""` (reason visible)
-   - `SkillButton6/7/8.lock_reason_text: ... != ""` (all four locked slots)
-   - `SkillButton1.lock_reason_text: lock_reason_text == ""` (unlocked slot
-     shows no reason - derived, not hardcoded)
-   - then `end_turn` xN (or `debug_fast_forward`) to reach round >= 4 and assert
-     `SkillButton5.lock_reason_text == ""` and `SkillButton5.state_text != "phase_locked"`
-     (the reason disappears exactly when the lock does).
-3. `playtest/health_bar_numbers.yaml` (UX-05) - boot, at full HP:
-   - `HealthBar.hp_text: hp_text != ""` and `hp_text == str(hp_max) + "/" + str(hp_max)`
-     (full-HP text, expressed against max_health - no absolute HP literal)
-   - `HealthBar.hp_max: hp_max > 0`; `HealthBar.hp_value: hp_value == hp_max`
-   - then `debug_damage_player` (injects ~40% HP through apply_damage - the
-     documented injection interface) and assert:
-     `HealthBar.hp_value: hp_value < hp_max * 0.5 and hp_value > 0` and
-     `HealthBar.hp_text: hp_text == str(hp_value) + "/" + str(hp_max)`
-     (the number tracks the live value, still max_health-relative).
+### D5 - Three NEW scenario files, zero edits to existing yamls
 
-All health asserts are expressed against `hp_max` / ratios - **zero absolute HP
-literals** (roadmap rule + brief constraint 6). No new DEBUG action is needed.
+One scenario per UX item (mirrors jinyong-hud's 3-scenario shape, keeps blast radius one-file-per-scenario, and gives the backlog-closure task per-scenario counts to cite). The seven existing creation/menu scenario yamls (`creation_single_ui`, `creation_layout_readability`, `creation_mouse_interaction`, `creation_traits_back_next_buttons`, `creation_budget_clamp_and_traits`, `creation_back_to_menu_walk`, `menu_to_creation_to_tutorial_order`) are **byte-untouched** - their pins already cover everything this round must not break.
 
-### 2.8 `tests/test_playtest_contract_smoke.py` - additive contract pin
+---
 
-- `ROUND_SCENARIOS` appends the three new names (end, same order as
-  `scenario_order`; existing entries untouched).
-- ONE new function `test_hud_info_surface_contract` (stdlib-only, follows the
-  existing regex helpers): pins the four new vars on every SkillButton block,
-  the three HealthBar vars, the three new scenario files existing with
-  `name:` == basename, single-integer `at:` values, and a comparison operator
-  on every assert line.
+## 2. Architecture / data flow (text diagram)
 
-### 2.9 Unit tests (headless, `run() -> bool` SceneTree contract)
+```
+player input (mouse clicks / move_* / ui_accept)
+        |
+        v
+creation.gd state: phase, attrs, points_left, attr_index   (UNCHANGED rules)
+        |
+        v  _render()  (every mutation path ends here)
+   +---------------- NEW: pure composition layer ----------------+
+   | hp_value  = hp_from_bone(attrs["bone"])        (= bone * 5, §7) |
+   | hp_text   = "当前气血 %d" % hp_value                           |
+   | confirm_summary_text = confirm_summary_text_from(attrs)       |
+   | attr_effects_text()  (all five, name-prefixed, verbatim)      |
+   +----------------------------------------------------------------+
+        |                    |                       |
+        v                    v                       v
+AttrDescLabel.text   HpValueLabel.text      ConfirmSummaryLabel.text
+(all-five effects)   (ATTRS only)            (CONFIRM only)
+        |                    |                       |
+        +----- surface vars (CreationScreen.hp_value / hp_text / ----+
+              confirm_summary_text) + node blocks (HpValueLabel,
+              ConfirmSummaryLabel: visible/text)
+                        |
+                        v  _process() -> _update_geometry_observables()
+        points_attrs_gap_ok CONFIRM cluster re-pointed to
+        ConfirmSummaryLabel rect (same name, same yaml lines)
+                        |
+                        v
+playtest/<3 new scenarios>.yaml  --Expression--> live-node asserts
+        |                    |
+        v                    v
+tests/test_playtest_contract_smoke.py   tests/test_creation_info_texts.gd
+(static two-place sync pin)             (headless unit pin, -s runner)
+```
 
-- `tests/test_skill_button_info.gd` (NEW): (a) `state_palette("no_energy")`
-  luma 0.6629 is >= 0.10 from each of the five existing states' luma
-  (pin the numbers: ready 0.3874, cooldown 0.0814, phase_locked 0.5306,
-  hp_gated 0.2020, waiting 0.1558); (b) `cost_label_text(0) == "无消耗"`,
-  `(25) == "内力 25"`; (c) `effect_summary` on a real tutorial SkillData
-  (non-empty, <= 6 CJK chars, contains the skill's own damage number);
-  (d) tag text `"内力不足"` present on the no_energy palette.
-- `tests/test_health_bar_text.gd` (NEW): (a) `hp_label_text(500, 500) == "500/500"`,
-  `(200, 500) == "200/500"`; (b) instantiate health_bar.tscn headless, call
-  `setup("杨过", 500, null)` + `update_health(500, 500)` and assert `hp_text ==
-  "500/500"`, `hp_value == 500`, `hp_max == 500`; (c) **regression pin**: the
-  frozen geometry observables still read their authored values (`size == (68,24)`,
-  `bar_width == 64.0`, `bar_height == 12.0`, `empty_cap_px == EMPTY_CAP_PX`) -
-  proving the additive label changed no constant.
-- Both wired into the GDScript unit-suite runner list (append-only, same as the
-  jinyong-events round wired `test_event_data.gd`).
+Single source of truth: the label text and the surface var are written from the same composed string in `_render()`; the unit test calls the same pure functions; the scenarios assert both the node text (display proof) and the vars (relative numeric proof).
 
-### 2.10 Docs / evidence
+---
 
-| File | Change |
+## 3. Component list (all paths relative to repo root)
+
+### C1 · `scenes/segments/creation.tscn` - two additive Label nodes, nothing else
+
+**No existing node, offset, `custom_minimum_size`, separation, size flag or text is edited.** Add:
+
+```ini
+[node name="HpValueLabel" type="Label" parent="MouseBox/AttrBox"]
+horizontal_alignment = 1
+mouse_filter = 2
+visible = false
+text = ""
+clip_text = false
+text_overrun_behavior = 0
+
+[node name="ConfirmSummaryLabel" type="Label" parent="MouseBox/ConfirmBox"]
+horizontal_alignment = 1
+mouse_filter = 2
+visible = false
+text = ""
+clip_text = false
+text_overrun_behavior = 0
+```
+
+- `HpValueLabel` is authored **between `AttrDescLabel` and `AttrNavRow`** (tscn node order == VBox order); `ConfirmSummaryLabel` is authored **before `ConfirmButton`** (first child of `ConfirmBox`).
+- No `custom_minimum_size` (natural one-line / five-line heights); no autowrap on the summary (explicit `\n`); the effects label keeps its existing `autowrap_mode = 3`.
+- `mouse_filter = 2` (IGNORE) - explicit-declaration discipline (AttrDescLabel precedent); `clip_text = false` + `text_overrun_behavior = 0` - the no-ellipsis discipline from jinyong-hud.
+- Both paths are new and pinned by nothing; sibling-addition precedent (TopStrip, HpLabel, CostLabel/InfoLabel).
+
+### C2 · `scripts/segments/creation.gd` - additive vars + pure funcs + two render hooks + one measurement re-point
+
+Untouched: `START_POINTS`, `ATTR_MIN/MAX`, `_ATTR_DESCS` (byte-identical), `_step_cost`, all input handlers, `SaveManager.new_profile` call, all existing observables' semantics. New (all with `## Surface:` doc comments):
+
+```gdscript
+## Surface: current HP of the build under construction, derived exactly as
+## design/40_progression.md §7 defines it for player-created characters
+## (气血 = 根骨 × 5). Display-only - no rule or stored value changes (UX-07).
+var hp_value: int = 50
+
+## Surface: the HpValueLabel text ("当前气血 N"); kept equal to the label so
+## asserts can pin the exact rendered format (UX-07).
+var hp_text: String = ""
+
+## Surface: the ConfirmSummaryLabel text - one "名 值" line per attribute,
+## the final-value checklist the confirm page was missing (UX-08).
+var confirm_summary_text: String = ""
+
+
+## Pure derivation: HP from 根骨 (design/40_progression.md §7). Reads no
+## nodes, so tests can call it on a bare instance. The multiplier 5 IS the
+## documented formula - the only number this round is allowed to show.
+func hp_from_bone(bone: int) -> int:
+	return bone * 5
+
+
+## Pure composition: all five attribute effects, name-prefixed, segments
+## VERBATIM from _ATTR_DESCS (design/10_systems.md §1 + §7 formulas).
+## Nothing is invented; _attr_desc("") never throws.
+func attr_effects_text() -> String:
+	var parts: Array[String] = []
+	for key in PlayerProfile.ATTR_KEYS:
+		parts.append("%s:%s" % [_attr_label(key), _attr_desc(key)])
+	return " · ".join(parts)
+
+
+## Pure composition: the confirm-page summary, one line per attribute in
+## PlayerProfile.ATTR_KEYS order, same "名 值" shape as the ATTRS row labels.
+func confirm_summary_text_from(values: Dictionary) -> String:
+	var lines: Array[String] = []
+	for key in PlayerProfile.ATTR_KEYS:
+		lines.append("%s %2d" % [_attr_label(key), int(values.get(key, 0))])
+	return "\n".join(lines)
+```
+
+Render hooks in `_render()`:
+
+```gdscript
+# Derivations (cheap; every attrs mutation ends in _render):
+hp_value = hp_from_bone(int(attrs["bone"]))
+hp_text = "当前气血 %d" % hp_value
+confirm_summary_text = confirm_summary_text_from(attrs)
+# UX-06: the desc slot lists ALL FIVE effects (was: the focused attr's desc).
+# attr_index still drives the focus highlight (modulate) and the +/- target.
+var attr_desc_label: Label = get_node_or_null("MouseBox/AttrBox/AttrDescLabel") as Label
+if attr_desc_label != null:
+	attr_desc_label.visible = phase == "ATTRS"
+	if phase == "ATTRS":
+		attr_desc_label.text = attr_effects_text()
+# UX-07: current HP next to the formula list.
+var hp_label: Label = get_node_or_null("MouseBox/AttrBox/HpValueLabel") as Label
+if hp_label != null:
+	hp_label.visible = phase == "ATTRS"
+	if phase == "ATTRS":
+		hp_label.text = hp_text
+# UX-08: the confirm-page checklist above the two buttons.
+var confirm_summary_label: Label = get_node_or_null("MouseBox/ConfirmBox/ConfirmSummaryLabel") as Label
+if confirm_summary_label != null:
+	confirm_summary_label.visible = phase == "CONFIRM"
+	if phase == "CONFIRM":
+		confirm_summary_label.text = confirm_summary_text
+```
+
+And in `_update_geometry_observables()`, the `match phase:` `"CONFIRM":` arm of the `points_attrs_gap_ok` cluster (currently resolves `MouseBox/ConfirmBox/ConfirmButton`): first try `MouseBox/ConfirmBox/ConfirmSummaryLabel`; if non-null, `cluster = summary.get_global_rect()`; else keep the existing `ConfirmButton` fallback. Code comment must state: same observable, same yaml lines, measured-quantity change per the jinyong-layout-r2 precedent; rect top == first ink line top and rect center == ink center (centered lines) so both conjuncts (top y, center x) remain ink facts.
+
+`PlayerProfile` is a `class_name` (`scripts/data/player_profile.gd`), so the pure functions resolve off-tree - the unit test needs no SceneTree.
+
+### C3 · `playtest/_common.yaml` - append-only surface + scenario_order
+
+- `CreationScreen` block appends: `hp_value`, `hp_text`, `confirm_summary_text` (after `desc_alignment_ok`).
+- Two new node blocks (next to `AttrDescLabel`/`TraitDescLabel`/`PointsLabel`):
+  `HpValueLabel: [visible, text]`, `ConfirmSummaryLabel: [visible, text]`.
+- `scenario_order` appends, in this exact order: `creation_attr_effect_info`, `creation_hp_value_displayed`, `creation_confirm_summary` (50 -> 53 scenarios).
+
+### C4 · `playtest/creation_attr_effect_info.yaml` (UX-06) - full skeleton
+
+```yaml
+name: creation_attr_effect_info
+description: >-
+  UX-06: at rest (f30, default focus) the ATTRS desc slot lists all five
+  attribute effects - every name present, every effect keyword present, the
+  bone formula verbatim. Focus cycling (move_down) proves the list does not
+  follow focus away - the info is at-rest, not focus-transient.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    AttrDescLabel.visible: visible == true
+    AttrDescLabel.text: text.contains("根骨") == true
+    AttrDescLabel.text: text.contains("内力") == true
+    AttrDescLabel.text: text.contains("身法") == true
+    AttrDescLabel.text: text.contains("悟性") == true
+    AttrDescLabel.text: text.contains("福缘") == true
+    AttrDescLabel.text: text.contains("气血 = 根骨 × 5") == true
+    AttrDescLabel.text: text.contains("内力值") == true
+    AttrDescLabel.text: text.contains("移动力") == true
+    AttrDescLabel.text: text.contains("学功法") == true
+    AttrDescLabel.text: text.contains("奇遇") == true
+    CreationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 40
+  actions:
+  - move_down
+- at: 70
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attr_index: attr_index == 1
+    AttrDescLabel.text: text.contains("福缘") == true
+    AttrDescLabel.text: text.contains("奇遇") == true
+```
+
+("气血 = 根骨 × 5" is the documented formula string from `_ATTR_DESCS` / `40_progression.md §7` - a text contract, not an invented number. The `move_down` leg also satisfies the "at least one input per scenario" rule.)
+
+### C5 · `playtest/creation_hp_value_displayed.yaml` (UX-07) - full skeleton
+
+```yaml
+name: creation_hp_value_displayed
+description: >-
+  UX-07: the current HP is displayed next to the formula and tracks the live
+  build - every numeric assert is RELATIVE to attrs (hp_value ==
+  attrs["bone"] * 5), zero absolute HP literals. move_right raises the
+  focused bone row (default focus = row 0) and the displayed value follows.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    HpValueLabel.visible: visible == true
+    HpValueLabel.text: 'text != ""'
+    HpValueLabel.text: text.contains("气血") == true
+    CreationScreen.hp_value: hp_value == attrs["bone"] * 5
+    CreationScreen.hp_text: 'hp_text == "当前气血 " + str(hp_value)'
+- at: 40
+  actions:
+  - move_right
+- at: 45
+  actions: []
+  assert:
+    CreationScreen.hp_value: changed
+- at: 70
+  actions: []
+  assert:
+    CreationScreen.hp_value: hp_value == attrs["bone"] * 5
+    CreationScreen.hp_text: 'hp_text == "当前气血 " + str(hp_value)'
+    HpValueLabel.text: 'text != ""'
+- at: 80
+  actions:
+  - move_left
+- at: 105
+  actions: []
+  assert:
+    CreationScreen.hp_value: hp_value == attrs["bone"] * 5
+```
+
+`str()` in an assert expression is proven by `health_bar_numbers.yaml` (`hp_text == str(hp_max)`); dictionary indexing is proven by `creation_single_ui.yaml` (`attrs["bone"] == 11`). **Fallback if the harness Expression ever rejects `+` on strings:** replace `hp_text == "当前气血 " + str(hp_value)` with `hp_text.contains(str(hp_value)) == true` (still relative) - do NOT fall back to any absolute literal.
+
+### C6 · `playtest/creation_confirm_summary.yaml` (UX-08) - full skeleton
+
+```yaml
+name: creation_confirm_summary
+description: >-
+  UX-08: walking ATTRS -> TRAITS -> CONFIRM (real clicks), the confirm page
+  lists the final value of each attribute (one per-assert per attribute, each
+  expressed RELATIVE to the live attrs dict). The CONFIRM-phase geometry pins
+  (points_attrs_gap_ok with the re-pointed first-row cluster, skeleton, box
+  fit, nav cluster) prove the summary entered the frozen layout without
+  moving it. BackButton returns to TRAITS and the summary phase-hides.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    ConfirmSummaryLabel.visible: visible == false
+- at: 40
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+- at: 100
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 150
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+    ConfirmSummaryLabel.visible: visible == true
+    ConfirmSummaryLabel.text: 'text != ""'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text != ""'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("根骨 " + str(attrs["bone"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("内力 " + str(attrs["inner"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("身法 " + str(attrs["agility"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("悟性 " + str(attrs["wisdom"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("福缘 " + str(attrs["fortune"])) == true'
+    CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
+    CreationScreen.phase_skeleton_same: phase_skeleton_same == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
+- at: 160
+  actions: []
+  clicks:
+  - BackButton
+- at: 180
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    ConfirmSummaryLabel.visible: visible == false
+```
+
+All `clicks:` targets (`AttrNextButton`, `TraitNextButton`, `BackButton`) already belong to whitelisted surface blocks (the smoke test enforces clicks-owner membership). Attr values 10..20 are always two digits, so `"%s %2d"` renders exactly `"名 NN"` and the `contains("名 " + str(attrs[key]))` form matches. Same string-concat fallback rule as C5 if ever needed.
+
+### C7 · `tests/test_playtest_contract_smoke.py` - ROUND_SCENARIOS tail + one additive test
+
+- `ROUND_SCENARIOS` appends, in the SAME order as the `scenario_order` tail: `creation_attr_effect_info`, `creation_hp_value_displayed`, `creation_confirm_summary` (the existing `test_round_scenarios_present_on_disk_and_in_order` enforces the two lists agree).
+- New additive function `test_creation_clarity_surface_contract()` (mirrors `test_hud_info_surface_contract`): asserts `CreationScreen` block carries `hp_value` / `hp_text` / `confirm_summary_text`; `HpValueLabel` and `ConfirmSummaryLabel` blocks exist with `visible` + `text`; `AttrDescLabel` still whitelisted (guard); for each of the three new scenario files: exists on disk, `name:` == basename (regex `^name:\s*<name>\s*$`), every timeline `at:` value is a single integer (the same `\bat\s*:` regex), and every 4-space dotted assert line carries a comparison operator (`== != < > and or` - the no-bare-scalar-silent-false rule). Stdlib only; existing functions untouched.
+
+### C8 · `tests/test_creation_info_texts.gd` + `tests/unit_test_runner.gd` registry
+
+New headless unit test, contract `static func run() -> bool` + `_expect` helper (test_health_bar_text.gd pattern; scene instantiated, never added to a tree; `PlayerProfile` is a `class_name` so the pure functions work off-tree):
+
+1. **Formula pin (relative):** `for b in range(10, 21): hp_from_bone(b) == b * 5` - the full creation clamp range; the operand 5 is the §7 contract.
+2. **Effects composition pin:** `attr_effects_text()` contains all five names, `气血 = 根骨 × 5`, `内力值`, `移动力`, `学功法`, `奇遇`; contains no `▶` (cursor-marker guard).
+3. **Summary composition pin:** for a sample attrs dict, `confirm_summary_text_from()` has exactly 5 lines and each `"名 值"` line present.
+4. **Scene wiring pin:** instantiate `creation.tscn`; set `attrs["bone"] = 15`; call `_render()`; assert `HpValueLabel.text == "当前气血 75"`, `HpValueLabel.visible == true`, `AttrDescLabel.text == attr_effects_text()`; set `phase = "CONFIRM"`, `_render()`; assert `ConfirmSummaryLabel.visible == true` and its text contains `"根骨 15"`, `HpValueLabel.visible == false`; both new labels `mouse_filter == 2`, `clip_text == false`, `text_overrun_behavior == 0`, `horizontal_alignment == 1`.
+5. **Frozen-geometry regression pin (any drift reddens THIS test):** `AttrRow0..4.custom_minimum_size == Vector2(0, 44)`; `AttrDescLabel.custom_minimum_size == Vector2(0, 48)`; `MouseBox` offsets `-280 / -240 / 280 / 240`; `AttrBox` separation 10, `ConfirmBox` separation 12; `ConfirmButton.custom_minimum_size == Vector2(240, 44)`; `BackButton.custom_minimum_size == Vector2(160, 44)`; `AttrLabel` pair `horizontal_alignment == 2 and size_flags_horizontal == 3`; `AttrNavRow.size_flags_horizontal == 4`.
+
+Register `res://tests/test_creation_info_texts.gd` in `unit_test_runner.gd`'s `TESTS` array in alphabetical position (after `test_card_data.gd`; additions only, no removals) - suite 17 -> 18 files.
+
+### C9 · Design-archive edits (docs FIRST, then code - the constraint-2 order)
+
+1. `design/30_presentation.md`: (a) update the UI-layout 捏人屏 row: the ATTRS desc slot lists all five attribute effects (name-prefixed, sourced from `10_systems.md §1` / `40_progression.md §7`), the current-HP line (`HpValueLabel`, live `气血 = 根骨 × 5` value) sits below it, and the CONFIRM page carries `ConfirmSummaryLabel` (per-attr final values) above the two buttons; (b) append a dated 2026-08-27 amendment block recording D1's at-rest decision + the rejected per-row alternatives (with the ink-center / box-overflow reasons) and D3's `points_attrs_gap_ok` CONFIRM cluster re-point (same observable, same yaml lines, jinyong-layout-r2 precedent, with the ink-honesty argument).
+2. `design/20_content.md`: append a "no content gap" note (mirroring §5's discipline): all five attribute effects have existing definitions (`_ATTR_DESCS`, verbatim from `10_systems.md §1` + `40_progression.md §7`); 悟性 / 福缘 have `-` in the battle-derived column, so their displayed effects are the cultivation meanings exactly as defined - **nothing invented, no gap to record**.
+3. `design/40_ux_backlog.md`: append a 记录 row (2026-08-27 `jinyong-clarity`: fixes landed for UX-06/07/08 + the three scenario files; post-fix gate evidence pending; per rule 2 CLOSED is written only by the post-gate evidence task). The three rows stay OPEN at landing time.
+4. `design/99_changelog.md`: append the `jinyong-clarity` round row (creation info layer, 50 -> 53 scenarios, verify_report tombstone, docs-first record).
+5. `design/90_decisions.md`: append to the Out-of-scope table: maintaining a delivery verdict inside `final/verify_report.json` - rejected because `repo_apply` ignores `final/*` (never refreshed), the jinyong-events-era verdict kept presenting itself as current and misled the jinyong-hud backlog-closure re-check; replaced by a pointer note; the only authoritative gate evidence is the pipeline step products, never a repo file under `final/`.
+
+### C10 · `final/verify_report.json` tombstone + README re-point + round evidence notes
+
+1. Tombstone JSON (no verdict fields):
+```json
+{
+  "status": "superseded_pointer_note",
+  "note": "This file is NOT a delivery verdict and does not represent the current delivery state. Authoritative gate results are the PIPELINE STEP PRODUCTS (5_compile: compile_report.json / playtest_report.json / playtest_summary.md; 5_vision: vision_report.json; 5_test: test_report.json) - pipeline artifacts, not repo files. The pipeline's repo_apply ignores final/*, so nothing in this directory is ever refreshed by a run. The verdict text this file used to carry (last written by the jinyong-events round's t_impl card: vision gate IncompleteRead, 4/47 scenarios judged, terminal_victory 5/6) was removed on 2026-08-27 by the jinyong-clarity round; the decision is recorded in design/90_decisions.md (Out of scope) and design/99_changelog.md. The pre-replacement content is recoverable from git history.",
+  "represents_current_delivery": false
+}
+```
+2. `README.md` "Verification status (honest)": re-point the `final/verify_report.json` citation to the pipeline gate products (no "this round's verdict" claim from a repo file that the pipeline cannot refresh).
+3. `final/creation_info_probe_notes.md` (probe task, BEFORE the code lands): one inline direct-boot probe recording the pre-fix A-class absence - `HpValueLabel` / `ConfirmSummaryLabel` nodes absent, `hp_value` / `hp_text` / `confirm_summary_text` observables absent, `AttrDescLabel.text` shows only the focused attr's desc at rest (the UX-06 baseline). Mirrors `final/hud_info_probe_notes.md §1`.
+4. `final/delivery_notes.md` for this round (the closing record, jinyong-hud template): A/B classification of the three info groups, gate-product honesty (compile / playtest / unit / vision states as measured, not claimed), the no-gap content note, UX disposition, and the verify_report resolution decision.
+
+---
+
+## 4. Frozen-pin compatibility table (why every existing creation pin stays green)
+
+| pinned observable (creator scenario) | why this round cannot redden it |
 |---|---|
-| `design/40_ux_backlog.md` | UX-03 / UX-04 / UX-05 rows: OPEN -> `CLOSED(jinyong-hud)` with evidence paths (`playtest/skill_button_effect_info.yaml`, `playtest/locked_slot_unlock_reason.yaml`, `playtest/health_bar_numbers.yaml`, `final/hud_info_probe_notes.md`). Closure is explicit (backlog rule 2: action + evidence; no evidence -> no CLOSED). |
-| `design/20_content.md` | NEW section 5 「内力消耗缺口」: no technique in the tutorial battle (or progression data) defines an inner-force cost; `10_systems.md §1` keeps "pool stores but does not spend"; `SkillData.cost` defaults 0; per-skill costs are a CONTENT GAP to be defined in the 养成 round - never invented in place. Lists the 8 player techniques + 12-slot bar as "cost undefined (0)". |
-| `design/30_presentation.md` | Appended rows: skill-button info line (cost label + contextual info label, no-ellipsis discipline) and the HP number on the bar (child-of-Bar label, geometry constants untouched). |
-| `design/99_changelog.md` | jinyong-hud round row (scope + rationale). |
-| `final/hud_info_probe_notes.md` (NEW) | Pre-fix probe: current HUD shows no cost/effect/lock-reason/HP-number observables (A-class reds) + post-fix label-rect overlap probe for CostLabel/InfoLabel/FahuiLabel ink. |
-| `final/delivery_notes.md` | Round notes; explicitly names the missing-cost content gap. |
+| `attr_rows_uniform` (f30) | the five `AttrRow` rects (44px, shared edges) are untouched; new labels are `AttrBox`-level siblings |
+| `attr_label_alignment_ok` (f30) | checks only `AttrRow%d/AttrLabel` property pair (2 / 3) - untouched |
+| `points_attrs_gap_ok` ATTRS arm (f28) | cluster = `_row_ink_union(0)` - row 0 ink unchanged |
+| `points_attrs_gap_ok` TRAITS arm (f45) | cluster = `TraitToggle0` rect - untouched |
+| `points_attrs_gap_ok` CONFIRM (re-pointed, new pin at f150 of the new scenario) | cluster = `ConfirmSummaryLabel` rect; gap ≈ 9.5 ∈ [4, 24]; fallback = old ConfirmButton lookup |
+| `phase_skeleton_same` (f44/f58/f150) | `AttrBox` / `TraitBox` / `ConfirmBox` tops are all still `MouseBox` top (112) - only children were appended, no box moved |
+| `creation_in_viewport` | `MouseBox` 560×480 offsets untouched |
+| `creation_box_fits` | ATTRS bottom ≈ 511, CONFIRM bottom ≈ 309, both ≤ 584 (73px / 275px slack) |
+| `attr_cluster_center_ok` / `attr_cluster_width_ok` (f30) | measured on row ink (label text ∪ minus ∪ plus) - rows untouched |
+| `nav_cluster_center_ok` (all phases) | nav buttons keep shrink-center + fixed widths; vertical position is not measured |
+| `trait_cluster_center_ok` (f90) | `TraitBox` untouched |
+| `desc_center_ok` (f30) | `AttrDescLabel` stays centered-aligned; its wrapped multi-line text keeps an ink x-center equal to the label center (each wrapped line is centered); the helper's single-line width is inexact but the derived fact (x-center ±6, non-zero) remains true - the same known limitation the code comment already documents for the TRAITS desc; `desc_alignment_ok` (property pin) remains the load-bearing centering proof |
+| `desc_alignment_ok` (all phases) | checks `AttrDescLabel` / `TraitDescLabel` `horizontal_alignment == 1` - unchanged properties |
+| `cursor_markers_visible == false` | new texts are plain Chinese, no `▶`; the `_render()` scan covers the new labels automatically |
+| `creation_traits_back_next_buttons` f30 `AttrDescLabel.text.contains("气血")` | the all-five list still contains bone's formula segment "气血 = 根骨 × 5" |
+| `creation_single_ui` points/budget walk | no input-path or clamp logic touched |
+| `menu_to_creation_to_tutorial_order` / `creation_back_to_menu_walk` / `spine_to_ending` | routing, `SaveManager.new_profile`, `GameManager.finish_creation` untouched; no new control can steal focus or input (`focus_mode` untouched on interactive nodes, new labels are `mouse_filter = 2`) |
+
+Regression net: the seven existing creation/menu yamls byte-untouched + `spine_to_ending` + the full 50-scenario gate + the unit suite (18 files) + the smoke test.
 
 ---
 
-## 3. Technology Stack
+## 5. Observable contract (the hard interface - implementers match names exactly)
 
-- **GDScript + stock Godot 4 Controls** (Label, Button stylebox overrides,
-  ProgressBar child overlay) - exactly the in-repo toolkit; no new deps.
-- **Playtest harness** as-is: `playtest/_common.yaml` + per-scenario YAML +
-  `Expression`-evaluated asserts on the whitelisted surface.
-- **pytest static smoke** (`tests/test_playtest_contract_smoke.py`) for the
-  contract pins; **GDScript SceneTree unit tests** for the pure functions.
-- No art assets, no audio, no `project.godot` changes (no new input actions or
-  autoloads; all new scenarios reuse declared actions).
+| surface entry | type | meaning | written by |
+|---|---|---|---|
+| `CreationScreen.hp_value` | int | `attrs["bone"] * 5` (§7 formula) | `_render()` |
+| `CreationScreen.hp_text` | String | `"当前气血 %d"` - the exact rendered format | `_render()` |
+| `CreationScreen.confirm_summary_text` | String | five `名 值` lines joined with `\n` | `_render()` |
+| `HpValueLabel` (node block) | visible, text | the HP line, ATTRS-gated | `_render()` |
+| `ConfirmSummaryLabel` (node block) | visible, text | the confirm checklist, CONFIRM-gated | `_render()` |
 
----
+UI strings (Chinese-only hard rule, verbatim contracts):
+- Effects list: `_attr_label(key) + ":" + _attr_desc(key)` for the five keys, joined `" · "` -> `根骨:气血 = 根骨 × 5 · 内力:内力值 = 内力 × 2 · 身法:移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法 · 悟性:决定学功法的速度(修习查表) · 福缘:影响事件与奇遇(游历事件可重掷)` (every segment is an existing string).
+- HP line: `当前气血 50` (format `"当前气血 %d"`).
+- Summary lines: `根骨 12` (format `"%s %2d"`, same shape as the row labels).
 
-## 4. Edge Cases (from step1_sota.md -> how this design answers each)
-
-- **Costs do not exist anywhere**: `SkillData.cost` defaults 0; the display
-  renders "无消耗" (graceful undefined); the gap is recorded in
-  `design/20_content.md §5` + delivery notes. No number is invented.
-- **no_energy must be distinct from locked**: luma 0.6629 is the only band
-  pairwise >= 0.10 from all five existing states (computed above, pinned in
-  `test_skill_button_info.gd`); hue (light purple) differs from phase_locked's
-  light gray; Chinese tag 内力不足 vs 锁定. The state machinery is real and
-  unit-tested even though it cannot fire with current data.
-- **Lock reason is tutorial-scoped**: derived from the same predicate, "" when
-  not locked; the scenario asserts the empty case AND the round-4 flip.
-- **Health geometry frozen**: sibling/child Label addition only; new test file
-  pins the unchanged constants. `update_health()` writes the text; no constant
-  touched in the three frozen files.
-- **Health asserts relative to max_health**: `hp_text == str(hp_max)+"/"+str(hp_max)`,
-  `hp_value < hp_max * 0.5` - no absolute HP literals anywhere.
-- **Button label crowding (104x48, 4 live labels)**: two new labels placed in
-  measured free bands; FahuiLabel rect is the only existing-child rect touched
-  (unpinned); probe-first fallback shrinks the summary, never widens into
-  pinned siblings, never uses ellipsis.
-- **Two-place sync**: three new scenarios appended to BOTH `scenario_order` and
-  `ROUND_SCENARIOS` in the same order; every assert line carries an operator;
-  single-integer `at:` values only.
-- **spine_to_ending + existing suites stay green**: with current data every new
-  derivation evaluates to the empty/false branch (cost 0 -> no_energy false;
-  lock_reason only on the already-locked slots 5-8 pre-round-4; waiting override
-  unchanged), so existing `state_text` / `state_tag_text` / `state_luma` values
-  are byte-identical on every existing frame. New observables are additive to
-  the surface; existing assert lines are untouched.
+Every new piece of displayed information has at least one assert: five name + five keyword asserts (UX-06), visibility + non-empty + relative-equality + change-tracking asserts (UX-07), one per-attribute relative assert + phase-gating asserts (UX-08). All numeric asserts are relative expressions (`hp_value == attrs["bone"] * 5`, `contains("根骨 " + str(attrs["bone"]))`); **zero absolute numeric literals in new asserts**.
 
 ---
 
-## 5. Rollback / Safety (no irreversible operations)
+## 6. Edge cases from the SOTA report - how this design handles each
 
-- Every edit is additive (new vars, new nodes, new files, appended list entries,
-  appended doc rows). No deletion, no rewrite of pinned constants, no data
-  migration.
-- The three frozen files (`scripts/ui/health_bar.gd`, `scenes/ui/health_bar.tscn`,
-  `tests/test_health_bar.gd`) receive ONLY: one new child node, three new vars +
-  one static + guarded writes in `update_health()`/`setup()` (health_bar.gd); one
-  node block (health_bar.tscn); appended test cases (test file). Revert = remove
-  those blocks; the pinned geometry lines are never edited, so rollback cannot
-  drift the frozen contract. The new `tests/test_health_bar_text.gd` doubles as
-  a constant-unchanged regression pin.
-- Scenario registration follows the append-only rule; a bad scenario file is
-  deleted without touching siblings.
-- Probe-first gating (see 6) blocks label placement on measured ink overlap.
+- **"A desc label already exists"** - it is reused as the carrier (content semantics changed, D1) instead of adding a parallel node; the cycling-assert alternative was considered and rejected as leaving the at-rest page unchanged (D1 rationale).
+- **"Effect-text source of truth"** - every segment is an existing string; 悟性/福缘 display their cultivation meanings as defined; `design/20_content.md` gets the explicit "no gap" note rather than silence.
+- **"HP must be relative, never == 50"** - `hp_value == attrs["bone"] * 5` everywhere; the only literal is the formula operand 5, which IS the documented contract.
+- **"Frozen geometry pinned by two scenarios"** - §4 table; the one unavoidable measurement change (CONFIRM gap cluster) is declared, precedented, and newly pinned.
+- **"No silent constant edits"** - the tscn diff contains only two new node stanzas; the unit test re-pins every frozen constant so drift reddens a test.
+- **"CONFIRM observables must come from the surface"** - `hp_value` / `hp_text` / `confirm_summary_text` are real vars appended to the `CreationScreen` block; node blocks added; contract test pins the two-place sync.
+- **"Scenario-harness hard rules"** - name == basename, single-integer `at:` values, comparison operator on every dotted assert line, `ROUND_SCENARIOS` order == `scenario_order` tail order, direct `creation.tscn` boots, at least one input per scenario.
+- **"cursor glyph"** - no `▶` anywhere; scan runs after every `_render`.
+- **"Chinese-only UI text"** - all new strings are Chinese, quoted in §5.
+- **"verify_report fossil"** - D4 + C10.
+- **"Backlog closure discipline"** - OPEN at landing; only the post-gate evidence task flips to `CLOSED(jinyong-clarity)` citing `playtest_summary.md` per-scenario counts (`creation_attr_effect_info N/N` etc.) - the jinyong-hud CLOSED-before-evidence reversal is the standing lesson.
+- **"Content-gap ledger honesty"** - the "no gap, sourced from §1" note (C9.2) instead of silence.
 
 ---
 
-## 6. Task Decomposition (for PM)
+## 7. Design changes declared for `5_design` (surgical archive updates after acceptance)
 
-1. **A1 - SkillData cost field** (2.1): one line; independent.
-2. **A2 - skill_button.gd info layer** (2.3): no_energy palette + 4 observables +
-   2 statics + `_refresh_info_label`; depends on A1.
-3. **A3 - skill_button.tscn labels** (2.4): CostLabel + InfoLabel + FahuiLabel
-   rect narrow; depends on A2. **Probe-gated**: run the label-rect ink probe
-   before/after; shrink summary on overlap.
-4. **A4 - hud.gd derivation** (2.2): no_energy + lock_reason_text in
-   `_refresh_skill_button_states`; depends on A2/A3.
-5. **B1 - health bar numbers** (2.6): HpLabel + observables + static; independent
-   of A*; frozen-geometry discipline.
-6. **C1 - contract wiring** (2.7 + 2.8): three scenario files, surface append,
-   scenario_order + ROUND_SCENARIOS, smoke test function; depends on A4 + B1.
-7. **C2 - unit tests** (2.9): two new test files + runner wiring; depends on A2/B1.
-8. **D1 - docs + closure** (2.10): backlog CLOSED rows with evidence, content-gap
-   section, presentation rows, changelog, probe notes, delivery notes; after C1/C2
-   produce the gate evidence.
-9. **D2 - full regression**: 47 -> 50 scenarios, spine_to_ending green, only
-   `terminal_victory_8_12_rounds_hp_15_40` may stay red (sanctioned balance
-   deferral).
+1. `30_presentation.md` - 捏人屏 row update + the 2026-08-27 amendment block (D1 decision + rejected alternatives; D3 cluster re-point) - see C9.1.
+2. `20_content.md` - "no content gap" note for attribute effect text - C9.2.
+3. `40_ux_backlog.md` - the round's 记录 row now; CLOSED rows + evidence only from the post-gate task - C9.3.
+4. `99_changelog.md` - one append-only round row - C9.4.
+5. `90_decisions.md` - one Out-of-scope row (verdict-in-final/ rejected) - C9.5.
+6. `final/verify_report.json` -> tombstone (C10.1) + README citation re-point (C10.2).
 
-**Acceptance (from the brief):** each UX item has a playtest assertion pinning
-visible text/number (non-empty text / number appears, health relative to
-max_health); `design/40_ux_backlog.md` shows all three as CLOSED(jinyong-hud)
-with evidence paths; spine_to_ending fully green; existing playtest + unit
-suites not red.
+No conflicts with the archive's rules: the desc-slot change is a presentation record addition (the archive never pinned focused-vs-all content semantics); the cluster re-point follows the repo's own "same name, same yaml lines, logged measured-quantity change" convention.
+
+---
+
+## 8. Safety, baseline protection, rollback
+
+- **Everything additive:** two new scene nodes, three script vars, three pure funcs, two render hooks, one measurement re-point with fallback, three new yaml files, surface/order/smoke/TESTS registry appends, doc row appends. No existing file's pinned lines are edited (the only in-file edit sites are `creation.gd`'s desc assignment, the CONFIRM gap arm, and `creation.tscn`'s node list).
+- **The one content-replacement op (verify_report.json)** follows backup -> execute -> verify -> record: decision rows written first; replacement second; verification third (parses as JSON; no `all_goals_met` / `ready_for_deploy` / `verified_subtasks` fields; pointer text present); recoverability via git history stated in the changelog row. Rollback: `git revert` restores the fossil byte-for-byte if the decision is ever reversed.
+- **Whole-round rollback:** every change lands as normal git commits in one round; `git revert` of the round's commits restores the exact 50-scenario / 73-script / 17-test baseline.
+- **No rule/value drift guard:** `_ATTR_DESCS`, `START_POINTS`, `ATTR_MIN/MAX`, `_step_cost`, `new_profile`, battle/cultivation files untouched; the only new number anywhere is the ×5 display derivation, which is the documented §7 formula; the unit test pins it relatively across the whole 10..20 clamp range.
+
+---
+
+## 9. Verification plan (gate criteria) and PM decomposition hints
+
+**Gate criteria (all must hold on the final tree):**
+- `5_compile` sidecar: whole-repo compile 74 scripts (73 + the new unit test file) with 0 errors; playtest hard gate passed, **53/53 scenarios green** - including `spine_to_ending` 32/32, the seven existing creation/menu scenarios byte-unchanged and green, and the three new scenarios green (`creation_attr_effect_info`, `creation_hp_value_displayed`, `creation_confirm_summary`).
+- GDScript unit suite via `run_tests.sh` / `-s` runner: **18 passed, 0 failed**.
+- pytest smoke gate: all existing tests + `test_creation_clarity_surface_contract` green.
+- Vision gate: may be blind (`endpoint_unreachable`) - same stance as jinyong-hud: the three findings are information-presence pins (text non-empty / value present) judged by playtest asserts; rendered-ink concerns are compensated by the existing measured observables, not by a vision verdict.
+- Post-gate `backlog_closure` evidence task flips UX-06/07/08 to `CLOSED(jinyong-clarity)` citing `playtest_summary.md` per-scenario counts (backlog rule 2); delivery notes record the honest gate-product state and the verify_report resolution.
+
+**Task decomposition order (dependencies):**
+1. `creation_info_probe` - pre-fix A/B probe notes (C10.3) - BEFORE any code lands.
+2. `docs_presentation_record` - 30_presentation + 20_content rows (C9.1, C9.2) - docs FIRST per constraint 2.
+3. `creation_info_labels` - tscn + creation.gd + unit test + TESTS registry (C1, C2, C8).
+4. `creation_clarity_scenarios` - three yamls + `_common.yaml` surface/order + smoke ROUND_SCENARIOS + new test function (C3-C7).
+5. `verify_report_tombstone` - 90_decisions + 99_changelog rows, file replacement + verification, README re-point (C9.4, C9.5, C10.1, C10.2).
+6. `backlog_record` - 40_ux_backlog 记录 row (C9.3) + delivery notes (C10.4).
+7. (post-gate) `backlog_closure` evidence task - the only writer of CLOSED.
+
+---
+
+## 10. Linter / tooling selection
+
+No new external tooling - the round is pure in-repo Godot/GDScript + the existing stdlib-only pytest smoke test (PyYAML stays out, per every prior round). `linter_manifest.json` therefore stays identical to the repo baseline: `.py` -> `ruff`, `.yaml` / `.json` / `.md` -> `basic`. GDScript (`.gd`) and scenes (`.tscn`) are deliberately NOT in the manifest - they are parsed per-file by the host-controlled `gdscript_check` / compile gates (the addon rule: a misspelled backend name must never silently disable a gate).
