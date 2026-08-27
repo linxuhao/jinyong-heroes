@@ -574,3 +574,19 @@ map.tscn` 的 MAP 段 TRAVEL↔EVENT 切换——该段恰有两个常驻 Label:
 结局仍可达(routing-first + 重排后时间线,既有 ENDING 断言逐行存活)。实测 PASS 计数
 属下游 `5_compile`/`5_test` 闸门产物,本轮不预设。
 
+**实测确认(2026-08-29,终局闸门):** 本节 (a)–(d) 与 §8.1/§8.2b/§8.3 表格均为设计期
+(doc-first)推演,终局实测后无需修订。本轮 `5_compile` 的 `playtest_summary.md` 实测
+**57/57 场景全 PASS**(硬闸门过、零 runtime error、断言失败 0/57):重排后的
+`spine_to_ending` **42/42**(3 个事件块插入后 ENDING 块 f580 逐行存活,「六段连着 +
+走得到结局」在真实运行中成立),`map_node_event_shaolin` **32/32**(唯一重基线
+`events_resolved_count == 2` 与新增 `== 1` 阶梯钉成立,`attr_bone` 差分钉未受洛阳
+去程/返程 merchant 事件影响),新场景 `map_node_event_mainline_east` **23/23** /
+`map_node_event_mainline_return` **20/20**(四绑定逐一被钉、无名谷不在 boot 触发、
+`tomb_bed` 返程触发并解算、统一提示串被钉);既有回归网零红:`save_load_roundtrip`
+**14/14**(节点事件只在 travel 到达时触发,存读档不复触发)、`event_travel_effects`
+**19/19**、`cultivation_month_cycle_and_deck_bookkeeping` **17/17**、
+`cultivation_changes_combat` **30/30**(袋子与 RNG 流未被节点通道触碰,按构造成立);
+编译 **77/77** 零错误;视觉闸门 blind(`endpoint_unreachable`,人眼代判,57 场景 228
+帧,本轮零新几何/零新调色板)。§8.3 缺口未因实测而关闭:battle / facility 仍已声明
+未实现,昆仑 event 槽仍为终点保证的有意 `declared`,三者待后续轮次实现时才关闭。
+
