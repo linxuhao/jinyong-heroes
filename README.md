@@ -125,9 +125,12 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   rendered-ink width of the HP number fits the 64 px bar).
 - **Skill data**: `scripts/data/skill_data.gd` - `@export` schema incl. the
   new `cost: int = 0` (inner-force cost; 0 = undefined this round).
-- **Unit tests**: any `tests/*.gd` extending `SceneTree` with a top-level
-  `static func run() -> bool` is auto-discovered by the sidecar's `/script`
-  gate (see `tests/unit_test_runner.gd`).
+- **Unit tests**: GDScript test files with a top-level
+  `static func run() -> bool` are collected by `tests/unit_test_runner.gd`'s
+  explicit append-only `TESTS` registry (17 files, incl. the new
+  `test_skill_button_info.gd` / `test_health_bar_text.gd` /
+  `test_skill_button_no_energy.gd`), run headless via
+  `godot --headless --path . -s res://tests/unit_test_runner.gd`.
 
 ## Verification status (honest)
 
@@ -165,12 +168,15 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   machine-adjudicated - the round compensates with measured observables
   (`hp_text_width_ok`, nameplate/hint overlap pins), not a vision verdict.
 - Known doc drift (cosmetic, no code inconsistency): the pre-continuation
-  records `final/delivery_notes.md` §1/§5/§6/§7/§8.5, the jinyong-hud
-  changelog rows and `final/hud_info_probe_notes.md` §2 still describe the
-  `no_energy` state as deferred and the backlog as OPEN (both were landed
-  by the post-review continuation); the authoritative records are the code,
-  `design/20_content.md` §5, `design/30_presentation.md` and
-  `design/40_ux_backlog.md`.
+  records `final/delivery_notes.md` §1/§5/§6/§7/§8.5 and the jinyong-hud
+  changelog rows still describe the `no_energy` state as deferred and the
+  backlog as OPEN (both were landed by the post-review continuation);
+  `final/hud_info_probe_notes.md` §1/§2 additionally still carry the
+  pre-rework `cur/max` `hp_text` wording, and the changelog has no
+  appended row for the `no_energy` follow-up implementation itself. The
+  authoritative records are the code, `design/20_content.md` §5,
+  `design/30_presentation.md`, `design/40_ux_backlog.md` and this round's
+  `final/verify_report.json`.
 
 ## Repository layout
 
