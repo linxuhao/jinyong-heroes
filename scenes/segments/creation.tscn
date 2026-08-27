@@ -150,6 +150,14 @@ text = ""
 autowrap_mode = 3
 mouse_filter = 2
 
+[node name="HpValueLabel" type="Label" parent="MouseBox/AttrBox"]
+horizontal_alignment = 1
+mouse_filter = 2
+visible = false
+text = ""
+clip_text = false
+text_overrun_behavior = 0
+
 [node name="AttrNavRow" type="HBoxContainer" parent="MouseBox/AttrBox"]
 custom_minimum_size = Vector2(0, 44)
 size_flags_horizontal = 4
@@ -237,6 +245,14 @@ focus_mode = 0
 [node name="ConfirmBox" type="VBoxContainer" parent="MouseBox"]
 theme_override_constants/separation = 12
 visible = false
+
+[node name="ConfirmSummaryLabel" type="Label" parent="MouseBox/ConfirmBox"]
+horizontal_alignment = 1
+mouse_filter = 2
+visible = false
+text = ""
+clip_text = false
+text_overrun_behavior = 0
 
 [node name="ConfirmButton" type="Button" parent="MouseBox/ConfirmBox"]
 size_flags_horizontal = 4

@@ -55,6 +55,19 @@ var pressed_connected: Dictionary = {}
 ## prove that).
 var cursor_markers_visible: bool = false
 
+## Surface: current HP of the build under construction, derived exactly as
+## design/40_progression.md §7 defines it for player-created characters
+## (气血 = 根骨 × 5). Display-only — no rule or stored value changes (UX-07).
+var hp_value: int = 50
+
+## Surface: the HpValueLabel text ("当前气血 N"); kept equal to the label so
+## asserts can pin the exact rendered format (UX-07).
+var hp_text: String = ""
+
+## Surface: the ConfirmSummaryLabel text — one "名 值" line per attribute, the
+## final-value checklist the confirm page was missing (UX-08).
+var confirm_summary_text: String = ""
+
 ## Round-2 geometry observables (surface, append-only): per-frame, decidable
 ## creation-screen layout facts consumed by the playtest gate under
 ## CreationScreen.* (creation_layout_readability.yaml). Phase-gated facts
@@ -206,7 +219,7 @@ func _update_geometry_observables() -> void:
 				if gap_toggle0 != null:
 					cluster = gap_toggle0.get_global_rect()
 			"CONFIRM":
-				var gap_confirm: Button = get_node_or_null("MouseBox/ConfirmBox/ConfirmButton") as Button
+				var gap_summary: Control = get_node_or_null("MouseBox/ConfirmBox/ConfirmSummaryLabel") as Control
 				if gap_confirm != null:
 					cluster = gap_confirm.get_global_rect()
 		# Zero-size cluster = missing node: keep the previous value (do not
