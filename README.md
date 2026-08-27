@@ -134,8 +134,14 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
 
 ## Verification status (honest)
 
-`final/verify_report.json` records this round's verdict:
-**all_goals_met = false, ready_for_deploy = false**. In short:
+The only authoritative gate evidence is the pipeline step products —
+`5_compile`'s `compile_report.json` / `playtest_report.json` /
+`playtest_summary.md`, `5_vision`'s `vision_report.json`, `5_test`'s
+`test_report.json` — pipeline artifacts, not repo files. The repo file
+`final/verify_report.json` is deliberately NOT a delivery verdict: it is a
+tombstone pointer note (`superseded_pointer_note`) stating it does not
+represent the current delivery state, because the pipeline's `repo_apply`
+ignores `final/*` and can never refresh it. In short:
 
 - The three information layers (effect/cost, lock reason, HP numbers) are
   implemented and pinned by playtest assertions and unit tests; the frozen
@@ -175,8 +181,9 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   pre-rework `cur/max` `hp_text` wording, and the changelog has no
   appended row for the `no_energy` follow-up implementation itself. The
   authoritative records are the code, `design/20_content.md` §5,
-  `design/30_presentation.md`, `design/40_ux_backlog.md` and this round's
-  `final/verify_report.json`.
+  `design/30_presentation.md`, `design/40_ux_backlog.md`; the only
+  authoritative gate evidence is the pipeline step products, never
+  `final/verify_report.json` (tombstone pointer note).
 
 ## Repository layout
 
