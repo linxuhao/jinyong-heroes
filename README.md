@@ -45,6 +45,18 @@ Three new playtest scenarios pin the visibility of the three items
 `health_bar_numbers`; 47 -> 50 scenarios) plus two new headless unit tests
 (`tests/test_skill_button_info.gd`, `tests/test_health_bar_text.gd`).
 
+Post-review hardening in the same round: the HP number was reworked to the
+current-value-only route (`fix_hp_number_readability_v2`, recorded in
+`design/30_presentation.md`) and four on-frame readability observables are
+now asserted in playtest (`HealthBar.hp_text_width_ok`,
+`HUD.nameplate_pairwise_overlap`, `HUD.hint_nameplate_overlap`,
+`SettingsPanel.title_rows_overlap`) - measured ink-width / overlap checks
+that do not depend on the (blind) vision gate. Note: this snapshot also
+carries the sibling **jinyong-balance** round's tutorial-balance changes
+(shen-diao regen 20 -> 0, melee damage reduction -50% -> -10%;
+`design/99_changelog.md` / `final/terminal_victory_balance_notes.md`) -
+combat values, outside this round's presentation-only scope.
+
 ## Requirements
 
 - Godot 4.x. No external dependencies, no build step.
@@ -97,7 +109,8 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   `fahui_text` / `cost_text` / `effect_text` / `effect_summary_text` /
   `lock_reason_text` / `hp_gated` / `disabled`; `HealthBar`:
   `bar_width` / `bar_height` / `empty_area_px` / `empty_cap_px` /
-  `hp_text` / `hp_value` / `hp_max`.
+  `hp_text` / `hp_value` / `hp_max` / `hp_text_width_ok` (measured
+  rendered-ink width of the HP number fits the 64 px bar).
 - **Skill data**: `scripts/data/skill_data.gd` - `@export` schema incl. the
   new `cost: int = 0` (inner-force cost; 0 = undefined this round).
 - **Unit tests**: any `tests/*.gd` extending `SceneTree` with a top-level
@@ -121,12 +134,22 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   `playtest_summary.md`) on disk with the three scenarios green - artifacts
   produced downstream of the verifier step, not repo files.
 - Compile / playtest / unit / vision gates run after the verifier step; the
-  reviewer-injected results recorded in `final/delivery_notes.md` §3
-  (compile 71/71, unit 11/11, playtest hard gate passed with only the
-  sanctioned `terminal_victory_8_12_rounds_hp_15_40` balance deferral red)
-  are not repo artifacts and are not counted as verified here. The vision
-  gate was blind (endpoint unreachable): the rendered-ink legibility of the
-  new labels was never machine-adjudicated.
+  reviewer-recorded results quoted in `final/delivery_notes.md` §3
+  (compile 71/71 scripts, unit 11/11, playtest hard gate passed with the
+  three new scenarios and `spine_to_ending` green, only the then-sanctioned
+  `terminal_victory_8_12_rounds_hp_15_40` red) are pipeline artifacts, not
+  repo files, and are not counted as verified here. The tree has also
+  evolved since those runs (HP current-value rework, on-frame readability
+  observables, the sibling jinyong-balance round), so the downstream gate
+  re-run is the authoritative confirmation. The vision gate was blind
+  (endpoint unreachable): the rendered-ink legibility of the new labels was
+  never machine-adjudicated - the round partially compensates with measured
+  observables (`hp_text_width_ok`, nameplate/hint overlap pins), not a
+  vision verdict.
+- Known doc drift (cosmetic, no code inconsistency): `final/delivery_notes.md`
+  §1/§7/§8.1 and the jinyong-hud changelog row still describe `hp_text` as
+  `cur/max`, while the shipped code/scenario/design record the
+  current-value-only route (`fix_hp_number_readability_v2`).
 
 ## Repository layout
 
