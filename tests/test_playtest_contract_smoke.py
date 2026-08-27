@@ -49,7 +49,16 @@ ROUND_SCENARIOS: list[str] = [
     "creation_hp_value_displayed",
     "creation_confirm_summary",
     "qi_cost_blocks_cast_no_energy",
+    "map_node_event_shaolin",
 ]
+
+# The 12 observables the jinyong-map-events round appends to the MapScreen
+# surface block (in playtest/_common.yaml), in the same order they are appended.
+MAP_NODE_EVENT_SURFACE_VARS: tuple[str, ...] = (
+    "phase", "event_id", "event_focus", "entry_declared_gap_types",
+    "silver", "attr_bone", "attr_inner", "attr_agility", "attr_wisdom",
+    "attr_fortune", "last_effect_types", "events_resolved_count",
+)
 
 
 def _items_under(text: str, header: str) -> list[str]:
@@ -680,3 +689,77 @@ def test_qi_cost_surface_contract() -> None:
                 f"{name}.yaml line {lineno} assert missing "
                 f"comparison operator: {line.strip()}"
             )
+
+
+def test_map_node_event_surface_contract() -> None:
+    """Static contract pin for the jinyong-map-events round.
+
+    Pins the MapScreen node-entry event contract against ``playtest/_common.yaml``
+    and the new ``map_node_event_shaolin.yaml`` scenario: the 12 new observables
+    (phase / event_id / event_focus / entry_declared_gap_types / silver / attr_*×5 /
+    last_effect_types / events_resolved_count) are whitelisted on the surface,
+    ``map_node_event_shaolin`` is in scenario_order (two-place sync), the scenario
+    file exists with ``name:`` equal to its basename, every timeline ``at:`` is a
+    single integer, every 4-space dotted assert line carries a comparison operator
+    or the differential token changed/unchanged (the repo's
+    no-bare-scalar-silent-false rule), and the declared-but-unimplemented battle /
+    facility gaps are assertable via an entry_declared_gap_types line containing
+    both "battle" and "facility".
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "MapScreen" in blocks, "surface has no MapScreen block"
+    map_items = blocks["MapScreen"]
+    assert map_items, "MapScreen surface block parsed empty (vacuous pass guard)"
+
+    # Append-only guard: the five pre-existing MapScreen vars are still there.
+    for var in ("current_node_id", "focus_id", "ended", "visible", "size"):
+        assert var in map_items, f"MapScreen.{var} no longer whitelisted on the surface"
+
+    # The 12 new observables are whitelisted on the surface.
+    for var in MAP_NODE_EVENT_SURFACE_VARS:
+        assert var in map_items, f"MapScreen.{var} not whitelisted on the surface"
+
+    # Two-place sync: the new scenario is listed in scenario_order.
+    assert "map_node_event_shaolin" in _items_under(
+        text, "scenario_order"
+    ), "map_node_event_shaolin not in _common.yaml scenario_order"
+
+    # Scenario file static checks (same shape as test_qi_cost_surface_contract).
+    name = "map_node_event_shaolin"
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            has_op = any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            )
+            has_diff = "changed" in line or "unchanged" in line
+            assert has_op or has_diff, (
+                f"{name}.yaml line {lineno} assert missing "
+                f"comparison operator: {line.strip()}"
+            )
+
+    # Honesty pin: the declared-unimplemented gaps are assertable via a line
+    # carrying both "battle" and "facility" on MapScreen.entry_declared_gap_types.
+    gap_lines = [
+        line
+        for line in ftext.splitlines()
+        if line.strip().startswith("MapScreen.entry_declared_gap_types:")
+    ]
+    assert gap_lines, (
+        f"{name}.yaml missing MapScreen.entry_declared_gap_types assert line"
+    )
+    assert all(
+        "battle" in line and "facility" in line for line in gap_lines
+    ), f"{name}.yaml entry_declared_gap_types line must reference both battle and facility gaps"
