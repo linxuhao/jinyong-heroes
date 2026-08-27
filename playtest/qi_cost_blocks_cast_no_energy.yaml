@@ -10,10 +10,15 @@ description: >-
   button 4 (array index 3, never phase-locked, never cast, no HP gate) enters
   no_energy - NOT phase_locked - and is disabled; the hotkey select is refused
   with the visible reason 内力不足 and selection is unchanged; a confirm
-  attempt consumes nothing (energy stays 0, no cooldown started). The free
-  basic (button 1) stays ready - the player is never fully disarmed. No
-  end_turn: the round-1 player turn persists to the final assert, so the
-  waiting override never masks button states.
+  attempt consumes nothing (energy stays 0, no cooldown started). Button 1
+  (重剑无锋) is this round's free move in the cost table (its own cost-table
+  pin, see 20_content.md §7.3) - it is NOT the never-disarmed guarantee; that
+  belongs to the basic attack (普攻, cost 0, unconditionally available at 0
+  qi, see design/90_decisions.md). The scenario ends round 1 with one
+  end_turn: in round 2 the pool is still 0 and no skill is selected, so a
+  single attack_confirm fires the basic attack at zero cost - the
+  never-disarmed negative control (acted set, energy still 0, confirming it
+  was a basic attack, not a skill).
 timeline:
 - at: 3
   actions:
@@ -92,3 +97,27 @@ timeline:
     Player.energy: 'energy == 0'
     SkillButton4.cooldown_remaining: 'cooldown_remaining == 0'
     SkillButton4.state_text: 'state_text == "no_energy"'
+- at: 400
+  actions:
+  - end_turn
+- at: 950
+  actions: []
+  assert:
+    CombatManager.current_round: 'current_round == 2'
+    Player.acted: 'acted == false'
+    Player.energy: 'energy == 0'
+- at: 960
+  actions:
+  - move_right
+- at: 975
+  actions:
+  - move_right
+- at: 1000
+  actions:
+  - attack_confirm
+- at: 1100
+  actions: []
+  assert:
+    Player.acted: 'acted == true'
+    Player.energy: 'energy == 0'
+    Player.selected_skill_index: 'selected_skill_index == -1'
