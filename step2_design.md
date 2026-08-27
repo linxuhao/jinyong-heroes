@@ -1,600 +1,370 @@
-# Technical Architecture Design - jinyong-spend-qi (Spend the Inner-Qi Pool)
-
-Round goal: give the 8 player moves real inner-qi costs, wire combat casting to
-actually spend qi (insufficient qi blocks the cast), and make the `no_energy`
-HUD state reachable in a real battle and pinned by a new playtest scenario.
-**This round moves exactly one numerical lever: qi costs.** No health, damage,
-cooldown, move-range, or enemy-strength values change.
-
-Everything below was verified against the repo at design time (file paths,
-line anchors, scenario timelines, and the playtest contract are real, not
-assumed). Paths are relative to the repo root (`./`).
-
----
+# 技术架构设计 — Map Node Events (jinyong-map-events round)
 
 ## 1. Overview
 
-The presentation layer for costs is already shipped and inert
-(`SkillData.cost` schema field, `CostLabel` "内力 N" rendering,
-`no_energy_predicate` + 6-state palette + unit test
-`tests/test_skill_button_no_energy.gd`). What is missing is **content**
-(the 8 cost values), **enforcement** (a cast-time gate + deduction), and
-**proof** (a real-battle scenario that pins `no_energy`).
+Make the 6-node jianghu map actually trigger content on entry. This round implements exactly
+one content type end-to-end — **event** — by reusing the existing `scripts/data/event_data.gd`
+pool (16 rows) and the existing event resolution logic from `scripts/segments/cultivation.gd`,
+extracted into a shared pure-static module. Battle and sect-facility types get **declaration
+slots only**, recorded as honest gaps. Shaolin — the dead-end branch off Luoyang — gets the one
+fully interactive node-entry event this round, via a **deterministic binding to an existing
+pool row** (zero new prose).
 
-This round is therefore a *data-table + one-gate* change, decomposed as:
+Non-negotiables inherited from the brief and SOTA:
 
-1. **Docs first** (hard rule from the brief): the cost table lands in
-   `design/20_content.md` and the "只存不耗" paragraph is replaced in
-   `design/10_systems.md §1` **before** any code changes.
-2. **Data**: 7 of the 8 Yang Guo moves get non-zero `cost` in
-   `scripts/battlefield.gd::_create_all_skill_data()` (additive property
-   assignments, same pattern as `is_finisher` / `hp_gate_below_ratio`).
-   重剑无锋 (button 1) stays 0 - see §2.3.
-3. **Engine**: `scripts/autoload/combat_manager.gd::_execute_skill()` gains
-   an insufficient-qi gate (failure -> skill NOT consumed, returns null) and
-   a success-only clamped deduction next to the cooldown start.
-4. **Player-facing**: `scripts/characters/player.gd::_skill_reject_reason()`
-   gains an "内力不足" rejection reason (mirrors the existing acted-gate
-   two-level pattern: visible reason at select time, hard gate at execute
-   time), plus a `energy_max` observable for cap-relative asserts.
-5. **Display tracking**: `scripts/ui/hud.gd` refreshes the top-strip
-   EnergyLabel per frame (a setup()-only write would freeze the number at
-   the starting pool once casts start deducting).
-6. **Proof**: one new playtest scenario (`qi_cost_blocks_cast_no_energy`,
-   the 54th scenario), one new debug injection action
-   (`debug_spend_player_qi`), one new unit test
-   (`tests/test_qi_costs_match_design.gd`, 18 -> 19 files in the TESTS
-   registry), and the two-place contract sync
-   (`playtest/_common.yaml` `scenario_order` +
-   `tests/test_playtest_contract_smoke.py` `ROUND_SCENARIOS`).
+1. **`spine_to_ending` stays green with its UNMODIFIABLE timeline.** That scenario walks
+   无名谷→洛阳→武当→襄阳→昆仑 with exactly 4 `(move_right, ui_accept)` pairs at
+   f420–f490 and asserts `ENDING` at f520. Any *blocking interactive* event on a MAINLINE node
+   consumes presses the budget does not have (verified by hand-simulation below). Therefore
+   the interactive node event lives on **Shaolin (off-spine)**; mainline nodes *declare* event
+   slots that stay inert this round and are recorded as gaps.
+2. **Docs first.** The `design/` archive edits are the first implementation tasks, before any
+   code (§2).
+3. **No new event text.** The Shaolin binding points at an existing `EventData.TABLE` row.
+4. **Append-only playtest contract.** New scenario file + surface/action whitelist appends +
+   smoke-test contract pin; zero edits to any of the 54 existing scenario yamls (last-known
+   count from the knowledge base, not an on-disk gate product — no gate counts may be
+   fabricated).
+5. **One lever.** No numeric tuning, no combat rule change, no month-loop change, no new art.
 
-Nothing is rebuilt in `skill_button.gd` / `hud.gd` palette / scenes - the
-machinery this round activates already exists and is unit-tested.
+## 2. Design changes (declared for the `design/` archive — the docs-first round)
 
----
+This round is explicitly data-first per the brief, so the archive edits are scheduled BEFORE
+code (§9 task ordering). They are declared here; the `5_design` step reconciles them after
+final acceptance.
 
-## 2. Design changes (docs-first) - the cost table
+| File | Change | Rationale |
+|---|---|---|
+| `design/40_progression.md` | §5 (第 6 段 · 大地图): after the existing node-movement paragraph, add the **per-node entry-content declaration table** — every node declares `event` / `battle` / `facility` slots; only Shaolin's event slot is `active` this round; battle/facility and mainline event slots are `declared` (declaration-only, unimplemented); the spine-protection reason for inert mainline slots is stated verbatim (f420–f520 fixed budget, unmodifiable yaml). | The map paragraph currently says "节点上触发战斗、事件或门派设施" — the second half is unimplemented. The declaration schema makes it data-first. |
+| `design/20_content.md` | New dated section **§8 大地图节点进入内容 (2026-08-28, jinyong-map-events 轮)**: the 6-node entry-content table (mirroring `map_data.gd`), the Shaolin binding (`night_rain`, from the existing pool, with the "closest-scene, zero-new-prose" rationale), and the gap notes in the §5 style (see §8.5 below). | The single authoritative content record; gap notes follow the existing §5 discipline ("不许假装实现，也不许悄悄不提"). |
+| `design/90_decisions.md` | Dated decision note (appended after the existing 2026-08-27 note, same style): **event resolution logic relocation** — `_draw_event` / `_apply_event_option`'s effect loop / `_add_practice` are extracted from `cultivation.gd` into a shared pure-static module `scripts/data/event_logic.gd`; cultivation delegates byte-identically (same RNG op order, same effect application). Rationale: the map segment must reuse the resolution path rather than fork a parallel system; the only way to share instance-coupled code without regressing cultivation's pinned tests is to move the *pure* core once, with the doc note written first. | Required by the brief: "如果解算逻辑需要挪位置或共享，先改设计档案说明理由，再动代码". |
+| `design/99_changelog.md` | Append one round row (append-only; no existing row edited). | Round archive discipline. |
 
-Per the addon contract, these are the declared design-archive changes the
-`5_design` step applies surgically after the run passes. **The docs task
-lands before the code tasks** (brief: "必须先写进 design/20_content.md,
-再写进代码").
+### 2.1 Gap notes to record in `20_content.md` §8 (§5 style — declared-but-unimplemented)
 
-### 2.1 The cost table (the verbatim contract implementers copy)
+1. **battle** slots: declared on the relevant nodes, unimplemented this round (no battle
+   encounter wiring on map entry; `battle_id` stays `""`).
+2. **facility** (门派设施) slots: declared, unimplemented (no sect-facility content type).
+3. **mainline event slots** (无名谷/洛阳/武当/襄阳/昆仑): declared, deferred — an interactive
+   event there would consume input budget the unmodifiable `spine_to_ending` timeline does not
+   have. NOT "postponed silently": the spine-protection reason is written in the gap note.
+4. **No Shaolin-exclusive authored event text this round**: the "reason to visit" is a
+   deterministic binding to the existing `night_rain` pool row. A future *authored* exclusive
+   row (e.g. a Shaolin-specific scene) is a content gap — it must be authored **inside
+   `event_data.gd`'s TABLE only**, never inline in `map_data.gd` / `map.gd`, and must be
+   recorded as a gap first.
+5. **Node-event re-fire policy**: the Shaolin event fires on **every arrival by travel**; there
+   is no once-per-profile flag this round. Extending `PlayerProfile.flags` sanitization for a
+   new persisted key is out of scope; the policy (re-playable content site) is recorded rather
+   than silently missing.
+6. **江湖阅历 trait's 打听 action** (reveal adjacent node content, `40_progression.md` §2.2):
+   declared in the archive, not implemented; out of scope this round — recorded so it is not
+   read as forgotten.
 
-Inner-qi costs for the 8 tutorial player moves. Yang Guo's pool is 180
-(`battlefield.gd` `cd.energy = 180`, design/20_content.md §1 内力值 180).
+### 2.2 Why the Shaolin binding row is `night_rain` (破庙夜雨)
 
-| # | Button | Skill id (battlefield.gd) | Art | Cost (qi) | Rationale (tier) |
-|---|--------|---------------------------|-----|-----------|------------------|
-| 1 | SkillButton1 | `heavy_edge` (重剑无锋) | 玄铁剑法 | **0** | free basic strike - see §2.3 |
-| 2 | SkillButton2 | `grand_simplicity` (大巧不工) | 玄铁剑法 | **15** | light line AoE |
-| 3 | SkillButton3 | `thousand_force_cleave` (力斩千钧) | 玄铁剑法 | **20** | mid cross AoE |
-| 4 | SkillButton4 | `boundless_seas` (四海无量) | 玄铁剑法 | **25** | 绝招 (self-origin radius-2 AoE, cd 6) |
-| 5 | SkillButton5 | `heart_rending_strike` (心惊肉跳) | 黯然销魂掌 | **10** | cheapest single (cd 1) |
-| 6 | SkillButton6 | `dragging_mire` (拖泥带水) | 黯然销魂掌 | **15** | light utility single + slow |
-| 7 | SkillButton7 | `wandering_valley` (徘徊空谷) | 黯然销魂掌 | **20** | mid jump utility + AoE |
-| 8 | SkillButton8 | `seventeen_melancholy_forms` (黯然销魂十七式) | 黯然销魂掌 | **30** | most expensive - the ultimate 绝招 (adjacent AoE, hp-gated, cd 8) |
+Of the 16 pool rows, `night_rain` is the only one whose scene is **a monk in a temple** ("老僧
+独坐，就着灯火补屋檐") — the closest existing fit for visiting 少林 (a monastery): you arrive,
+help mend the leaky roof (silver −6, 根骨 +1) or practice sword under the eaves (practice +2).
+Zero new prose. "Exclusive" is mechanism-exclusivity: **only Shaolin's node entry fires this
+row deterministically**; the row itself stays in the shared pool (cultivation's 游历 bag may
+still draw it — the two channels are independent, see §4.5). If the team later prefers a
+different row, only the `event_id` value in `map_data.gd` changes; the mechanism is unaffected.
 
-Ladder: light 10-15 < mid 20 < 绝招 25/30; 十七式 (30) is the single most
-expensive move in the game, honouring "重招贵、轻招便宜、绝招最贵".
-All 23 enemy/other techniques and all progression (encounter) techniques
-**stay cost 0** - enemies have `energy = 0` and progression pricing is a
-later round's lever.
-
-### 2.2 Win-path budget (why these numbers are safe - verified cast-by-cast)
-
-`terminal_victory_8_12_rounds_hp_15_40.yaml` is the cost-sensitive gate
-(baseline today: **green 6/6**; the scenario's own header still carries the
-stale "red at ~78%" note from the pre-jinyong-balance era - the measured
-current state is green). Its scripted chain casts (in order):
-`skill_1, skill_4, skill_3, skill_8, skill_1, skill_3, skill_7, skill_4,
-skill_5, skill_1, skill_7, skill_1`. With the table above:
-
-| Cast | Cost | Cumulative | Energy before cast (cap 180) | Passes gate? |
-|------|------|-----------|------------------------------|--------------|
-| f620 skill_4 | 25 | 25 | 180 | 25 ≤ 180 yes |
-| f970 skill_3 | 20 | 45 | 155 | yes |
-| f1045 skill_8 | 30 | 75 | 135 | yes |
-| f1300 skill_1 | 0 | 75 | 105 | free |
-| f1560 skill_3 | 20 | 95 | 105 | yes |
-| f1820 skill_7 | 20 | 115 | 85 | yes |
-| f2080 skill_4 | 25 | 140 | 65 | yes |
-| f2340 skill_5 | 10 | 150 | 40 | yes |
-| f2600 skill_1 | 0 | 150 | 30 | free |
-| f2870 skill_7 | 20 | 170 | 30 | 20 ≤ 30 yes |
-| f2960 skill_1 | 0 | 170 | 10 | free |
-
-**Total spend 170 / 180, margin 10.** Every cast passes the gate
-(`energy == cost` is castable; the predicate blocks only `energy < cost`),
-so damage/cooldown/HP trajectories are byte-identical and the scenario stays
-6/6. The win path nearly exhausts the pool by design - the costs are a real
-constraint (a wasteful player can run dry) without breaking winnability.
-The other two skill-casting scenarios are far under budget:
-`central_divine_innate_qi_fatal_guard` spends 15+20 = 35 (plus free
-`skill_1` casts); `skill_rejection_reason_texts` casts only free `skill_1`.
-
-**Fallback rule (from the brief, restated for PM):** if any regression run
-reddens the tutorial win, the COST TABLE is wrong - revise costs only.
-Never touch HP, damage, cooldowns, or enemies this round.
-
-### 2.3 Why 重剑无锋 stays free (documented zero-cost decision, non-goal 3)
-
-1. **Existing pin**: `playtest/skill_button_effect_info.yaml` line 42 pins
-   `SkillButton1.cost_text == "无消耗"`, and existing yamls are immutable
-   this round. A non-zero cost for button 1 would redden an existing
-   scenario - the only resolution satisfying both constraints is cost 0.
-2. **Content rationale (record it, don't invent a number)**: it is the
-   basic strike of the sword art ("重剑无锋,大巧不工" - the plainest
-   verb), cd 1, and the design property that **the player is never fully
-   disarmed**: at 0 qi there is always one castable move. This property is
-   pinned as a negative control in the new scenario (§5.2).
-3. All 12 skill-bar slots beyond the 8 player moves keep cost 0
-   (progression arts - the 养成 round's lever, not this round's).
-
-### 2.4 Archive edits (the docs task, exact targets)
-
-| File | Edit |
-|------|------|
-| `design/10_systems.md` §1 | Replace the paragraph starting "**内力池本轮只存不耗。**" with the new statement: the pool stores AND spends - casting deducts per the `20_content.md` cost table, insufficient qi blocks the cast at the execution point (button shows 「内力不足」), 重剑无锋 is free (rationale in 20_content), and the pool **does not regenerate within a battle** (recorded gap - regen mechanics belong to a later round). |
-| `design/20_content.md` §1 | Add an inner-force-cost column to both move tables (玄铁剑法 4 rows, 黯然销魂掌 4 rows) with the §2.1 values. |
-| `design/20_content.md` | Append a dated section (2026-08-27, jinyong-spend-qi): the full §2.1 table + rationale, the win-path budget (170/180), the 重剑无锋 free rationale (§2.3), enemy/progression techniques stay 0, and the no-regen gap. Also append a dated note inside §5 that the "内容缺口" it recorded is now CLOSED by this round (the original text stays as the jinyong-hud historical record). |
-| `design/30_presentation.md` | Amend the no_energy bullet ("当前内容下不可达……刻意不写任何伪装它在实战中触发的 playtest 断言") with a dated note: real costs now defined, no_energy is reachable in live play and pinned by `qi_cost_blocks_cast_no_energy` (not a伪装 assert - the costs are real content). |
-| `design/99_changelog.md` | Append the jinyong-spend-qi row (what/why, one-lever discipline, budget math). |
-| `design/40_ux_backlog.md` | Append a 记录 row: UX-03's `cost_text` now shows real costs on 7 of 8 slots; button 1 stays 「无消耗」 by the documented pin + rationale. |
-| `README.md` | Update the skill-data bullet: `cost: int` now carries real values (see `design/20_content.md`); 0 = free/undefined. |
-
-In-archive text follows the archive's existing (Chinese) convention; the
-numbers and structure above are the contract. Code-comment sync (the now-
-false "display only - no technique costs this run" comments) is listed in
-C6.
-
----
-
-## 3. Architecture / data flow (text diagram)
+## 3. Architecture diagram (text)
 
 ```
-design/20_content.md §cost table  (SOURCE OF TRUTH, lands first)
+scripts/data/map_data.gd  (EXTEND, additive)
+  NODES rows gain "entry_content": {event|battle|facility: {status, id}}
+  new statics: entry_content(id), active_event_id(id), declared_gap_types(id)
         |
         v
-battlefield.gd :: _create_all_skill_data()        [C1 - data]
-        sets .cost on 7 SkillData resources (heavy_edge untouched = 0)
-        |
-        v
-SkillData.cost  (existing @export field, one value, three consumers)
-        |
-        +--> skill_button.gd :: no_energy_predicate -> SkillData.insufficient_energy
-        |       (HUD per-frame derivation: state_text / disabled / 内力不足 tag)   [C5]
-        |
-        +--> player.gd :: _skill_reject_reason                                      [C4]
-        |       select-time gate -> action_hint "内力不足" (visible reason)
-        |
-        +--> combat_manager.gd :: _execute_skill                                    [C3]
-                GATE  (failure -> return null, nothing consumed):
-                  "energy" in unit and SkillData.insufficient_energy(cost, energy)
-                SUCCESS BLOCK (beside cooldown start, acted = true):
-                  unit.energy = SkillData.spend(unit.energy, cost)   [clamped >= 0]
-                shared spend_unit_energy() helper  <-- debug_spend_player_qi (C3b)
-                                                      (injection goes through
-                                                       the same spend path)
+scripts/segments/map.gd  (EXTEND, additive EVENT phase)
+  _travel(): end-node routing FIRST (unchanged) -> _maybe_start_entry_event()
+  phase "TRAVEL" (existing behavior, byte-identical when no active slot)
+  phase "EVENT" : move_* cycles _event_focus (0/1); ui_accept resolves
+        |                                |
+        | reuses (no fork)               v
+        |                    scripts/data/event_logic.gd  (NEW, pure statics)
+        |                      draw_unseen_id(profile, rng)     <- bag draw
+        |                      apply_option_effects(profile, opt) <- 5 effect types
+        |                      add_practice(profile, amount)   <- first-unmastered
+        |                                ^
+        | delegates byte-identically     |
+        +---------------- scripts/segments/cultivation.gd  (EDIT, delegation only)
+                           _draw_event / _apply_event_option / _add_practice
+                           keep event_id / phase / _sync_surface management
 
-player.gd :: energy / energy_max (NEW observable, cap-relative asserts)  [C4]
-hud.gd    :: EnergyLabel "内力: %d" refreshed PER FRAME                   [C5]
+scripts/data/event_data.gd  (UNTOUCHED — the mandated single text pool)
+SaveManager.profile  (map_node, silver, add_attr, inventory, flags["events_seen"] — untouched schema)
 
-playtest/qi_cost_blocks_cast_no_energy.yaml  (54th scenario)             [C7]
-_common.yaml (surface: Player.energy_max; actions: debug_spend_player_qi;
-              scenario_order append) + test_playtest_contract_smoke.py
-              ROUND_SCENARIOS append + new contract test                 [C8]
-tests/test_qi_costs_match_design.gd  (data pin, TESTS 18 -> 19)          [C8]
+Pins:
+  playtest/map_node_event_shaolin.yaml  (NEW scenario, 54 -> 55, append-only)
+  playtest/_common.yaml                 (MapScreen surface append + scenario_order tail append)
+  tests/test_map_node_event.gd          (NEW unit pin, registered in unit_test_runner.gd TESTS)
+  tests/test_playtest_contract_smoke.py (additive contract pin + ROUND_SCENARIOS tail sync)
 ```
-
-Cast chain (verified): UI button / hotkey -> `player.select_skill()`
-(rejection reasons) -> J / click target -> `player._execute_skill()` ->
-`CombatManager._execute_action()` -> `combat_manager.gd::_execute_skill()`
-(the single execution point for player AND AI casts - the `cost > 0` guard
-makes enemies, whose techniques are all cost 0 and whose energy is 0,
-byte-identical in behavior).
-
----
 
 ## 4. Component list
 
-### C0 · Docs-first task (§2.4) - BLOCKS all code tasks
-Single task, lands before C1. No code may land before it (brief hard rule).
+### 4.1 `scripts/data/map_data.gd` — entry-content declarations (data-first)
 
-### C1 · `scripts/battlefield.gd` - the 8 cost values
-- **Where**: `_create_all_skill_data()` (~L227-378). Set `.cost`
-  additively after `_skill()` returns - the exact pattern already used for
-  `is_finisher` / `hp_gate_below_ratio` / `jump_tiles` /
-  `status_applied`. The 10-positional-arg `_skill()` factory signature is
-  NOT extended (per the SOTA: additive property assignment, not a new arg).
-- **What** (verbatim):
-  ```gdscript
-  # heavy_edge: no cost line - the free basic (design/20_content.md cost table)
-  skills["grand_simplicity"].cost = 15
-  skills["thousand_force_cleave"].cost = 20
-  skills["boundless_seas"].cost = 25    # set alongside its is_finisher block
-  skills["heart_rending_strike"].cost = 10
-  skills["dragging_mire"].cost = 15     # alongside status_applied
-  skills["wandering_valley"].cost = 20  # alongside jump_tiles
-  skills["seventeen_melancholy_forms"].cost = 30  # alongside hp_gate/is_finisher
-  ```
-  (Where a local var already exists - boundless_seas, dragging_mire,
-  wandering_valley, seventeen_forms - assign on the local before storing;
-  equivalent.)
-- **Not touched**: all 23 enemy/other technique entries, `_skill()`
-  itself, every damage/cooldown/HP value. Interface: none new - the
-  existing `SkillData.cost` field.
+Additive only; `node_def()` already deep-copies, so extra keys are invisible to existing
+callers and `tests/test_map_data.gd` stays green.
 
-### C2 · `scripts/data/skill_data.gd` - two pure cost statics
-Additive, next to the `cost` field:
+Each NODES row gains `entry_content`. Statuses: `"active"` (implemented + live) or
+`"declared"` (declaration slot only — unimplemented this round):
+
 ```gdscript
-## Insufficient-inner-force predicate (single source of truth,
-## jinyong-spend-qi): true when the skill costs inner force (cost > 0) and
-## the pool is strictly below it. cost == 0 never blocks (free basic,
-## enemy/progression techniques). Shared by the executor gate, the player's
-## select-time rejection, and skill_button.no_energy_predicate (which
-## delegates here - its public API and unit tests stay unchanged).
-static func insufficient_energy(cost: int, energy: int) -> bool:
-	return cost > 0 and energy < cost
-
-## Spend math (pure): pool minus cost, clamped at 0; negative costs read
-## as 0. The executor's deduction and the debug drain both go through this.
-static func spend(current: int, cost: int) -> int:
-	return maxi(current - maxi(cost, 0), 0)
+{"id": "wuming_valley", "display_name": "无名谷", "is_end": false,
+    "entry_content": {
+        "event":    {"status": "declared", "event_id": ""},
+        "battle":   {"status": "declared", "battle_id": ""},
+        "facility": {"status": "declared", "facility_id": ""},
+    }},
+# luoyang / wudang / xiangyang / kunlun: same "declared" shape (mainline, spine-protected)
+{"id": "shaolin", "display_name": "少林", "is_end": false,
+    "entry_content": {
+        "event":    {"status": "active", "event_id": "night_rain"},
+        "battle":   {"status": "declared", "battle_id": ""},
+        "facility": {"status": "declared", "facility_id": ""},
+    }},
 ```
 
-### C3 · `scripts/autoload/combat_manager.gd` - gate + deduction + debug drain
-1. **Gate** in `_execute_skill()` (~L1310-1320), appended to the existing
-   gate block after the `hp_gate_below_ratio` check (mirrors the HUD
-   priority order phase > cooldown > hp_gated > no_energy):
-   ```gdscript
-   # --- Execution gate (failure -> skill NOT consumed): insufficient inner
-   # force (jinyong-spend-qi). cost == 0 never gates, so enemies (energy 0,
-   # all techniques free) and the free basic are unaffected.
-   if "energy" in unit \
-   		and SkillData.insufficient_energy(int(skill.cost), int(unit.energy)):
-   	return null
-   ```
-   (`skill_data.gd` is preloaded/available; add the const preload if the
-   file lacks one.)
-2. **Deduction** in the success block (~L1416, beside the cooldown start),
-   success-only (failed gates spend nothing, start no cooldown, never set
-   `acted`):
-   ```gdscript
-   # --- Spend inner force (only on successful execution, clamped >= 0) ---
-   spend_unit_energy(unit, int(skill.cost))
-   ```
-3. **Shared spend path** (single helper both the cast and the debug action
-   use - the roadmap's "injection goes through the normal pipeline" rule):
-   ```gdscript
-   ## Spend `cost` inner force from `unit` through the ONE spend path every
-   ## cast uses. Clamped at 0. Returns the new pool value (-1 when the unit
-   ## exposes no energy / is gone - nothing spent).
-   func spend_unit_energy(unit: Node, cost: int) -> int:
-   	if unit == null or not is_instance_valid(unit) or not ("energy" in unit):
-   		return -1
-   	if int(cost) <= 0:
-   		return int(unit.energy)
-   	unit.energy = SkillData.spend(int(unit.energy), int(cost))
-   	return int(unit.energy)
-   ```
-4. **Debug injection action** `debug_spend_player_qi()` next to
-   `debug_damage_player()` (~L399): no-op unless a battle is active and the
-   player exists; drains the player's whole remaining pool through
-   `spend_unit_energy(player, int(player.energy))` (drain-to-zero is robust
-   against any future cost retuning - every costed move becomes
-   insufficient). Three-place wiring, same as every existing debug action:
-   `project.godot [input]` (empty-events entry, harness-only),
-   `scripts/autoload/game_manager.gd` `_process`
-   (`if Input.is_action_just_pressed("debug_spend_player_qi"): CombatManager.debug_spend_player_qi()`),
-   and `playtest/_common.yaml` `actions:` list (append).
+New static accessors (pure data layer, deep-copied like `node_def`):
 
-### C4 · `scripts/characters/player.gd` - select gate + energy_max
-1. **`energy_max` observable** (cap-relative asserts, mirrors the
-   `max_health` discipline):
-   ```gdscript
-   ## 内力池上限: the pool this battle started with. Playtest surface for
-   ## cap-relative qi asserts (energy < energy_max), mirroring max_health.
-   ## Written once in setup(); the pool does not regenerate in battle
-   ## (recorded gap, design/20_content.md).
-   var energy_max: int = 0
-   ```
-   In `setup()` beside `energy = data.energy` (~L214): `energy_max = data.energy`.
-   (Enemy units are NOT touched - the surface asserts only the Player's
-   pool; enemy energy is 0 and their techniques are free.)
-2. **Select-time rejection reason** in `_skill_reject_reason()` (~L278),
-   inserted after the HP-gate block and before the technique-seal check
-   (mirroring the HUD priority; visible reason instead of a silent no-op -
-   the acted-gate precedent from the 2026-08-24 changelog row):
-   ```gdscript
-   # jinyong-spend-qi: insufficient inner force. Selecting a skill whose
-   # cost exceeds the current pool is refused with the visible reason; the
-   # HUD already renders the same fact (no_energy state + 内力不足 tag) and
-   # the engine hard-gates the cast (CombatManager._execute_skill).
-   if skill != null and SkillData.insufficient_energy(int(skill.cost), int(energy)):
-   	return "内力不足"   # 8th rejection reason; grep-able acceptance point
-   ```
-   Add `const SkillData = preload("res://scripts/data/skill_data.gd")` if
-   not already present (skill_data.gd has no dependencies - no cycle).
+- `entry_content(id) -> Dictionary` — the node's `entry_content` ({} if unknown).
+- `active_event_id(id) -> String` — the `event_id` iff `status == "active"` AND
+  `EventData.def(event_id) != null`; else `""`. (A typo'd binding reads as inert — fail-safe,
+  never a crash; the unit test pins the binding resolves.)
+- `declared_gap_types(id) -> Array[String]` — types whose slot `status == "declared"`
+  (e.g. `["event", "battle", "facility"]` on luoyang; `["battle", "facility"]` on shaolin).
+  This is the **honesty observable**: the declared-but-unimplemented gap is assertable, not
+  just documented.
 
-### C5 · `scripts/ui/hud.gd` - live EnergyLabel
-The top-strip `EnergyLabel` ("内力: %d") is currently written only in
-`setup()` (~L371-381, comment "display only; no technique costs this run").
-Once casts deduct, a setup()-only write freezes the number at the starting
-pool - exactly the "assertion green, player can't see it" defect class this
-repo hunts. Refactor: extract the guarded write into
-`_refresh_energy_label(player: Node)`, call it from `setup()` AND from the
-per-frame refresh that calls `_refresh_skill_button_states(player)`
-(~L700-711). No rects, nodes, or geometry constants change - text content
-only (shorter strings shrink the label rect; the existing
-`top_text_pairwise_overlap` / `top_text_in_strip` pins read rects and stay
-green). The skill-button state derivation (`no_energy`, `disabled`,
-`derive_state`) is ALREADY per-frame - zero changes there.
+### 4.2 `scripts/data/event_logic.gd` — NEW shared pure-static module
 
-### C6 · Comment sync (no logic) - stale "display only" claims
-Update the now-false doc-comments so the next round doesn't get misled
-(each is a one-line comment edit, grep-verified targets):
-`player.gd:110`, `enemy.gd:83`, `data/character_data.gd:18`,
-`data/gongfa_data.gd:18`, `hud.gd` energy-label comment, and the
-"with current content every SkillData.cost == 0" notes in
-`skill_button.gd` (`no_energy` var, `no_energy_predicate`,
-`cost_label_text`) and `hud.gd` (`_refresh_skill_button_states`).
-`skill_button.gd::no_energy_predicate` delegates to
-`SkillData.insufficient_energy` (one-line body change; public signature,
-palette, priority chain, and `tests/test_skill_button_no_energy.gd` all
-unchanged and stay green).
+`class_name EventLogic`. No scene, no autoload, no signal — pure statics over
+`(profile, rng)`; zero new RNG ops, zero new effect types. One resolution path for both
+cultivation and the map segment.
 
-### C7 · `playtest/qi_cost_blocks_cast_no_energy.yaml` - the new scenario
-Full skeleton in §5. Boots `res://scenes/main.tscn` (default scene),
-7x `ui_accept` boot prefix, all within round 1's player turn (~f400, far
-under the 3000-frame cap).
+- `static func draw_unseen_id(profile: PlayerProfile, rng: RandomNumberGenerator) -> String`
+  — the no-repeat bag draw, byte-for-byte the current `cultivation._draw_event()` body:
+  unseen ids from `EventData.all()`, pool reset when exhausted, exactly **one**
+  `rng.randi_range(0, pool.size() - 1)` call. (RNG op order unchanged → the seeded stream is
+  untouched → `event_travel_effects` and all cultivation draws stay deterministic.)
+- `static func apply_option_effects(profile: PlayerProfile, opt: EventData.EventOption) -> void`
+  — the 5-type effect loop from `cultivation._apply_event_option` (silver clamp ≥ 0,
+  `add_attr`, inventory append-if-absent, `add_practice`), verbatim.
+- `static func add_practice(profile: PlayerProfile, amount: int) -> void`
+  — `cultivation._add_practice` verbatim, including the 杀破狼 `TraitEffects.pojun_practice`
+  hook and first-unmastered targeting; `return` when no unmastered art exists.
 
-### C8 · Contract + unit tests
-- `playtest/_common.yaml`: append `debug_spend_player_qi` to `actions:`;
-  append `energy_max` to the `Player:` surface block; append
-  `qi_cost_blocks_cast_no_energy` to `scenario_order` (tail).
-  Counting note (per Step-1 review): the dir currently holds **53 scenario
-  yamls + `_common.yaml` = 54 files**; this round makes it **54 scenarios +
-  _common = 55 files** (the "53 existing scenarios" in the brief = the
-  53 pre-existing scenario files, all of which must stay green).
-- `tests/test_playtest_contract_smoke.py`: append
-  `qi_cost_blocks_cast_no_energy` to `ROUND_SCENARIOS` (tail - same order
-  as scenario_order); add `test_qi_cost_surface_contract()` mirroring
-  `test_hud_info_surface_contract`: pins `Player.energy_max` whitelisted,
-  `debug_spend_player_qi` in the actions list, the new yaml's existence,
-  `name:` == basename, single-integer `at:` values, and a comparison
-  operator (or `changed`/`unchanged` token) on every 4-space dotted assert
-  line.
-- `tests/test_qi_costs_match_design.gd` (new, `static func run() -> bool`,
-  registered in `tests/unit_test_runner.gd` `TESTS` in alphabetical
-  position - 18 -> 19 files): instantiates
-  `preload("res://scripts/battlefield.gd").new()` (never added to the
-  tree, so `_ready` never runs; `_create_all_skill_data()` is pure data),
-  pins all 8 costs against the §2.1 table, pins `cost == 0` for EVERY other
-  skill id in the returned dict (robust enumeration, not a spot check),
-  and pins the `SkillData.insufficient_energy` / `SkillData.spend` truth
-  tables (0-cost never blocks; energy == cost castable; clamp at 0;
-  negative cost reads as 0).
-  Rationale for pinning the numbers at the unit layer: the playtest
-  scenario stays **cost-agnostic** (asserts the mechanic only) so future
-  cost retuning reddens exactly one greppable unit file, not the
-  regression net.
+**Naming-independence note (reviewer #4):** `EventLogic` holds no instance state and no
+scene references; neither segment keeps a live instance of the other. Cultivation and map
+each *call* statics — no coupling either direction beyond the shared module, so cultivation's
+pinned cases (last-known: 48 effects-land cases in `tests/test_cultivation.gd`, plus
+`event_travel_effects`) and `save_load_roundtrip` cannot regress through instance
+interaction.
 
-### C9 · Docs closure
-The §2.4 archive edits ride with C0 (docs-first); after the gates run, the
-round record lands in `99_changelog.md` / `40_ux_backlog.md` 记录 /
-`30_presentation.md` amendment (already listed in §2.4 - same edits, one
-pass). `final/` delivery notes per repo convention (optional, PM).
+### 4.3 `scripts/segments/cultivation.gd` — delegation only (byte-identical behavior)
 
----
+Three surgical edits, nothing else changes:
 
-## 5. Playtest contract (architect-owned surface + scenario skeleton)
+- `_draw_event() -> String`: body becomes `return EventLogic.draw_unseen_id(SaveManager.profile, SaveManager.rng)`.
+- `_apply_event_option(opt_index)`: keeps `event_id` lookup, option pick, seen-mark,
+  `event_id = ""`, `_sync_surface()` — only the `for eff in opt.effects: match ...` loop is
+  replaced by `EventLogic.apply_option_effects(SaveManager.profile, opt)`.
+- `_add_practice(amount)`: body becomes `EventLogic.add_practice(SaveManager.profile, amount)`.
 
-Surface/action additions (the hard contract for implementers - names must
-match verbatim):
-- `actions:` += `debug_spend_player_qi` (must ALSO exist in
-  `project.godot [input]` as an empty-events entry, and be handled in
-  `game_manager.gd` `_process`).
-- `surface: Player:` += `energy_max` (`energy` is already whitelisted).
-- `scenario_order:` += `qi_cost_blocks_cast_no_energy` (tail).
+Phase machine, `_sync_surface`, EVENT render, `_fast_forward`, `_debug_step_month` are
+untouched. All existing cultivation unit tests and playtest scenarios must pass unchanged.
 
-### 5.1 Scenario skeleton - `playtest/qi_cost_blocks_cast_no_energy.yaml`
+### 4.4 `scripts/segments/map.gd` — additive EVENT phase
 
-Name: `qi_cost_blocks_cast_no_energy` (basename == name). Boots the default
-scene (real tutorial battle). All action frames follow the measured
-terminal_victory / fahui_du cadence; PM may shift frames after a probe run
-but the assert set and their order are the contract.
+New surface vars (see §5) + a two-phase input gate. **Inert by default**: a node whose event
+slot is not `active` produces byte-identical behavior to today.
 
-```yaml
-name: qi_cost_blocks_cast_no_energy
-description: >-
-  Real-battle proof that casting spends inner qi and that insufficient qi
-  blocks the move: a real skill_2 cast deducts the pool (energy <
-  energy_max); after draining the pool through the shared spend path
-  (debug_spend_player_qi), button 4 (never cast, never phase-locked, no HP
-  gate) enters no_energy - NOT phase_locked - and is disabled; the hotkey
-  select is refused (visible reason 内力不足, selection unchanged) and
-  nothing is consumed (energy unchanged, no cooldown started). The free
-  basic (button 1) stays ready - the player is never fully disarmed.
-timeline:
-- at: 3 / 5 / 7 / 9 / 11 / 13 / 15   # 7x ui_accept (boot: menu -> creation -> tutorial)
-- at: 30
-  assert:                            # baseline: full pool, no no_energy anywhere
-    Player.energy: 'energy == energy_max'
-    SkillButton4.state_text: 'state_text != "no_energy"'
-    SkillButton4.disabled: false
-- at: 46 / 61 / 76                   # move_up x3 -> player (7,2), Central Divine adjacent
-- at: 91
-  actions: [skill_2]                 # select 大巧不工 (cost > 0)
-- at: 106
-  actions: [attack_confirm]          # real cast lands on Central Divine
-- at: 150
-  assert:                            # THE deduction: a real cast spent qi
-    Player.energy: 'energy < energy_max'
-    Player.acted: true
-    CombatManager.current_round: 1
-- at: 170
-  actions: [debug_spend_player_qi]   # drain pool to 0 via the shared spend path
-- at: 240
-  assert:                            # THE state: no_energy, not phase_locked, disabled
-    Player.energy: 'energy >= 0 and energy < energy_max'
-    SkillButton4.state_text: 'state_text == "no_energy"'
-    SkillButton4.state_text: 'state_text != "phase_locked"'
-    SkillButton4.disabled: true
-    SkillButton4.state_tag_text: 'state_tag_text == "内力不足"'
-    SkillButton1.disabled: false     # free basic never gated (negative control)
-    SkillButton1.state_text: 'state_text == "ready"'
-- at: 260
-  actions: [skill_4]                 # hotkey attempt on the blocked move
-- at: 280
-  assert:                            # select refused with the visible reason
-    ActionHintLabel.text: 'text == "内力不足"'
-    Player.selected_skill_index: 'selected_skill_index != 3'
-- at: 300
-  actions: [attack_confirm]          # confirm attempt (acted gate rejects - nothing happens)
-- at: 360
-  assert:                            # nothing consumed: no spend, no cooldown, still blocked
-    Player.energy: unchanged
-    SkillButton4.cooldown_remaining: 0
-    SkillButton4.state_text: 'state_text == "no_energy"'
+- `phase: String = "TRAVEL"` — existing focus/travel flow; `"EVENT"` while a node event is up.
+- `_travel()` (order matters):
+  1. existing adjacency checks + `current_node_id` assignment + `map_node` write + `autosave()`;
+  2. **end-node routing first** (unchanged `is_end_node` → `ended = true` → ENDING);
+  3. then `_maybe_start_entry_event()`: `var eid := MapData.active_event_id(current_node_id)`;
+     if `eid != ""` → `phase = "EVENT"`, `event_id = eid`, `_event_focus = 0`, `_render()`.
+     (Invariant recorded in design: a future node that is both end and active routes to ENDING
+     first — node content never blocks the ending.)
+- `_unhandled_input`: `if ended: return` (unchanged); then
+  `if phase == "EVENT":` route `move_up/move_left` → `_event_focus = 0`,
+  `move_down/move_right` → `_event_focus = 1` (cultivation's EVENT-phase convention),
+  `ui_accept` → `_resolve_node_event()`; **all** consume `set_input_as_handled()` and return.
+  Otherwise the existing travel/focus branches, unchanged.
+- `_resolve_node_event()`:
+  `var def := EventData.def(event_id)`; pick option by `_event_focus`;
+  `last_effect_types` = the option's effect `type`s in order;
+  `EventLogic.apply_option_effects(SaveManager.profile, opt)`;
+  `events_resolved_count += 1`;
+  `event_id = ""`, `phase = "TRAVEL"`, `SaveManager.autosave()`, `_sync_surface()`, `_render()`.
+  **No read or write of `flags["events_seen"]`** — the node channel is a deterministic binding,
+  independent of the cultivation bag (reviewer #5: entering Shaolin always shows its event,
+  regardless of what 游历 already drew; no order-dependence, no flakiness).
+- `_render()`: in EVENT phase, append the event block (title / text / both option labels with
+  `▶` marker / `"\n\n上下选择，回车定夺"`) and **replace the travel hint line** in the same
+  transition — the map must not keep promising "回车启程" while a modal event is up (the
+  repo's "no stale promise" discipline). TRAVEL-phase render text is unchanged.
+- `_ready()` is **untouched**: entry content fires only on arrival-by-travel, never on boot or
+  load — a save→load roundtrip at Shaolin does not re-trigger an event, and `save_load_roundtrip`
+  stays green.
+
+### 4.5 Two independent event channels (stated explicitly)
+
+- **Cultivation 游历 channel**: RNG bag draw, no-repeat via `flags["events_seen"]`, marks seen.
+- **Map node channel**: deterministic `node → event_id` binding, reads/writes neither the bag
+  nor the seed stream, fires on every arrival by travel.
+
+They share one pool (`EventData`) and one effect-application path (`EventLogic`), nothing else.
+Reusing the same row on both channels is accepted and recorded (§2.1 gap #4).
+
+## 5. Observable contract (exact names — the playtest surface whitelist)
+
+`playtest/_common.yaml` `surface: MapScreen:` block, **append-only** (existing five entries
+untouched):
+
+```
+  MapScreen:
+  - current_node_id        # existing
+  - focus_id               # existing
+  - ended                  # existing
+  - visible                # existing
+  - size                   # existing
+  - phase                  # NEW: "TRAVEL" | "EVENT"
+  - event_id               # NEW: "" when no node event is up
+  - event_focus            # NEW: 0 | 1 (which option the ▶ marks)
+  - entry_declared_gap_types  # NEW: Array[String] of declared-unimplemented slot types at the current node
+  - silver                 # NEW: profile.silver mirror
+  - attr_bone              # NEW: profile mirrors (differential asserts)
+  - attr_inner
+  - attr_agility
+  - attr_wisdom
+  - attr_fortune
+  - last_effect_types      # NEW: Array[String] effect types of the last resolved option, in order
+  - events_resolved_count  # NEW: session count of resolved node events (ladder 0 -> 1)
 ```
 
-Why this shape holds (verified against the code):
-- Button 4 is array index 3 -> `phase_locked` requires `i >= 4`, so it is
-  NEVER phase-locked; it is never cast in this scenario (cooldown 0
-  throughout) and has no `hp_gate_below_ratio` - the only predicate that
-  can be true at f240 is `no_energy`. The `waiting` override is false
-  throughout (player's turn: the skill_2 cast sets `acted` but the turn
-  persists until `end_turn`, which this scenario never presses).
-- The f300 `attack_confirm` reaches the acted gate ("本回合已行动",
-  set by the f106 cast) before any basic attack executes - no side effects;
-  the f360 asserts prove skill 4 itself never fired.
-- All qi asserts are cap-relative (`energy_max`); the exact cost values are
-  deliberately NOT asserted here (see C8 rationale).
-- Every assert line carries a comparison operator (or the `unchanged`
-  differential token), satisfying the smoke-test discipline.
+`_sync_surface()` on map.gd mirrors the profile fields (the cultivation pattern). These are
+the hard contract for the implementer: node/variable/action names must match verbatim.
 
----
+## 6. Playtest scenario skeleton (architect-owned; PM fills final thresholds)
 
-## 6. Technology stack
+New file `playtest/map_node_event_shaolin.yaml` (54 → 55, append-only; every existing yaml
+untouched). `name:` equals the basename; every `at:` a single integer; every assert carries a
+comparison operator; **numeric asserts are differential/relative — no absolute numeric
+literals** (the exact `silver −6 / attr +1` math is pinned in the GDScript unit test where
+before/after variables exist; the playtest pins appearance, selectability, and
+application-by-differential).
 
-In-place Godot 4 / GDScript - no new dependencies, no new scenes, no new
-nodes, no new signals (the HUD refreshes per frame already; the EnergyLabel
-joins that path). Reused as-is per the SOTA: `SkillData.cost` schema field,
-the 6-state button palette + `derive_state` + `no_energy_predicate`, the
-per-frame HUD derivation, the debug-action injection pattern
-(`project.godot [input]` + `game_manager.gd` `_process` +
-`combat_manager.gd` fixture), the rejection-reason machinery, and the
-headless playtest/pytest harness. Nothing external is warranted for a
-data-table + one-gate change.
+**Frame budget (reviewer #1 — enumerated so it is never under-allocated):** the boot to MAP
+reuses the spine's proven prefix; the Shaolin leg needs 3 more key-frames + assert frames:
 
-Linter manifest (see `linter_manifest.json`): `.py` -> ruff,
-`.yaml`/`.json`/`.md` -> basic. `.gd` is deliberately NOT in the manifest -
-the `gdscript_check` gate parses every GDScript file with
-`godot --check-only` after each implementation step (host-controlled, per
-the addon guidance).
+| Frame | Action | Effect |
+|---|---|---|
+| 3–15 | `ui_accept` ×7 | menu → tutorial (spine prefix, proven) |
+| 20 | `debug_win_tutorial` | tutorial WON |
+| 50–90 | `ui_accept` ×3 | transition → creation |
+| 120–190 | `move_right` ×5, `ui_accept`, `move_right`, `ui_accept` | creation → sect select → CULTIVATION |
+| 280 | `debug_fast_forward` | 36 months → MAP |
+| 400 | assert | `current_state == "MAP"` (spine prefix end) |
+| 420 | `move_right` | focus → 洛阳 (mainline auto-select) |
+| 430 | `ui_accept` | travel → 洛阳; **no event** (declared slot) |
+| 440 | `move_right` | focus → 武当 (auto-select) |
+| 450 | `move_right` | focus cycles → **少林** (3rd neighbor of 洛阳) |
+| 460 | `ui_accept` | travel → 少林; EVENT phase opens |
+| 470 | assert | `phase == "EVENT"`, `event_id == "night_rain"` (deterministic binding pin — this is a *binding*, not a drawn id), `current_node_id == "shaolin"` |
+| 480 | `move_right` | `event_focus` 0 → 1 (option B selectable) |
+| 490 | assert | `event_focus == 1`, `phase == "EVENT"` (focus moved, event still up — proves both options selectable) |
+| 500 | `move_left` | `event_focus` back to 0 (option A selectable) |
+| 510 | `ui_accept` | resolve option A: 帮工换宿 (silver −6, 根骨 +1) |
+| 530 | assert | `phase == "TRAVEL"`, `event_id == ""`, `last_effect_types == ["silver", "attr"]`, `attr_bone: changed`, `events_resolved_count == 1`, `entry_declared_gap_types.has("battle") and entry_declared_gap_types.has("facility")` (the honesty pin: gaps declared, visible, assertable) |
+| 560 | `move_right` | focus → 洛阳 (少林's only neighbor) |
+| 570 | `ui_accept` | travel back → 洛阳; no event, no stall (declared slot inert) |
+| 600 | assert | `current_node_id == "luoyang"`, `phase == "TRAVEL"`, `event_id == ""` |
 
----
+Total ≤ ~f600, far under the 3000 cap / ≤ 2999 last assert. **Silver note for the PM:** after
+`debug_fast_forward` the profile's silver is nonzero but not guaranteed ≥ 6, so the silver leg
+should be asserted via `last_effect_types` (structural: the silver effect was applied) and the
+guaranteed differential is `attr_bone: changed` (floor 10, +1 always lands). Do NOT assert
+`silver: changed` unless a pre-check confirms silver ≥ 6 — the ≥ 0 clamp can make it a silent
+no-op on the mainline-boot profile. A direct `res://scenes/segments/map.tscn` boot is NOT
+usable for this scenario: the default profile has silver 0 and empty gongfa, so option A's
+silver clamps and option B's practice no-ops — nothing observable.
 
-## 7. Edge cases (Step-1 SOTA -> how this design answers each)
+**Two-place sync (hard):** `_common.yaml` `scenario_order` tail gains `- map_node_event_shaolin`
+after `- qi_cost_blocks_cast_no_energy`; `tests/test_playtest_contract_smoke.py`
+`ROUND_SCENARIOS` tail gains `"map_node_event_shaolin"` in the same position; a new
+`test_map_node_event_surface_contract()` pins (a) the new MapScreen vars whitelisted, (b) the
+scenario file exists with `name == basename`, (c) single-integer `at:` values, (d) comparison
+operator (or `changed`/`unchanged`) on every 4-space dotted assert line — the same shape as
+`test_qi_cost_surface_contract()`.
 
-| # | SOTA edge case | Answer |
-|---|----------------|--------|
-| 1 | `skill_button_effect_info.yaml` pins `SkillButton1.cost_text == "无消耗"` | 重剑无锋 stays cost 0 (§2.3) - only button 1 is pinned; the other 7 moves are free to take costs without touching any existing yaml. |
-| 2 | Enemies have `energy = 0`; a cost on any enemy skill would permanently block enemy casting | The gate is `cost > 0`-guarded and per-unit; all 23 enemy techniques stay 0 (pinned by enumeration in the new unit test). Enemies are byte-identical. |
-| 3 | `spine_to_ending` cost-insensitive; `terminal_victory` cost-sensitive | Win-path budget verified cast-by-cast (§2.2): 170/180, all gates pass; baseline green 6/6; if it reddens, revise costs (never HP/enemies). |
-| 4 | `_skill()` is the factory, not the cast point | Costs set additively in `_create_all_skill_data()` (C1); gate + deduction live in `_execute_skill()` (C3) - the single execution point for player and AI. |
-| 5 | Deduction must be success-only and floored | Deduction sits in the success block beside the cooldown start; `SkillData.spend` clamps at 0 and treats negative costs as 0 (C2). Failed gates return null having spent nothing. |
-| 6 | `phase_locked` masks `no_energy` in the priority chain | The scenario asserts on SkillButton4 (index 3, never phase-locked, never cast, no HP gate) and pins `state_text != "phase_locked"` explicitly. |
-| 7 | No qi-cap observable for relative asserts | `player.gd::energy_max` added + whitelisted (C4); all qi asserts are cap-relative. |
-| 8 | Presentation is done - don't rebuild it | Zero palette/scene/label changes; the only presentation edit is making the existing EnergyLabel track the live pool per frame (C5) - without it the round's own feature would be invisible. |
-| 9 | Playtest contract is a multi-place sync | scenario_order + ROUND_SCENARIOS + surface whitelist + `project.godot [input]` + `game_manager` handler + `_common.yaml` actions (C3/C7/C8); counting clarified (53 -> 54 scenarios). |
-| 10 | Tutorial budget bounds the table | Ladder 10/15/20/25/30; win path spends 170/180 (§2.2); the free basic keeps the player never-disarmed. |
+## 7. GDScript unit pin
 
-Additional verified-non-risks: the only existing scenarios casting
-non-free moves are `terminal_victory` (budgeted), `central_divine_innate_qi_fatal_guard`
-(spends 35), and `skill_rejection_reason_texts` (free `skill_1` only) - a
-repo-wide grep for `skill_[2-8]` across `playtest/*.yaml` confirms no
-others. `CostLabel` renders "内力 15" style text inside its pinned
-(26,2)-(62,14) rect (font 9 - 2 CJK + digits fits; `clip_text=false`,
-`text_overrun_behavior=0` already set, no-ellipsis discipline respected).
-Save games are unaffected (battles are ephemeral; `PlayerProfile` carries
-no battle-pool field). Encounter battles (progression techniques, cost 0)
-are unaffected - the gate is data-driven, so a future round can price them
-without touching the engine (extensibility, no premature work now).
+`tests/test_map_node_event.gd` (NEW; static `run() -> bool` contract; registered by appending
+to `TESTS` in `tests/unit_test_runner.gd`; expected compile count 75 → 77, last-known baseline
+75/75 — label as expectation, not a measurement):
 
----
+1. **MapData schema**: every node declares all three slots; statuses ∈ {active, declared};
+   exactly one active event slot (shaolin); `active_event_id("shaolin")` resolves in
+   `EventData.def`; `declared_gap_types` returns the right arrays; unknown node → {} / "" / [].
+2. **EventLogic parity** (controlled profiles, relative asserts):
+   `apply_option_effects` lands each of the 5 effect types exactly as the pool row states
+   (silver == before + value with ≥ 0 clamp; attr == before + value; item appended once;
+   practice adds to the first unmastered art; none → no change).
+   `add_practice` with empty gongfa → no-op, no error.
+   `draw_unseen_id` 15-of-16 exclusion → forced missing id; full bag → reset + non-empty draw
+   (mirrors the existing cultivation criteria, now against the shared module).
+3. **map.gd EVENT phase** (instantiate `scenes/segments/map.tscn` like `test_cultivation.gd`
+   instantiates the cultivation scene): travel 洛阳→少林 opens EVENT with `event_id ==
+   "night_rain"`; `_event_focus` cycles 0/1; resolve applies option effects to the profile
+   (attr delta == pool value), returns `phase == "TRAVEL"`, `event_id == ""`,
+   `events_resolved_count` 0 → 1; flags["events_seen"] untouched by the map channel; a
+   mainline-node travel (wuming→luoyang) leaves phase TRAVEL and event_id "" (inert proof).
 
-## 8. Rollback / safety
+## 8. Edge cases (from step1_sota / review) → how this design answers each
 
-No irreversible operations. Every change is a file edit (git-revertible);
-no schema migration, no data rewrite, no file deletion:
-- New files: 1 scenario yaml, 1 unit test.
-- Append-only edits: `_common.yaml` (actions/surface/scenario_order),
-  smoke test (ROUND_SCENARIOS + one new test function),
-  `unit_test_runner.gd` TESTS, `project.godot [input]`.
-- In-place edits: `battlefield.gd` (7 property assignments),
-  `combat_manager.gd` (one gate + one helper + one debug fixture + one call
-  in the success block), `player.gd` (one var + one setup line + one gate
-  branch), `hud.gd` (extract + per-frame call), `skill_button.gd` (one-line
-  delegation), `skill_data.gd` (two statics), comments.
-- The only content replacement is the `10_systems.md §1` paragraph
-  (old text quoted in §2.4, recoverable via git and re-stated verbatim in
-  the task).
-- Rollback = revert the commit; the inert-before/inert-after property
-  holds in reverse (with all costs 0 the predicate is identically false
-  and every code path is byte-identical to today's).
+| # | Edge case | Answer |
+|---|---|---|
+| 1 | spine budget: any blocking mainline event breaks f520 | Mainline event slots `declared` (inert). Hand-simulation: even the most favorable consumption (event eats exactly the next `(move_right, ui_accept)` pair) leaves the run at 武当 at f520 — 2 pairs short. Interactive node content lives only on Shaolin; 昆仑 routes to ENDING before/independently of entry content. |
+| 2 | "exclusive" must not mean "invented" | First-choice path: deterministic binding to an existing row (`night_rain`). A new authored row is a LAST RESORT, gated on a `20_content.md` gap note recorded first and authored only inside `event_data.gd` — never inline. Not needed this round. |
+| 3 | RNG-drawn ids unassertable | The node event is a deterministic binding, so `event_id == "night_rain"` is a legitimate pin (a data binding, not a draw). No new RNG ops exist on the map leg at all. |
+| 4 | sharing must not regress cultivation | Pure statics only, no instance coupling either direction (§4.2 note); cultivation delegates with identical RNG op order and effect application; all existing cultivation pins must stay green unchanged. |
+| 5 | bag/channel independence | The map channel never reads/writes `events_seen` (§4.5) — entering Shaolin always shows its event regardless of prior 游历 draws; no order-dependence. |
+| 6 | inert regression-neutrality | A non-active node produces byte-identical `_travel` / focus / render; end-node routing unchanged and ordered first; `_ready` untouched. |
+| 7 | declared-unimplemented honesty | `declared_gap_types` observable + 20_content.md §8 gap notes + the playtest honesty pin in the scenario (f530). No faking, no silence. |
+| 8 | docs-first ordering | §2 schedules the four design-doc edits as tasks 1–2, before any code; compile-count figures are labeled last-known/expected, never fabricated. |
+| 9 | save/load integrity | No new persisted keys; entry fires only on travel, never on boot/load; autosave after resolution; `save_load_roundtrip` untouched and must stay green. |
 
-Ordering safety: C0 (docs) blocks C1; the cost values in code must match
-the landed doc table exactly (the unit test enforces it).
+## 9. Safety, rollback, task decomposition (for PM)
 
----
+No irreversible operations: all edits are additive (new keys in deep-copied data rows, new
+statics, one new module, one new scenario, whitelist appends) or surgical delegation swaps in
+`cultivation.gd`. The only behavior-affecting edit is `cultivation.gd`'s three delegations —
+rollback = restore the three original bodies (verbatim in §4.3); everything else deletes
+cleanly. No existing yaml, no gate product, no art asset is touched.
 
-## 9. Regression criteria + at-risk scenario list
+Suggested task order (docs-first is a hard constraint, not a preference):
 
-**Must-stay-green (the round's success gate):**
-- All 53 existing scenarios green (54 after the append; 55 yaml files incl.
-  `_common.yaml`).
-- `spine_to_ending` **32/32** (force-wins via `debug_win_tutorial` - cost
-  insensitive).
-- `terminal_victory_8_12_rounds_hp_15_40` **6/6** (baseline green; budget
-  math in §2.2; a new red here means the cost table is wrong - revise
-  costs, nothing else).
-- GDScript unit suite 18 -> 19 files, all pass; pytest smoke suite green.
-- The new scenario `qi_cost_blocks_cast_no_energy` green.
+1. `design/40_progression.md` §5 + `design/20_content.md` §8 (gap notes, binding, table) — **before code**.
+2. `design/90_decisions.md` relocation note + `design/99_changelog.md` round row — **before code**.
+3. `scripts/data/map_data.gd` entry_content + accessors (+ extend `tests/test_map_data.gd`? No — additive keys are invisible to it; pin in the new test file instead).
+4. `scripts/data/event_logic.gd` (new) + `cultivation.gd` delegation swap.
+5. `scripts/segments/map.gd` EVENT phase + `_sync_surface` observables.
+6. `tests/test_map_node_event.gd` + `unit_test_runner.gd` TESTS append.
+7. `playtest/_common.yaml` surface append + scenario_order tail append; `playtest/map_node_event_shaolin.yaml`.
+8. `tests/test_playtest_contract_smoke.py` ROUND_SCENARIOS tail + new contract pin.
+9. Regression pass: spine_to_ending, save_load_roundtrip, event_travel_effects, all cultivation scenarios green; new scenario green. No gate counts claimed before they land.
 
-**At-risk focus list for re-runs during implementation** (Step-1 review
-suggestion - the full suite is mandatory anyway; these are the ones whose
-timelines interact with costs):
-`terminal_victory_8_12_rounds_hp_15_40` (12 casts, 170 qi),
-`central_divine_innate_qi_fatal_guard` (casts skill_2 + skill_3),
-`skill_rejection_reason_texts` (free casts + reason texts - the new
-"内力不足" reason must not fire at a full pool), `skill_button_effect_info`
-(the 无消耗 pin), `fahui_du_multiplies_damage` (free skill_1 + damage pin),
-`skill_button_visual_states` / `skill_bar_waiting_state` /
-`skill_button_turn_overlay` / `two_phase_skill_unlock_and_hp_gate` /
-`locked_slot_unlock_reason` / `skill_hint_and_range_highlight` /
-`skill_description_visible` / `ui_geometry_readability` (button-state
-readers - all assert at a full 180 pool, where `no_energy` is false), and
-`spine_to_ending`.
+## 10. Technology stack
 
----
-
-## 10. Task decomposition (for PM)
-
-| Task | Content | Depends on |
-|------|---------|-----------|
-| T1 `docs_costs_first` | §2.4 archive edits: 20_content cost tables + dated section + §5 gap-closure note; 10_systems §1 paragraph replacement; 30_presentation no_energy amendment; 99_changelog row; 40_ux_backlog 记录; README bullet. | - (BLOCKS all code) |
-| T2 `skill_data_statics` | C2: `insufficient_energy` + `spend` statics (+ comment sync of the "display only" lines in character_data/gongfa_data). | T1 |
-| T3 `battlefield_costs` | C1: 7 cost assignments + free-basic comment. | T1, T2 |
-| T4 `executor_gate_spend` | C3: gate, success-block deduction via `spend_unit_energy`, helper, `debug_spend_player_qi` + project.godot/game_manager wiring. | T2, T3 |
-| T5 `player_select_gate_observable` | C4: `energy_max` var + setup write; `_skill_reject_reason` "内力不足" branch (+ player.gd:110 comment). | T2, T3 |
-| T6 `hud_live_energy_label` | C5 (+ energy-label comment); C6 skill_button delegation + stale comments. | T2 |
-| T7 `playtest_scenario` | C7: new yaml; `_common.yaml` surface/actions/scenario_order appends. | T4, T5 |
-| T8 `contract_and_unit_tests` | C8: smoke-test ROUND_SCENARIOS + `test_qi_cost_surface_contract`; `tests/test_qi_costs_match_design.gd` + TESTS registration. | T3, T7 |
-| T9 `regression_run` | §9: full playtest (54 scenarios), unit suite (19 files), spine 32/32, terminal_victory 6/6, new scenario green; record baseline-vs-after for terminal_victory (no misattribution of pre-existing state). | T1-T8 |
-
-Sequencing note: T4/T5/T6 are independent of each other (all depend on
-T2/T3); T7 needs T4 (the drain action) and T5 (the select reason +
-`energy_max`); T8 needs T3 (the data pin) and T7 (the scenario file).
+Godot 4.4 built-ins only (GDScript statics, Control/Label, `_unhandled_input`), reusing the
+repo's existing modules per SOTA: `EventData` pool, `SaveManager.profile` effect API, the
+playtest harness (`_common.yaml` sibling scan + `tests/test_playtest_contract_smoke.py`),
+`unit_test_runner.gd` TESTS registry. Zero new third-party dependencies, zero new art/audio.
