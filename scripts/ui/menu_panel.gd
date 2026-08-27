@@ -66,6 +66,20 @@ func _ready() -> void:
 	# (6) File-existence load availability, then (7) first render.
 	_refresh_load_availability()
 	_render()
+	# (8) Re-fit to the viewport. Every OTHER segment is instantiated at runtime,
+	# by which time the viewport is final; this panel is authored INTO menu.tscn,
+	# so it is laid out at load — and on the web the canvas only reaches its real
+	# size a few frames later (measured: devicePixelRatio 2, a 5120x2578 backing
+	# store). Its offsets stay derived from the pre-settle parent rect, and
+	# nothing in the project listens for a resize, so the menu stayed squeezed
+	# into the top-left corner until entering Settings and back rebuilt it. The
+	# deferred call catches the boot case; the signal catches every later resize.
+	get_viewport().size_changed.connect(_fit_to_parent)
+	_fit_to_parent.call_deferred()
+
+
+func _fit_to_parent() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 func _unhandled_input(event: InputEvent) -> void:
