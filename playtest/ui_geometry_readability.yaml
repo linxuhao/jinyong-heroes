@@ -58,6 +58,9 @@ timeline:
     HealthBar.bar_height: bar_height >= 12
     HealthBar.empty_cap_px: empty_cap_px >= 10
     HealthBar.empty_area_px: empty_area_px >= 120
+    HealthBar.hp_text_width_ok: hp_text_width_ok == true
+    HUD.nameplate_pairwise_overlap: nameplate_pairwise_overlap == false
+    HUD.hint_nameplate_overlap: hint_nameplate_overlap == false
 - at: 40
   actions:
   - move_up

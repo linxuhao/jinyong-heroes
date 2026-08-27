@@ -300,6 +300,8 @@ surface:
   - top_strip_alpha
   - hint_hpbar_overlap
   - hpbar_strip_overlap
+  - hint_nameplate_overlap
+  - nameplate_pairwise_overlap
   MoveHintLabel:
   - state
   - text
@@ -559,6 +561,7 @@ surface:
   - hp_text
   - hp_value
   - hp_max
+  - hp_text_width_ok
   Battlefield:
   - board_aligned
   - grid_lines_visible
@@ -676,6 +679,7 @@ surface:
   - visible
   - focus_index
   - pressed_connected
+  - title_rows_overlap
   SettingsManager:
   - sfx_volume_db
   - music_volume_db

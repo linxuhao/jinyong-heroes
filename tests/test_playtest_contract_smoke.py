@@ -514,3 +514,60 @@ def test_hud_info_surface_contract() -> None:
                     f"{name}.yaml line {lineno} assert missing "
                     f"comparison operator: {line.strip()}"
                 )
+
+
+def test_readability_geometry_surface_contract() -> None:
+    """Static contract pin for the feedback-round-5 geometry asserts.
+
+    The four on-frame readability defects (HP number width, nameplate pairwise
+    overlap, hint-vs-nameplate overlap, settings title rows) all had GREEN
+    headless asserts that only check node state, not rendered geometry. This
+    round's fix tasks expose four geometry observables (HealthBar.hp_text_width_ok,
+    HUD.hint_nameplate_overlap, HUD.nameplate_pairwise_overlap,
+    SettingsPanel.title_rows_overlap) that the playtest now asserts on. This
+    test pins the wiring side: the four vars are whitelisted on the surface and
+    the four new assert lines in the two touched scenarios each carry a
+    comparison operator (no-bare-scalar-silent-false rule). No new scenario
+    files, so ROUND_SCENARIOS is intentionally untouched.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+
+    # HealthBar.hp_text_width_ok
+    health_items = blocks.get("HealthBar", [])
+    assert "hp_text_width_ok" in health_items, (
+        "HealthBar.hp_text_width_ok not whitelisted on the surface"
+    )
+
+    # HUD.hint_nameplate_overlap / HUD.nameplate_pairwise_overlap
+    hud_items = blocks.get("HUD", [])
+    for var in ("hint_nameplate_overlap", "nameplate_pairwise_overlap"):
+        assert var in hud_items, "HUD.%s not whitelisted on the surface" % (var,)
+
+    # SettingsPanel.title_rows_overlap — exactly one SettingsPanel block holds
+    # the whitelist, so its presence pins the "no second block" guard.
+    settings_items = blocks.get("SettingsPanel", [])
+    assert settings_items, "surface has no SettingsPanel block"
+    assert "title_rows_overlap" in settings_items, (
+        "SettingsPanel.title_rows_overlap not whitelisted on the surface"
+    )
+
+    # Every newly added geometry assert line carries a comparison operator.
+    expected_lines = {
+        "HealthBar.hp_text_width_ok:": "ui_geometry_readability.yaml",
+        "HUD.nameplate_pairwise_overlap:": "ui_geometry_readability.yaml",
+        "HUD.hint_nameplate_overlap:": "ui_geometry_readability.yaml",
+        "SettingsPanel.title_rows_overlap:": "settings_panel.yaml",
+    }
+    for prefix, scenario in expected_lines.items():
+        ftext = (PLAYTEST_DIR / scenario).read_text(encoding="utf-8")
+        matched = [
+            line
+            for line in ftext.splitlines()
+            if line.strip().startswith(prefix)
+        ]
+        assert matched, f"{scenario} missing {prefix} assert line"
+        for line in matched:
+            assert any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            ), f"{scenario} assert missing comparison operator: {line.strip()}"

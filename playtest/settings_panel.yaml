@@ -24,6 +24,7 @@ timeline:
     SettingsPanel.visible: true
     SettingsManager.sfx_volume_db: sfx_volume_db == 0.0
     AudioManager.sfx_volume_db: sfx_volume_db == 0.0
+    SettingsPanel.title_rows_overlap: title_rows_overlap == false
 - at: 70
   actions:
   - move_right
