@@ -72,6 +72,19 @@ var top_strip_alpha: float = 1.0
 var hint_hpbar_overlap: bool = false
 var hpbar_strip_overlap: bool = false
 
+## Nameplate-overlap observables (playtest surface, pinned by
+## ui_geometry_readability.yaml). Recomputed every `_process` frame inside
+## `_update_geometry_observables()`:
+##   - nameplate_pairwise_overlap — true iff ANY pair of visible HealthBar
+##     NameLabel rects inset-intersects (1px inset); the ~2px seam between
+##     adjacent units' nameplates must be preserved (hence NameLabel 64x9 rects,
+##     NOT the 68x24 widget, which would overlap by 4px and force this true).
+##   - hint_nameplate_overlap — true iff any VISIBLE hint label rect
+##     (MoveHintLabel, SkillDescLabel) inset-intersects any nameplate rect.
+## Both default false and stay false on empty rect sets.
+var nameplate_pairwise_overlap: bool = false
+var hint_nameplate_overlap: bool = false
+
 ## Lazily-resolved TopStrip node (nullable — NOT an @onready var, so scenes
 ## without the node stay safe; resolved inside _update_geometry_observables()
 ## like the existing _round_indicator pattern).
@@ -117,6 +130,21 @@ func _skill_button(n: String) -> Control:
 ## with a 2px gap must NOT read as overlapping.
 func _inset_overlap(a: Rect2, b: Rect2) -> bool:
 	return a.grow(-1.0).intersects(b.grow(-1.0))
+
+## Collect the global rect of every VISIBLE HealthBar's NameLabel node. Uses the
+## NameLabel rect (64x9 in the authored tscn), NOT the 68x24 widget: two adjacent
+## units' NameLabel rects touch exactly and become a 2px gap under the 1px-inset
+## rule — the required seam. Bars that are freed, hidden, or lack a NameLabel are
+## skipped. All rects share the HUD layer-10 scale-1 coordinate space.
+func get_nameplate_rects() -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for bar in _health_bars:
+		if not is_instance_valid(bar) or not bar.visible:
+			continue
+		var name_label: Control = bar.get_node_or_null("NameLabel") as Control
+		if name_label != null and is_instance_valid(name_label):
+			rects.append(name_label.get_global_rect())
+	return rects
 
 ## Recompute the two HUD geometric observables every frame:
 ##   - round_pause_overlap: RoundIndicator rect vs PauseButton rect (false
@@ -279,6 +307,32 @@ func _update_geometry_observables() -> void:
 				continue
 			if _inset_overlap(hint_rect, bar.get_global_rect()):
 				hint_hpbar_overlap = true
+
+	# --- Nameplate overlap observables (ui_geometry_readability) ---
+	# Computed from get_nameplate_rects() (NameLabel rects only). Both default to
+	# false and stay false on empty rect sets. SkillDescLabel participates only
+	# when visible; MoveHintLabel participates only when visible (hidden hint
+	# labels report a stale rect and must not false-positive).
+	var nameplates: Array[Rect2] = get_nameplate_rects()
+
+	nameplate_pairwise_overlap = false
+	for i in range(nameplates.size()):
+		for j in range(i + 1, nameplates.size()):
+			if _inset_overlap(nameplates[i], nameplates[j]):
+				nameplate_pairwise_overlap = true
+
+	hint_nameplate_overlap = false
+	var hint_labels: Array[Control] = []
+	if is_instance_valid(_skill_desc_label) and _skill_desc_label.visible:
+		hint_labels.append(_skill_desc_label)
+	var move_hint: Control = get_node_or_null("MoveHintLabel") as Control
+	if move_hint != null and is_instance_valid(move_hint) and move_hint.visible:
+		hint_labels.append(move_hint)
+	for label in hint_labels:
+		var lr: Rect2 = label.get_global_rect()
+		for r in nameplates:
+			if _inset_overlap(lr, r):
+				hint_nameplate_overlap = true
 
 # ---------------------------------------------------------------------------
 # Public API

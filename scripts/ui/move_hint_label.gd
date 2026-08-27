@@ -52,6 +52,45 @@ const FALLBACK_SIZE: Vector2 = Vector2(200, 20)
 ## so this slot is empty and the hint adds no occlusion.
 const FEET_OFFSET: Vector2 = Vector2(0, 44)
 
+## Ordered candidate dock offsets tried when the default below-feet slot would
+## collide with a unit nameplate. The default (0,44) stays FIRST so it wins
+## whenever no nameplate is near the feet slot (existing position-pinned
+## scenarios keep their geometry). Each candidate is the hint's center offset
+## from the actor's tile in the HUD scale-1 coordinate space.
+const _DOCK_CANDIDATES: Array[Vector2] = [
+	Vector2(0, 44),
+	Vector2(-90, 44),
+	Vector2(90, 44),
+	Vector2(0, -44),
+	Vector2(-150, 44),
+	Vector2(150, 44),
+]
+
+## Pure static: pick the hint's final center so its rect is inset-disjoint
+## (1px) from every nameplate rect, falling back through the ordered dock
+## candidates. Each candidate is clamped into the viewport (the existing
+## half-size clamp) before the overlap check. Returns
+## {"center": Vector2, "hidden": bool} — hidden=true only when NO candidate is
+## free; the center value is then unused.
+static func _pick_dock_center(world_pos: Vector2, label_size: Vector2,
+		vp_rect: Rect2, nameplates: Array[Rect2]) -> Dictionary:
+	var half: Vector2 = label_size / 2.0
+	for offset in _DOCK_CANDIDATES:
+		var cand: Vector2 = world_pos + offset
+		cand.x = clamp(cand.x, vp_rect.position.x + half.x,
+			vp_rect.position.x + vp_rect.size.x - half.x)
+		cand.y = clamp(cand.y, vp_rect.position.y + half.y,
+			vp_rect.position.y + vp_rect.size.y - half.y)
+		var rect: Rect2 = Rect2(cand - half, label_size)
+		var free: bool = true
+		for r in nameplates:
+			if rect.grow(-1.0).intersects(r.grow(-1.0)):
+				free = false
+				break
+		if free:
+			return {"center": cand, "hidden": false}
+	return {"center": world_pos + _DOCK_CANDIDATES[0], "hidden": true}
+
 func _ready() -> void:
 	# Hard requirement: the hint must never eat the click-move / right-click
 	# undo / targeting events. Label is not focusable by default, so focus_mode
@@ -97,17 +136,26 @@ func _process(_delta: float) -> void:
 	# Position: below the player's feet, above the tile edge, same scale-1
 	# world space as grid_to_world.
 	var world_pos: Vector2 = GridManager.grid_to_world(player.grid_pos)
-	center = world_pos + FEET_OFFSET
 
-	# Clamp into the viewport so the hint never drifts off-frame. Use the
-	# fallback while the Label's own size is still (0,0) pre-layout.
+	# Clamp into the viewport so the hint never drifts off-frame, AND keep the
+	# final rect clear of every unit nameplate. Use the fallback while the
+	# Label's own size is still (0,0) pre-layout.
 	var vp_rect: Rect2 = get_viewport().get_visible_rect()
 	var label_size: Vector2 = size if size.length() > 0.0 else FALLBACK_SIZE
-	var half: Vector2 = label_size / 2.0
-	center.x = clamp(center.x, vp_rect.position.x + half.x,
-		vp_rect.position.x + vp_rect.size.x - half.x)
-	center.y = clamp(center.y, vp_rect.position.y + half.y,
-		vp_rect.position.y + vp_rect.size.y - half.y)
+
+	# Collect unit nameplate rects from the HUD parent (defensive: only when the
+	# parent exposes get_nameplate_rects). The hint repositions to the first free
+	# candidate dock offset so it never renders inside a nameplate; it hides only
+	# when NO candidate is free. Nameplate nodes are never modified.
+	var nameplates: Array[Rect2] = []
+	var hud: Node = get_parent()
+	if hud != null and hud.has_method("get_nameplate_rects"):
+		nameplates = hud.get_nameplate_rects()
+	var pick: Dictionary = _pick_dock_center(world_pos, label_size, vp_rect, nameplates)
+	if bool(pick.get("hidden", false)):
+		_hide()
+		return
+	center = pick["center"]
 
 	global_position = center - size / 2.0
 
