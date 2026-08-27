@@ -64,7 +64,7 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 | 结束回合 / 出招 / 技能说明 | 顶栏下方右侧 |
 | 血条 + 名字 | 悬浮于角色上方,名字在血条**之上**(有半透明底),不叠压;血条顶边夹在顶栏之下(`top ≥ 94`) |
 | 教程面板 | 屏幕居中,**不透明底色** |
-| 捏人屏 | 三阶段(捏人 / 特质 / 确认)内容整组在 **x=480 轴上居中**;每行 shrink-center(AttrLabel 最小宽贴文字;AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`);描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`) |
+| 捏人屏 | 三阶段(捏人 / 特质 / 确认)内容整组在 **x=480 轴上居中**;每行 shrink-center(AttrLabel 最小宽贴文字;AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`);描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`)。**属性页信息层**:AttrDescLabel 静止即全列五属性效果(名称前缀,逐字复用 `creation.gd::_ATTR_DESCS`);其正下方 `HpValueLabel` 显示当前气血(`气血 = 根骨 × 5` 的活值,仅 ATTRS 可见)。**确认页**:`ConfirmBox` 内 `ConfirmSummaryLabel` 列五项最终值(每行「名 值」),位于两个按钮之上,仅 CONFIRM 可见 |
 | 移动提示 (MoveHintLabel) | 跟随玩家所在格,在脚下 +44 px 处,中文状态跟随文案(左键点格移动 · 右键退回 / 右键退回起点 · 出手即确认 / 已出手 · 移动已确认),`mouse_filter = 2`(不拦截点击)。状态机 idle / undo_ready / committed / hidden 是既有引擎字段的纯函数;文案必须在锁定移动的**同一个转移**里换掉,不许留一条已经不成立的承诺。`move_target_affordance.yaml` 把 idle / undo_ready / committed(含退回后回 idle)三态文案钉住 |
 
 **技能按钮必须显示该招式的发挥度**(失常 / 正常 / 超常 + 乘数)——见
@@ -608,4 +608,26 @@ Bar 的最后一个子节点(盖在填充与 EmptyCap 之上)。
 **`health_bar.gd` / `health_bar.tscn` / `tests/test_health_bar.gd` 的几何常数一律不动**
 (68×24 部件、Bar 64×12 @(2,12)、`EMPTY_CAP_PX`、expand margin、`STRIP_BOTTOM`
 全部逐字节不变),本轮只改 `HpLabel` 的文字格式与样式(字体 / 描边 / 阴影),不碰冻结常数。
+
+### 捏人信息层(2026-08-27,jinyong-clarity 轮)
+
+**D1 · 属性描述槽改为静止即全列五属性效果。** `AttrDescLabel.text` 从「焦点属性的
+说明」(`_attr_desc(ATTR_KEYS[attr_index])`)改为「五项效果,名称前缀,逐字来自
+`creation.gd::_ATTR_DESCS`」(即 10_systems.md §1 + 40_progression.md §7)。原因:
+UX-06 是从静止页记录的,「焦点跟随显示」会让静止页原样保留缺陷。`attr_index` 仍驱动
+行焦点高亮与 +/- 目标,只改描述通道的语义。被否方案及理由:
+- **行内效果 Label**:新 Label 会把 `_row_ink_union(i)` 的墨迹 x-center 推偏约半宽,
+  超过 `attr_cluster_center_ok` 的 ±6px 钉;
+- **行间插入 5 行效果**:AttrBox 越过 `creation_box_fits` 预算(5×44 行 + 48 描述 +
+  44 导航 + 间距已占 372/480,再 +5 行×17+间距 ≈ +135px → 底 ≈614 > 584);
+- **扩展行标签文字**:破坏「数值右对齐贴住本行 -/+ 簇」的钉死节奏。
+(记作决定而非疏忽,供后续轮次查阅。)
+
+**D3 · points_attrs_gap_ok 的 CONFIRM 簇重指。** 该可观察量的 CONFIRM 分支原把
+「首行墨迹簇」解析为 `ConfirmButton` 的矩形;确认页新增 `ConfirmSummaryLabel` 位于
+按钮上方后,改指 `ConfirmSummaryLabel.get_global_rect()`(缺失时回退旧 ConfirmButton
+查找,`get_node_or_null` 哨兵)。**同名可观察量、同一批 yaml 断言行不变**——先例是
+jinyong-layout-r2 的 Round-3 重做(测的量变了,变量名与 yaml 行不变)。墨迹诚实性:
+VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行居中 ⇒ 矩形中心 ==
+墨迹中心;gap 检查读的 (top y, center x) 两个合取项因此都是墨迹事实。
 
