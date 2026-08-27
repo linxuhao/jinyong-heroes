@@ -29,8 +29,13 @@ Three UX items, all **information missing** (roadmap stage 2 — the player can 
    「第 4 轮解锁」 while locked, `""` otherwise (encounter battles and rounds ≥ 4
    render nothing — never a hardcoded always-on string).
 3. **UX-05 — health bar shows no number.** Added `HpLabel` (child of `Bar`, full-rect
-   anchors, centered, font 9, `mouse_filter=2`) rendering `cur/max`, with observables
-   `hp_text` / `hp_value` / `hp_max` written in `setup()` and `update_health()`.
+   anchors, centered, font 10, `mouse_filter=2`, light glyph `Color(0.95,0.95,0.95)` on a
+   dark outline — `outline_size=4` + `shadow_outline_size=2`, per `scenes/ui/health_bar.tscn`)
+   rendering **the current HP value only** (post-review readability rework
+   `fix_hp_number_readability_v2`: a 64×12 bar cannot legibly render the 9-glyph
+   「1000/1000」, so `hp_text` is `str(current)` — e.g. 「400」), with observables
+   `hp_text` / `hp_value` / `hp_max` written in `setup()` and `update_health()`;
+   `max_health` stays discoverable via the `hp_value` / `hp_max` observables.
    **No geometry constant in `health_bar.gd` / `health_bar.tscn` /
    `test_health_bar.gd` is touched** — the 68×24 widget, Bar 64×12 @(2,12),
    `EMPTY_CAP_PX`, expand margins and `STRIP_BOTTOM` stay byte-identical.
@@ -139,7 +144,7 @@ which runs after this task):
 | `final/hud_info_probe_notes.md` | pre-fix structural A-class red + post-fix surface-present read + CostLabel/InfoLabel/FahuiLabel rect-disjointness probe (projected) |
 | `playtest/skill_button_effect_info.yaml` | UX-03 — `effect_text != ""`, `cost_text == "无消耗"`, `effect_summary_text != ""`, `fahui_text == "发挥 ×1.3"` |
 | `playtest/locked_slot_unlock_reason.yaml` | UX-04 — `lock_reason_text != ""` on slots 5–8, `== ""` on unlocked, flips at round 4 |
-| `playtest/health_bar_numbers.yaml` | UX-05 — `hp_text != ""`, `== str(hp_max)+"/"+str(hp_max)`, `hp_value < hp_max*0.5` post-injection (max_health-relative) |
+| `playtest/health_bar_numbers.yaml` | UX-05 — `hp_text != ""`, `== str(hp_max)` (current value at full HP), `hp_value < hp_max*0.5` post-injection (max_health-relative) |
 | `playtest/_common.yaml` | surface (+4 vars × SkillButton1..12, +3 vars HealthBar) + `scenario_order` tail (47 → 50) |
 | `tests/test_playtest_contract_smoke.py` | `ROUND_SCENARIOS` + `test_hud_info_surface_contract` (contract pin) |
 | `tests/test_skill_button_info.gd`, `tests/test_health_bar_text.gd` | new additive unit tests (palette separation, formatters, frozen-geometry regression pin) |
@@ -166,7 +171,7 @@ the one red row); the full-gate report artifacts are absent (see §8.4).
 |---|---|---|
 | `skill_button_effect_info` | UX-03 | **PASS 5/5** — every row green (`effect_text != ""`, `cost_text == "无消耗"`, `effect_summary_text != ""`, `fahui_text == "发挥 ×1.3"`, locked-slot-5 negative control) |
 | `locked_slot_unlock_reason` | UX-04 | **PASS 8/8** — slots 5–8 non-empty reason, slot 1 empty, round≥4 flip (reason empty + state ≠ phase_locked) |
-| `health_bar_numbers` | UX-05 | **PASS 5/5** — `hp_text == str(hp_max)+"/"+str(hp_max)` at full HP, `hp_value == hp_max`, post-`debug_damage_player` `hp_value < hp_max*0.5 and hp_value > 0`, `hp_text == str(hp_value)+"/"+str(hp_max)` — all relative to max_health, zero absolute HP literals |
+| `health_bar_numbers` | UX-05 | **PASS 5/5** — `hp_text == str(hp_max)` at full HP, `hp_value == hp_max`, post-`debug_damage_player` `hp_value < hp_max*0.5 and hp_value > 0`, `hp_text == str(hp_value)` — all relative to max_health, zero absolute HP literals |
 
 ### 8.2 spine_to_ending
 
