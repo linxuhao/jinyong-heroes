@@ -5,15 +5,31 @@ class_name MapData
 ## (adjacency-validated focus moves), travel and ending routing belong to the
 ## map segment; this file only supplies the graph and the tier thresholds.
 
+## Event pool used to resolve node-entry event bindings (the single sanctioned
+## text source — see design/20_content.md §8). Preloaded directly; event_data.gd
+## is pure data and does not reference map_data.gd, so this is a safe one-way edge.
+const EventData = preload("res://scripts/data/event_data.gd")
+
+## Per-node entry-content declaration slots (design/20_content.md §8.1).
+## Status domain: "active" (implemented + live) | "declared" (declaration-only,
+## unimplemented this round — battle/facility, and mainline event slots kept
+## inert to protect the unmodifiable spine_to_ending timeline). Each slot's id
+## key is <type>_id (event_id / battle_id / facility_id).
 ## 6 map nodes. Mainline = 无名谷→洛阳→武当→襄阳→昆仑 (4 moves); 少林 is a
 ## branch off 洛阳. Only kunlun is an end node.
 const NODES: Array = [
-	{"id": "wuming_valley", "display_name": "无名谷", "is_end": false},
-	{"id": "luoyang", "display_name": "洛阳", "is_end": false},
-	{"id": "wudang", "display_name": "武当", "is_end": false},
-	{"id": "xiangyang", "display_name": "襄阳", "is_end": false},
-	{"id": "kunlun", "display_name": "昆仑", "is_end": true},
-	{"id": "shaolin", "display_name": "少林", "is_end": false},
+	{"id": "wuming_valley", "display_name": "无名谷", "is_end": false,
+		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+	{"id": "luoyang", "display_name": "洛阳", "is_end": false,
+		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+	{"id": "wudang", "display_name": "武当", "is_end": false,
+		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+	{"id": "xiangyang", "display_name": "襄阳", "is_end": false,
+		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+	{"id": "kunlun", "display_name": "昆仑", "is_end": true,
+		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+	{"id": "shaolin", "display_name": "少林", "is_end": false,
+		"entry_content": {"event": {"status": "active", "event_id": "night_rain"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 ]
 
 ## Undirected adjacency — both directions are listed explicitly.
@@ -91,3 +107,54 @@ static func ending_def(tier: int) -> Dictionary:
 		if row["tier"] == tier:
 			return row.duplicate(true)
 	return {}
+
+
+## The fixed slot-type order for entry-content traversal. Declared explicitly so
+## declared_gap_types() output is deterministic regardless of Dictionary order.
+const ENTRY_SLOT_TYPES: Array[String] = ["event", "battle", "facility"]
+
+
+## Deep-duplicated entry_content for a node; {} if unknown.
+static func entry_content(id: String) -> Dictionary:
+	var row: Dictionary = node_def(id)
+	if row.is_empty():
+		return {}
+	var ec: Variant = row.get("entry_content")
+	if typeof(ec) != TYPE_DICTIONARY:
+		return {}
+	return (ec as Dictionary).duplicate(true)
+
+
+## The event_id iff the node's event slot has status == "active" AND the id
+## resolves in the event pool; "" otherwise. A typo'd / empty / unknown binding
+## reads as inert (fail-safe, never a crash).
+static func active_event_id(id: String) -> String:
+	var ec: Dictionary = entry_content(id)
+	var slot: Variant = ec.get("event")
+	if typeof(slot) != TYPE_DICTIONARY:
+		return ""
+	if (slot as Dictionary).get("status", "") != "active":
+		return ""
+	var eid: Variant = (slot as Dictionary).get("event_id", "")
+	if typeof(eid) != TYPE_STRING or eid == "":
+		return ""
+	if EventData.def(eid as String) == null:
+		return ""
+	return eid as String
+
+
+## Slot types whose status == "declared" (unimplemented this round), in the
+## fixed order event, battle, facility; [] if unknown. The honesty observable:
+## declared-but-unimplemented content is assertable, not just documented.
+static func declared_gap_types(id: String) -> Array[String]:
+	var out: Array[String] = []
+	var ec: Dictionary = entry_content(id)
+	if ec.is_empty():
+		return out
+	for slot_type in ENTRY_SLOT_TYPES:
+		var slot: Variant = ec.get(slot_type)
+		if typeof(slot) != TYPE_DICTIONARY:
+			continue
+		if (slot as Dictionary).get("status", "") == "declared":
+			out.append(slot_type)
+	return out

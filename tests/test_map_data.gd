@@ -3,6 +3,7 @@
 ## print PASS/FAIL at the end; never relies on assert() (stripped in release).
 
 const MapData = preload("res://scripts/data/map_data.gd")
+const EventData = preload("res://scripts/data/event_data.gd")
 
 const NODE_IDS := ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun", "shaolin"]
 
@@ -21,6 +22,7 @@ static func run() -> bool:
 	ok = _test_nodes(ok)
 	ok = _test_adjacency(ok)
 	ok = _test_ending_tiers(ok)
+	ok = _test_entry_content(ok)
 	if ok:
 		print("PASS test_map_data")
 	else:
@@ -77,6 +79,58 @@ static func _test_ending_tiers(ok: bool) -> bool:
 	for tier in [1, 2, 3]:
 		var text: String = MapData.ending_def(tier)["text"] as String
 		ok = _expect(ok, text.length() > 20, "tier " + str(tier) + " text is 3-5 lines")
+	return ok
+
+
+static func _test_entry_content(ok: bool) -> bool:
+	# every node declares exactly the three slots event / battle / facility
+	for nid in NODE_IDS:
+		var ec: Dictionary = MapData.entry_content(nid)
+		ok = _expect(ok, ec.has("event") and ec.has("battle") and ec.has("facility"),
+			"entry_content " + nid + " has 3 slots")
+		ok = _expect(ok, ec.size() == 3, "entry_content " + nid + " has exactly 3 keys")
+	# status domain is {active, declared} for every slot
+	for nid in NODE_IDS:
+		for slot_type in ["event", "battle", "facility"]:
+			var slot: Dictionary = MapData.entry_content(nid)[slot_type]
+			var status: String = slot.get("status", "")
+			ok = _expect(ok, status == "active" or status == "declared",
+				nid + " slot " + slot_type + " status in {active,declared}")
+	# exactly one active slot across the whole table (shaolin's event slot)
+	var active_count := 0
+	for nid in NODE_IDS:
+		for slot_type in ["event", "battle", "facility"]:
+			if MapData.entry_content(nid)[slot_type].get("status", "") == "active":
+				active_count += 1
+	ok = _expect(ok, active_count == 1, "exactly one active slot across the table")
+	# shaolin binding: shape + resolves in the pool + deep copy
+	var shaolin_event: Dictionary = MapData.entry_content("shaolin")["event"]
+	ok = _expect(ok, shaolin_event == {"status": "active", "event_id": "night_rain"},
+		"shaolin event slot shape")
+	ok = _expect(ok, MapData.active_event_id("shaolin") == "night_rain",
+		"active_event_id shaolin")
+	ok = _expect(ok, EventData.def(MapData.active_event_id("shaolin")) != null,
+		"night_rain binding resolves in pool")
+	# deep copy: mutating a returned entry_content must not leak into the const
+	var deep: Dictionary = MapData.entry_content("shaolin")
+	deep.erase("event")
+	var reread: Dictionary = MapData.entry_content("shaolin")
+	ok = _expect(ok, reread.has("event"), "entry_content deep copy: event key survives caller mutation")
+	ok = _expect(ok, reread["event"] == {"status": "active", "event_id": "night_rain"},
+		"entry_content deep copy: value intact")
+	# mainline nodes: active_event_id "" (inert), declared gaps present
+	for nid in ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun"]:
+		ok = _expect(ok, MapData.active_event_id(nid) == "", "active_event_id " + nid + " inert")
+	ok = _expect(ok, MapData.declared_gap_types("luoyang") == ["event", "battle", "facility"],
+		"luoyang declared gap types (fixed order)")
+	ok = _expect(ok, MapData.declared_gap_types("wuming_valley") == ["event", "battle", "facility"],
+		"wuming_valley declared gap types (fixed order)")
+	ok = _expect(ok, MapData.declared_gap_types("shaolin") == ["battle", "facility"],
+		"shaolin declared gap types (no event)")
+	# unknown node degrades inert
+	ok = _expect(ok, MapData.entry_content("nope").is_empty(), "entry_content unknown -> {}")
+	ok = _expect(ok, MapData.active_event_id("nope") == "", "active_event_id unknown -> \"\"")
+	ok = _expect(ok, MapData.declared_gap_types("nope").is_empty(), "declared_gap_types unknown -> []")
 	return ok
 
 
