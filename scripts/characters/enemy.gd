@@ -288,9 +288,13 @@ func _process(_delta: float) -> void:
 ## double-process it — the `acted` gate in _try_attack_target is the backstop
 ## even if both paths ever run.
 func _input(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton):
-		return
-	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+	# Mouse OR finger: same relay. See player.gd's tap branch — the battlefield
+	# was mouse-only, so a phone could not attack an enemy any more than it
+	# could walk.
+	var is_tap: bool = event is InputEventScreenTouch and event.pressed
+	var is_click: bool = event is InputEventMouseButton \
+		and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
+	if not (is_tap or is_click):
 		return
 	var world: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
 	var click_grid: Vector2i = GridManager.world_to_grid(world)

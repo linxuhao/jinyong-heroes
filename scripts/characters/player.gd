@@ -408,9 +408,10 @@ func _process(_delta: float) -> void:
 ## `clicks:` event arrived at all. Never marks the event handled — this must
 ## not interfere with the real _unhandled_input path.
 func _input(event: InputEvent) -> void:
-	if event is InputEventMouseButton \
+	if (event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT \
-			and event.pressed:
+			and event.pressed) \
+			or (event is InputEventScreenTouch and event.pressed):
 		debug_input_events += 1
 		debug_last_raw_event_pos = event.position
 
@@ -498,10 +499,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			CombatManager.toggle_pause()
 			get_viewport().set_input_as_handled()
 
-	# --- Left-click on enemy grid position ---
-	elif event is InputEventMouseButton \
+	# --- Left-click / TAP on a grid position ---
+	# A finger is not a mouse. Every board interaction in this file used to
+	# test `event is InputEventMouseButton`, and an InputEventScreenTouch is
+	# not one — so on a phone the menus worked (Controls handle touch natively)
+	# and the battlefield did not: tapping a tile did nothing at all, with no
+	# hint, while the on-screen text said 「左键点格移动」. Touch is handled
+	# EXPLICITLY here rather than left to the engine's emulate-mouse-from-touch
+	# setting, because that setting is a global toggle whose delivery through
+	# the GUI phase is not something this game should be betting its only
+	# movement input on.
+	elif (event is InputEventMouseButton \
 			and event.button_index == MOUSE_BUTTON_LEFT \
-			and event.pressed:
+			and event.pressed) \
+			or (event is InputEventScreenTouch and event.pressed):
 		_handle_click_targeting(event)
 		get_viewport().set_input_as_handled()
 
@@ -642,7 +653,7 @@ func _on_move_completed() -> void:
 
 ## Handle a left mouse click: convert the click event's own viewport coordinates
 ## to battlefield world space and delegate to the shared handle_world_click.
-func _handle_click_targeting(event: InputEventMouseButton) -> void:
+func _handle_click_targeting(event: InputEvent) -> void:
 	# Use the click event's own viewport coordinates, converted to battlefield
 	# world space, instead of the viewport-cached pointer position. The canvas
 	# transform is identity today (no Camera2D offset in the battlefield; the
