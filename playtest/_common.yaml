@@ -646,6 +646,18 @@ surface:
   - ended
   - visible
   - size
+  - phase
+  - event_id
+  - event_focus
+  - entry_declared_gap_types
+  - silver
+  - attr_bone
+  - attr_inner
+  - attr_agility
+  - attr_wisdom
+  - attr_fortune
+  - last_effect_types
+  - events_resolved_count
   EndingScreen:
   - tier
   - done
@@ -797,3 +809,4 @@ scenario_order:
 - creation_hp_value_displayed
 - creation_confirm_summary
 - qi_cost_blocks_cast_no_energy
+- map_node_event_shaolin
