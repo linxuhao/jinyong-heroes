@@ -1,0 +1,84 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct-boot autosave refusal outside a STABLE state is expected and documented-harmless (test_map_node_event.gd L19-22); this scenario asserts no save state - do not misread the refusal as a regression.
+#
+# Direct boot of map.tscn. Pins three things: (1) the active 无名谷 binding does
+# NOT fire at boot (f30 is TRAVEL / event_id "" — entry events only fire on
+# travel arrival, never _ready()); (2) returning to 无名谷 by travel fires
+# tomb_bed; (3) the two hint sites are unified — HintLabel.text is byte-identical
+# to the map.gd panel string (左右/上下选择相邻去处，回车启程).
+name: map_node_event_mainline_return
+description: >-
+  Direct-boot map.tscn and pin the 无名谷 return-binding, the no-boot-fire
+  property, and the hint unification. At boot (f30) the active 无名谷 binding does
+  not fire — phase is TRAVEL and event_id is "" — proving entry events trigger
+  only on travel arrival, never on _ready(). The unified hint string
+  (左右/上下选择相邻去处，回车启程) is asserted verbatim on HintLabel.text, and
+  HintLabel hides during the EVENT phase and returns after resolving. Walking
+  洛阳 → 武当 → (move_left) → 无名谷 and arriving by travel fires tomb_bed
+  (EVENT, current_node_id wuming_valley); resolving option A returns to TRAVEL,
+  advances events_resolved_count to 2, and the inner gain is pinned as a
+  differential.
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+    HintLabel.visible: visible == true
+    HintLabel.text: 'text == "左右/上下选择相邻去处，回车启程"'
+- at: 40
+  actions:
+  - move_right
+- at: 50
+  actions:
+  - ui_accept
+- at: 60
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    HintLabel.visible: visible == false
+- at: 70
+  actions:
+  - ui_accept
+- at: 80
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.events_resolved_count: events_resolved_count == 1
+    HintLabel.visible: visible == true
+- at: 90
+  actions:
+  - move_right
+- at: 100
+  actions:
+  - move_left
+- at: 110
+  actions: []
+  assert:
+    MapScreen.focus_id: focus_id == "wuming_valley"
+- at: 120
+  actions:
+  - ui_accept
+- at: 130
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "tomb_bed"
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+- at: 140
+  actions:
+  - ui_accept
+- at: 150
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.events_resolved_count: events_resolved_count == 2
+    MapScreen.attr_inner: changed

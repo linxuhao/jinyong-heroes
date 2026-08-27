@@ -1,0 +1,100 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct-boot autosave refusal outside a STABLE state is expected and documented-harmless (test_map_node_event.gd L19-22); this scenario asserts no save state - do not misread the refusal as a regression.
+#
+# Direct boot of map.tscn. Walks the east mainline (无名谷 → 洛阳 → 武当 → 襄阳)
+# and pins the three live deterministic bindings (merchant / quanzhen_scripture /
+# dragon_scrap) plus the events_resolved_count ladder (1 → 2 → 3). The terminal
+# (昆仑) is left one press away and unblocked (ended == false) — the ending
+# itself stays proven by spine_to_ending.yaml.
+name: map_node_event_mainline_east
+description: >-
+  Direct-boot map.tscn and walk the east mainline (无名谷 → 洛阳 → 武当 → 襄阳).
+  Each stop fires its deterministic content event — merchant, quanzhen_scripture,
+  dragon_scrap — with resolving option A returning to TRAVEL and advancing the
+  events_resolved_count ladder by exactly one per resolution (1 at 洛阳, 3 at
+  襄阳). The final move_right focuses 昆仑 with ended == false: the terminal is
+  one press away and unblocked, so the added events never block progression (the
+  ending itself stays proven by spine_to_ending.yaml). The wisdom gain from
+  quanzhen_scripture's option A is pinned as a differential.
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+    MapScreen.focus_id: focus_id == "wuming_valley"
+- at: 40
+  actions:
+  - move_right
+- at: 50
+  actions:
+  - ui_accept
+- at: 60
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 70
+  actions:
+  - ui_accept
+- at: 80
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.events_resolved_count: events_resolved_count == 1
+- at: 90
+  actions:
+  - move_right
+- at: 100
+  actions:
+  - ui_accept
+- at: 110
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "quanzhen_scripture"
+    MapScreen.current_node_id: current_node_id == "wudang"
+- at: 120
+  actions:
+  - ui_accept
+- at: 130
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.attr_wisdom: changed
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - ui_accept
+- at: 160
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "dragon_scrap"
+    MapScreen.current_node_id: current_node_id == "xiangyang"
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.events_resolved_count: events_resolved_count == 3
+- at: 190
+  actions:
+  - move_right
+- at: 200
+  actions: []
+  assert:
+    MapScreen.focus_id: focus_id == "kunlun"
+    MapScreen.ended: ended == false
