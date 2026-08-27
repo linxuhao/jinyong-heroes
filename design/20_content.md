@@ -389,3 +389,15 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
    特质「江湖阅历」写着「大地图多一个行动:**打听**,揭示相邻节点的内容」——
    该行动本轮未实现、也在本轮范围之外;记在此处以免被读成遗忘。
 
+**实测确认(2026-08-28,终局闸门):** 本节表格与 §8.2 绑定均为设计期
+(doc-first)产物,终局实测后无需修订。本轮 `5_compile` 的 playtest 闸门
+**55/55 场景全 PASS**:`map_node_event_shaolin` **18/18**(进少林即开
+`night_rain`、两选项均可聚焦选中、选项效果落地、`entry_declared_gap_types`
+在节点上可断言),护线 `spine_to_ending` **32/32**(主线 5 槽位惰性在真实
+运行中成立,昆仑照常直达结局),`save_load_roundtrip` **14/14**(节点事件
+只在 travel 到达时触发,存读档不复触发),`event_travel_effects` **19/19**
+(共享 `EventLogic` 后 RNG 操作序未漂);编译 **77/77** 零错误。§8.3 六条
+缺口**一条也未因实测而关闭**:实测绿证明的是「event 类型做通了、声明与
+惰性行为如实」,battle / facility / 主线 event 槽仍是已声明未实现,待后续
+轮次实现时才关闭。
+
