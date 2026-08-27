@@ -1783,7 +1783,7 @@ func _damage_reduction(target: Node, is_melee: bool) -> float:
 			dr += 0.15
 		"shen_diao_power":
 			if is_melee:
-				dr += 0.5  # −50% melee DR (flat; percentages never take the fhd multiplier)
+				dr += 0.1  # −10% melee DR (flat; percentages never take the fhd multiplier)
 	# 狼 defense side.
 	if _traits_of(target).has("sha_po_lang"):
 		dr += TraitEffects.lang_dr(_living_enemies_of(target))
