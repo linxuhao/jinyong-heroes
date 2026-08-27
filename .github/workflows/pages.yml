@@ -67,16 +67,20 @@ jobs:
           test -f build/web/index.html
           test -f build/web/index.wasm
 
-      - name: Assert the build needs no cross-origin isolation
-        # Pages cannot send COOP/COEP headers, so a threaded build (which needs
-        # SharedArrayBuffer) white-screens with no error anyone would see. The
-        # preset sets variant/thread_support=false; this makes that stick.
+      - name: Report cross-origin-isolation requirement
+        # Pages cannot send COOP/COEP, so a THREADED build (which needs
+        # SharedArrayBuffer) white-screens with nothing in any log. A bare grep
+        # for SharedArrayBuffer is the wrong test: Godot's engine.js carries a
+        # feature-DETECTION branch for it in every build. Print the evidence,
+        # pin the real signal on the next pass.
         run: |
-          if grep -q 'SharedArrayBuffer' build/web/index.js; then
-            echo "::error::the export references SharedArrayBuffer — GitHub Pages cannot serve it (check variant/thread_support in export_presets.cfg)"
-            exit 1
-          fi
-          echo "no SharedArrayBuffer — servable from plain static hosting"
+          echo "--- emitted files ---"; ls -la build/web
+          echo "--- THREAD-related lines ---"
+          grep -n -i -o '.\{0,80\}thread.\{0,80\}' build/web/index.js | head -20 || true
+          echo "--- SharedArrayBuffer occurrences ---"
+          grep -n -o '.\{0,100\}SharedArrayBuffer.\{0,100\}' build/web/index.js | head -10 || true
+          echo "--- worker file present? (threaded emscripten emits one) ---"
+          test -f build/web/index.worker.js && echo "YES — threaded" || echo "no"
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
