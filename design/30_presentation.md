@@ -583,7 +583,9 @@ HotkeyLabel / StateTag / CooldownLabel 等被钉住的子节点矩形):
   `phase_locked > cooldown > hp_gated > no_energy > ready`(waiting 覆盖最后)由
   `skill_button.gd::derive_state()` 单一事实源实现。**当前内容下不可达**(每一 `SkillData.cost == 0`),
   仅由单元测试 `tests/test_skill_button_no_energy.gd` 证明——刻意不写任何伪装它在实战中触发的
-  playtest 断言。当养成轮定义真实招式消耗后自然激活。
+  playtest 断言。当养成轮定义真实招式消耗后自然激活。**已激活(2026-08-27,jinyong-spend-qi 轮)**:
+  真实招式消耗已定义(`20_content.md` §1/§7),`no_energy` 现已在实战中可达,并被新 playtest 场景
+  `qi_cost_blocks_cast_no_energy` 钉住——真实内容,非伪装断言。
 - **锁定原因派生自同一谓词**:只有 `CombatManager.tutorial_battle and i >= 4 and
   current_round < 4` 时 `lock_reason_text` 非空;遭遇战 / 第 4 轮起为空,绝不写死一条
   常显字符串。

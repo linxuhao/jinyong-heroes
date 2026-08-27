@@ -127,8 +127,8 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   two additive labels by `_render()` - display-only, no rule or stored-value
   change.
 - **Skill data**: `scripts/data/skill_data.gd` - `@export` schema incl.
-  `cost: int = 0` (inner-force cost; 0 = undefined, see
-  `design/20_content.md` §5).
+  `cost: int` (inner-force cost; 7 of the 8 tutorial player moves carry real
+  values 10-30, 重剑无锋 stays 0 = free basic; see `design/20_content.md` §7).
 - **Unit tests**: GDScript test files with a top-level
   `static func run() -> bool` are collected by `tests/unit_test_runner.gd`'s
   explicit append-only `TESTS` registry (18 files, incl. the new
