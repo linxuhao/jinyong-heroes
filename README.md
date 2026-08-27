@@ -30,10 +30,12 @@ Presentation-only change (no combat rules, no value changes, no art):
   derived every frame by the HUD from the same tutorial phase-lock predicate
   that disables the button; encounter battles and rounds >= 4 render an empty
   string (never a hardcoded always-on label).
-- **Health bar (UX-05)** - `HpLabel` (a child of `Bar`) renders `cur/max` with
-  `hp_text` / `hp_value` / `hp_max` observables, written in `setup()` and
-  `update_health()`. Every health playtest assertion is expressed relative to
-  `max_health`. No geometry constant in `scripts/ui/health_bar.gd` /
+- **Health bar (UX-05)** - `HpLabel` (a child of `Bar`) renders the **current HP
+  value only** (e.g. `400`; a 64px bar cannot legibly show the 9-glyph `1000/1000`),
+  light glyph on a strong dark outline, with `hp_text` / `hp_value` / `hp_max`
+  observables written in `setup()` and `update_health()`. Every health playtest
+  assertion is expressed relative to `max_health`. No geometry constant in
+  `scripts/ui/health_bar.gd` /
   `scenes/ui/health_bar.tscn` / `tests/test_health_bar.gd` was touched - the
   68x24 widget, Bar 64x12 @(2,12), `EMPTY_CAP_PX` and expand margins are
   byte-identical.

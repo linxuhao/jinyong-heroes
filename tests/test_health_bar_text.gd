@@ -23,17 +23,20 @@ static func run() -> bool:
 	ok = _expect(ok, bar is Control, "scene is a Control")
 
 	# Pure static format, exercised via the health_bar.gd script on the instance.
-	ok = _expect(ok, bar.hp_label_text(500, 500) == "500/500", 'hp_label_text(500,500) == "500/500"')
-	ok = _expect(ok, bar.hp_label_text(200, 500) == "200/500", 'hp_label_text(200,500) == "200/500"')
-	ok = _expect(ok, bar.hp_label_text(0, 500) == "0/500", 'hp_label_text(0,500) == "0/500"')
-	ok = _expect(ok, bar.hp_label_text(1000, 1000) == "1000/1000",
-			'hp_label_text(1000,1000) == "1000/1000"')
+	# Route (a) of the readability rework: only the CURRENT value is rendered
+	# ("500"), never "cur/max" — the 9-glyph "1000/1000" cannot fit a 64px bar
+	# legibly at any font size. max_health stays discoverable via hp_max.
+	ok = _expect(ok, bar.hp_label_text(500, 500) == "500", 'hp_label_text(500,500) == "500"')
+	ok = _expect(ok, bar.hp_label_text(200, 500) == "200", 'hp_label_text(200,500) == "200"')
+	ok = _expect(ok, bar.hp_label_text(0, 500) == "0", 'hp_label_text(0,500) == "0"')
+	ok = _expect(ok, bar.hp_label_text(1000, 1000) == "1000",
+			'hp_label_text(1000,1000) == "1000"')
 
 	bar.setup("测试", 500, null)
 
-	# Observables initialized to max/max in setup() so the number reads the
-	# moment the battle spawns, not just after a damage event.
-	ok = _expect(ok, bar.hp_text == "500/500", 'setup() hp_text == "500/500"')
+	# Observables initialized to max in setup() so the number reads the moment
+	# the battle spawns, not just after a damage event.
+	ok = _expect(ok, bar.hp_text == "500", 'setup() hp_text == "500"')
 	ok = _expect(ok, bar.hp_value == 500, "setup() hp_value == 500")
 	ok = _expect(ok, bar.hp_max == 500, "setup() hp_max == 500")
 	ok = _expect(ok, bar.hp_text_width_ok == true, "setup(500) hp_text_width_ok == true")
@@ -42,31 +45,31 @@ static func run() -> bool:
 	var hp_label: Label = bar.get_node("Bar/HpLabel") as Label
 	ok = _expect(ok, hp_label != null, "Bar/HpLabel exists and is a Label")
 	if hp_label != null:
-		ok = _expect(ok, hp_label.text == "500/500", 'Bar/HpLabel.text == "500/500" after setup()')
+		ok = _expect(ok, hp_label.text == "500", 'Bar/HpLabel.text == "500" after setup()')
 
 	# Live update: the observables and the label track the new value.
 	bar.update_health(200, 500)
-	ok = _expect(ok, bar.hp_text == "200/500", 'update_health(200,500) hp_text == "200/500"')
+	ok = _expect(ok, bar.hp_text == "200", 'update_health(200,500) hp_text == "200"')
 	ok = _expect(ok, bar.hp_value == 200, "update_health(200,500) hp_value == 200")
 	ok = _expect(ok, bar.hp_max == 500, "update_health(200,500) hp_max == 500")
 	if hp_label != null:
-		ok = _expect(ok, hp_label.text == "200/500", 'Bar/HpLabel.text == "200/500" after update_health()')
+		ok = _expect(ok, hp_label.text == "200", 'Bar/HpLabel.text == "200" after update_health()')
 		ok = _expect(ok, hp_label.mouse_filter == 2,
 				"Bar/HpLabel.mouse_filter == 2 (never blocks HUD clicks)")
 	ok = _expect(ok, bar.hp_text_width_ok == true, "update_health(200,500) hp_text_width_ok == true")
 
-	# --- Worst-case width: "1000/1000" must fit the 64px bar -----------------
+	# --- Worst-case width: "1000" must fit the 64px bar -------------------------
 	# max_health is 1000 since the 2026-08-24 balance change, so the longest
-	# string the bar can ever carry is "1000/1000". The fit observable must be
-	# true for it (font_size/outline chosen so the MEASURED rendered width,
-	# string_size + 2*outline_size, is <= 64.0).
+	# string the bar can ever carry is "1000" (4 glyphs, route (a)). The fit
+	# observable must be true for it (font_size 10 / outline 4 so the MEASURED
+	# rendered width, string_size + 2*outline_size, is <= 64.0).
 	bar.setup("测试", 1000, null)
 	bar.update_health(1000, 1000)
-	ok = _expect(ok, bar.hp_text == "1000/1000", 'update_health(1000,1000) hp_text == "1000/1000"')
+	ok = _expect(ok, bar.hp_text == "1000", 'update_health(1000,1000) hp_text == "1000"')
 	ok = _expect(ok, bar.hp_value == 1000, "update_health(1000,1000) hp_value == 1000")
 	ok = _expect(ok, bar.hp_max == 1000, "update_health(1000,1000) hp_max == 1000")
 	ok = _expect(ok, bar.hp_text_width_ok == true,
-			"worst-case '1000/1000' fits 64px (hp_text_width_ok == true)")
+			"worst-case '1000' fits 64px (hp_text_width_ok == true)")
 
 	# --- Scene structure of the additive HpLabel --------------------------
 	if hp_label != null:
@@ -81,17 +84,15 @@ static func run() -> bool:
 				"HpLabel horizontal_alignment == center")
 		ok = _expect(ok, hp_label.vertical_alignment == VERTICAL_ALIGNMENT_CENTER,
 				"HpLabel vertical_alignment == center")
-		ok = _expect(ok, hp_label.get_theme_font_size("font_size") <= 8,
-				"HpLabel font_size <= 8 (fits the 64px bar)")
+		ok = _expect(ok, hp_label.get_theme_font_size("font_size") >= 9,
+				"HpLabel font_size >= 9 (legible on the bar)")
 		ok = _expect(ok, hp_label.get_theme_constant("outline_size") >= 3,
-				"HpLabel outline_size >= 3 (legible on bright fill)")
+				"HpLabel outline_size >= 3 (strong dark outline on bright fill)")
 		var hp_fc: Color = hp_label.get_theme_color("font_color")
-		ok = _expect(ok, not hp_fc.is_equal_approx(Color(0.95, 0.95, 0.95)),
-				"HpLabel font_color no longer near-white")
-		ok = _expect(ok, hp_fc.get_luminance() >= 0.25 and hp_fc.get_luminance() <= 0.75,
-				"HpLabel font_color luminance in [0.25, 0.75] (mid-gray)")
+		ok = _expect(ok, hp_fc.get_luminance() >= 0.8,
+				"HpLabel font_color luminance >= 0.8 (light glyph)")
 		ok = _expect(ok, hp_label.get_theme_color("font_outline_color").is_equal_approx(
-				Color(0.05, 0.05, 0.05)), "HpLabel font_outline_color == dark")
+				Color(0.02, 0.02, 0.02)), "HpLabel font_outline_color == dark (0.02)")
 
 		# HpLabel must be Bar's LAST child so it paints above the fill and the
 		# EmptyCap (otherwise the cap would cover the number).

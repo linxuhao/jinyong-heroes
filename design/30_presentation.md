@@ -589,9 +589,19 @@ HotkeyLabel / StateTag / CooldownLabel 等被钉住的子节点矩形):
 ### 血条数值(UX-05)
 
 `HpLabel` 作为 `Bar` 的子节点(沿用 EmptyCap 先例),锚定 Bar 全矩形 (0,0)-(64,12),
-居中,字号 9,`clip_text=false`、`text_overrun_behavior=0`、`mouse_filter=2`,绘制为
-Bar 的最后一个子节点(盖在填充与 EmptyCap 之上)。文字 `cur/max`(如「500/500」),
-浅色字加深色描边(同 NameLabel 配方)。**`health_bar.gd` / `health_bar.tscn` /
-`tests/test_health_bar.gd` 的几何常数一律不动**(68×24 部件、Bar 64×12 @(2,12)、
-`EMPTY_CAP_PX`、expand margin、`STRIP_BOTTOM` 全部逐字节不变),本轮只往血条上加数字。
+居中,`clip_text=false`、`text_overrun_behavior=0`、`mouse_filter=2`,绘制为
+Bar 的最后一个子节点(盖在填充与 EmptyCap 之上)。
+
+**血条只显示当前值,不显示 cur/max(2026-08-26, fix_hp_number_readability_v2)。**
+64×12 的条上放不下 9 个字的「1000/1000」——字号 7–8 时笔画黏连,再怎么调颜色也读不清。
+路由 (a):条上只渲染当前值(如「400」,最多 4 个字),字号 10、**浅色字(0.95)+
+强深色描边(outline_size 4)+ 深色阴影 2**——满足「强深色描边(outline_size ≥ 3)」约束;
+满值 / 受伤时数字都压在条上,靠深描边在亮绿填充与黄填充上保持可读。`max_health`
+经 `hp_max` 观测量 / 悬停 / 选中说明暴露,不画在条上。`hp_text` 即 `str(current)`,
+`hp_value` / `hp_max` 语义不变,`hp_text_width_ok` 对条宽 64px 实时重算——只有
+渲染宽度真正装得下时才是 true。
+
+**`health_bar.gd` / `health_bar.tscn` / `tests/test_health_bar.gd` 的几何常数一律不动**
+(68×24 部件、Bar 64×12 @(2,12)、`EMPTY_CAP_PX`、expand margin、`STRIP_BOTTOM`
+全部逐字节不变),本轮只改 `HpLabel` 的文字格式与样式(字体 / 描边 / 阴影),不碰冻结常数。
 

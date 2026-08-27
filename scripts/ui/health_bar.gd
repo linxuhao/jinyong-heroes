@@ -119,10 +119,13 @@ var _fill_sb: StyleBoxFlat = null
 ## a "normal" stylebox override so the label reads on any artwork behind it.
 var _name_backing_sb: StyleBoxFlat = null
 
-## The rendered HP number as "<current>/<max>" (no spaces). Written to max/max in
-## setup() and rewritten on every update_health() so it stays live on damage.
-## Exposed for the playtest surface so health asserts can be expressed relative
-## to max_health (never an absolute HP literal).
+## The rendered HP number — the CURRENT value only (e.g. "400"), never "cur/max".
+## Route (a) of the readability rework: a 64px bar cannot render the 9-glyph
+## "1000/1000" legibly (strokes stick together at 7-8px), so only the current
+## value is drawn; max_health stays discoverable via the hp_max observable.
+## Written to max in setup() and rewritten on every update_health() so it stays
+## live on damage. Exposed for the playtest surface so health asserts can be
+## expressed relative to max_health (never an absolute HP literal).
 var hp_text: String = ""
 
 ## The live current-HP integer mirror (== the `current` argument of the most
@@ -134,11 +137,12 @@ var hp_value: int = 0
 var hp_max: int = 0
 
 ## True when the MEASURED rendered ink width of the HpLabel text fits within the
-## Bar width (64 px), so the worst-case "cur/max" string never overflows the bar
-## on either side. Recomputed at the end of setup() and update_health() (right
-## after hp_text is written) via _hp_rendered_width(). Additive observable —
-## deliberately kept OUT of the playtest surface; verified by the headless unit
-## test only.
+## Bar width (64 px), so the current-value string never overflows the bar on
+## either side. Recomputed at the end of setup() and update_health() (right
+## after hp_text is written) via _hp_rendered_width() against the live bar width.
+## Whitelisted on the playtest surface and asserted in ui_geometry_readability.yaml
+## (hp_text_width_ok == true) — recomputed against the real rendered width so it
+## is true only when the number actually fits its 64px host.
 var hp_text_width_ok: bool = false
 
 # ---------------------------------------------------------------------------
@@ -152,10 +156,15 @@ var hp_text_width_ok: bool = false
 # Public API
 # ---------------------------------------------------------------------------
 
-## Render the HP number as "cur/max" (no spaces, no padding). Pure function —
-## does not touch the scene, so it is safely headless-testable.
+## Render the HP number as the CURRENT value only (e.g. "400", "1000"). Route (a)
+## of the HP readability rework: a 64px bar cannot legibly render the 9-glyph
+## "1000/1000" at any legible font size, so only the current value is drawn and
+## max_health is surfaced via the hp_max observable. max_hp stays in the
+## signature (call shape and all call sites unchanged) but is intentionally
+## unused for now. Pure function — does not touch the scene, so it is safely
+## headless-testable.
 static func hp_label_text(current: int, max_hp: int) -> String:
-	return str(current) + "/" + str(max_hp)
+	return str(current)
 
 ## Measure the RENDERED ink width of `text` in `hp_label`, INCLUDING the outline
 ## expansion (the outline widens glyphs ~outline_size px per side, so the drawn
