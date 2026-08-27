@@ -48,6 +48,7 @@ ROUND_SCENARIOS: list[str] = [
     "creation_attr_effect_info",
     "creation_hp_value_displayed",
     "creation_confirm_summary",
+    "qi_cost_blocks_cast_no_energy",
 ]
 
 
@@ -628,3 +629,54 @@ def test_readability_geometry_surface_contract() -> None:
             assert any(
                 op in line for op in ["==", "!=", "<", ">", "and", "or"]
             ), f"{scenario} assert missing comparison operator: {line.strip()}"
+
+
+def test_qi_cost_surface_contract() -> None:
+    """Static contract pin for the jinyong-spend-qi round.
+
+    Pins the qi-cost surface contract against ``playtest/_common.yaml`` and the
+    new ``qi_cost_blocks_cast_no_energy.yaml`` scenario: ``Player.energy_max`` is
+    whitelisted on the surface (cap-relative qi asserts), ``debug_spend_player_qi``
+    is in the actions list (the shared spend-path injection), the scenario file
+    exists with ``name:`` equal to its basename, every timeline ``at:`` is a single
+    integer, and every 4-space dotted assert line carries a comparison operator or
+    the differential token changed/unchanged (the repo's
+    no-bare-scalar-silent-false rule). The exact cost values are deliberately NOT
+    pinned here — they live in the GDScript unit pin
+    (``tests/test_qi_costs_match_design.gd``) so a future cost retuning reddens one
+    greppable file, not the regression net.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    player_items = blocks.get("Player", [])
+    assert "energy_max" in player_items, (
+        "Player.energy_max not whitelisted on the surface"
+    )
+    actions = _items_under(text, "actions")
+    assert "debug_spend_player_qi" in actions, (
+        "debug_spend_player_qi not in _common.yaml actions list"
+    )
+
+    name = "qi_cost_blocks_cast_no_energy"
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            has_op = any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            )
+            has_diff = "changed" in line or "unchanged" in line
+            assert has_op or has_diff, (
+                f"{name}.yaml line {lineno} assert missing "
+                f"comparison operator: {line.strip()}"
+            )
