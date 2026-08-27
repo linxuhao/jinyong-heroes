@@ -2,7 +2,7 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: spine_to_ending
-description: 'The full six-segment spine inside the frame cap: tutorial win -> transition -> creation -> sect select -> cultivation (DEBUG fast-forward through all 36 months) -> map (4 moves to 昆仑) -> tiered ending.'
+description: 'The full six-segment spine inside the frame cap: tutorial win -> transition -> creation -> sect select -> cultivation (DEBUG fast-forward through all 36 months) -> map (the leg now resolves the 洛阳/武当/襄阳 node entry events en route to 昆仑) -> tiered ending, still reachable.'
 timeline:
 - at: 3
   actions:
@@ -118,8 +118,11 @@ timeline:
   actions:
   - ui_accept
 - at: 440
-  actions:
-  - move_right
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
 - at: 450
   actions:
   - ui_accept
@@ -130,12 +133,37 @@ timeline:
   actions:
   - ui_accept
 - at: 480
-  actions:
-  - move_right
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "quanzhen_scripture"
+    MapScreen.current_node_id: current_node_id == "wudang"
 - at: 490
   actions:
   - ui_accept
+- at: 500
+  actions:
+  - move_right
+- at: 510
+  actions:
+  - ui_accept
 - at: 520
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "dragon_scrap"
+    MapScreen.current_node_id: current_node_id == "xiangyang"
+    MapScreen.events_resolved_count: events_resolved_count == 2
+- at: 530
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - move_right
+- at: 550
+  actions:
+  - ui_accept
+- at: 580
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"
