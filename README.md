@@ -14,60 +14,52 @@ UI text is Chinese, rendered with the bundled NotoSansSC font (SIL OFL, see
 `assets/fonts/LICENSE_OFL.txt`). The project is at roadmap stage 2 -
 interaction: the player can read it, click it, and know what to press next.
 
-## Latest round: jinyong-hud - battle HUD information presentation
+## Latest round: jinyong-clarity - character creation "说人话" (UX-06/07/08)
 
-Presentation-only change (no combat rules, no value changes, no art):
+Presentation-only information round on the second screen the player meets
+(after jinyong-hud closed the battle-HUD trio UX-03/04/05): no game-rule
+change, no numeric-value change, no art, no frozen-geometry edit.
 
-- **Skill buttons (UX-03)** - each button surfaces its effect description
-  (`effect_text`, the technique's Chinese description, also shown as the
-  tooltip), a short on-face effect summary (`effect_summary_text`, derived
-  only from existing `SkillData` numbers, e.g. 「单体 45」) and the inner-force
-  cost line (`cost_text`; `SkillData.cost` defaults to 0 -> 「无消耗」).
-  No cost number was invented: no technique in `design/10_systems.md` §1 or
-  the code defines one - the missing per-skill costs are a recorded content
-  gap (`design/20_content.md` §5, also named in `final/delivery_notes.md`).
-- **Locked slots 5-8 (UX-04)** - `lock_reason_text` (「第 4 轮解锁」) is
-  derived every frame by the HUD from the same tutorial phase-lock predicate
-  that disables the button; encounter battles and rounds >= 4 render an empty
-  string (never a hardcoded always-on label).
-- **Health bar (UX-05)** - `HpLabel` (a child of `Bar`) renders the **current HP
-  value only** (e.g. `400`; a 64px bar cannot legibly show the 9-glyph `1000/1000`),
-  light glyph on a strong dark outline, with `hp_text` / `hp_value` / `hp_max`
-  observables written in `setup()` and `update_health()`. Every health playtest
-  assertion is expressed relative to `max_health`. No geometry constant in
-  `scripts/ui/health_bar.gd` /
-  `scenes/ui/health_bar.tscn` / `tests/test_health_bar.gd` was touched - the
-  68x24 widget, Bar 64x12 @(2,12), `EMPTY_CAP_PX` and expand margins are
-  byte-identical.
+- **Attribute effects (UX-06)** - the ATTRS description slot (`AttrDescLabel`)
+  now lists **all five attribute effects at rest** (name-prefixed; segments
+  verbatim from `creation.gd::_ATTR_DESCS` = `design/10_systems.md` §1
+  meanings + `design/40_progression.md` §7 formulas - nothing invented;
+  `design/20_content.md` §6 records the explicit "no content gap" note).
+  The list no longer follows focus: every attribute's meaning is on the page
+  while you decide where to spend points.
+- **Current HP (UX-07)** - a new additive `HpValueLabel` directly below the
+  effects list shows 「当前气血 N」, derived live from the build
+  (`hp_value = hp_from_bone(attrs["bone"]) = attrs["bone"] × 5`, the §7
+  formula; `hp_text` pins the exact rendered format). Every numeric playtest
+  assert is relative to the live `attrs` dict - zero absolute HP literals.
+- **Confirm summary (UX-08)** - a new additive `ConfirmSummaryLabel` is
+  `ConfirmBox`'s first child (above 「确认踏上江湖」), one 「名 值」 line per
+  attribute (`confirm_summary_text`, five lines) - the final-value checklist
+  the confirm page was missing. Per-attribute asserts are relative
+  (`contains("根骨 " + str(attrs["bone"]))`).
+- **One declared measurement change** - the `points_attrs_gap_ok` CONFIRM-phase
+  first-row ink cluster re-points from `ConfirmButton`'s rect to
+  `ConfirmSummaryLabel`'s rect (same observable, same yaml assert lines,
+  `ConfirmButton` fallback retained; the jinyong-layout-r2
+  measured-quantity-change precedent, recorded in `design/30_presentation.md`).
+- **Regression net** - three new playtest scenarios
+  (`creation_attr_effect_info`, `creation_hp_value_displayed`,
+  `creation_confirm_summary`; 50 -> 53 scenarios, appended to
+  `scenario_order` and the smoke test's `ROUND_SCENARIOS` in the same order)
+  plus one new headless unit test `tests/test_creation_info_texts.gd`, which
+  pins the pure derivations, the per-phase label wiring, and **every frozen
+  creation-geometry constant** so accidental drift reddens the test.
+- **Fossil evidence removed** - `final/verify_report.json`, a jinyong-events-era
+  verdict the pipeline could never refresh (`repo_apply` ignores `final/*`),
+  was replaced by a tombstone pointer note carrying no verdict fields: the
+  only authoritative gate evidence is the pipeline step products. The decision
+  is recorded in `design/90_decisions.md` (Out of scope) and
+  `design/99_changelog.md`.
 
-- **Insufficient inner force (review follow-up)** - the `no_energy` button
-  state is implemented: a sixth palette state (light purple bg
-  `(0.72,0.62,0.92)`, BT.709 luma 0.6629 - pairwise >= 0.10 from every
-  other state) with the 「内力不足」 tag (distinct from 「锁定」), a pure
-  `no_energy_predicate(cost, energy)`, the `phase_locked > cooldown >
-  hp_gated > no_energy > ready` priority chain in `derive_state()`, and a
-  `no_energy` term in the HUD's `disabled` derivation. With current content
-  every `SkillData.cost == 0`, so the state is real but unreachable in live
-  play (documented in `design/20_content.md` §5) and proven by the unit
-  test `tests/test_skill_button_no_energy.gd`.
-
-Three new playtest scenarios pin the visibility of the three items
-(`skill_button_effect_info`, `locked_slot_unlock_reason`,
-`health_bar_numbers`; 47 -> 50 scenarios) plus three new headless unit
-tests (`tests/test_skill_button_info.gd`, `tests/test_health_bar_text.gd`,
-`tests/test_skill_button_no_energy.gd`).
-
-Post-review hardening in the same round: the HP number was reworked to the
-current-value-only route (`fix_hp_number_readability_v2`, recorded in
-`design/30_presentation.md`) and four on-frame readability observables are
-now asserted in playtest (`HealthBar.hp_text_width_ok`,
-`HUD.nameplate_pairwise_overlap`, `HUD.hint_nameplate_overlap`,
-`SettingsPanel.title_rows_overlap`) - measured ink-width / overlap checks
-that do not depend on the (blind) vision gate. Note: this snapshot also
-carries the sibling **jinyong-balance** round's tutorial-balance changes
-(shen-diao regen 20 -> 0, melee damage reduction -50% -> -10%;
-`design/99_changelog.md` / `final/terminal_victory_balance_notes.md`) -
-combat values, outside this round's presentation-only scope.
+The previous jinyong-hud round's battle-HUD information layer (UX-03/04/05:
+skill-button effect/cost text, lock reasons, HP numbers on a frozen
+health-bar geometry, plus the `no_energy` button state) is recorded in
+`design/99_changelog.md` and the `final/*` notes history.
 
 ## Requirements
 
@@ -89,14 +81,16 @@ the main menu (新的冒险 / 读取存档 / 设置 / 退出). Headless:
 godot --path .
 ```
 
-Flow: main menu -> character creation (fixed point budget: attributes /
-innate traits) -> tutorial battle as a fully mastered Yang Guo vs the Five
-Masters (you are meant to win) -> transition -> sect choice -> cultivation.
+Flow: main menu -> character creation (fixed 30-point budget: five attributes
+with live effect explanations and current HP, 13 innate trait/flaw toggles,
+and a confirm page listing the final values before you commit) -> tutorial
+battle as a fully mastered Yang Guo vs the Five Masters (you are meant to
+win) -> transition -> sect choice -> cultivation.
 
 ## Tests
 
 `run_tests.sh` drives the full Godot gate through the `godot-builder` sidecar
-(compile check -> headless playtest of all 50 scenarios -> GDScript unit
+(compile check -> headless playtest of all 53 scenarios -> GDScript unit
 suite). It fails loudly when the sidecar is unreachable - the code then ships
 unverified, which is the intended behavior.
 
@@ -121,79 +115,79 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   `fahui_text` / `cost_text` / `effect_text` / `effect_summary_text` /
   `lock_reason_text` / `hp_gated` / `disabled`; `HealthBar`:
   `bar_width` / `bar_height` / `empty_area_px` / `empty_cap_px` /
-  `hp_text` / `hp_value` / `hp_max` / `hp_text_width_ok` (measured
-  rendered-ink width of the HP number fits the 64 px bar).
-- **Skill data**: `scripts/data/skill_data.gd` - `@export` schema incl. the
-  new `cost: int = 0` (inner-force cost; 0 = undefined this round).
+  `hp_text` / `hp_value` / `hp_max` / `hp_text_width_ok`; `CreationScreen`:
+  `phase` / `points_left` / `attr_index` / `attrs` / `trait_ids` plus the
+  round-2/3 geometry observables and the new clarity layer `hp_value` /
+  `hp_text` / `confirm_summary_text`; the node blocks `AttrDescLabel` /
+  `HpValueLabel` / `ConfirmSummaryLabel` expose `visible` + `text`.
+- **Creation info derivations** (`scripts/segments/creation.gd`): pure
+  `hp_from_bone(bone)` (= bone × 5, `design/40_progression.md` §7),
+  `attr_effects_text()` (all five effects, verbatim segments) and
+  `confirm_summary_text_from(attrs)` (five 「名 值」 lines), written into the
+  two additive labels by `_render()` - display-only, no rule or stored-value
+  change.
+- **Skill data**: `scripts/data/skill_data.gd` - `@export` schema incl.
+  `cost: int = 0` (inner-force cost; 0 = undefined, see
+  `design/20_content.md` §5).
 - **Unit tests**: GDScript test files with a top-level
   `static func run() -> bool` are collected by `tests/unit_test_runner.gd`'s
-  explicit append-only `TESTS` registry (17 files, incl. the new
-  `test_skill_button_info.gd` / `test_health_bar_text.gd` /
-  `test_skill_button_no_energy.gd`), run headless via
+  explicit append-only `TESTS` registry (18 files, incl. the new
+  `test_creation_info_texts.gd` and the jinyong-hud trio), run headless via
   `godot --headless --path . -s res://tests/unit_test_runner.gd`.
 
 ## Verification status (honest)
 
-The only authoritative gate evidence is the pipeline step products —
+The only authoritative gate evidence is the pipeline step products -
 `5_compile`'s `compile_report.json` / `playtest_report.json` /
 `playtest_summary.md`, `5_vision`'s `vision_report.json`, `5_test`'s
-`test_report.json` — pipeline artifacts, not repo files. The repo file
+`test_report.json` - pipeline artifacts, not repo files; none is on disk at
+the verifier step (the gates run after it). The repo file
 `final/verify_report.json` is deliberately NOT a delivery verdict: it is a
-tombstone pointer note (`superseded_pointer_note`) stating it does not
-represent the current delivery state, because the pipeline's `repo_apply`
-ignores `final/*` and can never refresh it. In short:
+tombstone pointer note (`superseded_pointer_note`,
+`represents_current_delivery: false`) stating it does not represent the
+current delivery state, because the pipeline's `repo_apply` ignores `final/*`
+and can never refresh it. In short:
 
-- The three information layers (effect/cost, lock reason, HP numbers) are
-  implemented and pinned by playtest assertions and unit tests; the frozen
-  health-bar geometry and the "no invented numbers" constraint are honored.
-- The insufficient-inner-force button state (`no_energy`, visually distinct
-  from 锁定) **is implemented** (post-review continuation): sixth palette
-  state (luma 0.6629, pairwise >= 0.10 from every other state), predicate +
-  priority chain + `disabled` term, proven by
-  `tests/test_skill_button_no_energy.gd`. It is unreachable in live play
-  with current content (every `SkillData.cost == 0`,
-  `design/20_content.md` §5) - expected, not a defect.
-- `design/40_ux_backlog.md` shows UX-03 / UX-04 / UX-05 as
-  **CLOSED(jinyong-hud)** with evidence paths (the three scenario yamls +
-  `final/hud_info_probe_notes.md`), closed by the post-gate evidence task
-  from a measured playtest run (50/50 scenarios green, incl.
-  `skill_button_effect_info` 5/5, `locked_slot_unlock_reason` 8/8,
-  `health_bar_numbers` 5/5, `spine_to_ending` 32/32).
-- Compile / playtest / unit / vision gates run after the verifier step;
-  their products (`compile_report.json` / `test_report.json` /
-  `playtest_summary.md` / `vision_report.json`) are pipeline artifacts, not
-  repo files, and none is on disk at this step. The reviewer-recorded run
-  (compile 72/72 scripts 0 errors, unit tests 12/12, playtest hard gate
-  passed 50/50 as above, `terminal_victory_8_12_rounds_hp_15_40` green
-  after the sibling jinyong-balance round) predates the post-review
-  `no_energy` addition; that addition is additive and inert with current
-  data (all `SkillData.cost == 0`), but the fresh downstream gate run is
-  the authoritative confirmation - which is why the verdict stays
-  `all_goals_met = false`. The vision gate was blind (endpoint
-  unreachable): the rendered-ink legibility of the new labels was never
-  machine-adjudicated - the round compensates with measured observables
-  (`hp_text_width_ok`, nameplate/hint overlap pins), not a vision verdict.
-- Known doc drift (cosmetic, no code inconsistency): the pre-continuation
-  records `final/delivery_notes.md` §1/§5/§6/§7/§8.5 and the jinyong-hud
-  changelog rows still describe the `no_energy` state as deferred and the
-  backlog as OPEN (both were landed by the post-review continuation);
-  `final/hud_info_probe_notes.md` §1/§2 additionally still carry the
-  pre-rework `cur/max` `hp_text` wording, and the changelog has no
-  appended row for the `no_energy` follow-up implementation itself. The
-  authoritative records are the code, `design/20_content.md` §5,
-  `design/30_presentation.md`, `design/40_ux_backlog.md`; the only
-  authoritative gate evidence is the pipeline step products, never
-  `final/verify_report.json` (tombstone pointer note).
+- The three creation information layers (attribute effects, current HP,
+  confirm summary) are implemented and pinned by playtest assertions and a
+  headless unit test; the frozen creation geometry is untouched (and
+  re-pinned by `tests/test_creation_info_texts.gd`); the attribute-effect
+  text is verbatim from existing definitions - no content gap
+  (`design/20_content.md` §6).
+- `design/40_ux_backlog.md` shows UX-06 / UX-07 / UX-08 as **OPEN** with
+  「修复已落,post-fix 闸门证据待验」 (fix landed, post-fix gate evidence
+  pending). Per backlog rule 2, `CLOSED(jinyong-clarity)` is written only by
+  the post-gate evidence task from measured `playtest_summary.md`
+  per-scenario counts (`creation_attr_effect_info`,
+  `creation_hp_value_displayed`, `creation_confirm_summary`) - an honest
+  OPEN beats an evidence-less CLOSED.
+- Compile / playtest / unit / vision gates run after the verifier step, so
+  this round's measured pass (53/53 scenarios green incl. `spine_to_ending`
+  32/32 and the seven existing creation/menu scenarios; 18/18 GDScript unit
+  tests; pytest smoke green) is **pending, not claimed**. The last fully
+  measured final-tree run (jinyong-hud's rerun: compile 73/73 scripts 0
+  errors, playtest 50/50 scenarios green) predates this round; the clarity
+  changes are additive by construction (two scene labels, three script
+  vars, three scenario files, one unit test), but the authoritative
+  confirmation is the fresh downstream gate run - which is why the round
+  verdict stays `all_goals_met = false`.
+- The vision gate may be blind (`endpoint_unreachable`, same stance as
+  jinyong-hud): the three findings are information-presence pins (text
+  non-empty / value present) judged by playtest asserts; rendered-ink
+  concerns are compensated by the existing measured geometry observables
+  (`points_attrs_gap_ok`, `creation_box_fits`, `desc_center_ok`,
+  `nav_cluster_center_ok`, ...), not by a vision verdict.
 
 ## Repository layout
 
 - `scripts/` - game code (`autoload/`, `characters/`, `data/`, `ui/`,
   `segments/`, `ai/`, `battlefield.gd`)
 - `scenes/` - Godot scenes (`ui/`, `segments/`, `main.tscn`)
-- `playtest/` - 50 headless playtest scenarios + the `_common.yaml` contract
-- `tests/` - GDScript unit suites + `test_playtest_contract_smoke.py`
+- `playtest/` - 53 headless playtest scenarios + the `_common.yaml` contract
+- `tests/` - GDScript unit suites (18 files) + `test_playtest_contract_smoke.py`
 - `design/` - the design archive (`00_overview.md` ... `99_changelog.md`);
   `40_ux_backlog.md` tracks player-eye UX debt, `20_content.md` §5 the
-  inner-force cost content gap
-- `final/` - per-round delivery notes, probe notes and `verify_report.json`
+  inner-force cost content gap (§6: attribute effects - no gap)
+- `final/` - per-round delivery notes and probe notes; `verify_report.json`
+  is a tombstone pointer note, not a verdict
 - `assets/` - color-block textures, NotoSansSC font, audio, seed portraits
