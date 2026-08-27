@@ -195,6 +195,10 @@ debug_click_creation_widget={
 "deadzone": 0.5,
 "events": []
 }
+debug_click_settings_row={
+"deadzone": 0.5,
+"events": []
+}
 debug_seed_save={
 "deadzone": 0.5,
 "events": []
