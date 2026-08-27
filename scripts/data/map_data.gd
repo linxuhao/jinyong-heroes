@@ -12,20 +12,24 @@ const EventData = preload("res://scripts/data/event_data.gd")
 
 ## Per-node entry-content declaration slots (design/20_content.md §8.1).
 ## Status domain: "active" (implemented + live) | "declared" (declaration-only,
-## unimplemented this round — battle/facility, and mainline event slots kept
-## inert to protect the unmodifiable spine_to_ending timeline). Each slot's id
+## unimplemented — battle/facility stay declared). Mainline event slots are LIVE:
+## wuming_valley/luoyang/wudang/xiangyang each bind a deterministic event_id from
+## the pool (literal rows — never a pool draw, keeping the node-event and
+## cultivation channels' events_seen independent). The end node (kunlun) stays
+## declared because end-node routing runs BEFORE entry content, so a future
+## end-node event can never silently block the ending. Each slot's id
 ## key is <type>_id (event_id / battle_id / facility_id).
 ## 6 map nodes. Mainline = 无名谷→洛阳→武当→襄阳→昆仑 (4 moves); 少林 is a
 ## branch off 洛阳. Only kunlun is an end node.
 const NODES: Array = [
 	{"id": "wuming_valley", "display_name": "无名谷", "is_end": false,
-		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+		"entry_content": {"event": {"status": "active", "event_id": "tomb_bed"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "luoyang", "display_name": "洛阳", "is_end": false,
-		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+		"entry_content": {"event": {"status": "active", "event_id": "merchant"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "wudang", "display_name": "武当", "is_end": false,
-		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+		"entry_content": {"event": {"status": "active", "event_id": "quanzhen_scripture"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "xiangyang", "display_name": "襄阳", "is_end": false,
-		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+		"entry_content": {"event": {"status": "active", "event_id": "dragon_scrap"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "kunlun", "display_name": "昆仑", "is_end": true,
 		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "shaolin", "display_name": "少林", "is_end": false,
