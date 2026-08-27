@@ -40,10 +40,22 @@ Presentation-only change (no combat rules, no value changes, no art):
   68x24 widget, Bar 64x12 @(2,12), `EMPTY_CAP_PX` and expand margins are
   byte-identical.
 
+- **Insufficient inner force (review follow-up)** - the `no_energy` button
+  state is implemented: a sixth palette state (light purple bg
+  `(0.72,0.62,0.92)`, BT.709 luma 0.6629 - pairwise >= 0.10 from every
+  other state) with the 「内力不足」 tag (distinct from 「锁定」), a pure
+  `no_energy_predicate(cost, energy)`, the `phase_locked > cooldown >
+  hp_gated > no_energy > ready` priority chain in `derive_state()`, and a
+  `no_energy` term in the HUD's `disabled` derivation. With current content
+  every `SkillData.cost == 0`, so the state is real but unreachable in live
+  play (documented in `design/20_content.md` §5) and proven by the unit
+  test `tests/test_skill_button_no_energy.gd`.
+
 Three new playtest scenarios pin the visibility of the three items
 (`skill_button_effect_info`, `locked_slot_unlock_reason`,
-`health_bar_numbers`; 47 -> 50 scenarios) plus two new headless unit tests
-(`tests/test_skill_button_info.gd`, `tests/test_health_bar_text.gd`).
+`health_bar_numbers`; 47 -> 50 scenarios) plus three new headless unit
+tests (`tests/test_skill_button_info.gd`, `tests/test_health_bar_text.gd`,
+`tests/test_skill_button_no_energy.gd`).
 
 Post-review hardening in the same round: the HP number was reworked to the
 current-value-only route (`fix_hp_number_readability_v2`, recorded in
@@ -126,30 +138,39 @@ python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
   implemented and pinned by playtest assertions and unit tests; the frozen
   health-bar geometry and the "no invented numbers" constraint are honored.
 - The insufficient-inner-force button state (`no_energy`, visually distinct
-  from 锁定) was **deferred, not implemented** - no skill defines a cost yet
-  (`design/20_content.md` §5), which leaves that MVP goal unmet this round.
-- `design/40_ux_backlog.md` keeps UX-03/UX-04/UX-05 **OPEN** with
-  「修复已落,post-fix 闸门证据待验」: per backlog rule 2, closing them needs
-  the full playtest gate products (`playtest_report.json` /
-  `playtest_summary.md`) on disk with the three scenarios green - artifacts
-  produced downstream of the verifier step, not repo files.
-- Compile / playtest / unit / vision gates run after the verifier step; the
-  reviewer-recorded results quoted in `final/delivery_notes.md` §3
-  (compile 71/71 scripts, unit 11/11, playtest hard gate passed with the
-  three new scenarios and `spine_to_ending` green, only the then-sanctioned
-  `terminal_victory_8_12_rounds_hp_15_40` red) are pipeline artifacts, not
-  repo files, and are not counted as verified here. The tree has also
-  evolved since those runs (HP current-value rework, on-frame readability
-  observables, the sibling jinyong-balance round), so the downstream gate
-  re-run is the authoritative confirmation. The vision gate was blind
-  (endpoint unreachable): the rendered-ink legibility of the new labels was
-  never machine-adjudicated - the round partially compensates with measured
-  observables (`hp_text_width_ok`, nameplate/hint overlap pins), not a
-  vision verdict.
-- Known doc drift (cosmetic, no code inconsistency): `final/delivery_notes.md`
-  §1/§7/§8.1 and the jinyong-hud changelog row still describe `hp_text` as
-  `cur/max`, while the shipped code/scenario/design record the
-  current-value-only route (`fix_hp_number_readability_v2`).
+  from 锁定) **is implemented** (post-review continuation): sixth palette
+  state (luma 0.6629, pairwise >= 0.10 from every other state), predicate +
+  priority chain + `disabled` term, proven by
+  `tests/test_skill_button_no_energy.gd`. It is unreachable in live play
+  with current content (every `SkillData.cost == 0`,
+  `design/20_content.md` §5) - expected, not a defect.
+- `design/40_ux_backlog.md` shows UX-03 / UX-04 / UX-05 as
+  **CLOSED(jinyong-hud)** with evidence paths (the three scenario yamls +
+  `final/hud_info_probe_notes.md`), closed by the post-gate evidence task
+  from a measured playtest run (50/50 scenarios green, incl.
+  `skill_button_effect_info` 5/5, `locked_slot_unlock_reason` 8/8,
+  `health_bar_numbers` 5/5, `spine_to_ending` 32/32).
+- Compile / playtest / unit / vision gates run after the verifier step;
+  their products (`compile_report.json` / `test_report.json` /
+  `playtest_summary.md` / `vision_report.json`) are pipeline artifacts, not
+  repo files, and none is on disk at this step. The reviewer-recorded run
+  (compile 72/72 scripts 0 errors, unit tests 12/12, playtest hard gate
+  passed 50/50 as above, `terminal_victory_8_12_rounds_hp_15_40` green
+  after the sibling jinyong-balance round) predates the post-review
+  `no_energy` addition; that addition is additive and inert with current
+  data (all `SkillData.cost == 0`), but the fresh downstream gate run is
+  the authoritative confirmation - which is why the verdict stays
+  `all_goals_met = false`. The vision gate was blind (endpoint
+  unreachable): the rendered-ink legibility of the new labels was never
+  machine-adjudicated - the round compensates with measured observables
+  (`hp_text_width_ok`, nameplate/hint overlap pins), not a vision verdict.
+- Known doc drift (cosmetic, no code inconsistency): the pre-continuation
+  records `final/delivery_notes.md` §1/§5/§6/§7/§8.5, the jinyong-hud
+  changelog rows and `final/hud_info_probe_notes.md` §2 still describe the
+  `no_energy` state as deferred and the backlog as OPEN (both were landed
+  by the post-review continuation); the authoritative records are the code,
+  `design/20_content.md` §5, `design/30_presentation.md` and
+  `design/40_ux_backlog.md`.
 
 ## Repository layout
 
