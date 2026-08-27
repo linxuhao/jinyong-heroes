@@ -96,13 +96,12 @@ numeric tuning, no combat rule change, no month-loop change, no art.
   append-only in `_common.yaml`; two-place contract sync
   (`scenario_order` + smoke-test `ROUND_SCENARIOS`) both append the scenario
   at the tail; a new pytest pin `test_map_node_event_surface_contract`
-  guards the contract; a new GDScript pin file
-  `tests/test_map_node_event.gd` covers the MapData schema, EventLogic
-  parity against the pool rows, and the map EVENT phase (open -> focus ->
-  resolve, bag independence). **Known wiring gap:** that unit pin file is not
-  yet appended to `tests/unit_test_runner.gd`'s TESTS registry (still 19
-  entries), so the default unit gate does not execute it yet - flagged in the
-  round's `final/verify_report.json`; the fix is a one-line append.
+  guards the contract; the new GDScript pin file
+  `tests/test_map_node_event.gd` (MapData schema, EventLogic parity against
+  the pool rows, map EVENT phase open -> focus -> resolve, bag independence)
+  is registered in `tests/unit_test_runner.gd`'s TESTS registry - the
+  registry now holds 20 files. (An earlier README revision described this
+  registration as missing; the delivered tree has it wired - corrected here.)
 
 Previous round (jinyong-spend-qi): all 8 tutorial moves carry real inner-qi
 costs (0/15/20/25/10/15/20/30, 重剑无锋 free; source of truth
@@ -208,14 +207,13 @@ godot --headless --path . -s res://tests/test_cultivation.gd  # SceneTree-style 
   `energy_max` (cap-relative, mirroring the `max_health` discipline).
 - **Unit tests**: GDScript test files with a top-level
   `static func run() -> bool` are collected by `tests/unit_test_runner.gd`'s
-  explicit append-only `TESTS` registry (19 files as delivered), run headless
+  explicit append-only `TESTS` registry (20 files as delivered, including
+  this round's `tests/test_map_node_event.gd`), run headless
   via `godot --headless --path . -s res://tests/unit_test_runner.gd`.
   SceneTree-extending integration suites (`test_cultivation.gd`,
   `test_encounter.gd`, `test_save_manager.gd`, `test_game_manager_fsm.gd`)
   are auto-discovered by the sidecar and driven with their own `-s`
-  invocation. `tests/test_map_node_event.gd` (this round's pin file, static
-  `run()` contract) is **not yet appended to the TESTS registry** - see the
-  known wiring gap above.
+  invocation.
 
 ## Verification status (honest)
 
@@ -230,13 +228,17 @@ never refreshed by a run - gate reports, not `final/` files, are the
 authoritative evidence). In short:
 
 - Every implementation-level goal of the map-events round is direct-read
-  verified: the 6-node entry-content declarations (data + design tables),
-  the shared `EventLogic` extraction with cultivation delegating
-  byte-identically, Shaolin's deterministic `night_rain` binding (existing
-  pool row, zero new prose), the honest declared-unimplemented gap notes in
+  verified by this step's verifier: the 6-node entry-content declarations
+  (data + the matching design tables in `40_progression.md` §5 /
+  `20_content.md` §8.1), the shared `EventLogic` extraction with cultivation
+  delegating byte-identically in exactly three spots (rationale recorded
+  doc-first in `90_decisions.md`), Shaolin's deterministic `night_rain`
+  binding to an **existing** pool row (zero new prose; `event_data.gd`
+  untouched), the honest declared-unimplemented gap notes in
   `design/20_content.md` §8.3, the append-only playtest contract (54 -> 55
-  scenarios, two-place sync), and the relative/differential assertions of
-  the new scenario.
+  scenarios, two-place sync, 12 new MapScreen observables), the relative/
+  differential assertions of the new scenario, and the TESTS registration of
+  `tests/test_map_node_event.gd` (20 entries).
 - The round's **measured** pass - all 55 scenarios green (the 54 pre-existing
   untouched + `map_node_event_shaolin`), `spine_to_ending` 32/32, compile
   zero errors (expected 75 -> 77 scripts), pytest smoke green, unit suite
@@ -246,11 +248,10 @@ authoritative evidence). In short:
   construction (mainline slots inert, end-node routing ordered first,
   `_ready` untouched), but the authoritative confirmation is the fresh
   downstream gate run.
-- One real wiring defect is flagged in the round verdict: the new
-  `tests/test_map_node_event.gd` is not yet registered in
-  `tests/unit_test_runner.gd`'s TESTS registry, so the default unit gate
-  would skip it (the playtest scenario still covers the end-to-end
-  behavior). Fix: append `"res://tests/test_map_node_event.gd"` to TESTS.
+- One stale README claim was found and corrected by this verification step:
+  the prior README revision said `tests/test_map_node_event.gd` was "not yet
+  appended" to the unit-test TESTS registry. The delivered tree has it
+  registered (20 entries), so no wiring defect remains.
 - If the downstream playtest gate reddens `spine_to_ending` or any existing
   scenario, that is a node-content defect by this round's constraint: make
   the offending mainline slot inert again (`status: "declared"`) - never
@@ -265,9 +266,9 @@ authoritative evidence). In short:
   `main.tscn`)
 - `playtest/` - 55 headless playtest scenarios + the `_common.yaml` contract
   (56 yaml files total)
-- `tests/` - GDScript unit suites (19 files in the TESTS registry + this
-  round's `test_map_node_event.gd` pending registration + SceneTree-style
-  integration suites) + `test_playtest_contract_smoke.py`
+- `tests/` - GDScript unit suites (20 files in the TESTS registry, incl.
+  `test_map_node_event.gd`, + SceneTree-style integration suites) +
+  `test_playtest_contract_smoke.py`
 - `design/` - the design archive (`00_overview.md` ... `99_changelog.md`);
   `20_content.md` §8 is the map node entry-content record (binding + honest
   gaps), §7 the inner-qi cost table; `40_progression.md` §5 the per-node
