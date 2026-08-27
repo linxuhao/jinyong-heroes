@@ -15,7 +15,7 @@ extends Resource
 @export var ai_class: String = ""         # e.g. "AIControllerEastHeretic"
 @export var color: Color = Color.WHITE    # placeholder shape color
 @export var initiative: int = 0           # 身法 value; drives turn order
-@export var energy: int = 0               # 内力 pool (display only; player 180, enemies 0)
+@export var energy: int = 0               # 内力 pool (player 180, enemies 0); spent by casting per design/20_content.md cost table
 @export var internal_arts: Array = []     # Array of GongfaData
 @export var external_arts: Array = []     # Array of GongfaData
 ## FULL known external-arts list (all grades, mastered flags mirrored) — NOT the

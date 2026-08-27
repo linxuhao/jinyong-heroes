@@ -15,7 +15,7 @@ extends Resource
 @export var kind: String = ""                 # "internal" | "external"
 @export var school: String = ""               # "sword"|"palm"|"finger"|"music"|"polearm"|"internal"
 @export var attribute: String = ""            # "yin"|"yang"|"hard"|"soft"
-@export var energy_provided: int = 0          # internal only (player 180, enemies 0)
+@export var energy_provided: int = 0          # internal only (player 180, enemies 0); this value fills the battle 内力 pool, which casting drains per design/20_content.md cost table
 @export var passive_id: String = ""           # internal only:
                                               #  "shen_diao_power"|"finger_dart"|"toad_reflect"|
                                               #  "one_yang_renewal"|"beggar_iron_bone"|"innate_qi"

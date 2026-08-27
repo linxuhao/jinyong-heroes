@@ -25,3 +25,18 @@ extends Resource
 @export var target_friendly: bool = false           # heal/affect allies (e.g. Primal Breath)
 @export var is_finisher: bool = false               # 绝招 flag for display
 @export var cost: int = 0              # 内力消耗 (0 = 未定义/不消耗; the only shipped value this round)
+
+## Insufficient-inner-force predicate (single source of truth, jinyong-spend-qi):
+## true only when the skill costs inner force (cost > 0) AND the pool is strictly
+## below it. cost == 0 never blocks (free basic, enemy/progression techniques).
+## Semantically identical to skill_button.gd::no_energy_predicate, which a later
+## task delegates here. Shared by the executor gate (combat_manager.gd), the
+## player's select-time rejection (player.gd), and the debug drain. Pure — no
+## instance state.
+static func insufficient_energy(cost: int, energy: int) -> bool:
+	return cost > 0 and energy < cost
+
+## Spend math (pure): pool minus cost, clamped at 0; a negative cost reads as 0.
+## The executor's deduction and the debug drain both go through this one path.
+static func spend(current: int, cost: int) -> int:
+	return maxi(current - maxi(cost, 0), 0)
