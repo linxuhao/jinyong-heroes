@@ -57,3 +57,17 @@
 | 全局 · 结局 | 结局按什么分级、分几档、各档的文案 | 用户 |
 
 2026-08-27 `jinyong-spend-qi fix`:普攻消耗 0,是玩家的保底动作;内力归零时玩家仍能普攻。给普攻定价属于重大规则改动,后续轮次不得顺手为之,要改先在此立决定。
+
+2026-08-28 `jinyong-map-events`:**事件解算逻辑从 `scripts/segments/cultivation.gd` 迁入共享纯静态模块 `scripts/data/event_logic.gd`(`class_name EventLogic`)**。被迁移的三个核心:
+
+- `_draw_event() -> String`(游历抽事件)
+- `_apply_event_option(opt_index: int) -> void` 中的 5 类效果循环(`for eff in opt.effects: match ...`)
+- `_add_practice(amount: int) -> void`(先未精通的功法 + 杀破狼 `TraitEffects.pojun_practice` 钩子)
+
+对应三个静态函数:`EventLogic.draw_unseen_id(profile: PlayerProfile, rng: RandomNumberGenerator) -> String`、`EventLogic.apply_option_effects(profile: PlayerProfile, opt: EventData.EventOption) -> void`、`EventLogic.add_practice(profile: PlayerProfile, amount: int) -> void`。
+
+**逐字不变的约束**:每抽**恰好一次** `rng.randi_range(0, pool.size() - 1)`(RNG 操作序不变 → 种子流不变 → 既有断言不漂移);效果仍限 5 类 `silver / attr / item / practice / none`。
+
+**所有权切分契约**:cultivation 保留 `_sync_surface()`、`flags["events_seen"]` 已见标记、phase / `event_id` 管理;EventLogic 只拥有纯抽 / 纯应用 / 纯加修习核心,不持有实例状态、无场景引用。
+
+动因(doc-first 纪录:"如果解算逻辑需要挪位置或共享,先改设计档案说明理由,再动代码"):大地图节点内容轮(map 段)要复用既有解算路径而非另起一套并行系统;共享实例耦合代码而不回归 cultivation 既有钉住的测试,唯一办法是**一次性把纯核心搬进共享模块**,故先记档再动代码。
