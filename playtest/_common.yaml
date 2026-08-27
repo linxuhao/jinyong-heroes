@@ -754,6 +754,9 @@ surface:
   PointsLabel:
   - visible
   - text
+  HintLabel:
+  - visible
+  - text
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn

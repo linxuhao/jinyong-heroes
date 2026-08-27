@@ -180,7 +180,23 @@ func _sync_surface() -> void:
 	entry_declared_gap_types = MapData.declared_gap_types(current_node_id)
 
 
+## Single-operation-hint invariant: the bottom travel hint is the map's own
+## promise ("左右选择 · 回车启程") and must NOT survive into a modal event panel
+## that asks for 上下选择. The event panel's own prompt is the only hint that may
+## show while phase == "EVENT"; the travel hint is restored whenever phase is
+## anything else (TRAVEL today, and any future phase) so it can never silently
+## re-promise travel while the player is not in the travel flow. hint.text is the
+## static scene text and is never touched here — visibility toggling is the whole
+## fix.
+func _apply_hint_visibility() -> void:
+	var hint: Label = get_node_or_null("HintLabel") as Label
+	if hint == null:
+		return
+	hint.visible = phase != "EVENT"
+
+
 func _render() -> void:
+	_apply_hint_visibility()
 	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
 		return

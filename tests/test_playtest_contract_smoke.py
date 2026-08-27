@@ -763,3 +763,30 @@ def test_map_node_event_surface_contract() -> None:
     assert all(
         "battle" in line and "facility" in line for line in gap_lines
     ), f"{name}.yaml entry_declared_gap_types line must reference both battle and facility gaps"
+
+    # Single-operation-hint negative control (5_vision_human round #1). The
+    # bottom travel hint (HintLabel) must be hidden while the node event modal is
+    # up and restored when it closes, so the map never shows two contradictory
+    # operation prompts at once. Three static half-pins: (1) HintLabel whitelisted
+    # on the surface with visible+text; (2) the scenario file asserts BOTH states
+    # (== false while EVENT, == true after TRAVEL) so a forgotten restore line is
+    # caught by the smoke gate alone; (3) the source-level toggle exists in map.gd.
+    hint_items = blocks.get("HintLabel", [])
+    assert "visible" in hint_items and "text" in hint_items, (
+        "HintLabel surface block must whitelist visible and text"
+    )
+    hint_visible_lines = [
+        line
+        for line in ftext.splitlines()
+        if line.strip().startswith("HintLabel.visible:")
+    ]
+    assert any("== false" in line for line in hint_visible_lines), (
+        f"{name}.yaml missing HintLabel.visible == false (hidden while EVENT)"
+    )
+    assert any("== true" in line for line in hint_visible_lines), (
+        f"{name}.yaml missing HintLabel.visible == true (restored on TRAVEL)"
+    )
+    src = (REPO_ROOT / "scripts" / "segments" / "map.gd").read_text(encoding="utf-8")
+    assert "HintLabel" in src and "visible = phase" in src.replace("\t", " "), (
+        "map.gd must toggle HintLabel.visible from the phase (missing or renamed)"
+    )
