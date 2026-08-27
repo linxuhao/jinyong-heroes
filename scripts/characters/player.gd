@@ -107,8 +107,17 @@ var statuses: Array[Dictionary] = []
 ## Observable status ids, kept in sync with statuses (surface contract).
 var status_names: Array[String] = []
 
-## 内力 energy pool (display only — no technique costs this run).
+## 内力 energy pool — the live inner-force pool this battle. Decreased by the
+## combat engine on every successful skill cast (CombatManager spends the
+## skill's cost via SkillData.spend). Does not regenerate within a battle
+## (recorded gap — regen mechanics belong to a later round).
 var energy: int = 0
+
+## 内力池上限: the pool size this battle started with. Written once in setup()
+## from data.energy (tutorial 180); the pool only decreases in battle, so the
+## once-written cap stays valid. Playtest surface for cap-relative qi asserts
+## (energy < energy_max), mirroring the max_health discipline.
+var energy_max: int = 0
 
 ## 身法 initiative value; drives turn order (88 for Yang Guo).
 var initiative: int = 0
@@ -212,6 +221,7 @@ func setup(data) -> void:
 	# Turn-based state from the CharacterData record.
 	moves_left = data.move_range
 	energy = data.energy
+	energy_max = data.energy
 	initiative = data.initiative
 	team = 0
 
@@ -287,6 +297,13 @@ func _skill_reject_reason(index: int) -> String:
 		var gate_hp: int = int(round(float(max_health) * skill.hp_gate_below_ratio))
 		if health >= gate_hp:
 			return "须在半血以下"  # "Below 50% HP": exactly 50% (250) is NOT usable.
+	# jinyong-spend-qi: insufficient inner force. Selecting a skill whose cost
+	# exceeds the current pool is refused with the visible reason; the HUD
+	# already renders the same fact (no_energy state + 内力不足 tag) and the
+	# engine hard-gates the cast (CombatManager._execute_skill). Mirrors the
+	# HUD priority so an insufficient-qi skill on cooldown still reports 冷却中.
+	if skill != null and SkillData.insufficient_energy(int(skill.cost), int(energy)):
+		return "内力不足"
 	if _has_restriction_status("no_techniques_next_turn"):
 		return "本回合无法用招"
 	if not TutorialManager.is_input_allowed("skill_%d" % (index + 1)):
