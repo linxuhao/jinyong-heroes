@@ -399,16 +399,7 @@ func _grant_year_arts() -> void:
 ## Add practice to the first unmastered gongfa; masters it on reaching the
 ## grade's threshold (丁4/丙6/乙8). A mastered art is never re-offered.
 func _add_practice(amount: int) -> void:
-	if SaveManager.profile.has_trait("sha_po_lang"):
-		amount = TraitEffects.pojun_practice(amount)
-	var gid: String = _first_unmastered_id()
-	if gid == "":
-		return
-	var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
-	entry["practice"] = int(entry.get("practice", 0)) + amount
-	var grade: String = entry.get("grade", "D")
-	if int(entry["practice"]) >= int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(grade, 4)):
-		entry["mastered"] = true
+	EventLogic.add_practice(SaveManager.profile, amount)
 
 
 func _unmastered_ids() -> Array[String]:
@@ -428,16 +419,7 @@ func _first_unmastered_id() -> String:
 
 ## 游历 event draw: one rng draw, no repeat until the pool is exhausted.
 func _draw_event() -> String:
-	var pool: Array[String] = []
-	for def in EventData.all():
-		if not (SaveManager.profile.flags.get("events_seen", []) as Array).has(def.id):
-			pool.append(def.id)
-	if pool.is_empty():
-		SaveManager.profile.flags["events_seen"] = []
-		for def in EventData.all():
-			pool.append(def.id)
-	var idx: int = SaveManager.rng.randi_range(0, pool.size() - 1)
-	return pool[idx]
+	return EventLogic.draw_unseen_id(SaveManager.profile, SaveManager.rng)
 
 
 ## Apply one event option's effects and mark the event seen.
@@ -445,18 +427,7 @@ func _apply_event_option(opt_index: int) -> void:
 	var def = EventData.def(event_id)
 	if def != null:
 		var opt = def.option_a if opt_index == 0 else def.option_b
-		for eff in opt.effects:
-			match eff.get("type", "none"):
-				"silver":
-					SaveManager.profile.silver = maxi(SaveManager.profile.silver + int(eff.get("value", 0)), 0)
-				"attr":
-					SaveManager.profile.add_attr(eff.get("target", ""), int(eff.get("value", 0)))
-				"item":
-					var target: String = eff.get("target", "")
-					if target != "" and not SaveManager.profile.inventory.has(target):
-						SaveManager.profile.inventory.append(target)
-				"practice":
-					_add_practice(int(eff.get("value", 0)))
+		EventLogic.apply_option_effects(SaveManager.profile, opt)
 	var seen: Array = SaveManager.profile.flags.get("events_seen", [])
 	if event_id != "" and not seen.has(event_id):
 		seen.append(event_id)
