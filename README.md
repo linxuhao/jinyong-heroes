@@ -11,55 +11,78 @@ cultivation -> battles/map (`design/00_overview.md`).
 
 Visuals are deliberately **color blocks** (roadmap stage 4 will produce art);
 UI text is Chinese, rendered with the bundled NotoSansSC font (SIL OFL, see
-`assets/fonts/LICENSE_OFL.txt`). The project is at roadmap stage 2 -
-interaction: the player can read it, click it, and know what to press next.
+`assets/fonts/LICENSE_OFL.txt`). The project is at roadmap stage 3 - game
+content: the move table now carries real numbers, starting with inner-qi
+costs.
 
-## Latest round: jinyong-clarity - character creation "说人话" (UX-06/07/08)
+## Latest round: jinyong-spend-qi - the inner-qi pool actually gets spent
 
-Presentation-only information round on the second screen the player meets
-(after jinyong-hud closed the battle-HUD trio UX-03/04/05): no game-rule
-change, no numeric-value change, no art, no frozen-geometry edit.
+One numerical lever, and only that lever: inner-qi costs. No health, damage,
+cooldown, or enemy-strength value changed.
 
-- **Attribute effects (UX-06)** - the ATTRS description slot (`AttrDescLabel`)
-  now lists **all five attribute effects at rest** (name-prefixed; segments
-  verbatim from `creation.gd::_ATTR_DESCS` = `design/10_systems.md` §1
-  meanings + `design/40_progression.md` §7 formulas - nothing invented;
-  `design/20_content.md` §6 records the explicit "no content gap" note).
-  The list no longer follows focus: every attribute's meaning is on the page
-  while you decide where to spend points.
-- **Current HP (UX-07)** - a new additive `HpValueLabel` directly below the
-  effects list shows 「当前气血 N」, derived live from the build
-  (`hp_value = hp_from_bone(attrs["bone"]) = attrs["bone"] × 5`, the §7
-  formula; `hp_text` pins the exact rendered format). Every numeric playtest
-  assert is relative to the live `attrs` dict - zero absolute HP literals.
-- **Confirm summary (UX-08)** - a new additive `ConfirmSummaryLabel` is
-  `ConfirmBox`'s first child (above 「确认踏上江湖」), one 「名 值」 line per
-  attribute (`confirm_summary_text`, five lines) - the final-value checklist
-  the confirm page was missing. Per-attribute asserts are relative
-  (`contains("根骨 " + str(attrs["bone"]))`).
-- **One declared measurement change** - the `points_attrs_gap_ok` CONFIRM-phase
-  first-row ink cluster re-points from `ConfirmButton`'s rect to
-  `ConfirmSummaryLabel`'s rect (same observable, same yaml assert lines,
-  `ConfirmButton` fallback retained; the jinyong-layout-r2
-  measured-quantity-change precedent, recorded in `design/30_presentation.md`).
-- **Regression net** - three new playtest scenarios
-  (`creation_attr_effect_info`, `creation_hp_value_displayed`,
-  `creation_confirm_summary`; 50 -> 53 scenarios, appended to
-  `scenario_order` and the smoke test's `ROUND_SCENARIOS` in the same order)
-  plus one new headless unit test `tests/test_creation_info_texts.gd`, which
-  pins the pure derivations, the per-phase label wiring, and **every frozen
-  creation-geometry constant** so accidental drift reddens the test.
-- **Fossil evidence removed** - `final/verify_report.json`, a jinyong-events-era
-  verdict the pipeline could never refresh (`repo_apply` ignores `final/*`),
-  was replaced by a tombstone pointer note carrying no verdict fields: the
-  only authoritative gate evidence is the pipeline step products. The decision
-  is recorded in `design/90_decisions.md` (Out of scope) and
-  `design/99_changelog.md`.
+- **The cost table (docs first, `design/20_content.md` §7 is the source of
+  truth, landed before any code)** - all 8 tutorial player moves now carry an
+  inner-qi cost:
 
-The previous jinyong-hud round's battle-HUD information layer (UX-03/04/05:
-skill-button effect/cost text, lock reasons, HP numbers on a frozen
-health-bar geometry, plus the `no_energy` button state) is recorded in
-`design/99_changelog.md` and the `final/*` notes history.
+  | Move (button) | Art | Cost (qi) | Tier |
+  |---|---|---|---|
+  | 重剑无锋 (1) | 玄铁剑法 | **0** | free basic - the player is never fully disarmed (§7.3 rationale: existing 「无消耗」 pin + never-disarmed design property) |
+  | 大巧不工 (2) | 玄铁剑法 | 15 | light line AoE |
+  | 力斩千钧 (3) | 玄铁剑法 | 20 | mid cross AoE |
+  | 四海无量 (4) | 玄铁剑法 | 25 | 绝招, cd 6 |
+  | 心惊肉跳 (5) | 黯然销魂掌 | 10 | cheapest single, cd 1 |
+  | 拖泥带水 (6) | 黯然销魂掌 | 15 | light utility + slow |
+  | 徘徊空谷 (7) | 黯然销魂掌 | 20 | mid jump utility + AoE |
+  | 黯然销魂十七式 (8) | 黯然销魂掌 | 30 | most expensive - the ultimate 绝招 (HP-gated, cd 8) |
+
+  Ladder: light 10-15 < mid 20 < 绝招 25/30. All 23 enemy techniques and all
+  progression (encounter) techniques stay cost 0 (enemies have energy 0;
+  progression pricing is a later round's lever). The pool (Yang Guo: 180)
+  does **not** regenerate within a battle - recorded gap in §7.4.
+  `design/10_systems.md` §1 now says the pool **stores AND spends**
+  (「内力池既存也耗」) - the old "只存不耗" statement is gone.
+- **Casting actually spends qi** - `combat_manager.gd::_execute_skill()` (the
+  single execution point for player and AI casts) gained: an insufficient-qi
+  gate before any side effect (the cast is refused, nothing consumed - no
+  cooldown, no qi, no action), and a success-only clamped deduction beside
+  the cooldown start. Costs are set in `battlefield.gd`
+  `_create_all_skill_data()` (the data factory); the pure math lives in
+  `SkillData.insufficient_energy(cost, energy)` / `SkillData.spend(current,
+  cost)` - one value, three consumers (executor gate, select-time rejection,
+  HUD `no_energy` state), no drift.
+- **`no_energy` is now reachable in live play** - with all costs 0 the state
+  was unreachable (built and unit-tested in the jinyong-hud round, inert).
+  With real costs it fires: the button enters `no_energy` (not `phase_locked`)
+  with the 「内力不足」 tag and is disabled; the hotkey select is refused with
+  the visible reason 「内力不足」. The top-strip EnergyLabel now refreshes
+  every frame (a setup-only write would freeze the number at the starting
+  pool once casts deduct).
+- **Regression net** - one new playtest scenario
+  `playtest/qi_cost_blocks_cast_no_energy.yaml` (53 -> 54 scenarios) pins it
+  in a real battle: a real cast deducts the pool (`energy < energy_max`,
+  cap-relative asserts), a drained pool drives button 4 into `no_energy`
+  (explicitly `!= "phase_locked"`) + disabled + tag, the refused select
+  leaves nothing consumed, and the free basic stays `ready` as the
+  never-disarmed negative control. One new headless unit test
+  `tests/test_qi_costs_match_design.gd` pins the cost table against the
+  design doc, pins cost 0 for every other skill id by enumeration, and pins
+  the insufficient/spend truth tables (18 -> 19 files in the TESTS registry).
+  Contract sync: `scenario_order` + smoke-test `ROUND_SCENARIOS` both append
+  the new scenario at the tail; `Player.energy_max` whitelisted;
+  `debug_spend_player_qi` drain action added (goes through the same shared
+  spend path as real casts). None of the 53 pre-existing scenario files was
+  touched.
+- **Tutorial winnability budget** - the win path's 12 casts spend 170 of 180
+  qi (margin 10); every cast passes the gate (`energy == cost` is castable,
+  only `energy < cost` is blocked), so damage/cooldown/HP trajectories are
+  unchanged and `terminal_victory_8_12_rounds_hp_15_40` keeps its green
+  baseline. If a future retune breaks it, the fix is the cost table, never
+  HP or enemies.
+
+History: the jinyong-clarity round added the creation-screen information
+layer (UX-06/07/08); jinyong-hud added the battle-HUD information layer
+(UX-03/04/05) including the originally-inert `no_energy` state. Both are
+recorded in `design/99_changelog.md` and the `final/*` notes history.
 
 ## Requirements
 
@@ -85,54 +108,58 @@ Flow: main menu -> character creation (fixed 30-point budget: five attributes
 with live effect explanations and current HP, 13 innate trait/flaw toggles,
 and a confirm page listing the final values before you commit) -> tutorial
 battle as a fully mastered Yang Guo vs the Five Masters (you are meant to
-win) -> transition -> sect choice -> cultivation.
+win) -> transition -> sect choice -> cultivation. In battle, casting a move
+spends its inner-qi cost from the pool shown in the top strip (内力: N);
+when the pool drops below a move's cost, that button greys into 「内力不足」
+and cannot be cast - the free basic 重剑无锋 always stays available.
 
 ## Tests
 
 `run_tests.sh` drives the full Godot gate through the `godot-builder` sidecar
-(compile check -> headless playtest of all 53 scenarios -> GDScript unit
-suite). It fails loudly when the sidecar is unreachable - the code then ships
-unverified, which is the intended behavior.
+(compile check -> headless playtest of all 54 scenarios -> GDScript unit
+suite of 19 collected files). It fails loudly when the sidecar is unreachable
+- the code then ships unverified, which is the intended behavior.
 
 ```bash
 GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
 python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
+godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite
 ```
 
 ## Key interfaces
 
 - **Autoload singletons** (`scripts/autoload/`): `GameManager` (scene flow,
   `get_player()`), `CombatManager` (battle state: `tutorial_battle`,
-  `current_round`, `phase`, `is_player_turn()`), `GridManager` (grid /
-  movement planning).
+  `current_round`, `phase`, `is_player_turn()`, and the qi spend path
+  `spend_unit_energy(unit, cost)` + the `debug_spend_player_qi()` drain
+  fixture), `GridManager` (grid / movement planning).
+- **Qi-cost layer** (jinyong-spend-qi): `SkillData.cost: int` carries the
+  table (source of truth `design/20_content.md` §7; 7 of 8 moves 10-30,
+  重剑无锋 0 = free basic); `SkillData.insufficient_energy(cost, energy)`
+  (cost > 0 and energy < cost - never blocks free moves or enemies);
+  `SkillData.spend(current, cost)` (clamped at 0); `Player.energy` / the
+  once-written `Player.energy_max` cap observable for cap-relative asserts;
+  `_execute_skill()` gates and deducts on the single cast path.
 - **Playtest contract** (the project's test "API"): `playtest/_common.yaml`
   declares the scene, the allowed actions (incl. debug injections such as
-  `debug_damage_player`), the observable surface whitelist and
-  `scenario_order`; each `playtest/*.yaml` is one scenario (name ==
-  basename, single-integer `at:`, a comparison operator on every assert
-  line). Observables are plain vars on live nodes, e.g.
+  `debug_damage_player` and `debug_spend_player_qi`), the observable surface
+  whitelist and `scenario_order`; each `playtest/*.yaml` is one scenario
+  (name == basename, single-integer `at:`, a comparison operator on every
+  assert line). Observables are plain vars on live nodes, e.g.
   `SkillButton1..12`: `state_text` / `state_tag_text` / `state_luma` /
   `fahui_text` / `cost_text` / `effect_text` / `effect_summary_text` /
   `lock_reason_text` / `hp_gated` / `disabled`; `HealthBar`:
   `bar_width` / `bar_height` / `empty_area_px` / `empty_cap_px` /
   `hp_text` / `hp_value` / `hp_max` / `hp_text_width_ok`; `CreationScreen`:
   `phase` / `points_left` / `attr_index` / `attrs` / `trait_ids` plus the
-  round-2/3 geometry observables and the new clarity layer `hp_value` /
-  `hp_text` / `confirm_summary_text`; the node blocks `AttrDescLabel` /
-  `HpValueLabel` / `ConfirmSummaryLabel` expose `visible` + `text`.
-- **Creation info derivations** (`scripts/segments/creation.gd`): pure
-  `hp_from_bone(bone)` (= bone × 5, `design/40_progression.md` §7),
-  `attr_effects_text()` (all five effects, verbatim segments) and
-  `confirm_summary_text_from(attrs)` (five 「名 值」 lines), written into the
-  two additive labels by `_render()` - display-only, no rule or stored-value
-  change.
-- **Skill data**: `scripts/data/skill_data.gd` - `@export` schema incl.
-  `cost: int` (inner-force cost; 7 of the 8 tutorial player moves carry real
-  values 10-30, 重剑无锋 stays 0 = free basic; see `design/20_content.md` §7).
+  geometry observables and the clarity layer `hp_value` / `hp_text` /
+  `confirm_summary_text`; `Player`: `energy` / `energy_max` (qi asserts are
+  cap-relative, mirroring the `max_health` discipline).
 - **Unit tests**: GDScript test files with a top-level
   `static func run() -> bool` are collected by `tests/unit_test_runner.gd`'s
-  explicit append-only `TESTS` registry (18 files, incl. the new
-  `test_creation_info_texts.gd` and the jinyong-hud trio), run headless via
+  explicit append-only `TESTS` registry (19 files, incl.
+  `test_qi_costs_match_design.gd`, `test_creation_info_texts.gd` and the
+  jinyong-hud trio), run headless via
   `godot --headless --path . -s res://tests/unit_test_runner.gd`.
 
 ## Verification status (honest)
@@ -148,46 +175,46 @@ tombstone pointer note (`superseded_pointer_note`,
 current delivery state, because the pipeline's `repo_apply` ignores `final/*`
 and can never refresh it. In short:
 
-- The three creation information layers (attribute effects, current HP,
-  confirm summary) are implemented and pinned by playtest assertions and a
-  headless unit test; the frozen creation geometry is untouched (and
-  re-pinned by `tests/test_creation_info_texts.gd`); the attribute-effect
-  text is verbatim from existing definitions - no content gap
-  (`design/20_content.md` §6).
-- `design/40_ux_backlog.md` shows UX-06 / UX-07 / UX-08 as **OPEN** with
-  「修复已落,post-fix 闸门证据待验」 (fix landed, post-fix gate evidence
-  pending). Per backlog rule 2, `CLOSED(jinyong-clarity)` is written only by
-  the post-gate evidence task from measured `playtest_summary.md`
-  per-scenario counts (`creation_attr_effect_info`,
-  `creation_hp_value_displayed`, `creation_confirm_summary`) - an honest
-  OPEN beats an evidence-less CLOSED.
-- Compile / playtest / unit / vision gates run after the verifier step, so
-  this round's measured pass (53/53 scenarios green incl. `spine_to_ending`
-  32/32 and the seven existing creation/menu scenarios; 18/18 GDScript unit
-  tests; pytest smoke green) is **pending, not claimed**. The last fully
-  measured final-tree run (jinyong-hud's rerun: compile 73/73 scripts 0
-  errors, playtest 50/50 scenarios green) predates this round; the clarity
-  changes are additive by construction (two scene labels, three script
-  vars, three scenario files, one unit test), but the authoritative
-  confirmation is the fresh downstream gate run - which is why the round
-  verdict stays `all_goals_met = false`.
-- The vision gate may be blind (`endpoint_unreachable`, same stance as
-  jinyong-hud): the three findings are information-presence pins (text
-  non-empty / value present) judged by playtest asserts; rendered-ink
-  concerns are compensated by the existing measured geometry observables
-  (`points_attrs_gap_ok`, `creation_box_fits`, `desc_center_ok`,
-  `nav_cluster_center_ok`, ...), not by a vision verdict.
+- The cost table is documented in `design/20_content.md` (§1 move tables +
+  §7, landed docs-first) and byte-identical in code
+  (`battlefield.gd::_create_all_skill_data()`) and in the unit-test pin
+  (`tests/test_qi_costs_match_design.gd` `DESIGN_COSTS`).
+  `design/10_systems.md` §1 no longer says the pool is never spent.
+- The engine change is verified by direct read: the insufficient-qi gate
+  returns before any side effect (cost>0-guarded, so enemies and the free
+  basic are unaffected), and the success-only clamped deduction sits beside
+  the cooldown start on the single cast path (`_execute_skill()`), reached
+  through the one shared `spend_unit_energy()` helper.
+- The new scenario pins `no_energy` in a real battle with cap-relative qi
+  asserts; the win-path budget (170/180) is design-documented so the
+  tutorial stays winnable without touching HP, damage, cooldowns or enemies.
+- The round's **measured** pass - all 54 scenarios green (the 53 pre-existing
+  untouched + the new one), `spine_to_ending` 32/32,
+  `terminal_victory_8_12_rounds_hp_15_40` 6/6, 19/19 unit tests, pytest
+  smoke green, compile zero errors - is **pending the downstream gate run,
+  not claimed**. The last fully measured final-tree run (jinyong-clarity's:
+  53/53 scenarios, 74/74 scripts) predates this round; the qi-cost changes
+  are additive by construction (data + one gate + one deduction), but the
+  authoritative confirmation is the fresh downstream gate run - which is why
+  the round verdict stays `all_goals_met = false` until those reports land.
+- If the downstream playtest gate reddens `terminal_victory` or any existing
+  scenario, that is a cost-table defect by the round's fallback rule: revise
+  the qi costs in `design/20_content.md` + `battlefield.gd` +
+  `test_qi_costs_match_design.gd` - never HP, damage, cooldowns, or enemies.
 
 ## Repository layout
 
 - `scripts/` - game code (`autoload/`, `characters/`, `data/`, `ui/`,
   `segments/`, `ai/`, `battlefield.gd`)
 - `scenes/` - Godot scenes (`ui/`, `segments/`, `main.tscn`)
-- `playtest/` - 53 headless playtest scenarios + the `_common.yaml` contract
-- `tests/` - GDScript unit suites (18 files) + `test_playtest_contract_smoke.py`
+- `playtest/` - 54 headless playtest scenarios + the `_common.yaml` contract
+  (55 yaml files total)
+- `tests/` - GDScript unit suites (19 collected files) +
+  `test_playtest_contract_smoke.py`
 - `design/` - the design archive (`00_overview.md` ... `99_changelog.md`);
-  `40_ux_backlog.md` tracks player-eye UX debt, `20_content.md` §5 the
-  inner-force cost content gap (§6: attribute effects - no gap)
-- `final/` - per-round delivery notes and probe notes; `verify_report.json`
-  is a tombstone pointer note, not a verdict
+  `40_ux_backlog.md` tracks player-eye UX debt, `20_content.md` §7 is the
+  inner-qi cost table (source of truth; §5's old cost gap is closed, §7.4
+  records the no-regen gap)
+- `final/` - per-round delivery notes and probe notes;
+  `verify_report.json` is a tombstone pointer note, not a verdict
 - `assets/` - color-block textures, NotoSansSC font, audio, seed portraits
