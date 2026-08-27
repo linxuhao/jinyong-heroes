@@ -5,84 +5,112 @@ parallel timelines collide in one jianghu. This is a fan-crossover brawler, not
 a recreation of any single novel. You create your own nobody, borrow the fully
 mastered body of Yang Guo for a tutorial duel against the Five Masters on
 Mount Hua's summit, then fall from the sky, receive a chance to join a great
-sect, and spend three in-game years (36 cultivation periods) training. The
-six-segment spine: creation -> tutorial battle -> transition -> sect choice ->
-cultivation -> battles/map (`design/00_overview.md`).
+sect, spend three in-game years (36 cultivation periods) training, and finally
+walk the six-node jianghu map to an ending (`design/00_overview.md`).
 
 Visuals are deliberately **color blocks** (roadmap stage 4 will produce art);
 UI text is Chinese, rendered with the bundled NotoSansSC font (SIL OFL, see
 `assets/fonts/LICENSE_OFL.txt`). The project is at roadmap stage 3 - game
-content: the move table now carries real numbers, starting with inner-qi
-costs.
+content: the move table carries real inner-qi costs, and the map nodes now
+trigger content on entry.
 
-## Latest round: jinyong-spend-qi - the inner-qi pool actually gets spent
+## Latest round: jinyong-map-events - map nodes actually have content
 
-One numerical lever, and only that lever: inner-qi costs. No health, damage,
-cooldown, or enemy-strength value changed.
+One lever only: node entry content. The 'event' type is implemented end-to-end
+by reusing the existing event pool and the existing event resolution logic;
+battle and sect-facility types get declaration slots and honest gap notes. No
+numeric tuning, no combat rule change, no month-loop change, no art.
 
-- **The cost table (docs first, `design/20_content.md` §7 is the source of
-  truth, landed before any code)** - all 8 tutorial player moves now carry an
-  inner-qi cost:
+- **Every node declares its own entry content (data-first).**
+  `scripts/data/map_data.gd` gives each of the 6 nodes (无名谷 -> 洛阳 -> 武当
+  -> 襄阳 -> 昆仑 mainline, 少林 a branch off 洛阳) an `entry_content` block
+  with three slots - `event` / `battle` / `facility` - each shaped
+  `{"status": "active"|"declared", "<type>_id": String}`. `active` means
+  implemented and live; `declared` means slot-only, unimplemented this round.
+  The same table lives in `design/40_progression.md` §5 and
+  `design/20_content.md` §8.1 (landed docs-first, dated 2026-08-28). New pure
+  accessors: `MapData.entry_content(id)`, `MapData.active_event_id(id)`
+  (non-empty only when the slot is active AND the id resolves in the event
+  pool - a typo'd binding reads as inert, never crashes), and
+  `MapData.declared_gap_types(id)` (the declared-but-unimplemented slot types;
+  the honesty observable).
 
-  | Move (button) | Art | Cost (qi) | Tier |
+  | Node | event | battle | facility |
   |---|---|---|---|
-  | 重剑无锋 (1) | 玄铁剑法 | **0** | free basic - the plainest move of the art, kept free by the existing 「无消耗」 pin (§7.3; the never-fully-disarmed guarantee itself belongs to the cost-0 basic attack, not this move) |
-  | 大巧不工 (2) | 玄铁剑法 | 15 | light line AoE |
-  | 力斩千钧 (3) | 玄铁剑法 | 20 | mid cross AoE |
-  | 四海无量 (4) | 玄铁剑法 | 25 | 绝招, cd 6 |
-  | 心惊肉跳 (5) | 黯然销魂掌 | 10 | cheapest single, cd 1 |
-  | 拖泥带水 (6) | 黯然销魂掌 | 15 | light utility + slow |
-  | 徘徊空谷 (7) | 黯然销魂掌 | 20 | mid jump utility + AoE |
-  | 黯然销魂十七式 (8) | 黯然销魂掌 | 30 | most expensive - the ultimate 绝招 (HP-gated, cd 8) |
+  | 无名谷 / 洛阳 / 武当 / 襄阳 / 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
+  | 少林 | **`active` / `night_rain`** | `declared` / `""` | `declared` / `""` |
 
-  Ladder: light 10-15 < mid 20 < 绝招 25/30. All 23 enemy techniques and all
-  progression (encounter) techniques stay cost 0 (enemies have energy 0;
-  progression pricing is a later round's lever). The pool (Yang Guo: 180)
-  does **not** regenerate within a battle - recorded gap in §7.4.
-  `design/10_systems.md` §1 now says the pool **stores AND spends**
-  (「内力池既存也耗」) - the old "只存不耗" statement is gone.
-- **Casting actually spends qi** - `combat_manager.gd::_execute_skill()` (the
-  single execution point for player and AI casts) gained: an insufficient-qi
-  gate before any side effect (the cast is refused, nothing consumed - no
-  cooldown, no qi, no action), and a success-only clamped deduction beside
-  the cooldown start. Costs are set in `battlefield.gd`
-  `_create_all_skill_data()` (the data factory); the pure math lives in
-  `SkillData.insufficient_energy(cost, energy)` / `SkillData.spend(current,
-  cost)` - one value, three consumers (executor gate, select-time rejection,
-  HUD `no_energy` state), no drift.
-- **`no_energy` is now reachable in live play** - with all costs 0 the state
-  was unreachable (built and unit-tested in the jinyong-hud round, inert).
-  With real costs it fires: the button enters `no_energy` (not `phase_locked`)
-  with the 「内力不足」 tag and is disabled; the hotkey select is refused with
-  the visible reason 「内力不足」. The top-strip EnergyLabel now refreshes
-  every frame (a setup-only write would freeze the number at the starting
-  pool once casts deduct).
-- **Regression net** - one new playtest scenario
-  `playtest/qi_cost_blocks_cast_no_energy.yaml` (53 -> 54 scenarios) pins it
-  in a real battle: a real cast deducts the pool (`energy < energy_max`,
-  cap-relative asserts), a drained pool drives button 4 into `no_energy`
-  (explicitly `!= "phase_locked"`) + disabled + tag, the refused select
-  leaves nothing consumed, and the free basic stays `ready` as the
-  never-disarmed negative control. One new headless unit test
-  `tests/test_qi_costs_match_design.gd` pins the cost table against the
-  design doc, pins cost 0 for every other skill id by enumeration, and pins
-  the insufficient/spend truth tables (18 -> 19 files in the TESTS registry).
-  Contract sync: `scenario_order` + smoke-test `ROUND_SCENARIOS` both append
-  the new scenario at the tail; `Player.energy_max` whitelisted;
-  `debug_spend_player_qi` drain action added (goes through the same shared
-  spend path as real casts). None of the 53 pre-existing scenario files was
-  touched.
-- **Tutorial winnability budget** - the win path's 12 casts spend 170 of 180
-  qi (margin 10); every cast passes the gate (`energy == cost` is castable,
-  only `energy < cost` is blocked), so damage/cooldown/HP trajectories are
-  unchanged and `terminal_victory_8_12_rounds_hp_15_40` keeps its green
-  baseline. If a future retune breaks it, the fix is the cost table, never
-  HP or enemies.
+- **The 'event' type reuses the existing pool and the existing resolution
+  logic - no parallel system.** The pure core of cultivation's event
+  resolution moved ONCE into a shared module, `scripts/data/event_logic.gd`
+  (`class_name EventLogic`, pure statics over `(profile, rng)`, no scene, no
+  autoload): `draw_unseen_id` (the no-repeat bag draw with exactly one RNG
+  op), `apply_option_effects` (the 5 sanctioned effect types: silver clamped
+  >= 0, attr, item append-once, practice, none) and `add_practice`
+  (first-unmastered art, 杀破狼 hook). `cultivation.gd` delegates in exactly
+  three spots (byte-identical behavior, same RNG op order); `map.gd` resolves
+  node events through the same functions. The relocation rationale is
+  recorded doc-first in `design/90_decisions.md` (2026-08-28 note).
+- **Shaolin finally has a reason to be visited.** Its event slot is the only
+  active one, bound to the **existing** pool row `night_rain` (破庙夜雨 - the
+  monk mending a leaky temple roof: 帮工换宿 silver −6 / 根骨 +1, or 檐下练剑
+  practice +2). "Exclusive" is mechanism-exclusivity: only Shaolin's node
+  entry fires this row deterministically. Zero new event prose was authored
+  anywhere (`design/20_content.md` §8.2 records the binding rationale; a
+  future authored Shaolin row would be a content gap, written only inside
+  `event_data.gd`'s TABLE, never inline).
+- **The map segment got an additive EVENT phase (`scripts/segments/map.gd`).**
+  On arrival by travel, a node with an active event slot opens a modal event
+  (phase `"EVENT"`): title/text/options from the pool row, `▶` marker cycling
+  with the arrow keys, 回车 resolves the focused option through
+  `EventLogic.apply_option_effects`, autosaves, and returns to `phase
+  "TRAVEL"`. Nodes without an active slot are byte-identical to before.
+  Entering 昆仑 still routes to the ENDING first (end-node routing runs
+  before entry content), and the event fires only on travel - never on boot
+  or load, so save/load roundtrips don't re-trigger.
+- **Two independent event channels, one pool and one effect path.**
+  Cultivation's 游历 channel keeps its RNG bag draw + `flags["events_seen"]`
+  bookkeeping; the map node channel is a deterministic binding that touches
+  neither the bag nor the RNG stream. They share `EventData` and `EventLogic`
+  and nothing else.
+- **Honest gaps, recorded not faked (`design/20_content.md` §8.3, §5 style).**
+  battle slots: declared, unimplemented. facility (门派设施) slots: declared,
+  unimplemented. Mainline event slots: declared and inert **on purpose** - the
+  unmodifiable `spine_to_ending.yaml` timeline has no input budget for a
+  blocking event on the main path, so the one interactive node event this
+  round lives on the 少林 branch. Plus: no authored Shaolin prose this round,
+  the node-event re-fire policy (fires on every arrival - Shaolin is a
+  re-visitable content site), and the 打听 trait action (declared in the
+  archive, out of scope).
+- **Regression net.** One new playtest scenario
+  `playtest/map_node_event_shaolin.yaml` (54 -> 55 scenarios, append-only):
+  entering 少林 opens the event (`phase == "EVENT"`, `event_id ==
+  "night_rain"` - a deterministic binding pin, not a draw), both options
+  focus-selectable (`event_focus` 0 <-> 1), resolving option A applies its
+  effects (`last_effect_types == ["silver", "attr"]` structurally,
+  `attr_bone: changed` as the differential), the count ladder steps, the
+  battle/facility gaps are assertable at the node
+  (`entry_declared_gap_types`), and the trip back to 洛阳 closes with no
+  stall. All numeric asserts are relative/differential - zero absolute
+  game-value literals. 12 new `MapScreen` surface observables whitelisted
+  append-only in `_common.yaml`; two-place contract sync
+  (`scenario_order` + smoke-test `ROUND_SCENARIOS`) both append the scenario
+  at the tail; a new pytest pin `test_map_node_event_surface_contract`
+  guards the contract; a new GDScript pin file
+  `tests/test_map_node_event.gd` covers the MapData schema, EventLogic
+  parity against the pool rows, and the map EVENT phase (open -> focus ->
+  resolve, bag independence). **Known wiring gap:** that unit pin file is not
+  yet appended to `tests/unit_test_runner.gd`'s TESTS registry (still 19
+  entries), so the default unit gate does not execute it yet - flagged in the
+  round's `final/verify_report.json`; the fix is a one-line append.
 
-History: the jinyong-clarity round added the creation-screen information
-layer (UX-06/07/08); jinyong-hud added the battle-HUD information layer
-(UX-03/04/05) including the originally-inert `no_energy` state. Both are
-recorded in `design/99_changelog.md` and the `final/*` notes history.
+Previous round (jinyong-spend-qi): all 8 tutorial moves carry real inner-qi
+costs (0/15/20/25/10/15/20/30, 重剑无锋 free; source of truth
+`design/20_content.md` §7), casting spends the pool with an insufficient-qi
+gate, and `no_energy` is reachable and pinned in live play. Earlier rounds:
+jinyong-clarity added the creation-screen information layer; jinyong-hud the
+battle-HUD information layer; jinyong-events grew the event pool to 16 rows.
+All recorded in `design/99_changelog.md` and the `final/*` notes history.
 
 ## Requirements
 
@@ -106,24 +134,28 @@ godot --path .
 
 Flow: main menu -> character creation (fixed 30-point budget: five attributes
 with live effect explanations and current HP, 13 innate trait/flaw toggles,
-and a confirm page listing the final values before you commit) -> tutorial
-battle as a fully mastered Yang Guo vs the Five Masters (you are meant to
-win) -> transition -> sect choice -> cultivation. In battle, casting a move
-spends its inner-qi cost from the pool shown in the top strip (内力: N);
-when the pool drops below a move's cost, that button greys into 「内力不足」
-and cannot be cast - the free basic 重剑无锋 always stays available.
+and a confirm page listing the final values) -> tutorial battle as a fully
+mastered Yang Guo vs the Five Masters (you are meant to win) -> transition ->
+sect choice -> 36-month cultivation -> the jianghu map. In battle, casting a
+move spends its inner-qi cost (内力: N in the top strip; a too-expensive move
+greys into 「内力不足」; the free basic 重剑无锋 always stays available). On
+the map, arrow keys cycle the adjacent nodes and 回车 travels; entering 少林
+(the branch off 洛阳) triggers its node event (上下选择，回车定夺), while the
+mainline 无名谷 -> 洛阳 -> 武当 -> 襄阳 -> 昆仑 walk stays unobstructed -
+reaching 昆仑 ends the run with a tiered ending.
 
 ## Tests
 
 `run_tests.sh` drives the full Godot gate through the `godot-builder` sidecar
-(compile check -> headless playtest of all 54 scenarios -> GDScript unit
-suite of 19 collected files). It fails loudly when the sidecar is unreachable
-- the code then ships unverified, which is the intended behavior.
+(compile check -> headless playtest of all 55 scenarios -> GDScript unit
+suite). It fails loudly when the sidecar is unreachable - the code then ships
+unverified, which is the intended behavior.
 
 ```bash
 GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
 python3 -m pytest tests/   # static playtest-contract smoke (stdlib-only pins)
 godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite
+godot --headless --path . -s res://tests/test_cultivation.gd  # SceneTree-style suites
 ```
 
 ## Key interfaces
@@ -132,35 +164,58 @@ godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite
   `get_player()`), `CombatManager` (battle state: `tutorial_battle`,
   `current_round`, `phase`, `is_player_turn()`, and the qi spend path
   `spend_unit_energy(unit, cost)` + the `debug_spend_player_qi()` drain
-  fixture), `GridManager` (grid / movement planning).
-- **Qi-cost layer** (jinyong-spend-qi): `SkillData.cost: int` carries the
-  table (source of truth `design/20_content.md` §7; 7 of 8 moves 10-30,
-  重剑无锋 0 = free basic); `SkillData.insufficient_energy(cost, energy)`
-  (cost > 0 and energy < cost - never blocks free moves or enemies);
-  `SkillData.spend(current, cost)` (clamped at 0); `Player.energy` / the
-  once-written `Player.energy_max` cap observable for cap-relative asserts;
+  fixture), `GridManager` (grid / movement planning), `SaveManager`
+  (profile, slots, `rng`, autosave).
+- **Map entry-content layer** (jinyong-map-events): `MapData.NODES` rows
+  carry `entry_content` = `{event|battle|facility: {status, <type>_id}}`;
+  `MapData.entry_content(id) -> Dictionary` (deep copy), `MapData.active_event_id(id)
+  -> String` (non-empty iff slot active AND `EventData.def(id) != null`),
+  `MapData.declared_gap_types(id) -> Array[String]`. Source of truth:
+  `design/20_content.md` §8 / `design/40_progression.md` §5.
+- **Shared event resolution** (jinyong-map-events): `EventLogic`
+  (`scripts/data/event_logic.gd`, pure statics) - `draw_unseen_id(profile,
+  rng)` (no-repeat bag, one RNG op), `apply_option_effects(profile, opt)`
+  (the 5 effect types), `add_practice(profile, amount)`. Used by BOTH the
+  cultivation 游历 channel and the map node-entry channel (one path, no
+  fork). Event text lives only in `scripts/data/event_data.gd`
+  (`EventData.TABLE`, 16 rows, 2 options each).
+- **MapScreen node-event phase** (`scripts/segments/map.gd`): `phase`
+  (`"TRAVEL"` | `"EVENT"`), `event_id`, `event_focus` (0/1),
+  `entry_declared_gap_types`, `last_effect_types`,
+  `events_resolved_count`, plus the profile mirrors `silver` /
+  `attr_bone..attr_fortune` for differential asserts. End-node routing to
+  ENDING runs before entry content; events fire only on arrival by travel.
+- **Qi-cost layer** (jinyong-spend-qi): `SkillData.cost: int` (source of
+  truth `design/20_content.md` §7); `SkillData.insufficient_energy(cost,
+  energy)`; `SkillData.spend(current, cost)` (clamped at 0);
+  `Player.energy` / `Player.energy_max` (cap-relative asserts);
   `_execute_skill()` gates and deducts on the single cast path.
 - **Playtest contract** (the project's test "API"): `playtest/_common.yaml`
   declares the scene, the allowed actions (incl. debug injections such as
   `debug_damage_player` and `debug_spend_player_qi`), the observable surface
   whitelist and `scenario_order`; each `playtest/*.yaml` is one scenario
-  (name == basename, single-integer `at:`, a comparison operator on every
-  assert line). Observables are plain vars on live nodes, e.g.
-  `SkillButton1..12`: `state_text` / `state_tag_text` / `state_luma` /
-  `fahui_text` / `cost_text` / `effect_text` / `effect_summary_text` /
-  `lock_reason_text` / `hp_gated` / `disabled`; `HealthBar`:
-  `bar_width` / `bar_height` / `empty_area_px` / `empty_cap_px` /
-  `hp_text` / `hp_value` / `hp_max` / `hp_text_width_ok`; `CreationScreen`:
-  `phase` / `points_left` / `attr_index` / `attrs` / `trait_ids` plus the
-  geometry observables and the clarity layer `hp_value` / `hp_text` /
-  `confirm_summary_text`; `Player`: `energy` / `energy_max` (qi asserts are
-  cap-relative, mirroring the `max_health` discipline).
+  (name == basename, single-integer `at:`, a comparison operator or
+  changed/unchanged token on every assert line). Observables are plain vars
+  on live nodes, e.g. `SkillButton1..12`: `state_text` / `state_tag_text` /
+  `state_luma` / `fahui_text` / `cost_text` / `effect_text` /
+  `effect_summary_text` / `lock_reason_text` / `hp_gated` / `disabled`;
+  `HealthBar`: `bar_width` / `bar_height` / `empty_area_px` /
+  `empty_cap_px` / `hp_text` / `hp_value` / `hp_max` / `hp_text_width_ok`;
+  `CreationScreen`: `phase` / `points_left` / `attr_index` / `attrs` /
+  `trait_ids` / geometry observables / `hp_value` / `hp_text` /
+  `confirm_summary_text`; `MapScreen`: `current_node_id` / `focus_id` /
+  `ended` / the node-event observables above; `Player`: `energy` /
+  `energy_max` (cap-relative, mirroring the `max_health` discipline).
 - **Unit tests**: GDScript test files with a top-level
   `static func run() -> bool` are collected by `tests/unit_test_runner.gd`'s
-  explicit append-only `TESTS` registry (19 files, incl.
-  `test_qi_costs_match_design.gd`, `test_creation_info_texts.gd` and the
-  jinyong-hud trio), run headless via
-  `godot --headless --path . -s res://tests/unit_test_runner.gd`.
+  explicit append-only `TESTS` registry (19 files as delivered), run headless
+  via `godot --headless --path . -s res://tests/unit_test_runner.gd`.
+  SceneTree-extending integration suites (`test_cultivation.gd`,
+  `test_encounter.gd`, `test_save_manager.gd`, `test_game_manager_fsm.gd`)
+  are auto-discovered by the sidecar and driven with their own `-s`
+  invocation. `tests/test_map_node_event.gd` (this round's pin file, static
+  `run()` contract) is **not yet appended to the TESTS registry** - see the
+  known wiring gap above.
 
 ## Verification status (honest)
 
@@ -169,58 +224,57 @@ The only authoritative gate evidence is the pipeline step products -
 `playtest_summary.md`, `5_vision`'s `vision_report.json`, `5_test`'s
 `test_report.json` - pipeline artifacts, not repo files; none is on disk at
 the verifier step (the gates run after it). The verifier's own round verdict
-is written fresh to `final/verify_report.json` this step (the
-jinyong-clarity-era tombstone pointer note was archived with a numeric
-suffix on replace): `all_goals_met = false` / `ready_for_deploy = false`,
-**solely because the measured regression pass awaits the gate products
-listed above** - every implementation-level goal is direct-read verified.
-Per the decision recorded in `design/90_decisions.md`, `repo_apply` ignores
-`final/*`, so any repo copy is never refreshed by a run: gate reports, not
-any `final/` file, are the authoritative evidence. In short:
+is written fresh to `final/verify_report.json` this step (per
+`design/90_decisions.md`, `repo_apply` ignores `final/*`, so any repo copy is
+never refreshed by a run - gate reports, not `final/` files, are the
+authoritative evidence). In short:
 
-- The cost table is documented in `design/20_content.md` (§1 move tables +
-  §7, landed docs-first) and byte-identical in code
-  (`battlefield.gd::_create_all_skill_data()`) and in the unit-test pin
-  (`tests/test_qi_costs_match_design.gd` `DESIGN_COSTS`).
-  `design/10_systems.md` §1 no longer says the pool is never spent.
-- The engine change is verified by direct read: the insufficient-qi gate
-  returns before any side effect (cost>0-guarded, so enemies and the free
-  basic are unaffected), and the success-only clamped deduction sits beside
-  the cooldown start on the single cast path (`_execute_skill()`), reached
-  through the one shared `spend_unit_energy()` helper.
-- The new scenario pins `no_energy` in a real battle with cap-relative qi
-  asserts; the win-path budget (170/180) is design-documented so the
-  tutorial stays winnable without touching HP, damage, cooldowns or enemies.
-- The round's **measured** pass - all 54 scenarios green (the 53 pre-existing
-  untouched + the new one), `spine_to_ending` 32/32,
-  `terminal_victory_8_12_rounds_hp_15_40` 6/6, 19/19 unit tests, pytest
-  smoke green, compile zero errors - is **pending the downstream gate run,
-  not claimed**. The last fully measured final-tree run (jinyong-clarity's:
-  53/53 scenarios, 74/74 scripts) predates this round; the qi-cost changes
-  are additive by construction (data + one gate + one deduction), but the
-  authoritative confirmation is the fresh downstream gate run - which is why
-  the round verdict stays `all_goals_met = false` until those reports land.
-- If the downstream playtest gate reddens `terminal_victory` or any existing
-  scenario, that is a cost-table defect by the round's fallback rule: revise
-  the qi costs in `design/20_content.md` + `battlefield.gd` +
-  `test_qi_costs_match_design.gd` - never HP, damage, cooldowns, or enemies.
+- Every implementation-level goal of the map-events round is direct-read
+  verified: the 6-node entry-content declarations (data + design tables),
+  the shared `EventLogic` extraction with cultivation delegating
+  byte-identically, Shaolin's deterministic `night_rain` binding (existing
+  pool row, zero new prose), the honest declared-unimplemented gap notes in
+  `design/20_content.md` §8.3, the append-only playtest contract (54 -> 55
+  scenarios, two-place sync), and the relative/differential assertions of
+  the new scenario.
+- The round's **measured** pass - all 55 scenarios green (the 54 pre-existing
+  untouched + `map_node_event_shaolin`), `spine_to_ending` 32/32, compile
+  zero errors (expected 75 -> 77 scripts), pytest smoke green, unit suite
+  green - is **pending the downstream gate run, not claimed**. The last
+  fully measured final-tree run (jinyong-spend-qi: 54/54 scenarios, 75/75
+  scripts) predates this round; the map-events changes are additive by
+  construction (mainline slots inert, end-node routing ordered first,
+  `_ready` untouched), but the authoritative confirmation is the fresh
+  downstream gate run.
+- One real wiring defect is flagged in the round verdict: the new
+  `tests/test_map_node_event.gd` is not yet registered in
+  `tests/unit_test_runner.gd`'s TESTS registry, so the default unit gate
+  would skip it (the playtest scenario still covers the end-to-end
+  behavior). Fix: append `"res://tests/test_map_node_event.gd"` to TESTS.
+- If the downstream playtest gate reddens `spine_to_ending` or any existing
+  scenario, that is a node-content defect by this round's constraint: make
+  the offending mainline slot inert again (`status: "declared"`) - never
+  touch the spine yaml, HP, damage, cooldowns, or the month loop.
 
 ## Repository layout
 
-- `scripts/` - game code (`autoload/`, `characters/`, `data/`, `ui/`,
-  `segments/`, `ai/`, `battlefield.gd`)
-- `scenes/` - Godot scenes (`ui/`, `segments/`, `main.tscn`)
-- `playtest/` - 54 headless playtest scenarios + the `_common.yaml` contract
-  (55 yaml files total)
-- `tests/` - GDScript unit suites (19 collected files) +
-  `test_playtest_contract_smoke.py`
+- `scripts/` - game code (`autoload/`, `characters/`, `data/` (incl.
+  `map_data.gd`, `event_data.gd`, `event_logic.gd`), `ui/`, `segments/`
+  (incl. `map.gd`), `ai/`, `battlefield.gd`)
+- `scenes/` - Godot scenes (`ui/`, `segments/` (incl. `map.tscn`),
+  `main.tscn`)
+- `playtest/` - 55 headless playtest scenarios + the `_common.yaml` contract
+  (56 yaml files total)
+- `tests/` - GDScript unit suites (19 files in the TESTS registry + this
+  round's `test_map_node_event.gd` pending registration + SceneTree-style
+  integration suites) + `test_playtest_contract_smoke.py`
 - `design/` - the design archive (`00_overview.md` ... `99_changelog.md`);
-  `40_ux_backlog.md` tracks player-eye UX debt, `20_content.md` §7 is the
-  inner-qi cost table (source of truth; §5's old cost gap is closed, §7.4
-  records the no-regen gap)
+  `20_content.md` §8 is the map node entry-content record (binding + honest
+  gaps), §7 the inner-qi cost table; `40_progression.md` §5 the per-node
+  declaration table; `90_decisions.md` the shared-EventLogic relocation
+  decision
 - `final/` - per-round delivery notes and probe notes;
-  `verify_report.json` carries the verifier step's round verdict (the old
-  tombstone pointer note was archived on replace) - per
+  `verify_report.json` carries the verifier step's round verdict - per
   `design/90_decisions.md` it is never refreshed by `repo_apply`, so the
   gate products, not `final/` files, are the authoritative evidence
 - `assets/` - color-block textures, NotoSansSC font, audio, seed portraits
