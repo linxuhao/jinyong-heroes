@@ -219,9 +219,21 @@ func _update_geometry_observables() -> void:
 				if gap_toggle0 != null:
 					cluster = gap_toggle0.get_global_rect()
 			"CONFIRM":
+				# points_attrs_gap_ok CONFIRM cluster: re-pointed from the
+				# ConfirmButton rect to the ConfirmSummaryLabel rect. Same
+				# observable, same yaml assert lines — a measured-quantity change
+				# per the jinyong-layout-r2 precedent. The summary label is now
+				# the phase's first-row ink cluster: its rect top == its first ink
+				# line's top and its centered lines make rect center == ink
+				# center, so both conjuncts the gap check reads (top y, center x)
+				# remain ink facts. ConfirmButton fallback for a missing node.
 				var gap_summary: Control = get_node_or_null("MouseBox/ConfirmBox/ConfirmSummaryLabel") as Control
-				if gap_confirm != null:
-					cluster = gap_confirm.get_global_rect()
+				if gap_summary != null:
+					cluster = gap_summary.get_global_rect()
+				else:
+					var gap_confirm: Button = get_node_or_null("MouseBox/ConfirmBox/ConfirmButton") as Button
+					if gap_confirm != null:
+						cluster = gap_confirm.get_global_rect()
 		# Zero-size cluster = missing node: keep the previous value (do not
 		# force true/false) so a transient lookup gap never fakes a verdict.
 		if cluster.size != Vector2.ZERO:
@@ -611,14 +623,34 @@ func _render() -> void:
 	var trait_next: Button = get_node_or_null("MouseBox/TraitBox/TraitNavRow/TraitNextButton") as Button
 	if trait_next != null:
 		trait_next.visible = phase == "TRAITS"
-	# Description labels (defects 4/5): each label shows the focused item's
-	# Chinese description and is visible only in its own phase. Uses
-	# get_node_or_null so a missing node can never crash the render path.
+	# Description labels (defects 4/5) + the clarity info layer (UX-06/07/08).
+	# All derivations are display-only — no rule or stored value changes.
+	hp_value = hp_from_bone(int(attrs["bone"]))
+	hp_text = "当前气血 %d" % hp_value
+	confirm_summary_text = confirm_summary_text_from(attrs)
 	var attr_desc_label: Label = get_node_or_null("MouseBox/AttrBox/AttrDescLabel") as Label
 	if attr_desc_label != null:
 		attr_desc_label.visible = phase == "ATTRS"
 		if phase == "ATTRS":
-			attr_desc_label.text = _attr_desc(PlayerProfile.ATTR_KEYS[attr_index])
+			# UX-06: the desc slot now lists ALL FIVE attribute effects at rest
+			# (name-prefixed, verbatim from _ATTR_DESCS) instead of only the
+			# focused attribute's desc — a deliberate D1 semantic change so the
+			# at-rest page tells the player what each attribute does. attr_index
+			# still drives the focus highlight (modulate) and the +/- target.
+			# Do NOT "fix" this back to the focused desc; it is the point of UX-06.
+			attr_desc_label.text = attr_effects_text()
+	# UX-07: current HP value next to the formula list (ATTRS only).
+	var hp_label: Label = get_node_or_null("MouseBox/AttrBox/HpValueLabel") as Label
+	if hp_label != null:
+		hp_label.visible = phase == "ATTRS"
+		if phase == "ATTRS":
+			hp_label.text = hp_text
+	# UX-08: the confirm-page final-value checklist (CONFIRM only).
+	var confirm_summary_label: Label = get_node_or_null("MouseBox/ConfirmBox/ConfirmSummaryLabel") as Label
+	if confirm_summary_label != null:
+		confirm_summary_label.visible = phase == "CONFIRM"
+		if phase == "CONFIRM":
+			confirm_summary_label.text = confirm_summary_text
 	var trait_desc_label: Label = get_node_or_null("MouseBox/TraitBox/TraitDescLabel") as Label
 	if trait_desc_label != null:
 		trait_desc_label.visible = phase == "TRAITS"
@@ -662,6 +694,32 @@ func _attr_label(key: String) -> String:
 		"fortune":
 			return "福缘"
 	return key
+
+
+## Pure derivation: HP from 根骨 (design/40_progression.md §7 气血 = 根骨 × 5).
+## Reads no nodes, so tests can call it on a bare instance. The multiplier 5
+## IS the documented formula — the only number this round is allowed to show.
+func hp_from_bone(bone: int) -> int:
+	return bone * 5
+
+
+## Pure composition: all five attribute effects, name-prefixed, each segment
+## VERBATIM from _ATTR_DESCS (design/10_systems.md §1 + 40_progression.md §7
+## formulas). Nothing is invented; _attr_desc("") never throws for unknown keys.
+func attr_effects_text() -> String:
+	var parts: Array[String] = []
+	for key in PlayerProfile.ATTR_KEYS:
+		parts.append("%s:%s" % [_attr_label(key), _attr_desc(key)])
+	return " · ".join(parts)
+
+
+## Pure composition: the confirm-page summary, one line per attribute in
+## PlayerProfile.ATTR_KEYS order, same "名 值" shape as the ATTRS row labels.
+func confirm_summary_text_from(values: Dictionary) -> String:
+	var lines: Array[String] = []
+	for key in PlayerProfile.ATTR_KEYS:
+		lines.append("%s %2d" % [_attr_label(key), int(values.get(key, 0))])
+	return "\n".join(lines)
 
 
 ## Chinese description for an attribute key; "" for unknown keys (never throws).
