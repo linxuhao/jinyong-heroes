@@ -724,7 +724,7 @@ func begin_turn(unit: Node) -> void:
 	var passive: String = _passive_of(unit)
 	match passive:
 		"shen_diao_power":
-			apply_heal(unit, 26)  # round(20 * 1.3)
+			apply_heal(unit, 0)  # round(0 * 1.3)
 		"one_yang_renewal":
 			apply_heal(unit, 13)  # round(10 * 1.3)
 
