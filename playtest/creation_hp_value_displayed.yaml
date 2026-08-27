@@ -1,0 +1,51 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct creation.tscn boot (phase asserts hold at f30 — proven scene-path
+# capability, see creation_mouse_interaction).
+# UX-07: the current HP is displayed next to the formula list. HpValueLabel is
+# ATTRS-gated visible with non-empty text containing 「气血」, and the surfaced
+# hp_value / hp_text derive from the LIVE build — every numeric assert is
+# RELATIVE to attrs (hp_value == attrs["bone"] * 5), zero absolute HP literals.
+# move_right at f40 raises the focused bone row (default focus = row 0, bone
+# 10 -> 11, HP 50 -> 55) and hp_value changes at f45 then equals attrs["bone"]*5
+# at f70; move_left at f80 returns to bone 10 and hp_value == attrs["bone"]*5.
+name: creation_hp_value_displayed
+description: >-
+  UX-07: the current HP (HpValueLabel) is displayed next to the formula list
+  and tracks the live build — every numeric assert RELATIVE to attrs
+  (hp_value == attrs["bone"] * 5), zero absolute HP literals. move_right raises
+  the focused bone row (default focus row 0) and the displayed value follows
+  (hp_value: changed at f45); move_left returns.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    HpValueLabel.visible: visible == true
+    HpValueLabel.text: 'text != ""'
+    HpValueLabel.text: 'text.contains("气血") == true'
+    CreationScreen.hp_value: hp_value == attrs["bone"] * 5
+    CreationScreen.hp_text: 'hp_text == "当前气血 " + str(hp_value)'
+- at: 40
+  actions:
+  - move_right
+- at: 45
+  actions: []
+  assert:
+    CreationScreen.hp_value: changed
+- at: 70
+  actions: []
+  assert:
+    CreationScreen.hp_value: hp_value == attrs["bone"] * 5
+    CreationScreen.hp_text: 'hp_text == "当前气血 " + str(hp_value)'
+    HpValueLabel.text: 'text != ""'
+- at: 80
+  actions:
+  - move_left
+- at: 105
+  actions: []
+  assert:
+    CreationScreen.hp_value: hp_value == attrs["bone"] * 5

@@ -608,6 +608,9 @@ surface:
   - trait_cluster_center_ok
   - desc_center_ok
   - desc_alignment_ok
+  - hp_value
+  - hp_text
+  - confirm_summary_text
   SectSelectScreen:
   - focus_index
   - selected_sect_id
@@ -699,6 +702,10 @@ surface:
   - visible
   - size
   - mouse_filter
+  BackButton:
+  - visible
+  - size
+  - mouse_filter
   SkillDescLabel:
   - visible
   - text
@@ -719,6 +726,12 @@ surface:
   - size
   - mouse_filter
   AttrDescLabel:
+  - visible
+  - text
+  HpValueLabel:
+  - visible
+  - text
+  ConfirmSummaryLabel:
   - visible
   - text
   TraitDescLabel:
@@ -778,3 +791,6 @@ scenario_order:
 - skill_button_effect_info
 - locked_slot_unlock_reason
 - health_bar_numbers
+- creation_attr_effect_info
+- creation_hp_value_displayed
+- creation_confirm_summary

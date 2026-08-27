@@ -1,0 +1,47 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct creation.tscn boot (phase asserts hold at f30 — proven scene-path
+# capability, see creation_mouse_interaction).
+# UX-06: at rest (f30, default focus) the ATTRS desc slot lists ALL FIVE
+# attribute effects (D1 semantic change) — every attribute name present, every
+# effect keyword present (内力值 / 移动力 / 学功法 / 奇遇), and the bone formula
+# verbatim (「气血 = 根骨 × 5」). The move_down leg at f40 cycles attr_index to 1
+# and at f70 the same full list still shows 福缘 + 奇遇 — proving the info is
+# at-rest, not focus-transient (cycling does not make the other rows disappear).
+name: creation_attr_effect_info
+description: >-
+  UX-06: at rest (f30, default focus) the ATTRS desc slot lists all five
+  attribute effects — every name (根骨/内力/身法/悟性/福缘) and every effect
+  keyword (内力值/移动力/学功法/奇遇) present, the bone formula 气血 = 根骨 × 5
+  verbatim. Focus cycling (move_down -> attr_index 1) proves the list does not
+  follow focus away: at f70 it still contains 福缘 and 奇遇.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    AttrDescLabel.visible: visible == true
+    AttrDescLabel.text: 'text.contains("根骨") == true'
+    AttrDescLabel.text: 'text.contains("内力") == true'
+    AttrDescLabel.text: 'text.contains("身法") == true'
+    AttrDescLabel.text: 'text.contains("悟性") == true'
+    AttrDescLabel.text: 'text.contains("福缘") == true'
+    AttrDescLabel.text: 'text.contains("气血 = 根骨 × 5") == true'
+    AttrDescLabel.text: 'text.contains("内力值") == true'
+    AttrDescLabel.text: 'text.contains("移动力") == true'
+    AttrDescLabel.text: 'text.contains("学功法") == true'
+    AttrDescLabel.text: 'text.contains("奇遇") == true'
+    CreationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 40
+  actions:
+  - move_down
+- at: 70
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attr_index: attr_index == 1
+    AttrDescLabel.text: 'text.contains("福缘") == true'
+    AttrDescLabel.text: 'text.contains("奇遇") == true'

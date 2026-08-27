@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct creation.tscn boot (phase asserts hold at f30 — proven scene-path
+# capability, see creation_mouse_interaction). The walk ATTRS -> TRAITS ->
+# CONFIRM uses real clicks (AttrNextButton / TraitNextButton) and the timings
+# match creation_traits_back_next_buttons (f40/f90/f100/f150).
+# UX-08: the confirm page lists the final value of each attribute. One
+# per-attribute assert, each RELATIVE to the live attrs dict
+# (contains("<名> " + str(attrs["<key>"]))), zero absolute literals. The
+# CONFIRM-phase geometry pins (points_attrs_gap_ok with the re-pointed
+# first-row cluster, phase_skeleton_same, creation_box_fits, nav_cluster_center_ok)
+# prove the summary entered the frozen layout without moving it. BackButton at
+# f160 returns to TRAITS and the summary phase-hides at f180.
+name: creation_confirm_summary
+description: >-
+  UX-08: walking ATTRS -> TRAITS -> CONFIRM with real clicks, the confirm page
+  lists the final value of each attribute (one per-attribute assert, each
+  RELATIVE to the live attrs dict). The CONFIRM-phase geometry pins
+  (points_attrs_gap_ok with the re-pointed first-row cluster, phase_skeleton_same,
+  creation_box_fits, nav_cluster_center_ok) prove the summary entered the frozen
+  layout without moving it. BackButton returns to TRAITS and the summary
+  phase-hides.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    ConfirmSummaryLabel.visible: visible == false
+- at: 40
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+- at: 100
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 150
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+    ConfirmSummaryLabel.visible: visible == true
+    ConfirmSummaryLabel.text: 'text != ""'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text != ""'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("根骨 " + str(attrs["bone"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("内力 " + str(attrs["inner"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("身法 " + str(attrs["agility"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("悟性 " + str(attrs["wisdom"])) == true'
+    CreationScreen.confirm_summary_text: 'confirm_summary_text.contains("福缘 " + str(attrs["fortune"])) == true'
+    CreationScreen.points_attrs_gap_ok: points_attrs_gap_ok == true
+    CreationScreen.phase_skeleton_same: phase_skeleton_same == true
+    CreationScreen.creation_box_fits: creation_box_fits == true
+    CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
+- at: 160
+  actions: []
+  clicks:
+  - BackButton
+- at: 180
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    ConfirmSummaryLabel.visible: visible == false

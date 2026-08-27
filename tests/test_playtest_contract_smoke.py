@@ -45,6 +45,9 @@ ROUND_SCENARIOS: list[str] = [
     "skill_button_effect_info",
     "locked_slot_unlock_reason",
     "health_bar_numbers",
+    "creation_attr_effect_info",
+    "creation_hp_value_displayed",
+    "creation_confirm_summary",
 ]
 
 
@@ -511,6 +514,60 @@ def test_hud_info_surface_contract() -> None:
                 assert any(
                     op in line for op in ["==", "!=", "<", ">", "and", "or"]
                 ), (
+                    f"{name}.yaml line {lineno} assert missing "
+                    f"comparison operator: {line.strip()}"
+                )
+
+
+def test_creation_clarity_surface_contract() -> None:
+    """Static contract pin for the jinyong-clarity round (UX-06/07/08 info layer).
+
+    Pins the three new CreationScreen observables (hp_value / hp_text /
+    confirm_summary_text), the two new node blocks (HpValueLabel /
+    ConfirmSummaryLabel with visible + text), the BackButton node block that the
+    confirm_summary scenario clicks, the still-whitelisted AttrDescLabel guard,
+    and for each of the three new scenario files: exists on disk, name: equals
+    its basename, every timeline at: is a single integer, and every 4-space
+    dotted assert line carries a comparison operator OR the differential token
+    changed/unchanged (the repo's no-bare-scalar-silent-false rule).
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    creation_items = blocks.get("CreationScreen", [])
+    for var in ("hp_value", "hp_text", "confirm_summary_text"):
+        assert var in creation_items, (
+            f"CreationScreen.{var} not whitelisted on the surface"
+        )
+    assert "AttrDescLabel" in blocks, "surface missing AttrDescLabel block (guard)"
+    for key in ("HpValueLabel", "ConfirmSummaryLabel"):
+        assert key in blocks, f"surface missing {key} block"
+        for prop in ("visible", "text"):
+            assert prop in blocks[key], (
+                f"{key}.{prop} not whitelisted on the surface"
+            )
+    assert "BackButton" in blocks, "surface missing BackButton block"
+
+    for name in ("creation_attr_effect_info", "creation_hp_value_displayed",
+                 "creation_confirm_summary"):
+        path = PLAYTEST_DIR / (name + ".yaml")
+        assert path.is_file(), f"{name}.yaml missing"
+        ftext = path.read_text(encoding="utf-8")
+        assert re.search(
+            rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+        ), f"{name}.yaml name: does not equal its basename"
+        for lineno, line in enumerate(ftext.splitlines(), start=1):
+            m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+            if m is not None:
+                assert m.group(1).isdigit(), (
+                    f"{name}.yaml line {lineno}: non-integer timeline "
+                    f"'at' value {m.group(1)!r}"
+                )
+            if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+                has_op = any(
+                    op in line for op in ["==", "!=", "<", ">", "and", "or"]
+                )
+                has_diff = "changed" in line or "unchanged" in line
+                assert has_op or has_diff, (
                     f"{name}.yaml line {lineno} assert missing "
                     f"comparison operator: {line.strip()}"
                 )
