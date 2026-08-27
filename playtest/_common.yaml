@@ -194,6 +194,7 @@ surface:
   - shield
   - status_names
   - energy
+  - energy_max
   - sprite_top
   - traits
   - debug_input_events
@@ -795,3 +796,4 @@ scenario_order:
 - creation_attr_effect_info
 - creation_hp_value_displayed
 - creation_confirm_summary
+- qi_cost_blocks_cast_no_energy
