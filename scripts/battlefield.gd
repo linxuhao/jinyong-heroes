@@ -231,37 +231,45 @@ func _create_all_skill_data() -> Dictionary:
 	skills["heavy_edge"] = _skill("重剑无锋",
 		"单体 45 伤害,击退 1 格。冷却 1 回合。",
 		63, 1, 1, "single", 0, "self", 1)
+	# heavy_edge: free basic per design/20_content.md §7.1 cost table (cost stays 0)
 	skills["grand_simplicity"] = _skill("大巧不工",
 		"直线 3 格 38 伤害。冷却 2 回合。",
 		53, 3, 2, "line", 3, "self", 0)
+	skills["grand_simplicity"].cost = 15
 	skills["thousand_force_cleave"] = _skill("力斩千钧",
 		"十字 2 格 34 伤害。冷却 3 回合。",
 		48, 2, 3, "cross", 2, "self", 0)
+	skills["thousand_force_cleave"].cost = 20
 	var boundless_seas = _skill("四海无量",
 		"以自身为心,半径 2 格全体 70 伤害。冷却 6 回合。",
 		98, 2, 6, "square", 2, "self", 0)
 	boundless_seas.is_finisher = true
+	boundless_seas.cost = 25
 	skills["boundless_seas"] = boundless_seas
 
 	# --- Yang Guo: Melancholy Palms (hotkeys 5-8) ---
 	skills["heart_rending_strike"] = _skill("心惊肉跳",
 		"单体 38 伤害。冷却 1 回合。",
 		53, 1, 1, "single", 0, "self", 0)
+	skills["heart_rending_strike"].cost = 10
 	var dragging_mire = _skill("拖泥带水",
 		"单体 25 伤害,目标下一回合移动力 −2。冷却 2 回合。",
 		35, 1, 2, "single", 0, "self", 0)
 	dragging_mire.status_applied = "move_minus_next_turn"
+	dragging_mire.cost = 15
 	skills["dragging_mire"] = dragging_mire
 	var wandering_valley = _skill("徘徊空谷",
 		"位移:跳 3 格,落点相邻全体 20 伤害。冷却 3 回合。",
 		28, 3, 3, "adjacent", 0, "landing", 0)
 	wandering_valley.jump_tiles = 3
+	wandering_valley.cost = 20
 	skills["wandering_valley"] = wandering_valley
 	var seventeen_forms = _skill("黯然销魂十七式",
 		"相邻全体 70 伤害,击退 2 格。需气血低于 50%。冷却 8 回合。",
 		98, 0, 8, "adjacent", 0, "self", 2)
 	seventeen_forms.hp_gate_below_ratio = 0.5
 	seventeen_forms.is_finisher = true
+	seventeen_forms.cost = 30
 	skills["seventeen_melancholy_forms"] = seventeen_forms
 
 	# --- East Heretic: Tidal Melody Tune ---
