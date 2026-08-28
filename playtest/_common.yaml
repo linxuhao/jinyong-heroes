@@ -638,6 +638,8 @@ surface:
   - hp_value
   - hp_text
   - confirm_summary_text
+  - trait_hover_index
+  - hover_connected
   SectSelectScreen:
   - focus_index
   - selected_sect_id

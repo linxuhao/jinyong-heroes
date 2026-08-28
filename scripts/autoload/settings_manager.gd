@@ -148,6 +148,25 @@ func _save() -> void:
 ## en. Headless (playtest/unit harness) is always zh — the assertion surface
 ## is the Chinese source text.
 func _detect_language() -> String:
-	if DisplayServer.get_name() == "headless":
+	# Auto-detect ONLY on the web export. That is where the feature earns its
+	# keep — OS.get_locale_language() maps from the browser language, so someone
+	# opening the Pages build from outside China lands in English without being
+	# asked. EVERY other run pins to "zh": desktop, and BOTH harness modes.
+	#
+	# This used to key on `DisplayServer.get_name() == "headless"`, and that
+	# guard NEVER FIRED. The play-test harness runs Godot in RENDER mode on Xvfb
+	# whenever a scenario asks for frame captures — which is the default path —
+	# because --headless forces the dummy rendering driver and photographs an
+	# empty viewport. Measured 2026-08-28: render_mode=render,
+	# SettingsManager.language=en, and 10 scenarios asserting the Chinese source
+	# strings byte-for-byte went red (PointsLabel read "Points left: 30", the map
+	# event body read "Up/down to choose, Enter to decide").
+	#
+	# The guard picked the wrong fact: "am I headless" is not the same question
+	# as "am I a real player". OS.has_feature("web") asks what the feature
+	# actually cares about, and needs no cooperation from the harness to stay
+	# true. A desktop player who picks English still gets it back on next launch
+	# — that is _load()'s job and it is untouched.
+	if not OS.has_feature("web"):
 		return "zh"
 	return "zh" if OS.get_locale_language().begins_with("zh") else "en"

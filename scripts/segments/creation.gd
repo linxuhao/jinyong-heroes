@@ -35,6 +35,14 @@ var attrs: Dictionary = {"bone": 10, "inner": 10, "agility": 10, "wisdom": 10, "
 
 var trait_index: int = 0
 
+## Surface: DISPLAY-ONLY hover preview channel (Defect C). -1 = no hover. When
+## >= 0, _render() shows _traits[trait_hover_index].description in TraitDescLabel
+## WITHOUT touching trait_index, never triggers a toggle, and never affects the
+## focus `modulate` (which stays driven solely by trait_index). Reset to -1 on
+## mouse_exited and whenever phase != "TRAITS" (a hidden button does not reliably
+## emit mouse_exited while the pointer sits on its old rect).
+var trait_hover_index: int = -1
+
 ## Surface: chosen trait/flaw ids.
 var trait_ids: Array[String] = []
 
@@ -47,6 +55,12 @@ var confirmed: bool = false
 ## directly and deliberately bypasses the signal link. Snapshot AFTER all
 ## connects in _ready (before connect() the connection list is empty).
 var pressed_connected: Dictionary = {}
+
+## Surface: hover_connected[widget_name] is true when that TraitToggle's mouse_entered
+## AND mouse_exited signals are both wired to the hover-preview handlers (Defect C).
+## Same snapshot-after-connects discipline as pressed_connected (the connection list is
+## empty before connect()).
+var hover_connected: Dictionary = {}
 
 ## Surface: true iff any rendered Label still shows the keyboard-cursor marker
 ## (U+25B6 BLACK RIGHT-POINTING TRIANGLE) of the removed text list. Recomputed
@@ -402,6 +416,12 @@ func _wire_mouse_widgets() -> void:
 		(get_node("MouseBox/AttrBox/AttrRow%d/AttrPlus%d" % [i, i]) as Button).pressed.connect(_on_attr_plus_pressed.bind(i))
 	for i in min(_traits.size(), 13):
 		(get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).pressed.connect(_on_trait_toggle_pressed.bind(i))
+		# Defect C: hover-preview. mouse_entered carries the index via .bind(i)
+		# (bind PREPENDS, so the handler takes one int arg); mouse_exited is
+		# connected UNBOUND (the signal emits 0 args — a .bind here would make
+		# emission a runtime error).
+		(get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).mouse_entered.connect(_on_trait_toggle_hover_entered.bind(i))
+		(get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).mouse_exited.connect(_on_trait_toggle_hover_exited)
 	(get_node("MouseBox/ConfirmBox/ConfirmButton") as Button).pressed.connect(_on_accept)
 	(get_node("MouseBox/ConfirmBox/BackButton") as Button).pressed.connect(_on_move_left)
 	# Phase-navigation buttons (defect 2): every keyboard-only transition gets a
@@ -418,6 +438,15 @@ func _wire_mouse_widgets() -> void:
 		pressed_connected["AttrPlus%d" % i] = (get_node("MouseBox/AttrBox/AttrRow%d/AttrPlus%d" % [i, i]) as Button).get_signal_connection_list("pressed").size() > 0
 	for i in min(_traits.size(), 13):
 		pressed_connected["TraitToggle%d" % i] = (get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button).get_signal_connection_list("pressed").size() > 0
+	# Snapshot AFTER all connects (Defect C): true iff BOTH hover signals are wired.
+	# Same range as the wiring loop above, so no key exists for an unwired toggle.
+	hover_connected.clear()
+	for i in min(_traits.size(), 13):
+		var hover_btn: Button = get_node("MouseBox/TraitBox/TraitToggle%d" % i) as Button
+		hover_connected["TraitToggle%d" % i] = (
+			hover_btn.get_signal_connection_list("mouse_entered").size() > 0
+			and hover_btn.get_signal_connection_list("mouse_exited").size() > 0
+		)
 	pressed_connected["ConfirmButton"] = (get_node("MouseBox/ConfirmBox/ConfirmButton") as Button).get_signal_connection_list("pressed").size() > 0
 	pressed_connected["BackButton"] = (get_node("MouseBox/ConfirmBox/BackButton") as Button).get_signal_connection_list("pressed").size() > 0
 	pressed_connected["AttrBackButton"] = (get_node("MouseBox/AttrBox/AttrNavRow/AttrBackButton") as Button).get_signal_connection_list("pressed").size() > 0
@@ -552,7 +581,38 @@ func _on_trait_toggle_pressed(i: int) -> void:
 	_render()
 
 
+## Pure selection rule (Defect C): which trait index the description label shows.
+## The hover preview wins whenever it is set (>= 0); otherwise fall back to the
+## keyboard-focused trait_index. Static on purpose — unit-testable without an
+## instance; _render() obtains its desc index ONLY via this call. Any negative
+## hover value counts as "unset".
+static func hover_desc_index(trait_index: int, trait_hover_index: int) -> int:
+	if trait_hover_index >= 0:
+		return trait_hover_index
+	return trait_index
+
+
+## Mouse TraitToggle{i} hover-entered: preview trait i's description WITHOUT
+## touching trait_index, WITHOUT toggling, and WITHOUT affecting the focus
+## modulate (display-only channel — see trait_hover_index).
+func _on_trait_toggle_hover_entered(i: int) -> void:
+	trait_hover_index = i
+	_render()
+
+
+## Mouse TraitToggle{i} hover-exited: drop the preview; the description falls back
+## to trait_index's entry. Connected UNBOUND (mouse_exited emits 0 args).
+func _on_trait_toggle_hover_exited() -> void:
+	trait_hover_index = -1
+	_render()
+
+
 func _render() -> void:
+	# Defect C phase gate (FIRST statement): a hidden button does not reliably emit
+	# mouse_exited while the pointer sits on its old rect, so this — not the exit
+	# signal — is the only guarantee a stale hover index cannot leak into ATTRS/CONFIRM.
+	if phase != "TRAITS":
+		trait_hover_index = -1
 	# Single-surface model: the MouseBox button set is the ONLY operation
 	# surface; the old keyboard-cursor text list (BodyLabel) is gone. Keyboard
 	# input remains a pure shortcut layer acting on this button surface (row
@@ -654,8 +714,11 @@ func _render() -> void:
 	var trait_desc_label: Label = get_node_or_null("MouseBox/TraitBox/TraitDescLabel") as Label
 	if trait_desc_label != null:
 		trait_desc_label.visible = phase == "TRAITS"
-		if phase == "TRAITS" and trait_index >= 0 and trait_index < _traits.size():
-			trait_desc_label.text = _traits[trait_index].description
+		# Defect C: resolve the display index through the pure helper so the
+		# "hover wins over focus" rule lives in exactly ONE place (unit-testable).
+		var desc_idx: int = hover_desc_index(trait_index, trait_hover_index)
+		if phase == "TRAITS" and desc_idx >= 0 and desc_idx < _traits.size():
+			trait_desc_label.text = _traits[desc_idx].description
 	# Focused-row visual: attr_index / trait_index drive which row minus/plus or
 	# toggle acts on; show the focus on the single button surface via modulate
 	# (full vs dim) instead of a duplicated text list. modulate propagates to a
