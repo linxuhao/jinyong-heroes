@@ -130,3 +130,49 @@
 它不能判断一张图画的是不是虾——**它强制的是「新增角色时必须在名册里写下这是哪种虾」**,
 把一条要靠记性的规则变成一道会拦人的门。
 
+## 战斗命中的 5 步优先级规则(2026-08-28,interaction-defects)
+
+左键点击按以下顺序解算(全文见 `30_presentation.md`):1) 脚格有敌人 → 攻击;
+2) **in-reach** 敌人的画出立绘矩形(`portrait_ink_rect`,每帧按钳制后实际墨迹)
+包含点击点 → 攻击最近者;3) 移动高亮中的可达空格 → 移动;4) out-of-reach 敌人
+矩形 → 选中(不静默移动);5) 自己脚格无操作,否则移动。
+
+**被否的 grid→rect→move 规则**(先点中格子找单位 → 再按立绘矩形 → 都没有才移动)
+实测三场景全红:`click_move_undo_right` **10→6**、`click_move_commit_lock` **9→1**、
+`move_target_affordance` **18→11**(`click_move_to_tile` 10→10 只是侥幸:第二次点击
+x=544 恰在矩形右缘外)。原因:顶行王重阳被 `BOARD_TOP_MARGIN_Y=92` 钳制的立绘画在
+y∈[92,220]、x∈[432,528],盖住 (7,2) 与 (7,3) 两格,三个场景从 (7,5) 上移的点击
+(480,160) 落在他身体里,被解析成「攻击王重阳」(超射程,静默失败)而不是移动。
+**结论:空格子不能仅仅因为背后站着一个高的就点不到。** 第 2 步因此只限 in-reach
+敌人;验收网为七条既有场景,保持全绿,不为新规则放水。
+
+## P0 根因:menu.tscn 的 SegmentHost 全屏 STOP(2026-08-28,interaction-defects)
+
+玩家报「左键移动完全失灵」而 headless playtest 57/57 全绿。真实 X11 窗口 + xdotool
+实测定位:`scenes/menu.tscn` 的 `SegmentHost`(铺满全屏的 Control)漏写
+`mouse_filter = 2`,Godot 默认 STOP,整局压在棋盘上方,吞掉所有不落在 Button 上的
+按键。修复落地 `42637b7`(前后实测:`raw=3 handled=0 EATER SegmentHost(filter=0)`
+→ `raw=3 handled=1 EATERS none`),玩家在 web + 桌面双端确认恢复。
+
+**57 绿的套件为什么看不见它(两个 dodge 原因):**
+1. 契约的默认 `scene:` 是 `res://scenes/main.tscn`,而游戏 `run/main_scene` 是
+   `res://scenes/menu.tscn`——每条场景都在给修好的孪生场景打分;
+2. `clicks:` 走 `Input.parse_input_event()` 注入,**永不进入 GUI 阶段**——STOP 控件
+   吃事件的那个阶段根本没被执行到。
+
+已落的两道 pytest 守卫(`test_every_full_rect_host_is_click_through`、
+`test_the_contract_boot_scene_is_recorded_against_the_games_own`)钉住这一类;
+`_common.yaml` 头注释记录 boot-scene 分歧。双层覆盖网(Layer 1 差分观测量、
+Layer 2 窗口化 X11 闸门)使同类缺陷下一次在服务器上变红。诚实边界:web 浏览器桥接
+服务器够不着,manual-only;skipped 的闸门运行记 OPEN 覆盖缺口,永不为绿。
+
+## 地图提示一屏一条(2026-08-28,interaction-defects)
+
+上一轮(jinyong-nodes)把页脚 `HintLabel` 与 `map.gd::_render()` TRAVEL 面板尾行
+统一成逐字节相同的同一句,结果同一屏把「左右/上下选择相邻去处，回车启程」印了两遍
+——「统一」合成了「重复」。本轮裁定:**保留页脚 `HintLabel`,删面板尾行**(面板留
+「当前:%s」)。理由:页脚是地图的持久操作提示、已被 `map_hint_single.yaml` 钉住、
+EVENT 隐藏逻辑(`_apply_hint_visibility`)挂在它上面,删面板行的爆炸半径最小;
+「一屏一条,一条提示」——不许用「两处都留着但内容一致」算统一。上一轮统一方案的
+本条勘误按规矩以新行记录,不改旧行。
+

@@ -170,6 +170,24 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 > **回合制改造要点**:Space 从"暂停"改绑为"结束回合",暂停单独归 Escape。
 > 旧版 Space 同时绑了 `pause_game` 与 `ui_accept`,是已知缺陷。
 
+### 战斗命中的 5 步优先级规则(2026-08-28,interaction-defects)
+
+左键点击世界点 `P` 在 `player.gd::handle_world_click` 内按以下顺序解算:
+
+1. `T = GridManager.world_to_grid(P)`,存活敌人占据 `T`(脚格)→ 攻击该敌人;
+2. 画出的立绘矩形(`portrait_ink_rect`,按每帧钳制后的实际墨迹,不是脚底−128 推算)
+   包含 `P` **且该敌人在攻击射程内**(in-reach)→ 攻击最近的那个(按 `grid_pos` 距离
+   决胜)——本步闭合「贴身敌人打不到」的缺口;
+3. `T` 是移动范围高亮中的可达空格 → 走过去(高亮仲裁:玩家看得见谁赢);
+4. 立绘矩形包含 `P` 但敌人 **out-of-reach** → 选中(不静默移动);
+5. `T` == 自己脚格 → 无操作;否则移动过去。
+
+硬约束:**out-of-reach 敌人的立绘矩形永远不能把一个可达空格变得点不到**——
+被否的 grid→rect→move 规则(先格子、再立绘矩形、最后点击移动)正是死在这上面
+(顶行王重阳被钳制的立绘盖住 (7,2)/(7,3),三个上移场景被解析成攻击而全红,
+实测 10→6 / 9→1 / 18→11,记录于 `90_decisions.md`)。重叠矩形的决胜键是按
+`grid_pos` 距 P 最近;`attack_reach_covers` 为纯静态谓词,headless 单元可测。
+
 ## 血条:必须做小(实测结论,不要再推一遍)
 
 2026-08-23,视觉闸门连续三轮判 **0/11**「solid green rectangles, not bars with
@@ -632,4 +650,47 @@ UX-06 是从静止页记录的,「焦点跟随显示」会让静止页原样保�
 jinyong-layout-r2 的 Round-3 重做(测的量变了,变量名与 yaml 行不变)。墨迹诚实性:
 VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行居中 ⇒ 矩形中心 ==
 墨迹中心;gap 检查读的 (top y, center x) 两个合取项因此都是墨迹事实。
+
+## 悬浮 HUD 不许吞点击:mouse_filter 审计表(2026-08-28,interaction-defects)
+
+`scenes/ui/health_bar.tscn` 全子树逐节点实测(`Bar` 的修复此前已 A/B 实测落地):
+
+| 节点 | mouse_filter | 备注 |
+|---|---|---|
+| root `HealthBar` | 2 (IGNORE) | 原有 |
+| `Bar` (ProgressBar) | 2 (IGNORE) | 本轮缺陷 A 的修复 + 每帧重断言 |
+| `EmptyCap` | 2 (IGNORE) | 原有显式 |
+| `HpLabel` | 2 (IGNORE) | 原有显式 + 每帧重断言 |
+| `NameLabel` | 2 (IGNORE) | 本轮补显式声明(原靠 Label 默认) |
+
+——全子树无 STOP:一个悬浮在角色身上的 HUD 控件,不许有任何一个是 STOP 的后代。
+`scripts/ui/health_bar.gd` 在 `update_health` 里对 `Bar`/`HpLabel`/cap 三个每帧重断言。
+
+**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=0`)的裁定(实测,非照注释):**
+经 `debug_click_target_fires` 计数器 + `input_click_differential` 敌格腿实测,
+点击其矩形时 `gui_input` **触发 0 次**——Godot GUI 拾取器不把事件路由给祖先为
+Node2D 的 Control,它既收不到事件也吃不掉事件(死路由)。节点**保留**:
+它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),`mouse_filter`
+留原值零 diff(两态皆惰性)。
+
+## 名牌挂到立绘顶端 + 地面标记(2026-08-28,interaction-defects)
+
+`health_bar.gd::follow_character` 的锚点从脚底 `+(-34, -32)` 改挂**立绘顶端**:
+`screen_pos = Vector2(char_x - 34, sprite_top - 4.0 - size.y)`(血条底边在
+`sprite_top` 上方 4px),`STRIP_BOTTOM + 2 = 94` 钳制**保留**(它是 UX-01b 的修复,
+被 `portrait_visibility.yaml` 钉住;无钳制变体实渲染顶行头部被顶栏盖住)。
+
+**顶行实测落地(Central_Divine,`sprite_top == 92`):** 名牌想挂到 `92 - 4 - 24 = 64`
+(进顶栏),被钳到 **y 94..118**,落在发际/额头带 `[92, 132]` 上;脸区从约
+`sprite_top + 40 = 132` 起,**不被盖**。中排单位无钳制咬合,严格在立绘上方
+(`bar_bottom < sprite_top`)。顶行断言因此钉「文档化落地」(`bar_top == 94` 且
+`bar_bottom <= sprite_top + 40`),中排钉严格不等式。
+
+**地面标记 `TileMarkers`**(`scripts/ui/tile_markers.gd`,Node2D `_draw`,挂在
+`scenes/battlefield.tscn` 中 `Characters` **之后**):为每个存活单位在
+`grid_to_world(grid_pos)` 画低透明度扁椭圆 + 细金边,标记「他站哪格」。必须挂在
+角色之后:逐单位 `_draw()` 先于子 Sprite2D,顶行(钳制把立绘压到自家格上)会把自己的
+脚标盖掉——实测 `TileMarkers` 对全部六个单位(含顶行)可见,且 Node2D `_draw` 无 GUI
+参与,天然不吞点击。顶行诚实视觉事实:标记画在自家立绘袍子上(「袍子上的椭圆」),
+是「他站这里」的如实表述。
 

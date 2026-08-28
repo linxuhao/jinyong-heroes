@@ -163,7 +163,7 @@ post-gate `5_design` evidence step from measured `playtest_summary.md` counts.
 
 ---
 
-# Delivery notes — jinyong-nodes(主线事件) (2026-08-29)
+# Delivery notes — jinyong-mainline(主线事件) (2026-08-27)
 
 ## Round record — main story node events wired
 
@@ -248,5 +248,105 @@ not measured by this task**; measured PASS/FAIL counts belong to the downstream
 `5_compile` (`compile_report.json` / `playtest_report.json` / `playtest_summary.md`),
 `5_test` (`test_report.json`) and `5_vision` (`vision_report.json`) gate artifacts, which
 do not exist when this task runs. No `N/N PASS` count is asserted for any scenario here.
+
+---
+
+# Delivery notes — interaction-defects(交互缺陷) (2026-08-28)
+
+Round record — three measured mouse/info interaction defects fixed (A: floating health
+bar's Bar control ate right-clicks; B: portrait a full tile above its cell / nameplate on
+the legs / portrait clicks did not target; C: trait descriptions showed only on click),
+plus the real-input coverage net, touch undo, and three small fixes. Docs card: records
+only; all code/YAML landed upstream this round, gate evidence pending (closing entries
+are written by the post-gate evidence step).
+
+## What changed per item
+
+- **Defect A audit residue:** `NameLabel` now declares `mouse_filter = 2` explicitly in
+  `scenes/ui/health_bar.tscn` (defensive; Bar's fix landed earlier). Enemy `ClickTarget`
+  verdict is measured, not commented: `debug_click_target_fires` stays 0 through the
+  `input_click_differential` enemy-tile leg — `gui_input` never fires (dead for routing,
+  cannot eat events). The node is **kept**: it is the harness click anchor that
+  `click_move_commit_lock.yaml` resolves by name; its `mouse_filter` left unchanged
+  (zero diff).
+- **P0 coverage net Layer 1:** permanent differential observables in `player.gd` —
+  `debug_right_input_events`, `debug_undo_events`, `debug_gui_eater` — backed by
+  `scripts/ui/input_census.gd` (`InputCensus.top_eater`, ported from the deleted
+  InputProbeOverlay). A STOP control reappearing under the feet now reddens headless.
+- **P0 coverage net Layer 2:** `scripts/autoload/input_gate.gd` (`InputGate` autoload,
+  activated by the env var `AITELIER_INPUT_GATE_REPORT`, self-drives to the battle state,
+  publishes the nine-key report, registered before `SceneManager`). The windowed X11
+  sidecar half is LANDED in AItelier (`abb1358`), outside this repo's boundary.
+- **UndoButton (touch undo):** HUD 「退回」 button driving the same shared undo entry,
+  same lock rule; `SkillDescLabel` shifted down 40 px.
+- **Defect B visual:** the nameplate re-anchored from the feet (`-32`) to the portrait
+  top (`sprite_top - 4 - size.y`), the `STRIP_BOTTOM + 2 = 94` clamp retained; new
+  `TileMarkers` ground-marker overlay (`scripts/ui/tile_markers.gd`) mounted in
+  `scenes/battlefield.tscn` AFTER `Characters`, so the occupied tile stays readable
+  (visible for all six units including the top row, click-inert by construction).
+- **Defect B hit:** `portrait_ink_rect` published per-frame on player and enemies; the
+  5-step priority resolver in `handle_world_click` (see below), plus the pure
+  `attack_reach_covers` predicate.
+- **Defect C:** `trait_hover_index` (separate preview channel, −1 on exit and when
+  phase != TRAITS) with `mouse_entered`/`mouse_exited` wired on every `TraitToggle{i}`;
+  it influences only `TraitDescLabel` — never `trait_index`, never toggle, never the
+  focus `modulate`.
+- **Small fixes:** the delivery-notes round heading (L166) corrected — round name
+  `jinyong-nodes`→ the actual authoring round, date `2026-08-29`→`2026-08-27` (this
+  file, round name and date only, body untouched); map hint is now one per screen (footer
+  `HintLabel` kept, panel trailing line removed); the MAP EVENT branch uses the
+  full-width comma 「上下选择，回车定夺」.
+
+## NEW assertions (five scenarios, by name)
+
+1. `input_click_differential` — per-press raw-vs-handled differential; feet-tile
+   right-click reaches the undo path with an empty GUI eater; the enemy-tile leg pins
+   `debug_click_target_fires == 0` (the ClickTarget measurement).
+2. `undo_button_retreat` — UndoButton wiring/geometry, disabled-state mirroring, click →
+   retreat via the shared entry.
+3. `click_portrait_body_targets_enemy` — clicking a **reachable** enemy's drawn portrait
+   body center attacks it (health drops / `acted == true`), with an out-of-reach negative
+   control.
+4. `health_bar_above_portrait` — bar bottom above `sprite_top` for mid-board units; the
+   top-row documented landing for Central_Divine (`bar_top == 94`, face untouched);
+   `tile_marker_count == 6`.
+5. `trait_hover_preview` — hover previews the description, `trait_index` untouched,
+   revert on exit.
+
+## Defect B priority rule
+
+Five-step resolution of a left-click at world point P (in `handle_world_click`):
+(1) enemy on the clicked tile → attack; (2) an **in-reach** enemy whose live drawn
+portrait rect contains P → attack (this closes the reachable-body gap); (3) reachable
+empty tile in the move-range highlight → move; (4) an **out-of-reach** enemy's rect →
+select (no silent move); (5) own tile no-op / else move. The operative guarantee:
+**an out-of-reach enemy's portrait rect can never make a reachable empty tile
+unclickable** — the rejected "grid → rect → move" rule did exactly that (measured
+`click_move_undo_right` 10→6, `click_move_commit_lock` 9→1, `move_target_affordance`
+18→11, because top-row Central_Divine's clamped art covers tiles (7,2)/(7,3)) and is
+recorded as rejected in `design/90_decisions.md`.
+
+## P0 honest coverage boundary
+
+The **web browser bridge is manual-only** — it cannot be exercised server-side; it is
+covered by the shared engine path, the player confirmation already in hand, and a manual
+checklist. The **X11 windowed gate covers the desktop window layer** end-to-end (real
+`menu.tscn` boot → OS event → engine → handler → state change); real-hardware touch is
+only partially covered (xdotool injects mouse events). **A skipped gate run is recorded
+as an OPEN coverage gap, never green.**
+
+## Verify-only confirmations (docs card)
+
+- `playtest/map_hint_single.yaml` exists and pins both halves: the footer
+  `HintLabel.text == "左右/上下选择相邻去处，回车启程"` and `BodyLabel` NOT containing
+  「回车启程」; EVENT leg pins the footer hidden and `BodyLabel` containing the
+  full-width 「上下选择，回车定夺」. `scripts/segments/map.gd:236` confirmed already
+  using the full-width 「，」.
+- `InputProbeOverlay` has **zero live references**: no preload/load of
+  `input_probe_overlay.gd`, no `[node name="InputProbeOverlay"]` or matching ext_resource
+  in `scenes/ui/hud.tscn`. The only remaining mentions are the intentional
+  port-attribution comment in `scripts/ui/input_census.gd:5` and design docs — not live
+  references, and left untouched.
+- `scenes/ui/hud.tscn` still parses (ext_resources precede sub_resources).
 
 
