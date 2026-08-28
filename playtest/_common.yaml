@@ -779,6 +779,9 @@ surface:
   PointsLabel:
   - visible
   - text
+  BodyLabel:
+  - text
+  - visible
   HintLabel:
   - visible
   - text
@@ -841,3 +844,4 @@ scenario_order:
 - map_node_event_shaolin
 - map_node_event_mainline_east
 - map_node_event_mainline_return
+- map_hint_single

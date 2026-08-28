@@ -1,0 +1,43 @@
+# One operation hint on screen, never two.
+#
+# map.gd documents a "single-operation-hint invariant" — the footer travel hint
+# must not survive into a modal event panel that asks for something else. The
+# invariant was only ever half-enforced: the footer was hidden during EVENT,
+# but during TRAVEL the SAME sentence was also printed at the end of the panel
+# body, so the player read 「左右/上下选择相邻去处，回车启程」 twice on one
+# screen. Unifying the two texts made them byte-identical, which turned a
+# near-duplicate into an exact one.
+#
+# This pins both halves, in both phases, so neither can come back:
+#   TRAVEL — the footer carries the hint, the panel body does NOT repeat it.
+#   EVENT  — the footer is hidden, the panel body carries its own prompt, and
+#            that prompt uses the same full-width comma the rest of the segment
+#            uses (it was half-width: 「上下选择,回车定夺」).
+name: map_hint_single
+description: >-
+  The map shows exactly one operation hint at a time. In TRAVEL the footer
+  HintLabel carries 「左右/上下选择相邻去处，回车启程」 and BodyLabel does not
+  repeat it; in EVENT the footer is hidden and BodyLabel carries
+  「上下选择，回车定夺」 with a full-width comma, matching the segment's other
+  prompt.
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    HintLabel.visible: visible == true
+    HintLabel.text: 'text == "左右/上下选择相邻去处，回车启程"'
+    BodyLabel.text: 'text.contains("回车启程") == false'
+- at: 40
+  actions:
+  - move_right
+- at: 50
+  actions:
+  - ui_accept
+- at: 70
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    HintLabel.visible: visible == false
+    BodyLabel.text: 'text.contains("上下选择，回车定夺") == true'

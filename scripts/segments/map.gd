@@ -207,7 +207,7 @@ func _render() -> void:
 			return
 		var ea = "▶ %s" % def.option_a.label if event_focus == 0 else "  %s" % def.option_a.label
 		var eb = "▶ %s" % def.option_b.label if event_focus == 1 else "  %s" % def.option_b.label
-		body.text = "【%s】\n\n%s\n\n%s\n%s\n\n上下选择,回车定夺" % [def.title, def.text, ea, eb]
+		body.text = "【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺" % [def.title, def.text, ea, eb]
 		return
 	var text: String = "【江湖行路】\n\n"
 	for node in MapData.node_ids():
@@ -218,5 +218,12 @@ func _render() -> void:
 			text += "  %s（可前往）\n" % name
 		else:
 			text += "  %s\n" % name
-	text += "\n当前：%s\n\n左右/上下选择相邻去处，回车启程" % MapData.node_def(current_node_id).get("display_name", current_node_id)
+	# The operation hint lives in ONE place: the footer HintLabel, whose
+	# visibility _apply_hint_visibility() already drives per phase. It used to be
+	# printed here as well, so the TRAVEL screen showed the identical sentence
+	# twice — the panel line and the footer, both reading
+	# 「左右/上下选择相邻去处，回车启程」. Unifying the two texts (2026-08-27) made
+	# them byte-identical and turned a near-duplicate into an exact one; the
+	# single-hint invariant this file documents above wants one, not two.
+	text += "\n当前：%s" % MapData.node_def(current_node_id).get("display_name", current_node_id)
 	body.text = text

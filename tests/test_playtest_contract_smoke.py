@@ -54,6 +54,7 @@ ROUND_SCENARIOS: list[str] = [
     "map_node_event_shaolin",
     "map_node_event_mainline_east",
     "map_node_event_mainline_return",
+    "map_hint_single",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
