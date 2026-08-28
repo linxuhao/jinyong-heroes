@@ -9,6 +9,7 @@
 ## the GDScript resource. This pins the priority rule's truth table (design
 ## §3.B2) — including the rejected-§3.1 guarantee that an empty tile never
 ## becomes unclickable behind a tall OUT-OF-REACH unit.
+## Registered in tests/unit_test_runner.gd (deterministic TESTS registry).
 
 const Player = preload("res://scripts/characters/player.gd")
 

@@ -7,6 +7,7 @@
 ##
 ## Contract: top-level static func run() -> bool; push_error on failure;
 ## print PASS/FAIL at the end; never relies on assert() (stripped in release).
+## Registered in tests/unit_test_runner.gd (deterministic TESTS registry).
 
 const CreationScript = preload("res://scripts/segments/creation.gd")
 

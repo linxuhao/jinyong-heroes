@@ -15,6 +15,8 @@
 ## reflection/scanning). A file that fails to load, whose run() returns false,
 ## or whose run() raises a runtime error (the call then yields null -> FAIL)
 ## makes the whole gate exit 1.
+## This round appends the §3.B2 click-priority and Defect-C hover-preview
+## pins (test_click_priority.gd, test_trait_hover_preview.gd) to the registry.
 extends SceneTree
 
 const TESTS: Array[String] = [
