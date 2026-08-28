@@ -1,6 +1,13 @@
 # Technical Architecture - Jinyong Tactics: Mouse & Info Interaction Defect Fixes
 
-Round: interaction-defects (2026-08-28). **Revision 4** - per the round owner's
+Round: interaction-defects (2026-08-28). **Revision 5** - 2026-08-28 08:24 UTC
+feedback: Revision 4 corrected the §1 summary but left the operative §3.P0
+steps 4-7, component row C-I5, and task row T4 byte-identical to Revision 3,
+contradicting §1 (CLI user args vs env var; 14-key vs nine-key; button-walk vs
+self-drive; NEW vs LANDED). Revision 5 deletes T4, restates C-I5 as LANDED, and
+rewrites §3.P0 steps 4-7 (plus intro/step 3/C-I3/Section 6 acceptance) against the
+landed nine-key/env-var/self-drive contract. Everything else carried verbatim.
+**Revision 4** - per the round owner's
 feedback of 2026-08-28 08:15 UTC: Revision 3 is accepted in substance; the one
 structural correction is that the Layer-2 **sidecar** half is already built,
 landed and proven (AItelier commit `abb1358`) and lives **outside this repo's
@@ -240,10 +247,12 @@ existing vars' semantics stay byte-identical, they are documented in the
 **Layer 2 - windowed X11 input gate (sidecar; the server-side "players can click"
 proof). Owner-prototyped on 2026-08-28 - the pitfalls below are measured, not
 speculative; build on them, do not re-find them.** `Input.parse_input_event()` never
-traverses the window layer, so the contract needs one run that does. New sidecar
-endpoint `/x11_input_smoke` (AItelier-side harness change, **requires a sidecar
-image rebuild** - xdotool must be baked into the Dockerfile; an `apt-get install` at
-run time lives in the container's writable layer and evaporates on rebuild):
+traverses the window layer, so the contract needs one run that does. The sidecar
+endpoint `/x11_input_smoke` is **LANDED** (AItelier `abb1358`, **outside this repo's
+boundary**); xdotool is baked into `Dockerfile.godot`. The four pitfalls below are
+implemented there - carry them forward as the reading manual, do not re-find them.
+This round's only Layer-2 work is the in-repo `InputGate` autoload (T3); the
+sidecar half is the interface T3 must satisfy, not a task here.
 1. **Copy the project to a container-writable path first** (the owner used `/tmp/rp`):
    the repo mount is read-only inside `aitelier-godot` and `--import` must write
    `res://.godot/` - otherwise `Cannot create file
@@ -253,42 +262,49 @@ run time lives in the container's writable layer and evaporates on rebuild):
    GameManager never comes up, and the log drowns in ~95000 script errors.
 3. Start Xvfb (already present in the sidecar) at 960×704×24; run the game
    **windowed** (not `--headless`): `DISPLAY=<xvfb> godot --path <proj>
-   --resolution 960x704 --position 0,0` with user args
-   `-- --input-gate-report <abs path>.json --input-gate-timeout-ms 20000`. Window at
-   (0,0), 960×704, content scale identity -> screen coordinates == viewport ==
-   board coordinates. The windowed run boots the REAL `run/main_scene`
+   --resolution 960x704 --position 0,0` with the environment variable
+   `AITELIER_INPUT_GATE_REPORT=<abs path>.json` set (NOT CLI user args - an autoload
+   keyed on `OS.get_cmdline_user_args()` never switches on). Window at (0,0),
+   960×704, content scale identity -> screen coordinates == viewport == board
+   coordinates. The windowed run boots the REAL `run/main_scene`
    (`menu.tscn`) - the exact scene the headless contract does not grade.
-4. **Drive by name, never by coordinates.** The game-side report publishes, every
-   250 ms, all visible Button names + their screen centers alongside the counter
-   block; the driver script picks targets by name (preference `*Next*` /
-   `Confirm*` / `*Skip*`, then the known menu/creation buttons) and issues
-   `xdotool mousemove <x> <y> click 1` (button 3 = right; `xdotool key Return`
-   where the flow wants a key, e.g. the tutorial advance). No hardcoded screen
-   coordinates anywhere - a layout change cannot rot the script. Owner-measured:
-   this exact route walks menu -> creation -> tutorial -> `state=BATTLE` and clicks
-   the board. `python-xlib` XTEST stays a documented fallback only, for the case
-   where xdotool cannot be baked into the image.
-5. Game side: new always-registered autoload `scripts/autoload/input_gate.gd`,
-   registered in `project.godot [autoload]` **before `SceneManager`** (project.godot
-   states SceneManager must remain the LAST entry - its `_teardown_battle_refs`
-   references the other autoloads by name; inserting after it breaks compile
-   ordering). Near-zero cost when the user args are absent. In gate mode it (a)
-   refreshes the JSON report every 250 ms: `{state, scene, buttons: [{name, x, y}],
-   debug_input_events, debug_click_events, debug_right_input_events,
-   debug_undo_events, debug_gui_eater, debug_last_raw_event_pos,
-   debug_last_click_grid, grid_pos, moves_left, current_round, player_world}`;
-   (b) quits after the timeout (deterministic exit, rc=124 impossible by
-   construction - the `test_game_manager_fsm` lesson).
-6. Harness asserts on the report after process exit: the button walk reached
-   `state=BATTLE` (real clicks through the real boot scene); the scripted
-   left-click at `player_world + (0,-64)` advanced `debug_input_events` **and**
-   `debug_click_events` **and** changed `grid_pos`; the scripted right-click at
-   `player_world` advanced `debug_right_input_events` and `debug_undo_events` and
-   restored `grid_pos`. A `raw > 0, handled == 0` with a non-empty `debug_gui_eater`
-   at a board point reproduces the menu.tscn class of defect on the server - the
-   gate goes red naming the eater.
-7. **Skip semantics are loud:** if Xvfb/xdotool cannot run, the endpoint returns
-   `skipped` with the reason; the pipeline records it in the gate report and
+4. **The project self-drives (LANDED contract - no button walk).** The autoload
+   is deliberately dumb about the game: navigation is not the layer under test. In
+   gate mode it takes **itself** to the state under test by internal calls, then
+   publishes `ready: true`. There is no `buttons[]` block and no
+   `*Next*` / `Confirm*` / `*Skip*` name-preference walk; the sidecar driver simply
+   aims `xdotool mousemove + click` at the published `player_world` (button 1 =
+   left, button 3 = right). No hardcoded screen coordinates - a layout change
+   cannot rot the script.
+5. Game side (T3, this round): new always-registered autoload
+   `scripts/autoload/input_gate.gd`, registered in `project.godot [autoload]`
+   **before `SceneManager`** (project.godot states SceneManager must remain the
+   LAST entry - its `_teardown_battle_refs` references the other autoloads by name;
+   inserting after it breaks compile ordering). Near-zero cost when the env var is
+   absent. In gate mode it self-drives to the battle state by internal calls, then
+   publishes `ready: true` and refreshes the JSON report every 250 ms with exactly
+   these nine keys (the sidecar reads these and nothing else): `ready` (bool, the
+   state under test has been reached), `player_world` ([x, y], where to aim in
+   viewport pixels), `grid` ([col, row]), `moves_left` (int), `raw_left`,
+   `handled_left`, `raw_right`, `handled_right` (the four raw/handled counters),
+   and `eater` (the topmost non-IGNORE Control under the last press, "" if none).
+   Richer debug keys may be published ALONGSIDE - the sidecar ignores unknown keys
+   - but if the nine are absent it reads zeros. It quits after the timeout
+   (deterministic exit, rc=124 impossible by construction - the
+   `test_game_manager_fsm` lesson).
+6. **Verdict machinery (LANDED, abb1358 - the interface T3 must satisfy, not work
+   to do).** After process exit the sidecar asserts on the nine-key report: the
+   self-drive reached `ready: true`; the scripted left-click at `player_world`
+   advanced `raw_left` **and** `handled_left` and changed `grid`; the scripted
+   right-click at `player_world` advanced `raw_right` and `handled_right` and
+   restored `grid`. It distinguishes raw-didn't-move / raw-moved-but-handled-didn't
+   (names the `eater`) / handled-moved-but-no-state-change, and a missing report
+   is `skipped` WITH A REASON, never a pass. Proven end-to-end against a throwaway
+   probe: reached BATTLE, published `player_world [480,352]`, a real click reported
+   `raw_left 0->1, handled_left 0, eater='Body'` (correctly naming
+   `TutorialOverlay/Panel/Body`).
+7. **Skip semantics (LANDED, abb1358):** if Xvfb/xdotool cannot run, the endpoint
+   returns `skipped` with the reason; the pipeline records it in the gate report and
    `final/delivery_notes.md` as an **OPEN coverage gap** - a skip is never green.
 
 **Honest boundary (recorded in `90_decisions.md` + delivery notes):** the X11 gate
@@ -551,9 +567,9 @@ separate, click-free path that can pin hover without toggling.
 | C-A2 | `scripts/characters/enemy.gd` | `debug_click_target_fires` counter in `_on_click_target_gui_input` (the 3.A measurement pin) |
 | C-I1 | `scripts/characters/player.gd` | add `debug_right_input_events`, `debug_undo_events`, `debug_gui_eater` (+ census call on every press); existing counters untouched |
 | C-I2 | `scripts/ui/input_census.gd` (NEW) | static `top_eater(root, pos)` - the overlay's measured walk, ported from git history (a673a42; the file was deleted in `1989be6`) |
-| C-I3 | `scripts/autoload/input_gate.gd` (NEW) | gate-mode autoload: JSON report refresh (counters + visible-Button names/centers), auto-quit; registers BEFORE `SceneManager` (must stay last) |
+| C-I3 | `scripts/autoload/input_gate.gd` (NEW) | gate-mode autoload: env-var `AITELIER_INPUT_GATE_REPORT` activation, self-drive to battle state, nine-key JSON report (`ready/player_world/grid/moves_left/raw_left/handled_left/raw_right/handled_right/eater`), auto-quit; registers BEFORE `SceneManager` (must stay last) |
 | C-I4 | `project.godot` | `[autoload]` register `InputGate` (GameManager precedent) |
-| C-I5 | sidecar `docker/godot/godot_harness.py` + sidecar Dockerfile | NEW `/x11_input_smoke` endpoint: copy-to-writable-path, double `--headless --import`, Xvfb + **xdotool baked into the Dockerfile** (image rebuild required), name-driven button walk. `python-xlib` XTEST fallback only |
+| C-I5 | sidecar `docker/godot/godot_harness.py` + sidecar Dockerfile | **LANDED** (AItelier `abb1358`, **outside this repo's boundary - not a task here**). `/x11_input_smoke` endpoint: copy-to-writable-path, double `--import`, Xvfb + xdotool baked into `Dockerfile.godot`, env-var-activated gate reading the nine keys (`ready/player_world/grid/moves_left/raw_left/handled_left/raw_right/handled_right/eater`); a missing report is `skipped` with a reason, never green. This row is the external interface T3 must satisfy, not a component of this round |
 | C-T1 | `scenes/ui/hud.tscn` | `UndoButton` node (right column, y176–212); `SkillDescLabel` offset_top 176->216 |
 | C-T2 | `scripts/ui/hud.gd` | undo button wiring + per-frame disabled refresh + `pressed_connected["UndoButton"]` + `undo_desc_overlap` observable |
 | C-B1 | `scripts/ui/tile_markers.gd` (NEW) | Node2D ground-marker overlay (ellipse + outline at `grid_to_world`, all living units) |
@@ -668,16 +684,16 @@ reverts to trait-`trait_index`'s text, `trait_index` still 0, no toggle fired
 "unknown key", that is a stale image - escalate; do not convert to a `clicks:`
 (a click would toggle).
 
-**X11 gate acceptance (not a YAML - the sidecar endpoint's own contract, C-I5):**
-setup = copy to a writable path, `--headless --import` twice, Xvfb 960×704×24,
-windowed run of the real `menu.tscn` boot; script = [name-driven button walk
-menu -> creation -> tutorial -> `state=BATTLE` (driver picks `*Next*` / `Confirm*` /
-`*Skip*` from the live Button report, never coordinates), motion to
+**X11 gate acceptance (not a YAML - the sidecar endpoint's own contract, C-I5;
+LANDED AItelier `abb1358`, outside this repo's boundary):** setup = copy to a
+writable path, `--headless --import` twice, Xvfb 960×704×24, windowed run of the
+real `menu.tscn` boot with `AITELIER_INPUT_GATE_REPORT` set; the autoload
+**self-drives** to the battle state by internal calls (no button walk - navigation
+is not the layer under test) and publishes `ready: true`; script = [motion to
 `player_world + (0,-64)` + click 1, wait, motion to `player_world` + click 3];
-report must show the walk reached BATTLE, `debug_input_events` +1,
-`debug_click_events` +1, `grid_pos` changed by the left click, then
-`debug_right_input_events` +1, `debug_undo_events` +1 and `grid_pos` restored by the
-right click, and `debug_gui_eater == ""` at both board points. A skipped run (no
+report must show `ready == true`, `raw_left` +1, `handled_left` +1, `grid` changed
+by the left click, then `raw_right` +1, `handled_right` +1 and `grid` restored by
+the right click, and `eater == ""` at both board points. A skipped run (no
 Xvfb/xdotool) is recorded as an OPEN coverage gap, never green. The sidecar's own
 unit tests cover the endpoint (the `hovers:` precedent: harness changes ship with
 sidecar tests + image rebuild).
@@ -789,8 +805,7 @@ inserted into protected files.
 |---|---|---|---|
 | T1 | P0 Layer 1: right/undo counters + `debug_gui_eater` + `InputCensus` port | C-I1, C-I2 | - |
 | T2 | P0: ClickTarget measurement pin + NameLabel filter + audit table (design record) | C-A1, C-A2, C-D1(partial) | T1 |
-| T3 | P0: `InputGate` autoload + report writer + registration (BEFORE `SceneManager`) | C-I3, C-I4 | - |
-| T4 | P0: sidecar `/x11_input_smoke` endpoint - copy-to-writable-path, double `--import`, Xvfb + xdotool (Dockerfile), name-driven driver + sidecar tests + image rebuild | C-I5 (sidecar) | T3 |
+| T3 | P0: `InputGate` autoload + report writer + registration (BEFORE `SceneManager`); Layer 2's sole remaining task (sidecar half LANDED in abb1358) | C-I3, C-I4 | - |
 | T5 | P0: `input_click_differential.yaml` scenario + surface/order sync | C-P1, C-P6(partial), C-P7(partial) | T1, T2 |
 | T6 | Touch undo: `UndoButton` + wiring + geometry observables + scenario | C-T1, C-T2, C-P2 | - |
 | T7 | Defect B visual: nameplate -> sprite_top (retain clamp) + top-row landing doc | C-B1(partial), C-D1(partial) | - |
