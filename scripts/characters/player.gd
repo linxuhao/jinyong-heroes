@@ -450,7 +450,8 @@ func _process(_delta: float) -> void:
 		portrait_bar_pos = (bar as Control).global_position
 	else:
 		portrait_bar_pos = Vector2(-1, -1)
-		# Relay this bar's anchor observables onto the unit (only after the bar
+		# Relays this bar's anchor observables onto the unit (only after the bar
+# INDENTED_SIBLING_TEST (3-tab-ish)
 		# resolves; 0.0 otherwise, so a missing bar never asserts a phantom).
 		if bar != null and bar.get("health_bar_screen_y") != null:
 			health_bar_screen_y = float(bar.get("health_bar_screen_y"))
