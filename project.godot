@@ -21,6 +21,9 @@ config/features=PackedStringArray("4.4")
 
 [autoload]
 
+; I18n first: it only registers the EN message table with TranslationServer
+; (no game refs), and every later autoload/scene may render translated text.
+I18n="*res://scripts/autoload/i18n.gd"
 GameManager="*res://scripts/autoload/game_manager.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 GridManager="*res://scripts/autoload/grid_manager.gd"
@@ -28,6 +31,7 @@ CombatManager="*res://scripts/autoload/combat_manager.gd"
 TutorialManager="*res://scripts/autoload/tutorial_manager.gd"
 AudioManager="*res://scripts/autoload/audio_manager.gd"
 ThemeManager="*res://scripts/autoload/theme_manager.gd"
+InputGate="*res://scripts/autoload/input_gate.gd"
 ; SceneManager must stay the LAST autoload entry: its _teardown_battle_refs
 ; references GameManager/CombatManager/GridManager by name (compile ordering).
 SettingsManager="*res://scripts/autoload/settings_manager.gd"
@@ -40,6 +44,14 @@ window/size/viewport_height=704
 window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
+
+[internationalization]
+
+; Fallback must be zh_CN (not the default "en"): the game's source strings ARE
+; the zh text and the only registered translation is EN, so an "en" fallback
+; would serve English to Chinese-locale players. With zh_CN fallback a zh
+; lookup misses every table and renders the key (the original Chinese) verbatim.
+locale/fallback="zh_CN"
 
 [gui]
 

@@ -91,8 +91,10 @@ func _ready() -> void:
 
 ## Map a canonical character name to its compact order token; unknown names
 ## are returned unchanged (fallback names like "Player"/"Enemy" unaffected).
+## tr(): display-layer i18n only — the zh token IS the key, so zh renders
+## byte-identically and en renders the translated name.
 func _token_for(name: String) -> String:
-	return _ORDER_TOKENS.get(name, name)
+	return tr(_ORDER_TOKENS.get(name, name))
 
 ## Build the ActiveLabel text from CombatManager.active_unit_name + the
 ## player's moves_left/acted. Null-safe pre-battle fallback "行动: <actor>"
@@ -104,7 +106,7 @@ func _active_text(actor: String) -> String:
 	if player == null or not is_instance_valid(player):
 		move_pips = ""
 		_last_acted = true
-		return "行动: %s" % actor
+		return tr("行动: %s") % actor
 	# Defensive guards (task contract): a player node that lacks moves_left /
 	# acted (e.g. a non-player scene) falls back to "Move 0 / End" instead of
 	# throwing on property access. `in` on an Object tests property existence.
@@ -112,11 +114,11 @@ func _active_text(actor: String) -> String:
 	var acted: bool = bool(player.acted) if "acted" in player else true
 	_last_acted = acted
 	move_pips = "·".repeat(moves_left)
-	return "行动: %s · 移动 %d %s · %s" % [
+	return tr("行动: %s · 移动 %d %s · %s") % [
 		actor,
 		moves_left,
 		move_pips,
-		("行动 ✓" if not acted else "结束"),
+		(tr("行动 ✓") if not acted else tr("结束")),
 	]
 
 # ---------------------------------------------------------------------------
@@ -148,7 +150,7 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		if round_label != null:
 			_round_label = round_label
 	if round_label != null:
-		round_label.text = "回合 %d" % round_num
+		round_label.text = tr("回合 %d") % round_num
 
 	var active_label: Label = _active_label
 	if active_label == null:
@@ -173,7 +175,7 @@ func update_display(round_num: int, actor: String, order: Array[String]) -> void
 		# canonical names above — tokenization is display-only. The "·" (U+00B7)
 		# separator is much narrower than the old ASCII arrow — all six names
 		# fit at font 10.
-		order_label.text = "顺序: %s" % "·".join(order.map(_token_for))
+		order_label.text = tr("顺序: %s") % "·".join(order.map(_token_for))
 
 	_apply_turn_highlight()
 

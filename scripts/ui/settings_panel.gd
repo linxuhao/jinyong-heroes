@@ -1,13 +1,14 @@
 ## SettingsPanel (step2_design C8 / task plan settings_panel_ui).
 ##
-## The settings screen: four rows (音效音量 / 音乐音量 / 全屏 / 返回), keyboard +
-## mouse hybrid, mirroring the MenuPanel pattern. Single activation path:
-## Button.pressed (mouse), ui_accept (keyboard) and the harness
+## The settings screen: five rows (音效音量 / 音乐音量 / 全屏 / 语言 / 返回),
+## keyboard + mouse hybrid, mirroring the MenuPanel pattern. Single activation
+## path: Button.pressed (mouse), ui_accept (keyboard) and the harness
 ## debug_click_settings_row action all converge on _activate_row(i).
 ##
-## Keyboard adjust: move_up/move_down cycle focus_index (0..3); move_left /
-## move_right step the focused row (volume rows +/-3 dB, 全屏 toggles, 返回 no-op);
-## ui_accept activates the focused row (返回 -> GameManager.menu_close_settings()).
+## Keyboard adjust: move_up/move_down cycle focus_index (0..4); move_left /
+## move_right step the focused row (volume rows +/-3 dB, 全屏/语言 toggle, 返回
+## no-op); ui_accept activates the focused row (返回 ->
+## GameManager.menu_close_settings()).
 ##
 ## Buttons use focus_mode = 0 so button-native ui_accept never fires — this
 ## panel's _unhandled_input is the single keyboard consumer, avoiding double
@@ -24,10 +25,10 @@
 ## never touches the HUD.
 extends Control
 
-const ROW_COUNT: int = 4
+const ROW_COUNT: int = 5
 const STEP_DB: float = 3.0
 
-## Surface: currently focused row index (0..3) — keyboard/debug activation
+## Surface: currently focused row index (0..4) — keyboard/debug activation
 ## target.
 var focus_index: int = 0
 
@@ -102,7 +103,7 @@ func _process(_delta: float) -> void:
 
 
 ## Keyboard/debug adjustment for the focused row: 0 sfx volume, 1 music volume,
-## 2 fullscreen toggle, 3 返回 no-op.
+## 2 fullscreen toggle, 3 language toggle, 4 返回 no-op.
 func _adjust_focused(dir: int) -> void:
 	match focus_index:
 		0:
@@ -113,11 +114,13 @@ func _adjust_focused(dir: int) -> void:
 			SettingsManager.set_fullscreen(not SettingsManager.fullscreen)
 			_render()
 		3:
+			_toggle_language()
+		4:
 			pass
 
 
 ## Single activation path: 0 sfx volume, 1 music volume, 2 fullscreen toggle,
-## 3 back to the menu.
+## 3 language toggle, 4 back to the menu.
 func _activate_row(i: int) -> void:
 	match i:
 		0:
@@ -128,7 +131,17 @@ func _activate_row(i: int) -> void:
 			SettingsManager.set_fullscreen(not SettingsManager.fullscreen)
 			_render()
 		3:
+			_toggle_language()
+		4:
 			GameManager.menu_close_settings()
+
+
+## Flip zh <-> en. SettingsManager applies the locale live (auto-translated
+## Controls re-render on the TranslationServer relocale) and persists it; the
+## re-render below refreshes this panel's code-composed row texts.
+func _toggle_language() -> void:
+	SettingsManager.set_language("en" if SettingsManager.language == "zh" else "zh")
+	_render()
 
 
 ## Step the SFX volume by dir * STEP_DB. Clamping to [-40.0, 6.0] is
@@ -147,11 +160,14 @@ func _step_music(dir: int) -> void:
 
 ## Render row texts from SettingsManager mirrors ONLY. dB text uses
 ## int(round(v)) so -10.0 renders "-10" deterministically (playtest-friendly).
+## Composed texts go through tr() (format-string keys); the language row shows
+## each language in its own script (中文 / English), never translated.
 func _render() -> void:
-	(get_node("SettingsBox/Button0") as Button).text = "音效音量: %d dB" % int(round(SettingsManager.sfx_volume_db))
-	(get_node("SettingsBox/Button1") as Button).text = "音乐音量: %d dB" % int(round(SettingsManager.music_volume_db))
-	(get_node("SettingsBox/Button2") as Button).text = "全屏: 开" if SettingsManager.fullscreen else "全屏: 关"
-	(get_node("SettingsBox/Button3") as Button).text = "返回"
+	(get_node("SettingsBox/Button0") as Button).text = tr("音效音量: %d dB") % int(round(SettingsManager.sfx_volume_db))
+	(get_node("SettingsBox/Button1") as Button).text = tr("音乐音量: %d dB") % int(round(SettingsManager.music_volume_db))
+	(get_node("SettingsBox/Button2") as Button).text = tr("全屏: 开") if SettingsManager.fullscreen else tr("全屏: 关")
+	(get_node("SettingsBox/Button3") as Button).text = tr("语言") + ": " + ("中文" if SettingsManager.language == "zh" else "English")
+	(get_node("SettingsBox/Button4") as Button).text = "返回"
 	_refresh_title_overlap()
 
 
@@ -170,6 +186,7 @@ func _refresh_title_overlap() -> void:
 		"SettingsBox/Button1",
 		"SettingsBox/Button2",
 		"SettingsBox/Button3",
+		"SettingsBox/Button4",
 	]:
 		var other := get_node_or_null(node_path) as Control
 		if other == null:

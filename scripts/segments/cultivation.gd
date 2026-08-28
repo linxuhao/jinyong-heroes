@@ -662,73 +662,76 @@ func _render() -> void:
 	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
 		return
-	var text: String = "第 %d 年 · 第 %d 月    门派: %s\n" % [year, month, _sect_display()]
-	text += "银两 %d    根骨 %d 内力 %d 身法 %d 悟性 %d 福缘 %d\n" % [
+	# Every literal piece goes through tr(): the body is COMPOSED, so Label
+	# auto-translate cannot match it — zh renders the keys verbatim (headless
+	# harness included), en renders the I18n table.
+	var text: String = tr("第 %d 年 · 第 %d 月    门派: %s\n") % [year, month, _sect_display()]
+	text += tr("银两 %d    根骨 %d 内力 %d 身法 %d 悟性 %d 福缘 %d\n") % [
 		silver, attr_bone, attr_inner, attr_agility, attr_wisdom, attr_fortune,
 	]
-	text += "武功 %d 门 · 大成 %d\n\n" % [gongfa_count, mastered_count]
+	text += tr("武功 %d 门 · 大成 %d\n\n") % [gongfa_count, mastered_count]
 	match phase:
 		"YEAR_AUGMENT":
-			text += "【开年际遇】\n"
+			text += tr("【开年际遇】\n")
 			text += _card_rows(_yearly_cards, _card_focus)
-			text += "\n左右选择，回车收取"
+			text += tr("\n左右选择，回车收取")
 		"CARD_PICK":
-			text += "【每月机缘】\n"
+			text += tr("【每月机缘】\n")
 			text += _card_rows(_monthly_cards, _card_focus)
-			text += "\n左右选择，回车收取"
+			text += tr("\n左右选择，回车收取")
 		"ACTION_PICK":
-			text += "【本月行动】\n"
+			text += tr("【本月行动】\n")
 			var labels: Array[String] = ["练功", "修习", "做工", "游历", "存盘", "读档", "删档"]
 			for i in range(labels.size()):
 				var marker: String = "▶" if i == _action_focus else " "
-				text += "%s %s   " % [marker, labels[i]]
+				text += "%s %s   " % [marker, tr(labels[i])]
 			if _action_focus == 6 and _delete_armed:
-				text += "\n\n⚠ 再按一次确认删除存档"
-			text += "\n\n上下选择，回车执行"
+				text += tr("\n\n⚠ 再按一次确认删除存档")
+			text += tr("\n\n上下选择，回车执行")
 		"GONGFA_PICK":
-			text += "【练功】\n"
+			text += tr("【练功】\n")
 			var ids: Array[String] = _unmastered_ids()
 			if ids.is_empty():
-				text += "暂无未大成武功，改选修习吧。"
+				text += tr("暂无未大成武功，改选修习吧。")
 			else:
 				for i in range(ids.size()):
 					var gid: String = ids[i]
 					var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
 					var marker: String = "▶" if i == _gongfa_focus % ids.size() else " "
-					text += "%s %s  （%d/%d）\n" % [marker, ProgressionGongfaData.display_name_of(gid), int(entry.get("practice", 0)), int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(entry.get("grade", "D"), 4))]
-				text += "\n上下选择，回车苦练"
+					text += tr("%s %s  （%d/%d）\n") % [marker, tr(ProgressionGongfaData.display_name_of(gid)), int(entry.get("practice", 0)), int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(entry.get("grade", "D"), 4))]
+				text += tr("\n上下选择，回车苦练")
 		"ATTR_PICK":
-			text += "【修习】\n"
+			text += tr("【修习】\n")
 			for i in range(PlayerProfile.ATTR_KEYS.size()):
 				var key: String = PlayerProfile.ATTR_KEYS[i]
 				var marker: String = "▶" if i == _attr_focus else " "
 				text += "%s %s %d\n" % [marker, _attr_label(key), SaveManager.profile.get_attr(key)]
-			text += "\n上下选择，回车修习（+1~+3）"
+			text += tr("\n上下选择，回车修习（+1~+3）")
 		"EVENT":
-			text += "【游历 · 遇事】\n"
+			text += tr("【游历 · 遇事】\n")
 			var def = EventData.def(event_id)
 			if def != null:
-				text += def.title + "\n" + def.text + "\n\n"
+				text += tr(def.title) + "\n" + tr(def.text) + "\n\n"
 				var sel: String = "▶" if _event_focus == 0 else " "
-				text += "%s %s\n" % [sel, def.option_a.label]
+				text += "%s %s\n" % [sel, tr(def.option_a.label)]
 				var sel2: String = "▶" if _event_focus == 1 else " "
-				text += "%s %s\n" % [sel2, def.option_b.label]
-			text += "\n上下选择，回车定夺"
+				text += "%s %s\n" % [sel2, tr(def.option_b.label)]
+			text += tr("\n上下选择，回车定夺")
 		"YEAR_END":
-			text += "【年关将至】\n"
+			text += tr("【年关将至】\n")
 			var labels2: Array[String] = ["留在本门", "另投他派"]
 			for i in range(labels2.size()):
 				var marker: String = "▶" if i == _year_choice else " "
-				text += "%s %s\n" % [marker, labels2[i]]
-			text += "\n上下选择，回车决定"
+				text += "%s %s\n" % [marker, tr(labels2[i])]
+			text += tr("\n上下选择，回车决定")
 		"SECT_SWITCH":
-			text += "【另投他派】\n"
+			text += tr("【另投他派】\n")
 			var rows: Array = ProgressionGongfaData.SECTS
 			for i in range(rows.size()):
 				var row: Dictionary = rows[i]
 				var marker: String = "▶" if i == _switch_focus else " "
-				text += "%s %s\n" % [marker, row["display_name"]]
-			text += "\n上下选择，回车拜入"
+				text += "%s %s\n" % [marker, tr(str(row["display_name"]))]
+			text += tr("\n上下选择，回车拜入")
 	body.text = text
 
 
@@ -737,44 +740,44 @@ func _card_rows(cards: Array, focus: int) -> String:
 	for i in range(cards.size()):
 		var c: Dictionary = cards[i]
 		var marker: String = "▶" if i == focus else " "
-		out += "%s %s（%s）\n" % [marker, c.get("display_name", ""), _category_label(c.get("category", ""))]
+		out += tr("%s %s（%s）\n") % [marker, tr(str(c.get("display_name", ""))), _category_label(c.get("category", ""))]
 	return out
 
 
 func _category_label(cat: String) -> String:
 	match cat:
 		"economy":
-			return "钱财"
+			return tr("钱财")
 		"equipment":
-			return "兵刃"
+			return tr("兵刃")
 		"growth":
-			return "成长"
+			return tr("成长")
 		"power":
-			return "机缘"
+			return tr("机缘")
 		"trait":
-			return "悟道"
+			return tr("悟道")
 		"artifact":
-			return "奇遇"
+			return tr("奇遇")
 	return cat
 
 
 func _sect_display() -> String:
 	var def: Dictionary = ProgressionGongfaData.sect_def(sect_id)
 	if def.is_empty():
-		return "未定"
-	return def.get("display_name", sect_id)
+		return tr("未定")
+	return tr(str(def.get("display_name", sect_id)))
 
 
 func _attr_label(key: String) -> String:
 	match key:
 		"bone":
-			return "根骨"
+			return tr("根骨")
 		"inner":
-			return "内力"
+			return tr("内力")
 		"agility":
-			return "身法"
+			return tr("身法")
 		"wisdom":
-			return "悟性"
+			return tr("悟性")
 		"fortune":
-			return "福缘"
+			return tr("福缘")
 	return key

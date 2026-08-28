@@ -1,0 +1,481 @@
+## I18n (autoload)
+##
+## Registers the ENGLISH translation table with Godot's TranslationServer.
+## Keys are the game's Chinese source strings (Chinese-as-key), so:
+##   - locale "zh_CN": no zh translation is registered, and the project's
+##     fallback locale is zh_CN too, so every lookup falls back to the key
+##     itself and the game renders its original Chinese verbatim.
+##   - locale "en": lookups hit the EN table below and render English.
+##
+## Control nodes auto-translate their displayed text (atr), so whole-string
+## labels/buttons (.tscn `text` and code-assigned literals) need no code
+## changes; only strings COMPOSED at runtime (format/concat) are wrapped in
+## tr() / TranslationServer.translate() at their composition sites. Game
+## LOGIC never reads translated values — source strings, ids and observables
+## stay Chinese/canonical; translation happens at the display layer only.
+##
+## SettingsManager owns WHICH locale is active (auto-detect + persistence +
+## the settings-panel row); this autoload only supplies the message table.
+## Composed gongfa display names (易筋经·入门, 罗汉拳·一式, ...) are generated
+## from ProgressionGongfaData at startup so data growth stays covered.
+extends Node
+
+## Grade display steps (ProgressionGongfaData.GRADE_STEP values).
+const _STEP_EN := {"入门": "Novice", "精进": "Adept", "大成": "Mastery", "圆满": "Perfection"}
+
+## Generic technique names (ProgressionGongfaData.TECHNIQUE_NAMES).
+const _FORM_EN := {"一式": "Form I", "二式": "Form II", "三式": "Form III"}
+
+const EN: Dictionary = {
+	# --- Menu / settings -------------------------------------------------
+	"华山论剑": "Duel at Mount Hua",
+	"新的冒险": "New Adventure",
+	"读取存档": "Load Game",
+	"设置": "Settings",
+	"退出": "Quit",
+	"没有找到存档": "No save found",
+	"存档已损坏，无法读取": "Save corrupted — cannot load",
+	"读取失败": "Load failed",
+	"音效音量": "Sound Volume",
+	"音乐音量": "Music Volume",
+	"全屏": "Fullscreen",
+	"返回": "Back",
+	"语言": "Language",
+	"音效音量: %d dB": "Sound Volume: %d dB",
+	"音乐音量: %d dB": "Music Volume: %d dB",
+	"全屏: 开": "Fullscreen: On",
+	"全屏: 关": "Fullscreen: Off",
+
+	# --- Battle HUD ------------------------------------------------------
+	"回合 0": "Round 0",
+	"回合 %d": "Round %d",
+	"行动: ": "Acting: ",
+	"行动: %s": "Acting: %s",
+	"行动: %s · 移动 %d %s · %s": "Acting: %s · Move %d %s · %s",
+	"行动 ✓": "Act ✓",
+	"结束": "Done",
+	"顺序: ": "Order: ",
+	"顺序: %s": "Order: %s",
+	"内力: 0": "Qi: 0",
+	"内力: %d": "Qi: %d",
+	"暂停": "Pause",
+	"继续": "Resume",
+	"结束回合": "End Turn",
+	"出招 (J)": "Strike (J)",
+	"点击招式按钮,查看招式说明": "Click a technique button to see what it does",
+	"发挥 ×": "Power ×",
+	"发挥 ×1.3": "Power ×1.3",
+	"内力 ": "Qi ",
+	"无消耗": "No cost",
+	"内力不足": "Not enough Qi",
+	"锁定": "Locked",
+	"气血": "HP",
+	"等待中": "Waiting",
+	"第 4 轮解锁": "Unlocks round 4",
+	"本回合已行动": "Already acted this round",
+	"回复 ": "Heal ",
+	"跳": "Jump ",
+	"单体": "Single",
+	"直线": "Line",
+	"十字": "Cross",
+	"方形": "Square",
+	"相邻": "Adjacent",
+	"全场": "Global",
+
+	# --- Player action hints ---------------------------------------------
+	"按 J 出招 / 点击目标": "Press J to strike / click a target",
+	"该招式不存在": "No such technique",
+	"教程尚未解锁": "Locked during the tutorial",
+	"冷却中 %d 回合": "On cooldown: %d rounds",
+	"须在半血以下": "Requires HP below half",
+	"本回合无法用招": "Techniques sealed this round",
+	"走不到那里": "Can't reach that tile",
+	"已出手,无法退回": "Already acted — no undo",
+	"射程不够": "Out of range",
+	"已出手 · 移动已确认": "Acted · move confirmed",
+	"右键退回起点 · 出手即确认": "Right-click to return · acting commits",
+	"左键点格移动 · 右键退回": "Left-click a tile to move · right-click to undo",
+
+	# --- Battle end overlays ---------------------------------------------
+	"胜利！华山论剑的胜者！\n\n按回车继续": "Victory! Champion of the Duel at Mount Hua!\n\nPress Enter to continue",
+	"战败于华山论剑\n\n按回车重试": "Defeated at the Duel at Mount Hua\n\nPress Enter to retry",
+
+	# --- Tutorial ---------------------------------------------------------
+	"移动": "Move",
+	"普通攻击": "Basic Attack",
+	"招式": "Techniques",
+	"战斗开始！": "Battle Start!",
+	"继续 ▶": "Continue ▶",
+	"跳过教程": "Skip Tutorial",
+	"你是杨过。击败五大高手，夺得华山论剑的胜者！\n\n按「继续」或回车继续。":
+		"You are Yang Guo. Defeat the five grandmasters and claim victory at the Duel at Mount Hua!\n\nPress \"Continue\" or Enter to continue.",
+	"WASD/方向键每次移动一格。每回合有 4 点移动力。\n\n现在就试试移动吧！":
+		"WASD / arrow keys move one tile at a time. You have 4 movement points per round.\n\nTry moving now!",
+	"移动到敌人身边，按 J（或鼠标左键）进行普通攻击。":
+		"Move next to an enemy and press J (or left-click) to make a basic attack.",
+	"按 1-4 选择重剑剑法招式，再按 J 对射程内最近的敌人施展。招式 5-8（黯然销魂掌）将在第 4 回合解锁。\n\n每个按钮都会显示它的发挥度（例如 发挥 ×1.3）。":
+		"Press 1-4 to pick a Heavy Sword technique, then press J to strike the nearest enemy in range. Techniques 5-8 (Heartbreak Palms) unlock at round 4.\n\nEach button shows its power multiplier (e.g. Power ×1.3).",
+	"按空格结束回合。结束回合后，敌人会按出手顺序依次行动。":
+		"Press Space to end your turn. Enemies then act in initiative order.",
+	"按 Esc 暂停/继续游戏。": "Press Esc to pause / resume the game.",
+	"教学完成。击败五大高手！\n\n按「继续」开始战斗。":
+		"Tutorial complete. Defeat the five grandmasters!\n\nPress \"Continue\" to start the battle.",
+
+	# --- Characters -------------------------------------------------------
+	"杨过": "Yang Guo",
+	"黄药师": "Huang Yaoshi",
+	"欧阳锋": "Ouyang Feng",
+	"段智兴": "Duan Zhixing",
+	"洪七公": "Hong Qigong",
+	"王重阳": "Wang Chongyang",
+	"侠客": "Wanderer",
+	"陪练弟子": "Sparring Disciple",
+
+	# --- Tutorial-battle skills (battlefield.gd) --------------------------
+	"重剑无锋": "Heavy Edge",
+	"单体 45 伤害,击退 1 格。冷却 1 回合。": "Single target, 45 damage, knockback 1. Cooldown 1 round.",
+	"大巧不工": "Artless Might",
+	"直线 3 格 38 伤害。冷却 2 回合。": "Line of 3 tiles, 38 damage. Cooldown 2 rounds.",
+	"力斩千钧": "Titan Cleave",
+	"十字 2 格 34 伤害。冷却 3 回合。": "Cross of size 2, 34 damage. Cooldown 3 rounds.",
+	"四海无量": "Boundless Seas",
+	"以自身为心,半径 2 格全体 70 伤害。冷却 6 回合。": "70 damage to all within radius 2 of self. Cooldown 6 rounds.",
+	"心惊肉跳": "Heart Shudder",
+	"单体 38 伤害。冷却 1 回合。": "Single target, 38 damage. Cooldown 1 round.",
+	"拖泥带水": "Dragging Mire",
+	"单体 25 伤害,目标下一回合移动力 −2。冷却 2 回合。": "Single target, 25 damage; target loses 2 movement next round. Cooldown 2 rounds.",
+	"徘徊空谷": "Vale Leap",
+	"位移:跳 3 格,落点相邻全体 20 伤害。冷却 3 回合。": "Leap 3 tiles; 20 damage to all adjacent to the landing. Cooldown 3 rounds.",
+	"黯然销魂十七式": "Seventeenth Form",
+	"相邻全体 70 伤害,击退 2 格。需气血低于 50%。冷却 8 回合。": "70 damage to all adjacent, knockback 2. Requires HP below 50%. Cooldown 8 rounds.",
+	"以目标格为中心的 3×3 范围攻击。冷却 2 回合。": "3×3 attack centered on the target tile. Cooldown 2 rounds.",
+	"封锁目标下一回合的招式。冷却 3 回合。": "Seals the target's techniques next round. Cooldown 3 rounds.",
+	"在自身周围(半径 2)布下迷阵,进入者减速。冷却 4 回合。": "Lays a maze (radius 2) around self; entering it slows. Cooldown 4 rounds.",
+	"全场旋律,降低所有目标先攻 2 回合。冷却 6 回合。": "A melody over the whole field; lowers all targets' initiative for 2 rounds. Cooldown 6 rounds.",
+	"带毒的单体攻击。冷却 2 回合。": "Poisoned single-target attack. Cooldown 2 rounds.",
+	"增益自身:下一回合第一招伤害 ×1.5。冷却 3 回合。": "Self buff: next round's first technique deals ×1.5 damage. Cooldown 3 rounds.",
+	"以自身为中心的十字攻击,附加中毒。冷却 3 回合。": "Cross attack centered on self; applies poison. Cooldown 3 rounds.",
+	"直线 4 格攻击,附带重击退。冷却 5 回合。": "Line of 4 tiles with heavy knockback. Cooldown 5 rounds.",
+	"远程指法,无视减伤。冷却 2 回合。": "Ranged finger strike; ignores damage reduction. Cooldown 2 rounds.",
+	"封锁目标下一回合的移动。冷却 3 回合。": "Seals the target's movement next round. Cooldown 3 rounds.",
+	"治疗自身或一名友方。冷却 4 回合。": "Heals self or one ally. Cooldown 4 rounds.",
+	"远程六脉齐发,直线 3 格。冷却 6 回合。": "All six meridian swords at range, line of 3 tiles. Cooldown 6 rounds.",
+	"带击退的单体掌法。冷却 2 回合。": "Single-target palm strike with knockback. Cooldown 2 rounds.",
+	"跳 3 格,落点 3×3 范围攻击。冷却 3 回合。": "Leap 3 tiles; 3×3 attack at the landing. Cooldown 3 rounds.",
+	"直线 3 格攻击,附带击退。冷却 4 回合。": "Line of 3 tiles with knockback. Cooldown 4 rounds.",
+	"以自身为中心半径 2 的冲击波,附带击退。冷却 6 回合。": "Shockwave of radius 2 around self, with knockback. Cooldown 6 rounds.",
+	"远程打狗棒法绊击。冷却 2 回合。": "Ranged Dog-Beating Staff trip. Cooldown 2 rounds.",
+	"远程打狗棒法点戳。冷却 2 回合。": "Ranged Dog-Beating Staff jab. Cooldown 2 rounds.",
+	"远程打狗棒法封击。冷却 2 回合。": "Ranged Dog-Beating Staff seal-strike. Cooldown 2 rounds.",
+	"单体剑击。冷却 1 回合。": "Single-target sword strike. Cooldown 1 round.",
+	"以自身为中心的十字 2 格攻击。冷却 3 回合。": "Cross attack of size 2 centered on self. Cooldown 3 rounds.",
+	"为自己加持吸收 50 伤害的护盾,持续 3 回合。冷却 5 回合。": "Shield that absorbs 50 damage for 3 rounds. Cooldown 5 rounds.",
+	"全体攻击,并驱散敌方增益。冷却 7 回合。": "Hits every enemy and dispels their buffs. Cooldown 7 rounds.",
+
+	# --- Character creation -----------------------------------------------
+	"点击 ± 调整属性 · 回车下一步": "Click ± to adjust · Enter for next",
+	"点击切换特质 · 回车进入确认": "Click to toggle traits · Enter to review",
+	"点击确认踏上江湖 · 回车确认": "Click to begin your journey · Enter to confirm",
+	"返回菜单": "Back to Menu",
+	"下一步": "Next",
+	"上一步": "Previous",
+	"确认踏上江湖": "Begin the Journey",
+	"剩余点数 %d": "Points left: %d",
+	"已选": "Chosen",
+	"当前气血 %d": "Current HP: %d",
+	"根骨": "Bone",
+	"内力": "Qi",
+	"身法": "Agility",
+	"悟性": "Wisdom",
+	"福缘": "Fortune",
+	"气血 = 根骨 × 5": "HP = Bone × 5",
+	"内力值 = 内力 × 2": "Qi pool = Qi × 2",
+	"移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法": "Movement = 2 + Agility ÷ 20 (rounded down); Initiative = Agility",
+	"决定学功法的速度(修习查表)": "Sets how fast you learn arts (study table)",
+	"影响事件与奇遇(游历事件可重掷)": "Affects events and rare finds (travel events can reroll)",
+
+	# --- Traits -----------------------------------------------------------
+	"左右互搏": "Ambidexterity",
+	"技能栏可装 3 门外功(12 格),而不是 2 门 8 格": "Skill bar fits 3 external arts (12 slots) instead of 2 arts (8 slots)",
+	"无师自通": "Self-Taught",
+	"可以在前置不齐时直接学高一级功法(发挥度照旧按缺几门算,依然失常)": "Learn a higher-grade art without its prerequisites (power multiplier still counts the missing tiers)",
+	"骨骼清奇": "Rare Physique",
+	"可同时主修两门内功(常规只能一门)": "Cultivate two internal arts at once (normally one)",
+	"过目不忘": "Photographic Memory",
+	"见过敌人用过的招式,可在无师门的情况下自学该门类的低级功法": "After seeing an enemy's technique, self-learn low-grade arts of that school without a sect",
+	"铁布衫": "Iron Shirt",
+	"每场战斗第一次受到的致命伤转为剩 1 气血": "The first fatal blow each battle leaves you at 1 HP instead",
+	"身轻如燕": "Swallow's Grace",
+	"战斗中可穿过敌人所在格(不能停留其上)": "Pass through enemy tiles in battle (cannot stop on them)",
+	"江湖阅历": "Worldly Ways",
+	"大地图多一个行动:打听,揭示相邻节点的内容": "Extra map action: Inquire — reveals what adjacent nodes hold",
+	"福缘深厚": "Deep Fortune",
+	"游历事件每年可重掷一次": "Reroll one travel event per year",
+	"杀破狼": "Killer Star",
+	"永远单人上阵,不能带同伴;同时领杀·破·狼三星": "Always fight alone, no companions; bear the Kill, Break and Wolf stars",
+	"旧伤": "Old Wound",
+	"无法使用绝招(每门外功的第 4 招)": "Cannot use finishers (each external art's 4th technique)",
+	"心魔": "Inner Demon",
+	"气血低于 30% 时,每回合有一次行动失控(随机移动,不攻击)": "Below 30% HP, one action each round runs wild (random move, no attack)",
+	"孤煞": "Lone Star",
+	"门派只教你外功,不教内功;内功得另想办法": "Sects teach you only external arts; find internal arts some other way",
+	"筋骨迟钝": "Stiff Joints",
+	"学不了轻功门类的任何功法": "Cannot learn any lightness arts",
+
+	# --- Cards ------------------------------------------------------------
+	"一袋碎银": "Pouch of Silver Bits",
+	"半锭纹银": "Half a Silver Ingot",
+	"一锭元宝": "Silver Ingot",
+	"行商分成": "Merchant's Cut",
+	"铁剑": "Iron Sword",
+	"精铁剑": "Fine Iron Sword",
+	"青锋剑": "Azure Blade",
+	"长剑": "Longsword",
+	"布衣": "Cloth Robe",
+	"皮甲": "Leather Armor",
+	"锁子甲": "Chainmail",
+	"软猬甲": "Hedgehog Armor",
+	"草鞋": "Straw Sandals",
+	"快靴": "Swift Boots",
+	"踏云履": "Cloud-Treading Shoes",
+	"凌波靴": "Wave-Gliding Boots",
+	"根骨淬炼": "Bone Tempering",
+	"内力充盈": "Brimming Qi",
+	"身法灵动": "Nimble Steps",
+	"悟性顿开": "Sudden Insight",
+	"福缘临身": "Fortune's Favor",
+	"苦修心得": "Ascetic Insights",
+	"机缘悟道": "Enlightened Chance",
+	"一袋盘缠": "Travel Purse",
+	"闭关潜修": "Secluded Training",
+	"脱胎换骨": "Rebirth",
+	"招式顿悟": "Technique Epiphany",
+	"仙丹妙药": "Divine Elixir",
+	"失传神功": "Lost Divine Art",
+	"前朝宝藏": "Ancient Treasure",
+
+	# --- Travel events ----------------------------------------------------
+	"山道遇劫匪": "Bandits on the Mountain Road",
+	"行至山道，一伙劫匪拦住去路。\n为首之人手提钢刀，索要买路财。": "On a mountain road, bandits block your way.\nTheir leader hefts a steel saber and demands a toll.",
+	"破财消灾": "Pay them off",
+	"出手退敌": "Drive them off",
+	"行商路过": "A Passing Merchant",
+	"一位行商赶着马车路过，\n车上满载刀剑兵刃，正愁销路。": "A merchant passes with a cart\nfull of blades, eager for buyers.",
+	"买下长剑": "Buy a longsword",
+	"婉拒": "Politely decline",
+	"古墓残碑": "The Broken Stele",
+	"荒野深处露出一角残碑，\n碑文似与古墓武学有关。": "Deep in the wilds a broken stele juts out;\nits inscription hints at the Ancient Tomb's arts.",
+	"入内参悟": "Study it within",
+	"谨慎绕行": "Carefully go around",
+	"老丐乞食": "An Old Beggar",
+	"巷口一名老丐伸手乞食，\n目光却在你身上暗暗打量。": "An old beggar holds out his hand at the alley mouth,\nyet his eyes quietly size you up.",
+	"施舍": "Give alms",
+	"切磋武学": "Spar with him",
+	"古墓寒玉": "Cold Jade of the Tomb",
+	"荒山之中藏着一座古墓，\n石室中央横着一张寒玉床。": "A tomb hides in the barren hills;\na cold jade bed lies in the stone chamber.",
+	"卧床练气": "Practice qi on the bed",
+	"床畔拾剑": "Take the sword beside it",
+	"神雕负伤": "The Wounded Condor",
+	"一只巨雕伏在崖边，\n翅上箭伤未愈，目光如炬。": "A giant condor crouches at the cliff's edge,\nan arrow wound on its wing, eyes blazing.",
+	"施药疗伤": "Treat its wound",
+	"静观其变": "Watch and wait",
+	"桃花迷阵": "Peach Blossom Maze",
+	"海岛风送来桃花香，\n花影错落，隐成阵势。": "Island wind carries the scent of peach blossoms;\ntheir scattered shadows form a hidden array.",
+	"循隙闯阵": "Slip through the gaps",
+	"阵外观潮": "Watch the tide outside",
+	"蛇胆奇效": "Miraculous Snake Gall",
+	"白驼山弟子叫卖蛇胆，\n称其大补真元，价钱不菲。": "A White Camel Mountain disciple hawks snake gall,\nclaiming great tonic power — at a steep price.",
+	"重金购之": "Pay the high price",
+	"掉头就走": "Walk away",
+	"降龙残谱": "The Torn Palm Manual",
+	"书摊上一册残破掌谱，\n隐见「降龙」二字，纸色发黄。": "On a book stall lies a tattered palm manual;\nthe faint words \"Dragon\" show on yellowed pages.",
+	"强记于心": "Memorize it",
+	"卖与书贾": "Sell it to a bookseller",
+	"渡口风波": "Trouble at the Ferry",
+	"河水暴涨，渡口只余一舟，\n艄公索价甚高，爱搭不理。": "The river swells; one boat remains at the ferry.\nThe boatman demands a high price, indifferent.",
+	"付钱渡河": "Pay and cross",
+	"泅水而过": "Swim across",
+	"镖行招募": "Escort Agency Hiring",
+	"镖头缺人手，见你身手，\n便邀你押一趟去南边的镖。": "Short-handed, the escort chief sees your skill\nand invites you to guard a convoy heading south.",
+	"接下镖单": "Take the job",
+	"婉拒独行": "Decline and travel on",
+	"大理市集": "Dali Market",
+	"市集上皮甲快靴俱全，\n掌柜的拍着胸脯称分量十足。": "The market has leather armor and swift boots;\nthe shopkeeper swears by their quality.",
+	"购皮甲": "Buy leather armor",
+	"购快靴": "Buy swift boots",
+	"破庙夜雨": "Night Rain at the Ruined Temple",
+	"夜雨滂沱，破庙漏得厉害，\n老僧独坐，就着灯火补屋檐。": "Night rain pours through the leaking ruined temple;\nan old monk sits alone, mending eaves by lamplight.",
+	"帮工换宿": "Help out for lodging",
+	"檐下练剑": "Practice sword under the eaves",
+	"赌坊喧嚣": "The Gambling House",
+	"镇上赌坊彻夜喧闹，\n有人一夜输光了全部盘缠。": "The town's gambling den roars all night;\nsomeone lost their whole travel purse by dawn.",
+	"入局三把": "Play three rounds",
+	"袖手旁观": "Just watch",
+	"全真抄经": "Scriptures at Quanzhen",
+	"全真宫外老道伏案抄经，\n见你驻足，递来一卷道德经。": "Outside the Quanzhen palace an old Taoist copies scripture;\nseeing you pause, he offers a Daodejing scroll.",
+	"随他抄经": "Copy with him",
+	"求教剑理": "Ask about sword theory",
+	"遗落的褡裢": "The Lost Satchel",
+	"路旁褡裢里散着银两，\n四下无人，只有风声掠过草叶。": "Silver spills from a satchel by the road.\nNo one around — only wind through the grass.",
+	"送还失主": "Find the owner",
+	"收起走人": "Pocket it and go",
+
+	# --- World map / endings ----------------------------------------------
+	"无名谷": "Nameless Valley",
+	"洛阳": "Luoyang",
+	"武当": "Wudang",
+	"襄阳": "Xiangyang",
+	"昆仑": "Kunlun",
+	"少林": "Shaolin",
+	"华山": "Mount Hua",
+	"一代宗师": "Grandmaster of an Era",
+	"武林为之震动。\n你的名号传遍江湖，各派掌门纷纷登门请教。\n此世武学之巅，自此有了你的名字。": "The martial world trembles.\nYour name spreads across the jianghu; sect masters come seeking guidance.\nThe summit of this age's martial arts now bears your name.",
+	"武林名宿": "Renowned Elder",
+	"江湖中人都认得你的名号。\n行至何处，皆有豪杰相迎。\n虽未登峰造极，亦是一方武林名宿。": "All the jianghu knows your name.\nWherever you go, heroes greet you.\nNot yet the summit — but a renowned elder of the land.",
+	"隐于市井": "Hidden Among the Crowd",
+	"你收起兵刃，隐入市井。\n江湖纷争从此与你无关。\n唯有炊烟与酒香，伴你终老。": "You sheathe your blade and vanish into the streets.\nThe jianghu's strife is no longer yours.\nOnly hearth smoke and the scent of wine keep you company to the end.",
+	"【结局 · %s】\n\n%s\n\n按回车重新开始": "[Ending · %s]\n\n%s\n\nPress Enter to restart",
+	"按回车重新开始": "Press Enter to restart",
+
+	# --- Transition -------------------------------------------------------
+	"华山之巅": "Atop Mount Hua",
+	"按回车继续": "Press Enter to continue",
+	"华山之巅，云海翻涌。\n你赢了论剑，也赢得了一段属于自己的江湖路。\n\n江湖很大，故事才刚刚开始。": "Atop Mount Hua, a sea of clouds churns.\nYou won the duel — and a jianghu road of your own.\n\nThe realm is vast; the story has only begun.",
+	"接下来的路，由你自己选择。\n\n先为自己定下根基吧。": "The road ahead is yours to choose.\n\nFirst, lay down your foundations.",
+
+	# --- Sect selection ---------------------------------------------------
+	"上下选择 · 回车拜入": "Up/down to choose · Enter to join",
+	"【拜入门派】\n\n": "[Choose a Sect]\n\n",
+	"%s %s —— 内功 %s（%s） · 外功 %s（%s）\n": "%s %s — Internal: %s (%s) · External: %s (%s)\n",
+
+	# --- Map travel -------------------------------------------------------
+	"左右/上下选择相邻去处，回车启程": "Arrow keys to pick an adjacent stop, Enter to set out",
+	"【江湖行路】\n\n": "[Traveling the Realm]\n\n",
+	"▶ %s（此处）\n": "▶ %s (here)\n",
+	"  %s（可前往）\n": "  %s (reachable)\n",
+	"\n当前：%s": "\nCurrent: %s",
+	"【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺": "[%s]\n\n%s\n\n%s\n%s\n\nUp/down to choose, Enter to decide",
+
+	# --- Cultivation ------------------------------------------------------
+	"方向键选择 · 回车执行": "Arrow keys to choose · Enter to act",
+	"第 %d 年 · 第 %d 月    门派: %s\n": "Year %d · Month %d    Sect: %s\n",
+	"银两 %d    根骨 %d 内力 %d 身法 %d 悟性 %d 福缘 %d\n": "Silver %d    Bone %d Qi %d Agility %d Wisdom %d Fortune %d\n",
+	"武功 %d 门 · 大成 %d\n\n": "Arts: %d · Mastered: %d\n\n",
+	"【开年际遇】\n": "[New Year's Fortune]\n",
+	"\n左右选择，回车收取": "\nLeft/right to choose, Enter to take",
+	"【每月机缘】\n": "[Monthly Chance]\n",
+	"【本月行动】\n": "[This Month's Action]\n",
+	"练功": "Train",
+	"修习": "Study",
+	"做工": "Work",
+	"游历": "Travel",
+	"存盘": "Save",
+	"读档": "Load",
+	"删档": "Delete Save",
+	"\n\n⚠ 再按一次确认删除存档": "\n\n⚠ Press again to confirm deleting the save",
+	"\n\n上下选择，回车执行": "\n\nUp/down to choose, Enter to act",
+	"【练功】\n": "[Training]\n",
+	"暂无未大成武功，改选修习吧。": "No unmastered arts yet — choose Study instead.",
+	"\n上下选择，回车苦练": "\nUp/down to choose, Enter to train",
+	"【修习】\n": "[Study]\n",
+	"\n上下选择，回车修习（+1~+3）": "\nUp/down to choose, Enter to study (+1~+3)",
+	"【游历 · 遇事】\n": "[Travel · Event]\n",
+	"\n上下选择，回车定夺": "\nUp/down to choose, Enter to decide",
+	"【年关将至】\n": "[Year's End]\n",
+	"留在本门": "Stay with your sect",
+	"另投他派": "Join another sect",
+	"\n上下选择，回车决定": "\nUp/down to choose, Enter to decide",
+	"【另投他派】\n": "[Join Another Sect]\n",
+	"\n上下选择，回车拜入": "\nUp/down to choose, Enter to join",
+	"%s %s（%s）\n": "%s %s (%s)\n",
+	"%s %s  （%d/%d）\n": "%s %s  (%d/%d)\n",
+	"钱财": "Wealth",
+	"兵刃": "Gear",
+	"成长": "Growth",
+	"机缘": "Opportunity",
+	"悟道": "Insight",
+	"奇遇": "Rare Find",
+	"未定": "Undecided",
+
+	# --- Progression gongfa -----------------------------------------------
+	"入门": "Novice",
+	"精进": "Adept",
+	"大成": "Mastery",
+	"圆满": "Perfection",
+	"一式": "Form I",
+	"二式": "Form II",
+	"三式": "Form III",
+	"丐帮": "Beggars' Sect",
+	"峨眉": "Emei",
+	"唐门": "Tang Clan",
+	"易筋经": "Yijin Sutra",
+	"罗汉拳": "Arhat Fist",
+	"纯阳无极功": "Pure Yang Art",
+	"太极剑": "Taiji Sword",
+	"混天功": "Huntian Art",
+	"打狗棒法": "Dog-Beating Staff",
+	"峨眉九阳功": "Emei Nine Yang",
+	"峨眉剑法": "Emei Sword Art",
+	"唐门心法": "Tang Inner Art",
+	"满天花雨": "Flower Rain",
+	"刚": "Hard",
+	"柔": "Soft",
+	"阴": "Yin",
+	"阳": "Yang",
+	"独孤九剑": "Dugu Nine Swords",
+	"总诀式": "Essence Form",
+	"破剑式": "Sword Breaker",
+	"破气式": "Qi Breaker",
+	"绝招·无招胜有招": "Finisher · Formless",
+	"降龙十八掌": "Eighteen Dragon Palms",
+	"亢龙有悔": "Proud Dragon",
+	"飞龙在天": "Flying Dragon",
+	"见龙在田": "Dragon Afield",
+	"绝招·潜龙勿用": "Finisher · Hidden Dragon",
+	"杨家枪法": "Yang Family Spear",
+	"回马枪": "Turnabout",
+	"梨花枪": "Pear Blossom",
+	"锁喉枪": "Throat Lock",
+	"绝招·枪出如龙": "Finisher · Dragon Surge",
+	"小李飞刀": "Flying Dagger",
+	"例不虚发": "Never Misses",
+	"连环飞刀": "Chain Daggers",
+	"满天刀雨": "Blade Rain",
+	"绝招·一刀飞仙": "Finisher · Flying Immortal",
+}
+
+
+func _enter_tree() -> void:
+	var t := Translation.new()
+	t.locale = "en"
+	for key in EN:
+		t.add_message(key, EN[key])
+	var composed: Dictionary = _composed_gongfa_messages()
+	for key in composed:
+		t.add_message(key, composed[key])
+	TranslationServer.add_translation(t)
+
+
+## Composed display names ProgressionGongfaData builds at runtime:
+##   <base>·<step>            (易筋经·入门  -> "Yijin Sutra · Novice")
+##   <art display>·<form>     (罗汉拳·一式  -> "Arhat Fist · Form I",
+##                             太极剑·精进·二式 -> "Taiji Sword · Adept · Form II")
+## Generated from the data tables so new sect rows stay covered. A few unused
+## combinations are generated too — harmless, they are never looked up.
+func _composed_gongfa_messages() -> Dictionary:
+	var out: Dictionary = {}
+	for sect in ProgressionGongfaData.SECTS:
+		for base in [str(sect["internal_base"]), str(sect["external_base"])]:
+			var base_en: String = str(EN.get(base, base))
+			# Art display names per grade step.
+			var displays: Dictionary = {base: base_en}
+			for step in _STEP_EN:
+				var display_key: String = "%s·%s" % [base, step]
+				var display_en: String = "%s · %s" % [base_en, _STEP_EN[step]]
+				out[display_key] = display_en
+				displays[display_key] = display_en
+			# Generic technique names off every display variant.
+			for display_key in displays:
+				for form in _FORM_EN:
+					out["%s·%s" % [display_key, form]] = "%s · %s" % [displays[display_key], _FORM_EN[form]]
+	return out

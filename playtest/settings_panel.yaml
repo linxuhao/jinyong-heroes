@@ -2,7 +2,7 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: settings_panel
-description: '设置 opens from the menu (entry 2, keyboard focus move_down x2 + ui_accept); the SFX row steps +3.0 dB through the SAME SettingsManager/AudioManager mirror path the mouse buttons call; 全屏 toggles persisted intent only (SettingsManager.fullscreen — headless has no window to assert); 返回 returns to MENU with a fresh MenuPanel. debug_reset_settings first pins the deterministic baseline because settings.cfg persists across processes (defaults 0.0 dB / -10.0 dB / false).'
+description: '设置 opens from the menu (entry 2, keyboard focus move_down x2 + ui_accept); the SFX row steps +3.0 dB through the SAME SettingsManager/AudioManager mirror path the mouse buttons call; 全屏 toggles persisted intent only (SettingsManager.fullscreen — headless has no window to assert); 语言 (row 3) toggles SettingsManager.language zh->en (headless boots pinned to zh); 返回 (now row 4) returns to MENU with a fresh MenuPanel. debug_reset_settings first pins the deterministic baseline because settings.cfg persists across processes (defaults 0.0 dB / -10.0 dB / false).'
 scene: res://scenes/menu.tscn
 timeline:
 - at: 10
@@ -50,13 +50,31 @@ timeline:
   actions: []
   assert:
     SettingsManager.fullscreen: true
+    SettingsManager.language: language == "zh"
 - at: 130
   actions:
   - move_down
 - at: 140
   actions:
   - ui_accept
+- at: 150
+  actions: []
+  assert:
+    SettingsManager.language: language == "en"
+- at: 155
+  actions:
+  - ui_accept
 - at: 160
+  actions: []
+  assert:
+    SettingsManager.language: language == "zh"
+- at: 165
+  actions:
+  - move_down
+- at: 170
+  actions:
+  - ui_accept
+- at: 190
   actions: []
   assert:
     GameManager.current_state: current_state == "MENU"

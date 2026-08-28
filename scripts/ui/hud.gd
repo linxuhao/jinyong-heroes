@@ -407,7 +407,7 @@ func _refresh_energy_label(player: Node) -> void:
 	if energy_label == null:
 		return
 	var qi: int = int(player.energy) if "energy" in player else 0
-	energy_label.text = "内力: %d" % qi
+	energy_label.text = tr("内力: %d") % qi
 
 
 ## Battle-exit cleanup: drop every per-battle reference so a scene swap never

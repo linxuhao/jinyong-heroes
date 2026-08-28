@@ -30,11 +30,12 @@ func _ready() -> void:
 ## Show the tutorial step with the given title and body text.
 ## If show_skip is false, the Skip button is hidden (e.g. on WELCOME step).
 func show_step(title: String, body: String, show_skip: bool) -> void:
+	# tr(): explicit for the RichTextLabel body (see TutorialManager.show_overlay).
 	if is_instance_valid(_title_label):
-		_title_label.text = title
+		_title_label.text = tr(title)
 
 	if is_instance_valid(_body_label):
-		_body_label.text = body
+		_body_label.text = tr(body)
 
 	if is_instance_valid(_skip_button):
 		_skip_button.visible = show_skip

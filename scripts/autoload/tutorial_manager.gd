@@ -280,14 +280,18 @@ func set_overlay(node: CanvasLayer) -> void:
 ## Update the overlay panel's title and body text, then show it.
 ## This is the primary way to display tutorial content.
 func show_overlay(title: String, body: String) -> void:
+	# tr(): the Label auto-translates whole titles anyway, but RichTextLabel
+	# body text is translated explicitly here so the EN locale never depends
+	# on RichTextLabel's auto-translate behavior. zh (and headless) is a
+	# byte-identical no-op — the zh string is its own key.
 	if _title_label != null:
-		_title_label.text = title
+		_title_label.text = tr(title)
 	if _body_label != null:
-		_body_label.text = body
+		_body_label.text = tr(body)
 
 	# Re-apply bbcode.
 	if _body_label != null:
-		_body_label.text = body
+		_body_label.text = tr(body)
 
 	_show_overlay_internal()
 

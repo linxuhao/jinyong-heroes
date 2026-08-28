@@ -35,4 +35,4 @@ func _render() -> void:
 	var def: Dictionary = MapData.ending_def(tier)
 	var title: String = def.get("title", "") if not def.is_empty() else ""
 	var text_lines: String = def.get("text", "") if not def.is_empty() else ""
-	body.text = "【结局 · %s】\n\n%s\n\n按回车重新开始" % [title, text_lines]
+	body.text = tr("【结局 · %s】\n\n%s\n\n按回车重新开始") % [tr(title), tr(text_lines)]

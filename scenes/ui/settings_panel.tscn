@@ -37,7 +37,7 @@ anchor_bottom = 0.5
 offset_left = -140.0
 offset_top = -48.0
 offset_right = 140.0
-offset_bottom = 208.0
+offset_bottom = 270.0
 theme_override_constants/separation = 14
 
 [node name="Button0" type="Button" parent="SettingsBox"]
@@ -59,6 +59,12 @@ focus_mode = 0
 text = "全屏"
 
 [node name="Button3" type="Button" parent="SettingsBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 48)
+focus_mode = 0
+text = "语言"
+
+[node name="Button4" type="Button" parent="SettingsBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(280, 48)
 focus_mode = 0

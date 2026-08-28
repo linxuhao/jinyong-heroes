@@ -34,11 +34,20 @@ var sfx_volume_db: float = DEFAULT_SFX_DB
 var music_volume_db: float = DEFAULT_MUSIC_DB
 var fullscreen: bool = false
 
+## UI language: "zh" or "en". First launch auto-detects from the OS locale
+## (on the web export OS.get_locale_language() maps from the browser
+## language); a persisted choice overrides detection. HEADLESS runs are
+## always "zh": the playtest/unit harness asserts the Chinese source strings
+## byte-for-byte, so the harness must never depend on the box's locale or on
+## a stray persisted settings.cfg.
+var language: String = "zh"
+
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
+	language = _detect_language()
 	_load()
 	_apply()
 
@@ -72,7 +81,20 @@ func set_fullscreen(b: bool) -> void:
 	_apply()
 	_save()
 
+## Set the UI language ("zh"/"en"; anything else is ignored), apply it live
+## (TranslationServer relocale — auto-translated Controls re-render on the
+## spot) and persist it.
+func set_language(lang: String) -> void:
+	if lang != "zh" and lang != "en":
+		return
+	language = lang
+	_apply()
+	_save()
+
 ## Restore the defaults (0.0 dB SFX / -10.0 dB music / windowed).
+## Deliberately does NOT touch `language`: the harness baseline
+## (debug_reset_settings) predates the language setting and playtest
+## scenarios must keep their byte-identical Chinese surface.
 func reset_to_defaults() -> void:
 	set_sfx_volume_db(DEFAULT_SFX_DB)
 	set_music_volume_db(DEFAULT_MUSIC_DB)
@@ -92,12 +114,22 @@ func _load() -> void:
 	sfx_volume_db = clampf(float(cfg.get_value("audio", "sfx_volume_db", DEFAULT_SFX_DB)), VOL_MIN_DB, VOL_MAX_DB)
 	music_volume_db = clampf(float(cfg.get_value("audio", "music_volume_db", DEFAULT_MUSIC_DB)), VOL_MIN_DB, VOL_MAX_DB)
 	fullscreen = bool(cfg.get_value("display", "fullscreen", false))
+	# Persisted language overrides the locale auto-detect — except headless,
+	# which stays pinned to "zh" for harness determinism (see `language` doc).
+	if DisplayServer.get_name() != "headless":
+		var lang := str(cfg.get_value("general", "language", ""))
+		if lang == "zh" or lang == "en":
+			language = lang
 
 ## Applies the current mirrors: pushes the volumes into AudioManager (which
 ## guards the players) and — only when a real window exists — the window mode.
 func _apply() -> void:
 	AudioManager.set_sfx_volume_db(sfx_volume_db)
 	AudioManager.set_music_volume_db(music_volume_db)
+	# zh renders the source strings (fallback locale is zh_CN, no zh table —
+	# lookups miss and the Chinese key itself is displayed); en hits I18n's
+	# registered table.
+	TranslationServer.set_locale("zh_CN" if language == "zh" else "en")
 	if DisplayServer.get_name() == "headless":
 		return
 	get_window().mode = Window.MODE_FULLSCREEN if fullscreen else Window.MODE_WINDOWED
@@ -108,4 +140,14 @@ func _save() -> void:
 	cfg.set_value("audio", "sfx_volume_db", sfx_volume_db)
 	cfg.set_value("audio", "music_volume_db", music_volume_db)
 	cfg.set_value("display", "fullscreen", fullscreen)
+	cfg.set_value("general", "language", language)
 	cfg.save(SETTINGS_PATH)
+
+
+## First-launch language: Chinese OS/browser locale -> zh, anything else ->
+## en. Headless (playtest/unit harness) is always zh — the assertion surface
+## is the Chinese source text.
+func _detect_language() -> String:
+	if DisplayServer.get_name() == "headless":
+		return "zh"
+	return "zh" if OS.get_locale_language().begins_with("zh") else "en"

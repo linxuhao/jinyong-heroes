@@ -145,7 +145,10 @@ static func fa_hui_du_label(fhd: float) -> String:
 	s = s.rstrip(".")
 	if not s.contains("."):
 		s += ".0"
-	return "发挥 ×" + s
+	# TranslationServer.translate (not tr()): static context. In zh (and in the
+	# headless harness, always zh) the key comes back verbatim so the playtest
+	# byte-contracts hold; en renders "Power ×<fhd>".
+	return TranslationServer.translate("发挥 ×") + s
 
 ## Inner-force cost label (UX-03, pure function): 0 -> "无消耗" (free basic /
 ## undefined), n > 0 -> "内力 <n>". Real per-skill costs are now defined
@@ -154,8 +157,8 @@ static func fa_hui_du_label(fhd: float) -> String:
 ## without a scene.
 static func cost_label_text(cost: int) -> String:
 	if cost > 0:
-		return "内力 " + str(cost)
-	return "无消耗"
+		return TranslationServer.translate("内力 ") + str(cost)
+	return TranslationServer.translate("无消耗")
 
 ## Insufficient-inner-force predicate (GOAL 4, pure function): a skill button
 ## reads "内力不足" when the skill costs inner force (cost > 0) and the player
@@ -211,34 +214,35 @@ static func effect_summary(skill) -> String:
 	if "jump_tiles" in skill:
 		jump = int(skill["jump_tiles"])
 	if heal > 0:
-		return "回复 " + str(heal)
+		return TranslationServer.translate("回复 ") + str(heal)
 	if jump > 0:
-		return "跳" + str(jump) + " · " + str(damage)
+		return TranslationServer.translate("跳") + str(jump) + " · " + str(damage)
 	if damage > 0:
-		var shape: String = "单体"
+		var shape: String = TranslationServer.translate("单体")
 		if "aoe_shape" in skill:
 			shape = _shape_label(str(skill["aoe_shape"]))
 		return shape + " " + str(damage)
 	return ""
 
-## Map an aoe_shape string to its Chinese label (界面文字一律中文). Unknown or
-## missing -> "单体" (the default single-target shape).
+## Map an aoe_shape string to its display label (zh source, translated for
+## the active locale). Unknown or missing -> 单体 (the default single-target
+## shape).
 static func _shape_label(shape: String) -> String:
 	match shape:
 		"single":
-			return "单体"
+			return TranslationServer.translate("单体")
 		"line":
-			return "直线"
+			return TranslationServer.translate("直线")
 		"cross":
-			return "十字"
+			return TranslationServer.translate("十字")
 		"square":
-			return "方形"
+			return TranslationServer.translate("方形")
 		"adjacent":
-			return "相邻"
+			return TranslationServer.translate("相邻")
 		"global":
-			return "全场"
+			return TranslationServer.translate("全场")
 		_:
-			return "单体"
+			return TranslationServer.translate("单体")
 
 ## Configure this button with a skill, a hotkey label, and the fa hui du
 ## multiplier of the external art that produced the skill.

@@ -44,14 +44,14 @@ func _render() -> void:
 	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
 		return
-	var text: String = "【拜入门派】\n\n"
+	var text: String = tr("【拜入门派】\n\n")
 	var rows: Array = ProgressionGongfaData.SECTS
 	for i in range(rows.size()):
 		var row: Dictionary = rows[i]
 		var marker: String = "▶" if i == focus_index else " "
-		text += "%s %s —— 内功 %s（%s） · 外功 %s（%s）\n" % [
-			marker, row["display_name"], row["internal_base"], row["internal_attribute"],
-			row["external_base"], row["external_attribute"],
+		text += tr("%s %s —— 内功 %s（%s） · 外功 %s（%s）\n") % [
+			marker, tr(str(row["display_name"])), tr(str(row["internal_base"])), tr(str(row["internal_attribute"])),
+			tr(str(row["external_base"])), tr(str(row["external_attribute"])),
 		]
-	text += "\n上下选择，回车拜入"
+	text += tr("\n上下选择，回车拜入")
 	body.text = text

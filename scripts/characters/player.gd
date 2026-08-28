@@ -312,7 +312,7 @@ func _skill_reject_reason(index: int) -> String:
 	if CombatManager.tutorial_battle and index >= 4 and CombatManager.current_round < 4:
 		return "教程尚未解锁"  # Two-phase unlock (tutorial-only): palm arts appear at round 4+.
 	if skill_cooldowns[index] > 0:
-		return "冷却中 %d 回合" % skill_cooldowns[index]
+		return tr("冷却中 %d 回合") % skill_cooldowns[index]
 	var skill = skills[index]
 	if skill != null and skill.hp_gate_below_ratio > 0.0:
 		var gate_hp: int = int(round(float(max_health) * skill.hp_gate_below_ratio))

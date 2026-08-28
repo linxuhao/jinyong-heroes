@@ -231,17 +231,17 @@ func _render() -> void:
 		if def == null:
 			body.text = ""
 			return
-		var ea = "▶ %s" % def.option_a.label if event_focus == 0 else "  %s" % def.option_a.label
-		var eb = "▶ %s" % def.option_b.label if event_focus == 1 else "  %s" % def.option_b.label
-		body.text = "【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺" % [def.title, def.text, ea, eb]
+		var ea = "▶ %s" % tr(def.option_a.label) if event_focus == 0 else "  %s" % tr(def.option_a.label)
+		var eb = "▶ %s" % tr(def.option_b.label) if event_focus == 1 else "  %s" % tr(def.option_b.label)
+		body.text = tr("【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺") % [tr(def.title), tr(def.text), ea, eb]
 		return
-	var text: String = "【江湖行路】\n\n"
+	var text: String = tr("【江湖行路】\n\n")
 	for node in MapData.node_ids():
-		var name: String = MapData.node_def(node).get("display_name", node)
+		var name: String = tr(str(MapData.node_def(node).get("display_name", node)))
 		if node == current_node_id:
-			text += "▶ %s（此处）\n" % name
+			text += tr("▶ %s（此处）\n") % name
 		elif node == focus_id:
-			text += "  %s（可前往）\n" % name
+			text += tr("  %s（可前往）\n") % name
 		else:
 			text += "  %s\n" % name
 	# The operation hint lives in ONE place: the footer HintLabel, whose
@@ -251,5 +251,5 @@ func _render() -> void:
 	# 「左右/上下选择相邻去处，回车启程」. Unifying the two texts (2026-08-27) made
 	# them byte-identical and turned a near-duplicate into an exact one; the
 	# single-hint invariant this file documents above wants one, not two.
-	text += "\n当前：%s" % MapData.node_def(current_node_id).get("display_name", current_node_id)
+	text += tr("\n当前：%s") % tr(str(MapData.node_def(current_node_id).get("display_name", current_node_id)))
 	body.text = text

@@ -560,7 +560,7 @@ func _render() -> void:
 	# that used to live inside the removed text list.
 	var points_label: Label = get_node_or_null("PointsLabel") as Label
 	if points_label != null:
-		points_label.text = "剩余点数 %d" % points_left
+		points_label.text = tr("剩余点数 %d") % points_left
 	var hint_label: Label = get_node_or_null("HintLabel") as Label
 	if hint_label != null:
 		match phase:
@@ -601,8 +601,8 @@ func _render() -> void:
 		if toggle != null:
 			toggle.visible = phase == "TRAITS"
 			var def = _traits[i]
-			var owned: String = "已选" if trait_ids.has(def.id) else ("+" + str(def.cost) if def.cost > 0 else str(def.cost))
-			toggle.text = def.display_name + " " + owned
+			var owned: String = tr("已选") if trait_ids.has(def.id) else ("+" + str(def.cost) if def.cost > 0 else str(def.cost))
+			toggle.text = tr(def.display_name) + " " + owned
 	var confirm_button: Button = get_node_or_null("MouseBox/ConfirmBox/ConfirmButton") as Button
 	if confirm_button != null:
 		confirm_button.visible = phase == "CONFIRM"
@@ -626,7 +626,7 @@ func _render() -> void:
 	# Description labels (defects 4/5) + the clarity info layer (UX-06/07/08).
 	# All derivations are display-only — no rule or stored value changes.
 	hp_value = hp_from_bone(int(attrs["bone"]))
-	hp_text = "当前气血 %d" % hp_value
+	hp_text = tr("当前气血 %d") % hp_value
 	confirm_summary_text = confirm_summary_text_from(attrs)
 	var attr_desc_label: Label = get_node_or_null("MouseBox/AttrBox/AttrDescLabel") as Label
 	if attr_desc_label != null:
@@ -684,15 +684,15 @@ func _render() -> void:
 func _attr_label(key: String) -> String:
 	match key:
 		"bone":
-			return "根骨"
+			return tr("根骨")
 		"inner":
-			return "内力"
+			return tr("内力")
 		"agility":
-			return "身法"
+			return tr("身法")
 		"wisdom":
-			return "悟性"
+			return tr("悟性")
 		"fortune":
-			return "福缘"
+			return tr("福缘")
 	return key
 
 
@@ -722,6 +722,8 @@ func confirm_summary_text_from(values: Dictionary) -> String:
 	return "\n".join(lines)
 
 
-## Chinese description for an attribute key; "" for unknown keys (never throws).
+## Description for an attribute key (zh source, translated for the active
+## locale); "" for unknown keys (never throws).
 func _attr_desc(key: String) -> String:
-	return _ATTR_DESCS.get(key, "")
+	var desc: String = _ATTR_DESCS.get(key, "")
+	return tr(desc) if desc != "" else ""
