@@ -324,14 +324,19 @@ the verifier step (the gates run after it). In short:
   hover-preview channel that never touches `trait_index` / toggle /
   `modulate`, the three small fixes, the six-scenario two-place sync, and
   the design/changelog/delivery-notes records.
-- The round's **measured** pass — all 65 scenarios green (the 58 pre-existing
+- The round's **targeted** pass — all 65 scenarios green (the 58 pre-existing
   plus the 7 new ones; the acceptance net `click_move_undo_right`,
   `click_move_commit_lock`, `move_target_affordance`, `click_move_to_tile`
   included), compile zero errors, pytest smoke green, the 22-file unit suite
   green, and the vision gate on the new presentation elements — is
   **pending the downstream gate run, not claimed**. The last fully measured
   final-tree run (jinyong-nodes: 57/57 scenarios, 77/77 scripts) predates
-  this round's changes.
+  this round's changes. The pre-fix gate run (review measurement) showed
+  15/65 red — the missing `debug_click_target_fires` counter, two geometry
+  reds (`follow_delta > 24`, `hint_nameplate_overlap`), the map-hint comma,
+  and 12 language-reds (English rendering under the Xvfb gate); the fix
+  round targets all 15 root causes in code, but the post-fix gate has not
+  run, so the green table is unconfirmed.
 - One minor docs-vs-code discrepancy found and recorded in
   `final/verify_report.json`: `design/30_presentation.md`'s audit table and
   the delivery notes say `NameLabel` gained an **explicit**
