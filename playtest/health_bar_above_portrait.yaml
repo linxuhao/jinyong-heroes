@@ -14,29 +14,30 @@
 # The single-surface scoping: Player carries sprite_top and portrait_bar_pos;
 # Central_Divine and West_Poison carry theirs; the HealthBar block (the PLAYER's
 # bar) only self-compares. Enemy start tiles cross-checked against
-# scripts/battlefield.gd: Player (7,5) sprite_top 224; Central_Divine (7,1) and
-# West_Poison (11,2) are both top-band-clamped by BOARD_TOP_MARGIN_Y
-# (BOARD_TOP_MARGIN_Y + half.y = 156 clamps their origin, sprite_top == 92), so
-# their above-portrait anchor would land at 92 - 4 - 24 = 64 (inside the top
-# strip) and is FLIPPED to the other side of the portrait (2026-08-28 geometry
-# fix): the bar TOP anchors 4 px below the portrait ink bottom
-# (portrait_ink_rect.end.y + 4 = 220 + 4 = 224), sitting on the unit's own tile.
-# The face of a 128 px portrait starts ~ sprite_top + 40 = 132, so bar_top == 224
-# > 132 means the bar is strictly below the face — a stronger claim than the old
-# "26 px intrusion into the hair band" landing.
+# scripts/battlefield.gd: Player (7,5) feet 352 sprite_top 224; Central_Divine
+# (7,1) feet world y = 32 + 64 = 96 -> sprite_top = 96 - 128 = -32 (NEGATIVE —
+# foot-anchored sprite, ink extends UP from the feet); West_Poison (11,2) feet
+# = 32 + 128 = 160 -> sprite_top = 160 - 128 = 32. Because sprite_top is below
+# the flip threshold STRIP_BOTTOM + 2 = 94, the above-portrait anchor
+# (sprite_top - 4 - 24 = -60 / 4) would sit inside or over the top strip, so the
+# bar is FLIPPED to the far side of the portrait: its TOP anchors 4 px below the
+# portrait ink bottom (portrait_ink_rect.end.y + 4 = feet + 4 = 100 for
+# Central_Divine, 164 for West_Poison) — sitting on the unit's OWN tile, the
+# truthful "stands here" statement.
 #
 # The click leg supplies the required differential: walk up one tile then retreat
 # (feet right-click), so the positional asserts are re-evaluated with the player
-# back at (7,5) (mid-board, unclamped).
+# back at (7,5) (mid-board).
 name: health_bar_above_portrait
 description: >-
   The nameplate sits above the portrait top and a ground marker marks each
   occupied tile. Mid-board player (7,5): sprite_top > 100 and the bar bottom is
   >= 4 px above sprite_top (normal above-anchor, bar_anchors_below_portrait ==
-  false). Top-band-clamped Central_Divine (7,1) and West Poison (11,2)
-  (sprite_top == 92) are FLIPPED to the other side of the portrait: their bar
-  top sits at portrait_ink_bottom + 4 = 224, strictly below the face
-  (bar_top > sprite_top + 40), bar_anchors_below_portrait true. TileMarkers.
+  false). Top-row Central_Divine (7,1) (sprite_top = 96 - 128 = -32,
+  negative) and West_Poison (11,2) (sprite_top = 160 - 128 = 32) FLIP to the far
+  side of the portrait: their bar top sits at portrait_ink_bottom + 4 = feet + 4
+  (100 and 164) — strictly below sprite_top + PORTRAIT_TEX_Y (bar_top >
+  sprite_top + 128), bar_anchors_below_portrait true. TileMarkers.
   tile_marker_count == 6 (player + five Greats) and tile_marker_visible == true.
   A walk-then-retreat click leg carries the differential assert.
 timeline:
@@ -91,12 +92,13 @@ timeline:
 - at: 200
   actions: []
   assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
     Player.sprite_top: sprite_top > 100.0
     Player.portrait_bar_pos: sprite_top - (portrait_bar_pos.y + 24.0) >= 4.0
     HealthBar.bar_top: bar_top > 94.0
     HealthBar.bar_bottom: bar_bottom > bar_top
     HealthBar.bar_anchors_below_portrait: bar_anchors_below_portrait == false
-    Central_Divine.portrait_bar_pos: portrait_bar_pos.y > sprite_top + 40.0
-    West_Poison.portrait_bar_pos: portrait_bar_pos.y > sprite_top + 40.0
+    Central_Divine.portrait_bar_pos: portrait_bar_pos.y > sprite_top + 128.0
+    West_Poison.portrait_bar_pos: portrait_bar_pos.y > sprite_top + 128.0
     TileMarkers.tile_marker_count: tile_marker_count == 6
     TileMarkers.tile_marker_visible: tile_marker_visible == true

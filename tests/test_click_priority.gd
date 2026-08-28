@@ -54,17 +54,23 @@ static func _test_attack_reach_covers(ok: bool) -> bool:
 # --- 2. resolve_click_step: the five-step truth table -------------------------
 
 static func _test_resolve_click_step(ok: bool) -> bool:
-	# Enemy data is pure: grid_pos + the live clamped portrait ink rect.
-	# Central_Divine-style clamped rect hangs DOWN over the tiles above its feet
-	# (top-row clamp): grid (7,1), ink rect x[432,528] y[92,220] covers (7,2)/(7,3).
-	var out_of_reach := {"grid_pos": Vector2i(7, 1), "rect": Rect2(Vector2(432, 92), Vector2(96, 128))}
+	# Enemy data is pure: grid_pos + the live UNCLAMPED portrait ink rect (foot
+	# anchor, offset (0, -tex_size.y/2)); ink extends UP from the feet — grid row
+	# r covers rows r-2, r-1. Central_Divine (7,1): feet world y = 32+64 = 96, ink
+	# rect y[-32,96] (x[432,528]); it overhangs only row-0 tiles (the border ring).
+	var out_of_reach := {"grid_pos": Vector2i(7, 1), "rect": Rect2(Vector2(432, -32), Vector2(96, 128))}
 	# An adjacent enemy at (7,4) (reach 1) whose body hangs over tile (7,3):
-	# ink rect x[432,528] y[160,288].
+	# ink rect x[432,528] y[160,288] — already unclamped (row 4, never clamped).
 	var in_reach := {"grid_pos": Vector2i(7, 4), "rect": Rect2(Vector2(432, 160), Vector2(96, 128))}
 	var player_grid := Vector2i(7, 5)
 	# Reachable-empty-tile set from plan_movement (the move-range highlight);
-	# own tile (7,5) is never in it.
+	# own tile (7,5) is never in it. (6,0) is SYNTHETIC — real is_walkable keeps
+	# border-ring row 0 non-walkable — but the unclamped row-1 ink (y[-32,96])
+	# overlaps only row-0 tiles, so the "reachable tile crossed by an OUT-OF-REACH
+	# rect -> step 3" case needs one row-0 reachable entry here (the brief voids
+	# any "rows 0-2 inaccessible" rule; this entry is test-fixture-only).
 	var reachable := {
+		Vector2i(6, 0): true,
 		Vector2i(7, 2): true,
 		Vector2i(7, 3): true,
 		Vector2i(7, 4): true,
@@ -78,26 +84,29 @@ static func _test_resolve_click_step(ok: bool) -> bool:
 			"enemy on clicked tile -> step 1")
 
 	# Row 2 — reachable empty tile crossed by an OUT-OF-REACH rect -> step 3 (move).
-	# Click tile (7,2) at y=140 (inside out_of_reach rect, below in_reach's 160 top).
+	# Click (440,60) resolves to grid (6,0): inside out_of_reach rect (y[-32,96]),
+	# (6,0) is reachable (synthetic), out_of_reach's own tile is (7,1) — reachable
+	# wins over the out-of-reach body (step 3 beats step 4).
 	ok = _expect(ok, Player.resolve_click_step(
-			Vector2(480, 140), Vector2i(7, 2), player_grid,
+			Vector2(440, 60), Vector2i(6, 0), player_grid,
 			[out_of_reach, in_reach], reachable, -1, []) == 3,
 			"reachable empty tile + out-of-reach rect crossing -> step 3 (move)")
 
 	# Row 3 — reachable empty tile crossed by an IN-REACH rect -> step 2 (attack).
-	# Click tile (7,3) at y=220 (inside in_reach rect, below out_of_reach's 220 edge).
+	# Click tile (7,3) at y=220 (inside in_reach rect [160,288), above out_of_reach's
+	# 96 top / outside its [-32,96) rect). Unchanged point in the unclamped set).
 	ok = _expect(ok, Player.resolve_click_step(
 			Vector2(480, 220), Vector2i(7, 3), player_grid,
 			[out_of_reach, in_reach], reachable, -1, []) == 2,
 			"reachable empty tile + in-reach rect crossing -> step 2 (attack)")
 
 	# Row 4 — out-of-reach body, non-highlighted -> step 4 (select/no-op).
-	# The click point (440,120) is inside out_of_reach's rect (x[432,528]) but its
-	# resolved tile (6,1) is NOT that enemy's own tile (7,1) and is not reachable —
-	# clicking the enemy's own tile would be step 1, so step 4 needs a body point
-	# that hangs over an unoccupied, unreachable tile.
+	# Click (480,60) resolves to grid (7,0): inside out_of_reach's rect (y[-32,96]),
+	# its resolved tile (7,0) is NOT that enemy's own tile (7,1) and is NOT reachable
+	# (only (6,0) is synthetic-reachable) — clicking the enemy's own tile would be
+	# step 1, so step 4 needs a body point over an unreachable, unoccupied tile.
 	ok = _expect(ok, Player.resolve_click_step(
-			Vector2(440, 120), Vector2i(6, 1), player_grid,
+			Vector2(480, 60), Vector2i(7, 0), player_grid,
 			[out_of_reach, in_reach], reachable, -1, []) == 4,
 			"out-of-reach body, non-highlighted -> step 4")
 

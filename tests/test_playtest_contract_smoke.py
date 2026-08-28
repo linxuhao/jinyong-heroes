@@ -274,20 +274,19 @@ def test_affordance_surface_contract() -> None:
         assert "portrait_fail_layer" in blocks[unit], (
             f"{unit}.portrait_fail_layer not whitelisted on surface"
         )
-    # Verify new scenario file exists and has comparison operators
+    # Verify new scenario file exists and every Camera. assert carries a
+    # comparison operator (the rewritten CAMERA-LEVEL gate — full-portrait
+    # visibility is the camera's property, not a sprite's, so the old per-unit
+    # portrait_visible scan is replaced by the Camera. block).
     pv = PLAYTEST_DIR / "portrait_visibility.yaml"
     assert pv.is_file(), "portrait_visibility.yaml missing"
     pv_text = pv.read_text(encoding="utf-8")
     for line in pv_text.splitlines():
         stripped = line.strip()
-        if stripped.startswith("Player.portrait_visible:") or \
-           stripped.startswith("Central_Divine.portrait_visible:") or \
-           stripped.startswith("East_Heretic.portrait_visible:") or \
-           stripped.startswith("West_Poison.portrait_visible:") or \
-           stripped.startswith("South_Emperor.portrait_visible:") or \
-           stripped.startswith("North_Beggar.portrait_visible:"):
+        if stripped.startswith("Camera."):
             assert any(op in stripped for op in ["==", "!=", "<", ">", "and", "or"]), (
-                f"portrait_visibility.yaml assert missing comparison operator: {stripped}"
+                f"portrait_visibility.yaml Camera assert missing comparison "
+                f"operator: {stripped}"
             )
     # MoveHintLabel surface contract (UX-02)
     assert "MoveHintLabel" in blocks, "surface missing MoveHintLabel block"
@@ -438,9 +437,14 @@ def test_event_content_surface_contract() -> None:
          test_timeline_at_values_are_integers), and every Node.var assert line
          (exactly 4 leading spaces + a dotted key) carries a comparison
          operator — the repo's no-bare-scalar-silent-false rule.
-      3. playtest/portrait_visibility.yaml — contains a
-         `f"{unit}.portrait_covered_frac:"` assert line for each of the six
-         units (the partial-occlusion A/B gate lines).
+      3. (rewritten 2026-08-28) portrait_visibility.yaml is now the CAMERA-LEVEL
+         visibility gate: the old per-unit `f"{unit}.portrait_covered_frac:"
+         assert-line requirement is DELETED (full-portrait visibility is the
+         camera's property, not a sprite's; the gate now asserts Camera.*
+         observables the CameraFollower publishes). The per-unit surface
+         whitelist of the four portrait probe vars (portrait_covered_frac /
+         portrait_sprite_pos / portrait_tex_size / portrait_bar_pos) STAYS —
+         append-only.
     """
     text = COMMON.read_text(encoding="utf-8")
     blocks = _surface_blocks(text)
@@ -479,17 +483,6 @@ def test_event_content_surface_contract() -> None:
                 f"event_travel_effects.yaml line {lineno} assert missing "
                 f"comparison operator: {line.strip()}"
             )
-
-    # portrait_visibility.yaml: each unit has a covered_frac assert line.
-    pv_text = (PLAYTEST_DIR / "portrait_visibility.yaml").read_text(
-        encoding="utf-8"
-    )
-    for unit in ["Player", "East_Heretic", "West_Poison", "South_Emperor",
-                 "North_Beggar", "Central_Divine"]:
-        assert any(
-            line.strip().startswith(f"{unit}.portrait_covered_frac:")
-            for line in pv_text.splitlines()
-        ), f"portrait_visibility.yaml missing {unit}.portrait_covered_frac assert"
 
 
 def test_hud_info_surface_contract() -> None:

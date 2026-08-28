@@ -2,14 +2,19 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 #
-# UX-01 regression gate: every battle unit's portrait must put ink on the
-# rendered frame at f40 (battle turn 1, all six units present). Each unit's
-# `portrait_visible` is the six-layer VisibilityProbe predicate (hidden_in_tree
-# / null_texture / zero_rect / off_viewport / clipped / occluded); the fail
-# layer id says WHY when one is red. This scenario is the re-measurement
-# instrument for the A2 fix set, which was EMPTY at wiring time (probe PENDING,
-# builder outage) — its first green run is the measured confirmation of
-# all-six-visible, its first red run prints the real observed fail_layer.
+# Camera-level visibility gate (2026-08-28 rewrite). Full-portrait visibility is
+# the camera/layout's property, NOT a sprite's: the follow Camera2D frames the
+# ACTIVE unit into the unobstructed band between the HUD top bar and the action
+# bar, and an INACTIVE portrait sitting partly off-viewport or behind the HUD is
+# normal framing, not a defect. The sprite-level VisibilityProbe layers
+# (portrait_visible / portrait_fail_layer / portrait_covered_frac) no longer
+# adjudicate portrait placement — this scenario asserts game-level observables
+# the CameraFollower publishes instead: the camera stays within its
+# constant-derived no-blank range (camera_y in [camera_y_lo, camera_y_hi]), the
+# active unit's screen y sits inside the unobstructed [hud_band_top,
+# hud_band_bottom], and the follow target IS the active actor
+# (follow_target_is_active). A portrait_tex_size > 0 sanity is kept so an empty
+# texture still reddens the gate.
 name: portrait_visibility
 timeline:
 # One entry per frame: `at` is a single integer. The shorthand from the probe
@@ -29,25 +34,12 @@ timeline:
 - {at: 30, actions: [tutorial_next]}
 - at: 40
   assert:
-    Player.portrait_visible: portrait_visible == true
-    Player.portrait_fail_layer: portrait_fail_layer == ""
-    Central_Divine.portrait_visible: portrait_visible == true
-    Central_Divine.portrait_fail_layer: portrait_fail_layer == ""
-    East_Heretic.portrait_visible: portrait_visible == true
-    West_Poison.portrait_visible: portrait_visible == true
-    South_Emperor.portrait_visible: portrait_visible == true
-    North_Beggar.portrait_visible: portrait_visible == true
-    Player.sprite_top: sprite_top >= 0.0
-    Central_Divine.sprite_top: sprite_top >= 0.0
-    East_Heretic.portrait_fail_layer: portrait_fail_layer == ""
-    West_Poison.portrait_fail_layer: portrait_fail_layer == ""
-    South_Emperor.portrait_fail_layer: portrait_fail_layer == ""
-    North_Beggar.portrait_fail_layer: portrait_fail_layer == ""
-    Player.portrait_covered_frac: portrait_covered_frac < 0.25
-    Central_Divine.portrait_covered_frac: portrait_covered_frac < 0.25
-    East_Heretic.portrait_covered_frac: portrait_covered_frac < 0.25
-    West_Poison.portrait_covered_frac: portrait_covered_frac < 0.25
-    South_Emperor.portrait_covered_frac: portrait_covered_frac < 0.25
-    North_Beggar.portrait_covered_frac: portrait_covered_frac < 0.25
+    Camera.follow_target_is_active: follow_target_is_active == true
+    Camera.active_unit_screen_y: active_unit_screen_y >= hud_band_top and active_unit_screen_y <= hud_band_bottom
+    Camera.camera_position: camera_position.y >= camera_y_lo and camera_position.y <= camera_y_hi
     Player.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
     Central_Divine.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
+    East_Heretic.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
+    West_Poison.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
+    South_Emperor.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
+    North_Beggar.portrait_tex_size: portrait_tex_size.x > 0.0 and portrait_tex_size.y > 0.0
