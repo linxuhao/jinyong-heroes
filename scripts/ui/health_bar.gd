@@ -75,12 +75,25 @@ var bar_top: float = 0.0
 ## previous-frame value on the early-return paths.
 var bar_bottom: float = 0.0
 
-## True when the unclamped desired widget bottom == sprite_top - 4 (the
-## portrait-top anchor path ran); false only on the legacy feet fallback for a
-## character node without a sprite_top property. It does NOT change when the
-## STRIP_BOTTOM clamp bites (e.g. top-row Central_Divine still reports true —
-## only the final position is clamped).
+## True when the widget is anchored by the portrait-TOP rule: the unclamped
+## desired widget bottom == sprite_top - 4 (the above-portrait anchor path ran).
+## False on two paths: the legacy feet fallback (a character node without a
+## sprite_top property) and the FLIPPED path below (a top-band unit whose
+## above-portrait anchor would land inside the top strip gets its widget top
+## anchored 4 px below the portrait ink bottom instead — the above-anchor rule
+## did NOT run, so this flag is false there).
 var bar_anchors_sprite_top: bool = false
+
+## True when this bar took the FLIPPED side of the portrait for this frame:
+## the widget TOP is anchored 4 px below the portrait ink bottom (used for
+## top-band units, e.g. Central_Divine at (7,1) whose sprite_top == 92 leaves
+## only 2 px between the strip floor STRIP_BOTTOM + 2 == 94 and the portrait
+## top, so an above-portrait bar would be clamped back onto the hair band).
+## False = the normal "widget bottom 4 px above sprite_top" anchoring. Published
+## every frame in follow_character() and whitelisted on the HealthBar playtest
+## surface, so the flip side a unit actually got is assertable (never inferred
+## from a hardcoded bar_top literal).
+var bar_anchors_below_portrait: bool = false
 
 
 ## even if the label node is missing, so it is safe to assert on.
@@ -285,13 +298,26 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	if label != null:
 		label.text = char_name
 		# Make the name readable over any backdrop: light text on a dark
-		# outline with a soft shadow. Font size stays 10 (tscn); the outline
-		# widens glyphs by ~outline_size px, which the short aliases still
-		# fit inside the 110 px label with clip_text disabled.
+		# outline with a soft shadow. The outline widens glyphs by
+		# ~outline_size px, which the short aliases still fit inside the 64 px
+		# label with clip_text disabled. (The font SIZE is the height lever —
+		# see the name-plate text-metrics block below.)
 		label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
 		label.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.05))
 		label.add_theme_constant_override("outline_size", 2)
 		label.add_theme_constant_override("shadow_outline_size", 1)
+		# Name-plate text metrics (2026-08-28 geometry fix). The nameplate is a
+		# SINGLE line, so the only real lever on its measured height (== the font
+		# line height, which is what clamps the authored rect upward and with it
+		# the derived widget height) is the font size. Measured on this theme:
+		# font_size 10 → 15 px line height → a 27 px widget, which breaks the
+		# untouched ui_geometry_readability.yaml f30 envelope `total_height <= 26`;
+		# font_size 9 → 12 px → exactly the compact 24 px the scene authors
+		# (12 name row + 12 bar row). outline_size / shadow_outline_size /
+		# line_spacing are NOT levers (measured: overriding them to 0 changed the
+		# label's minimum height by 0 px), so the Q6 name readability kit —
+		# outline, shadow, semi-transparent backing — is untouched.
+		label.add_theme_font_size_override("font_size", 9)
 		# Name-label backing: a cached semi-transparent StyleBoxFlat applied as
 		# the "normal" stylebox so the label stays readable when a character
 		# portrait passes behind it. Idempotent — re-assigned on repeated
@@ -430,11 +456,17 @@ func update_health(current: int, max_hp: int) -> void:
 ##
 ## Two levers, both applied to theme SOURCES (never to the resulting heights, so
 ## the invariant holds under any future theme):
-##   - Bar: the ProgressBar "minimum_height" theme constant, plus the track
-##     StyleBoxFlat's VERTICAL expand margins (SIDE_TOP/SIDE_BOTTOM). The
-##     HORIZONTAL 8.0 is deliberately kept — it is the Q5 "track visible at
-##     full HP" fix (the 8px track halo). These feed the control's combined
-##     minimum size, which is what clamps the authored 12 upward to 22.
+##   - Bar: the ProgressBar "minimum_height" THEME CONSTANT only. Measured
+##     2026-08-28: the authored 12 was being pushed to 22 by the project theme's
+##     ProgressBar minimum_height, not by the track stylebox — with the constant
+##     overridden the bar's combined minimum is 4.0 (just the 2+2 px track
+##     border), i.e. the authored floor governs again. The track stylebox's
+##     expand margins therefore stay 8.0 on ALL FOUR sides: they are the Q5
+##     "track visible at full HP" halo (the drawn track grows 8 px past the rect
+##     so a full bar reads as a bar, not a block), they are pinned as 8.0 on
+##     every side by tests/test_health_bar.gd, and StyleBox.get_minimum_size()
+##     does not include expand margins — trimming them would have bought nothing
+##     and broken a green pin.
 ##   - NameLabel: the cached backing stylebox's TOP/BOTTOM content margins
 ##     (2.0 -> 0.0). SIDE_LEFT/SIDE_RIGHT stay 3.0 — that is the ~6px seam two
 ##     adjacent nameplates depend on.
@@ -445,20 +477,17 @@ func update_health(current: int, max_hp: int) -> void:
 func _relayout_children() -> void:
 	if not is_instance_valid(_bar):
 		return
-	# Compact theme-derived inflation sources (never the resulting heights):
-	#   - Bar: ProgressBar "minimum_height" constant + the track StyleBoxFlat's
-	#     VERTICAL expand margins (the horizontal 8.0 stays — it is the Q5
-	#     "track visible at full HP" fix). These feed get_combined_minimum_size(),
-	#     which clamps Control.size upward; trimming the vertical pair is what
-	#     lets the Bar measure its authored height again.
+	# Compact theme-derived inflation SOURCES (never the resulting heights):
+	#   - Bar: the ProgressBar "minimum_height" theme constant, which is what
+	#     feeds get_combined_minimum_size() and clamped the authored 12 up to 22.
+	#     The track stylebox's 8.0 expand margins are LEFT ALONE on all four
+	#     sides — they are the Q5 full-HP track halo and do not enter the
+	#     minimum-size computation (StyleBox.get_minimum_size() = content margins
+	#     + borders only).
 	#   - NameLabel: the cached backing StyleBoxFlat's TOP/BOTTOM content
 	#     margins (2.0 -> 0.0). SIDE_LEFT/SIDE_RIGHT stay 3.0 — that is the
 	#     ~6px seam two adjacent nameplates depend on.
 	_bar.add_theme_constant_override("minimum_height", 0)
-	var bg: StyleBox = _bar.get_theme_stylebox("background")
-	if bg is StyleBoxFlat:
-		bg.set_expand_margin(SIDE_TOP, 0.0)
-		bg.set_expand_margin(SIDE_BOTTOM, 0.0)
 	if _name_backing_sb != null:
 		_name_backing_sb.set_content_margin(SIDE_TOP, 0.0)
 		_name_backing_sb.set_content_margin(SIDE_BOTTOM, 0.0)
@@ -555,9 +584,22 @@ func follow_character() -> void:
 			# on the far side keeps follow_delta honest everywhere (<= 24) instead
 			# of clamping the bar into the hair band. bar_anchors_sprite_top stays
 			# false on the flipped path (the above-anchor rule did NOT run).
-			var ink_bottom: float = (get_viewport().get_final_transform()
-					* Vector2(0.0, _portrait_ink_bottom_world())).y
-			screen_pos = Vector2(screen_pos.x - 34.0, ink_bottom + 4.0)
+			var ink_bottom: float = _portrait_ink_bottom_world()
+			# Own-tile fallback for the flipped anchor. Measured 2026-08-28: with
+			# the ink-bottom anchor, top-band (7,1) and (11,2) bars sat at y
+			# 224..251 — INSIDE the right-column action stack (EndTurnButton
+			# 92..128, AttackButton 136..172, UndoButton 176..212), because their
+			# columns 7 and 11 overlap those buttons' x range. A nameplate printed
+			# over three action buttons is not a fix, so the flipped bar goes under
+			# the unit's own tile instead: tile bottom = feet + TILE/2, giving a
+			# consistent 28 px gap under the feet, clear of the action stack and of
+			# the STRIP zone (the retained clamp below stays the last resort).
+			var feet: float = float(_char_node.global_position.y)
+			var tile_bottom: float = feet + 32.0
+			var flip_y: float = ink_bottom + 4.0
+			if tile_bottom > flip_y:
+				flip_y = tile_bottom
+			screen_pos = Vector2(screen_pos.x - 34.0, flip_y)
 			bar_anchors_below_portrait = true
 			bar_anchors_sprite_top = false
 		else:
