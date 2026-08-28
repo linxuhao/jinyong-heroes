@@ -41,18 +41,18 @@ GridManager.board_rect() ◀──── 常量源 ────┐        │
                                        且 follow_target_is_active == true
 ```
 
-**点击反向流(屏幕→世界,相机一动就必须配对)**:
+**点击反向流(屏幕→世界,现状已正确、相机感知;health_bar 跟随才是要修的)**:
 ```
 InputEventMouseButton.position(viewport-px)
         │  harness 用 get_global_transform_with_canvas().origin 解锚(相机感知,既有契约)
         ▼
 注入屏幕点 ──▶ player.gd 点击入口
-        │  Coord.screen_to_world(pos, get_viewport())   ← 本轮新增(替换 identity 假设)
+        │  get_canvas_transform().affine_inverse() * pos  (现状已如此;可选收敛到 Coord.screen_to_world,行为逐字等价)
         ▼
 handle_world_click(world_pos) ──▶ 五步解析器(世界空间 portrait_ink_rect)
 ```
 
-health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMarkers/背景/网格是世界空间 Node2D,随相机移动(免费)。
+health_bar.gd 跟随现用 get_final_transform()(**漏相机,本轮修走 Coord.world_to_screen / canvas transform**);TileMarkers/背景/网格是世界空间 Node2D,随相机移动(免费)。
 
 ## 组件列表
 
@@ -73,15 +73,18 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
   7. **平滑关闭**:`position_smoothing_enabled = false`(确定性;帧钉断言不与缓动赛跑)。
 - **传送/回合切换**:`reset_smoothing()` + `force_update_scroll()` 在(战斗开始进入 STATE_BATTLE)+ (每次 `CombatManager.turn_started` / `phase_changed` 目标跳变)时调用,**先于任何帧钉断言**——战斗开始那次是与第 0 帧赛跑的那个。
 - **HUD 节点解析**:懒加载缓存 `_top_strip`/`_skill_bar`(从 Camera 节点 `../HUDLayer/HUD/TopStrip`、`../HUDLayer/HUD/SkillBar`,defensive `get_node_or_null`;main/menu 双子结构一致)。HUD 几何静态,可缓存;每帧重读也安全。
-- **发布(surface 块 `Camera:`)**:`camera_position: Vector2`、`camera_x_lo/hi`、`camera_y_lo/hi`、`hud_band_top`、`hud_band_bottom`、`active_unit_screen_y`(= `Coord.world_to_screen(target.position, get_viewport()).y`)、`follow_target_id: String`(活跃单位名)、`follow_target_is_active: bool`(在脚本内 `follow_target_id == CombatManager.active_unit_name`)。
+- **发布(surface 块 `Camera:`)**:`camera_position: Vector2`、`camera_x_lo/hi`、`camera_y_lo/hi`、`hud_band_top`、`hud_band_bottom`、`active_unit_screen_y`(= `Coord.world_to_screen(target.position, get_viewport()).y`,**canvas transform,含相机**)、`active_unit_world_y`(= `target.position.y`)、`viewport_half_y`(= `get_viewport_rect().size.y/2`,读不写字面量)、`follow_target_id: String`(活跃单位名)、`follow_target_is_active: bool`(在脚本内 `follow_target_id == CombatManager.active_unit_name`)。`active_unit_world_y`/`viewport_half_y` 专为变换钉子(§camera_transform_follows_unit)而发,使 `active_unit_screen_y − active_unit_world_y == viewport_half_y − camera_position.y` 全用已发布量、零字面量。
 
 ### C2 · Coord(世界↔屏幕单一转换)— `scripts/coord.gd`(新)
 - **职责**:唯一拥有世界↔屏幕映射,避免三处各抄一份(player 点击、health_bar 跟随、follower 发布 active_unit_screen_y)。
-- **接口**(纯静态,取 viewport):
-  - `static func world_to_screen(world: Vector2, vp: Viewport) -> Vector2:` → `vp.get_final_transform() * world`
-  - `static func screen_to_world(screen: Vector2, vp: Viewport) -> Vector2:` → `vp.get_final_transform().affine_inverse() * screen`
-- **依据**:`get_final_transform()` 复合 stretch + 相机;既有 in-tree 模式见 `health_bar.gd` L561。今天(identity 相机、原生尺寸)数值上 screen==world;相机一动后这是唯一正确路径。
-- **消费方改动**:player.gd 点击入口改走 `Coord.screen_to_world`;health_bar.gd 可选改走 `Coord.world_to_screen`(已正确,不强制以降风险);follower 用 `Coord.world_to_screen`。
+- **接口**(纯静态,取 viewport;**建在 canvas transform 上,不是 final transform**):
+  - `static func world_to_screen(world: Vector2, vp: Viewport) -> Vector2:` → `vp.get_canvas_transform() * world`
+  - `static func screen_to_world(screen: Vector2, vp: Viewport) -> Vector2:` → `vp.get_canvas_transform().affine_inverse() * screen`
+- **依据(本轮更正,以本反馈为准)**:Godot 4 里相机写在 **canvas transform** 里,不在 final transform 里——`get_canvas_transform()` = 世界→视口(**Camera2D 在这里**);`get_final_transform()` = 视口→窗口像素(**只有 stretch,没有相机**)。两端消费方(HUD/血条所在的非跟随 CanvasLayer 与 `InputEventMouseButton.position`)都在**视口逻辑空间**,需要的正是「世界→视口」即 canvas transform。`final transform` 今天能用只因为缩放为 1,**本轮正是让相机动起来的那一轮,它不再恒等**。**Step 1 报告那句「health_bar.gd L561 already maps world→screen through get_final_transform() — the camera-aware screen mapping pattern already exists in-tree」是错的**(final transform 不含相机),以本架构为准。
+- **消费方改动(三处现状不同,逐处裁决)**:
+  - **player.gd 点击入口(本轮不强制改)**:现状 `handle_world_click(get_canvas_transform().affine_inverse() * event.position)`(player.gd:783、:585 右键、enemy.gd:321)**已经正确且相机感知**,`_common.yaml:82` 把这个形状记成了实测契约。可选「收敛到单一工具函数」,但**必须行为逐字等价**(结果 == `Coord.screen_to_world(event.position, get_viewport())`);为降风险可**干脆不动这三处**——实现者定,但要说清。
+  - **health_bar.gd 跟随(本轮真正要修的那处)**:L561、L578 现用 `get_viewport().get_final_transform() * ...`(**没有相机**)→ 改走 `Coord.world_to_screen`(canvas)。详见 C7。
+  - **follower 发布 `active_unit_screen_y`**:用 `Coord.world_to_screen`(canvas)。详见 C1。
 
 ### C3 · GridManager(常量源 + 删除 + board_rect 访问器)— `scripts/autoload/grid_manager.gd`(改)
 - **新增访问器**:`static func board_rect() -> Rect2:` 返回 `Rect2(Vector2.ZERO, Vector2(GRID_WIDTH*TILE_SIZE, GRID_HEIGHT*TILE_SIZE))`(棋盘艺术品矩形 `[0,W*T]×[0,H*T]`)。follower、backdrop fit、断言一律走它,**不再各自乘常量**。
@@ -99,15 +102,16 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
   - 两者为 0 = 立绘站在自己格子上。在 `_process` 末尾(算完 `portrait_ink_rect` 后)写入。
 - **删除**:`_refresh_sprite_clamp()`(player L1212 / enemy L435)及其在 `_process` 顶部的调用(player L419 / enemy L269)。删后精灵 offset 永远是脚锚点 `Vector2(0, -tex_size.y/2.0)`(已在 `_apply_*_visuals` 设好:player L1203 / enemy L426),不再每帧算钳位。`sprite_top` 退化为常量派生 `position.y - tex_size.y`(仍发布,health_bar 仍读)。
 - **`portrait_ink_rect` 注释更新**:去掉"world == screen under identity canvas transform / clamped offset"措辞,改为"未钳位脚锚点:ink = [feet.x − tex.w/2, feet.y − tex.h] .. [feet.x + tex.w/2, feet.y]"。
-- **点击入口屏幕→世界**:player.gd 调 `handle_world_click(world_pos)` 的入口(~L779-781,注释称"today event.position==world, affine inverse keeps path correct if a camera is added")必须改为 `handle_world_click(Coord.screen_to_world(event.position, get_viewport()))`。enemy.gd 若有同类 `event.position`/`get_canvas_transform()` 点击入口,一并走 `Coord.screen_to_world`(实现者 grep `event.position` / `get_canvas_transform` 核全)。`handle_world_click` 签名不变(已解耦)。
+- **点击入口(现状已正确,本轮行为不变)**:player.gd:783(`handle_world_click(get_canvas_transform().affine_inverse() * event.position)`)、player.gd:585(右键同形)、enemy.gd:321(同形)**已经正确且相机感知**,`_common.yaml:82` 把这个形状记成实测契约。注释"today event.position==world"是 identity 假设的旧措辞、**不属实**(它走的是 `get_canvas_transform().affine_inverse()`),应删/改。可选「收敛到 `Coord.screen_to_world`」,**但必须逐字等价**(结果 == `get_canvas_transform().affine_inverse() * event.position`);为降风险可**干脆不动这三处**——实现者定,但要说清。`handle_world_click` 签名不变(已解耦)。
 
 ### C6 · 五步立绘命中解析器(裁决:保留)— `player.gd::resolve_click_step`(改输入,不动逻辑)
 - **裁决**:保留。钳位无关理由——立绘 96×128 的墨迹从脚格向上/外延伸超出 64 格,点**可见身体**(非脚格)应命中该敌。判据问句"立绘站在格子上时它解决什么":解决"点身体而非点脚格"。
-- **唯一改动**:入口世界坐标经 C5 的 `Coord.screen_to_world` 后传入;解析器内部世界空间 `portrait_ink_rect.has_point(world_pos)`(L1062)逻辑不变。**out-of-reach 身体永不把可达空格变得点不到**的硬约束不变。
+- **唯一改动(若 C5 选择收敛)**:若 C5 把点击入口收敛到 `Coord.screen_to_world`(行为逐字等价),入口世界坐标经它传入;否则现状 `get_canvas_transform().affine_inverse() * event.position` 不动,解析器入口不变。解析器内部世界空间 `portrait_ink_rect.has_point(world_pos)`(L1062)逻辑不变。**out-of-reach 身体永不把可达空格变得点不到**的硬约束不变。
 
-### C7 · 名牌/血条跟随(裁决:保留,几何冻结)— `scripts/ui/health_bar.gd`(只改注释/无几何)
+### C7 · 名牌/血条跟随(裁决:保留,几何冻结;**本轮真正要修的变换点**)— `scripts/ui/health_bar.gd`(改跟随变换 + 删辩护注释)
 - **裁决**:保留。钳位无关理由——可读控件悬于头顶、避开 `0..T` 顶栏带;翻转路径锚到墨迹底边+4 = 单位自己脚+4(诚实的"站这里")。
-- **改动**:仅删 L569-574"Measured top-row landing (STRIP_BOTTOM + 2 = 94 clamp retained)… documented top-row landing"注释段;跟随逻辑已相机感知(L561 `get_final_transform()`),`STRIP_BOTTOM=92.0`(L49)与全部内部几何常数**冻结不动**(brief 硬约束)。
+- **改动**:仅删 L569-574"Measured top-row landing (STRIP_BOTTOM + 2 = 94 clamp retained)… documented top-row landing"注释段。**本轮真正要修的变换点**:health_bar.gd 是本轮**唯一坏**的那个跟随点——L561、L578 现用 `get_viewport().get_final_transform() * ...`(**只有 stretch、没有相机**);相机一动,血条/名牌会停在原地不跟人走(偏 `cam_y - V.y/2`)。改走 `Coord.world_to_screen(_char_node.global_position, get_viewport())`(canvas,**含相机**)。`STRIP_BOTTOM=92.0`(L49)与全部内部几何常数**冻结不动**(brief 硬约束:只改跟随用的变换,不改任何几何常数)。
+- **删辩护注释**:删 L556-560 那段——它写「get_final_transform() composes … with the canvas (camera) transform」(**错的**,final transform 不含相机)、「At the default scale-1 window it is numerically identical to … so existing assertions stay valid」(**用「今天看不出来」当理由**),是一段替缺陷辩护的散文,本轮拆钳位它得跟着走。
 - **断言**:health_bar_above_portrait.yaml 按**未钳位几何**重新推导(见 §playtest 契约改动)。
 
 ### C8 · TileMarkers 地面标记(裁决:保留,重写理由)— `scripts/ui/tile_markers.gd`(改 docstring)
@@ -147,8 +151,8 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
 ## playtest 契约改动(`playtest/_common.yaml` surface + 场景)
 
 ### surface 白名单(**append-only,只加不删**;`tests/test_playtest_contract_smoke.py` 守卫)
-- `Player` / `East_Heretic` / `West_Poison` / `South_Emperor` / `North_Beggar` / `Central_Divine`:各加 `ink_world_dx`、`ink_world_dy`。(注:West/South/North 现无 `sprite_top`;health_bar_above_portrait 重推导后若仍引用 `sprite_top`,补白名单;否则断言改用 `ink_world_dy` 表达。)
-- 新增块 `Camera:`:`camera_position`、`camera_x_lo`、`camera_x_hi`、`camera_y_lo`、`camera_y_hi`、`hud_band_top`、`hud_band_bottom`、`active_unit_screen_y`、`follow_target_id`、`follow_target_is_active`。
+- `Player` / `East_Heretic` / `West_Poison` / `South_Emperor` / `North_Beggar` / `Central_Divine`:各加 `ink_world_dx`、`ink_world_dy`、`health_bar_screen_y`(health_bar.gd 发布其实际绘制屏 y,供变换钉子断"血条跟着走",不第二次自算矩形)。(注:West/South/North 现无 `sprite_top`;health_bar_above_portrait 重推导后若仍引用 `sprite_top`,补白名单;否则断言改用 `ink_world_dy` 表达。)
+- 新增块 `Camera:`:`camera_position`、`camera_x_lo`、`camera_x_hi`、`camera_y_lo`、`camera_y_hi`、`hud_band_top`、`hud_band_bottom`、`active_unit_screen_y`、`active_unit_world_y`、`viewport_half_y`(=`get_viewport_rect().size.y/2`,读不写字面量)、`follow_target_id`、`follow_target_is_active`。`active_unit_world_y`/`viewport_half_y` 专为变换钉子(§camera_transform_follows_unit)而发,使 `active_unit_screen_y − active_unit_world_y == viewport_half_y − camera_position.y` 全用已发布量、零字面量。
 - 不删既有 `portrait_visible`/`portrait_fail_layer`/`portrait_covered_frac`/`sprite_top`/`portrait_ink_rect`(append-only)。
 
 ### 场景(可改既有断言/帧,见 jinyong-nodes 先例;场景数 append-only)
@@ -156,6 +160,13 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
   - boot 到战斗 f40,断言 Player + 五敌 `abs(ink_world_dx) <= 1.0 and abs(ink_world_dy) <= 1.0`。
   - **走位腿**:把玩家走到最北合法格(行 1,如 (6,1) 或 (8,1),行 0 是边界环不可入),到达帧重新断言同样两条。click 序列由实现者照 `click_move_to_tile` 多步走法风格 author。
   - **必须能红**:Phase 1(钳位仍在、出生点已恢复行 1-2)时,Central_Divine (7,1) dy=124、East/West (·,2) dy=60 → 红;走位腿玩家到 (6,1) dy=124 → 红。Phase 2 删钳位后全绿。若缺陷存在时也绿,无价值。
+- **NEW `playtest/camera_transform_follows_unit.yaml`(变换钉子,专门盯 canvas vs final,可独立于钳位红)**:
+  - 专门盯本轮真正要修的那个变换(health_bar/follower 用 canvas transform,**不是** final transform)。现有断言(含改写后的 portrait_visibility)盯不住它——错变换下 `active_unit_screen_y` 恰好恒等于 `active_unit_world_y`、且恒在带内,会自洽地绿。
+  - boot 到战斗,把玩家走到最北合法格(行 1,与 portrait_grid_alignment 走位腿同款),**在相机被钳到 cam_y_lo、不在棋盘中心的到达帧**断言:
+    - `Camera.follow_target_is_active == true`;
+    - `Camera.active_unit_screen_y - Camera.active_unit_world_y == Camera.viewport_half_y - Camera.camera_position.y`(**推导式,非字面量**;今天代入 = 92)。在**正确**(canvas)变换下成立;在 final-transform(漏相机)版本下左式恒为 0 → **红**。
+    - 同一帧断血条/名牌跟着走:`Player.health_bar_screen_y` 与 `Camera.active_unit_screen_y` 同向偏移(偏移量由 health_bar 几何常数导出,见 §像素推导;用已发布量,**不第二次自算矩形**)——final 版下血条停在 world 空间不跟、偏移错 → 红。
+  - **必须能红**:若实现误用 final transform(漏相机),左式 0 ≠ 92 → 红;正确用 canvas → 92 == 92 绿。这正是它存在的理由:盯住「变换本身对不对」,而非「立绘站不站格子」(后者由 portrait_grid_alignment 盯)。
 - **改写 `playtest/portrait_visibility.yaml` → 相机级**:
   - 删精灵级 `portrait_visible`/`sprite_top>=0`/`portrait_covered_frac<0.25` 作**闸门**的断言(保留 `portrait_tex_size>0` 作纹理存在 sanity)。
   - 改为:`Camera.follow_target_is_active == true`、`Camera.active_unit_screen_y >= Camera.hud_band_top and <= Camera.hud_band_bottom`、`Camera.camera_y >= Camera.camera_y_lo and <= Camera.camera_y_hi`。全部在 `Camera:` 单 surface 块内(断言只见一个块)。
@@ -173,8 +184,8 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
 **判据:pin 必须先红后绿;相机/点击配对必须先于/同时于删钳位。**
 
 - **Task A(Phase 1,pin 落地→红)**:C5 加 `ink_world_dx/dy`;NEW `portrait_grid_alignment.yaml`(静态+走位腿);恢复出生点 (7,1)/(3,2)/(11,2);删 MIN_LEGAL_ROW(行 0-2 重新合法,走位腿可达行 1)。**钳位仍在**。→ pin 红(Central dy=124、East/West dy=60、走位腿玩家到行1 dy=124)。其余场景:钳位在 → 仍绿。
-- **Task B(相机预置,可与 A 并行)**:C1 CameraFollower + C2 Coord + C4 `get_active_unit()` + C5 点击入口 screen→world + C9 backdrop 读 GridManager + surface 白名单加项。**钳位仍在** → 相机随活跃单位移动,ink 仍被钳在屏内,portrait_visibility(仍精灵级)绿,pin 仍红;click 经 screen→world 正确。
-- **Task C(删钳位 + 闸门/背书重写,依赖 A+B)**:删 clamp_sprite_offset/_refresh_sprite_clamp/BOARD_TOP_MARGIN_Y;改写 portrait_visibility.yaml → 相机级;重推 health_bar_above_portrait.yaml + 删 health_bar.gd L569-574 注释;重推 click_portrait_body_targets_enemy.yaml(+60→-64);重基线 test_click_priority.gd。→ pin 全绿(静态+走位腿);相机级闸门绿;背书清除;冻结四 + spine + GDScript 单元套件绿。
+- **Task B(相机预置,可与 A 并行)**:C1 CameraFollower + C2 Coord(**canvas transform**,非 final)+ C4 `get_active_unit()` + C7 health_bar 改走 `Coord.world_to_screen`(canvas,**本轮真正要修的变换点**)+ C9 backdrop 读 GridManager + surface 白名单加项。**钳位仍在** → 相机随活跃单位移动,ink 仍被钳在屏内。**⚠ 待实测预测(不许为了让 B 单独绿而放宽探针或推迟改写闸门)**:`portrait_visibility`(仍精灵级)很可能在 Task B 就红——`visibility_probe.gd:230` 用 `get_global_transform_with_canvas()`(**相机感知**),相机一动、钳位还在时它会如实报告立绘出屏/被遮。若红则照实报,要么 B 与 C 一起交付(闸门改写并入),要么把这条标成「待实测」;**不许**为保 B 单绿而放宽探针或推迟 portrait_visibility 改写。变换钉子(camera_transform_follows_unit)在 B 即应绿(canvas 已用对)——若实现误用 final 则红,正是它的用途。
+- **Task C(删钳位 + 闸门/背书重写,依赖 A+B)**:删 clamp_sprite_offset/_refresh_sprite_clamp/BOARD_TOP_MARGIN_Y;改写 portrait_visibility.yaml → 相机级(若 B 已红则此处只是落地;若 B 标「待实测」则 C 必须一并交付闸门改写以收红);重推 health_bar_above_portrait.yaml + 删 health_bar.gd L569-574 注释段(L556-560 辩护注释已在 B 随 C7 变换修复删);重推 click_portrait_body_targets_enemy.yaml(+60→-64);重基线 test_click_priority.gd。→ ink 对位 pin 全绿(静态+走位腿);变换钉子绿(canvas 已对);相机级闸门绿;背书清除;冻结四 + spine + GDScript 单元套件绿。
 
 > A、B 可并行;C 依赖二者。中间态的瞬态红(如 Task C 内部删钳位后、闸门改写前)是实施中,非交付检查点;交付检查点是 C 完成后全绿。
 
@@ -197,6 +208,7 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
 - **身体中心偏移**=`−PORTRAIT_TEX_Y/2 = −128/2 = −64`(墨迹中心相对脚)。故 click_portrait_body Central_Divine `+0,+60`(钳位补偿)→ `+0,-64`(身体中心)。
 - **未钳位 ink 矩形(行 r,feet=(x,y))**:`Rect2(Vector2(x-48, y-128), Vector2(96,128))`。行1 (7,1) feet (480,96) → `Rect2((432,-32),(96,128))`(test_click_priority 夹具新值)。
 - **dx 恒 0**:未钳位 ink center.x = feet.x(offset.x=0,纹理居中)→ dx=0。钳位只动 y,故 dx 恒 0;pin 的 dx 分量恒绿,真值在 dy。
+- **变换钉子推导(camera_transform_follows_unit)**:玩家到行 1,feet world y = GRID_ORIGIN.y + TILE_SIZE*1 = 32+64 = 96;cam_y 钳到 cam_y_lo = 260;**canvas 变换**下 screen_y = world_y + (V.y/2 − cam_y) = 96 + (352−260) = 96+92 = **188**;故 `active_unit_screen_y − active_unit_world_y = 188−96 = 92`,而 `viewport_half_y − camera_position.y = 352−260 = 92` → 等式成立(绿)。**final-transform(漏相机)版**:screen_y = world_y = 96 → 左式 = 0 ≠ 92 → **红**。`viewport_half_y` = `get_viewport_rect().size.y/2` = 352(读不写字面量)。血条跟随:`Player.health_bar_screen_y` 与 `active_unit_screen_y` 的偏移由 health_bar 几何常数(sprite_top / 头像高 / 悬浮偏移)导出;final 版下血条停在 world 空间不跟、偏移错 → 红。
 
 ## 代价(已知接受,写进 design/90_decisions.md + 40_ux_backlog.md)
 
@@ -220,14 +232,14 @@ health_bar.gd 跟随已用 `get_final_transform()`(相机感知,既有);TileMark
 ## 风险与回滚
 
 - **不可逆度低**:删除的是函数/常量/规则,可由 git 回滚。无 DB/批量数据。
-- **配对风险(最高)**:删钳位前若 player.gd screen→world 或 harness 相机感知任一缺失,click 在 cam≠center 位置全偏→冻结四红。**缓解**:Task B 先落 screen→world + 验证 harness;Task C 删钳位前四条已绿于移动相机。变红则上报原因不削弱。
+- **配对风险(最高)**:本轮的配对是 **health_bar/follower 用 canvas transform(含相机)+ harness 已相机感知(`get_global_transform_with_canvas`)+ click 入口已相机感知(`get_canvas_transform().affine_inverse()`,现状即对)**。删钳位后若任一退回 final transform(漏相机)或 harness 假定 identity,click/血条在 cam≠center 位置全偏→冻结四红。**缓解**:Task B 先落 canvas 变换(C2/C7)+ 验证 harness 走 `get_global_transform_with_canvas`;Task C 删钳位前四条已绿于移动相机。变红则上报原因不削弱。**注**:click 入口(player.gd:783/:585、enemy.gd:321)现状即 `get_canvas_transform().affine_inverse()`,本轮不强制改(见 C5);若收敛到 `Coord.screen_to_world` 必须逐字等价。
 - **中间态红**:Task A 后 pin 故意红(预期);Task C 内部瞬态红(闸门改写前)——非交付检查点。
 - **出生点恢复连断**:恢复 (7,1)/(3,2)/(11,2) + 删 MIN_LEGAL_ROW 须同 Task A(否则 (7,1) 不可达/走位腿不可走)。click_portrait_body 的身体 click 在 Task A(钳位在)用 +60 仍绿,Task C 改 -64。
 - **回滚路径**:git revert Task C → 回到 Task B 状态(pin 红,相机在动,钳位在);再 revert A → 回到原始钳位态。
 
 ## 技术栈 / 工具
 
-- **Godot 4.4 内建**:Camera2D(position/limits/reset_smoothing/force_update_scroll)、`Viewport.get_final_transform()`/`get_canvas_transform()`、CanvasLayer `follow_viewport_enabled=false`(HUD/Tutorial 已是非跟随)。零第三方依赖。
+- **Godot 4.4 内建**:Camera2D(position/limits/reset_smoothing/force_update_scroll)、**`Viewport.get_canvas_transform()`(世界→视口,含相机;本轮变换用此,非 final)**、`Viewport.get_final_transform()`(视口→窗口像素,只 stretch,漏相机——health_bar.gd 旧用法本轮改掉)、CanvasLayer `follow_viewport_enabled=false`(HUD/Tutorial 已是非跟随)。零第三方依赖。
 - **既有 playtest harness + 边车 `/script`**:跑 `res://tests/unit_test_runner.gd`(test_health_bar.gd / 重基线 test_click_priority.gd 不回归);`/playtest` 跑 57 场景;`/compile` 跑整仓解析。
 - **既有 surface 守卫**:`tests/test_playtest_contract_smoke.py`(append-only)、`tests/test_i18n_coverage.py`(中文文案,本轮相机工作不引入新字符串→保持绿)。
 
