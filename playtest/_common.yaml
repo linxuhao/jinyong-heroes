@@ -83,6 +83,17 @@
 # enemy.gd 现在都是这个形状。另外 Godot 的 GUI 拾取器不会把事件路由到
 # 「祖先是 Node2D 的 Control」——世界坐标的命中要走 `_input` 中继。
 #
+# `hovers:` — MOTION-ONLY mouse events (2026-08-28, Defect C).
+# A `hovers:` entry uses the SAME "<Node>[ +dx,dy]" anchor grammar as `clicks:`
+# (Control 取 get_global_rect() 的中心) but takes NO button token:
+# `TraitToggle5` moves the pointer there without pressing, so Button
+# mouse_entered / mouse_exited fire with no press. A `left`/`right`/`middle`
+# token after a hover entry is a push_error HARD failure, never a silent
+# ignore. Why motion-only matters: a `clicks:` entry also fires mouse_entered
+# (pointer moves before the press), so hover-WITHOUT-toggle can only be pinned
+# by a motion-only entry. A same-frame `hovers:` entry is pushed before any
+# `clicks:` entry (pointer-then-press, matching a real mouse).
+#
 # ── AUTHORED HEADER, carried verbatim from the monolithic
 #    playtest_spec.yaml this directory replaced ──
 # Playtest contract — audited (step playtest_contract, A1-A19) against the
@@ -638,6 +649,7 @@ surface:
   - hp_value
   - hp_text
   - confirm_summary_text
+  - trait_index
   - trait_hover_index
   - hover_connected
   SectSelectScreen:
@@ -737,6 +749,10 @@ surface:
   - size
   - mouse_filter
   TraitToggle0:
+  - visible
+  - size
+  - mouse_filter
+  TraitToggle5:
   - visible
   - size
   - mouse_filter
@@ -849,3 +865,4 @@ scenario_order:
 - map_node_event_mainline_return
 - map_hint_single
 - map_battle_node_huashan
+- trait_hover_preview

@@ -56,6 +56,7 @@ ROUND_SCENARIOS: list[str] = [
     "map_node_event_mainline_return",
     "map_hint_single",
     "map_battle_node_huashan",
+    "trait_hover_preview",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen

@@ -1,0 +1,75 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Defect C regression pin: hovering a TraitToggle{i} must preview trait i's
+# description IMMEDIATELY (Button.mouse_entered) and revert to trait_index's
+# entry on mouse_exited — through the display-only trait_hover_index channel.
+# Hover must never write trait_index (the keyboard focus / toggle target),
+# never toggle (trait_ids / points_left untouched), never fire pressed.
+# Driven with the harness's motion-only `hovers:` syntax: a `clicks:` entry
+# also fires mouse_entered (motion-before-press), so hover-without-toggle is
+# only assertable motion-only.
+#
+# Walk: direct creation.tscn boot (ATTRS at f30) -> clicks: AttrNextButton ->
+# TRAITS (_on_accept resets trait_index to 0). Then hovers: TraitToggle5
+# (身轻如燕 / swallow_lightness) -> preview; hovers: TraitNextButton (the
+# pointer leaves the toggle) -> revert to trait 0 (左右互搏).
+name: trait_hover_preview
+description: >-
+  creation.tscn direct boot: reach TRAITS by clicking AttrNextButton, then a
+  motion-only hover on TraitToggle5 sets CreationScreen.trait_hover_index == 5
+  and TraitDescLabel.text previews trait 5 身轻如燕 (穿过敌人所在格) while
+  trait_index stays 0, trait_ids stays empty and points_left stays 30 (no
+  toggle, no spend); hovering TraitNextButton moves the pointer off the toggle,
+  trait_hover_index returns to -1 and the description reverts to trait 0
+  左右互搏 (技能栏可装). hover_connected["TraitToggle5"] pins the wiring. No
+  clicks land on the toggle, so no toggle can fire.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.trait_index: trait_index == 0
+    CreationScreen.trait_ids: trait_ids.is_empty() == true
+    CreationScreen.trait_hover_index: trait_hover_index == -1
+    CreationScreen.points_left: points_left == 30
+    CreationScreen.hover_connected: hover_connected["TraitToggle5"] == true and hover_connected["TraitToggle0"] == true
+    TraitToggle5.visible: false
+- at: 40
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 60
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+    CreationScreen.phase: changed
+    CreationScreen.trait_index: trait_index == 0
+    TraitToggle5.visible: true
+    TraitToggle5.mouse_filter: mouse_filter == 0
+- at: 70
+  actions: []
+  hovers:
+  - TraitToggle5
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.trait_hover_index: trait_hover_index == 5
+    TraitDescLabel.text: text.contains("穿过敌人所在格") == true
+    CreationScreen.trait_index: trait_index == 0
+    CreationScreen.trait_ids: trait_ids.is_empty() == true
+    CreationScreen.points_left: points_left == 30
+- at: 100
+  actions: []
+  hovers:
+  - TraitNextButton
+- at: 120
+  actions: []
+  assert:
+    CreationScreen.trait_hover_index: trait_hover_index == -1
+    TraitDescLabel.text: text.contains("技能栏可装") == true
+    CreationScreen.trait_index: trait_index == 0
+    CreationScreen.trait_ids: unchanged
+    CreationScreen.points_left: points_left == 30
