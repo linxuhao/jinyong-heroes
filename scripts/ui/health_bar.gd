@@ -58,6 +58,23 @@ var _char_node: Node = null
 ## Cached ratio for color blending.
 var _last_ratio: float = 1.0
 
+## Screen-space top edge of the widget this frame (== global_position.y after
+## the clamp). Published in follow_character() after the clamp assigns
+## global_position; retains its previous-frame value on the early-return paths.
+var bar_top: float = 0.0
+
+## Screen-space bottom edge of the widget this frame (== global_position.y +
+## size.y). Published in follow_character() after the clamp; retains its
+## previous-frame value on the early-return paths.
+var bar_bottom: float = 0.0
+
+## True when the unclamped desired widget bottom == sprite_top - 4 (the
+## portrait-top anchor path ran); false only on the legacy feet fallback for a
+## character node without a sprite_top property. It does NOT change when the
+## STRIP_BOTTOM clamp bites (e.g. top-row Central_Divine still reports true —
+## only the final position is clamped).
+var bar_anchors_sprite_top: bool = false
+
 ## The character display name shown on the label. Always set by setup(),
 ## even if the label node is missing, so it is safe to assert on.
 var name_text: String = ""
@@ -413,11 +430,28 @@ func follow_character() -> void:
 	# At the default scale-1 window it is numerically identical to the old
 	# camera.get_canvas_transform(), so existing assertions stay valid.
 	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
-	# Compact 68×24 widget: offset by half the widget width (34) so it stays
-	# horizontally centred above the character, and −32 to float it above the
-	# feet without covering the actor (widget bottom edge stays 8 px above the
-	# character: 32 − 24 = 8, the same hover height as before).
-	screen_pos += Vector2(-34, -32)
+	# Portrait-top anchor: the widget bottom sits 4 px above the character's
+	# per-frame sprite_top (world px, published by player.gd / enemy.gd in
+	# _refresh_sprite_clamp()), so the nameplate reads as belonging to the
+	# portrait instead of sitting on the shins. sprite_top is mapped through
+	# the same viewport transform used above; under the identity canvas
+	# transform it is numerically sprite_top. Read defensively via get() so a
+	# character node without the property falls back to the legacy feet anchor.
+	# Measured top-row landing (STRIP_BOTTOM + 2 = 94 clamp retained): for
+	# Central_Divine sprite_top == 92; the bar wants top 92 - 4 - 24 = 64
+	# (inside the top strip) and is clamped to top 94, spanning y 94..118 over
+	# the hair/forehead band [92, 132]; the face of a 128 px portrait starts
+	# ~ sprite_top + 40 = 132, so the clamped bar does NOT cover the face.
+	# Mid-board units sit strictly above sprite_top (no clamp bite).
+	var top: Variant = _char_node.get("sprite_top") if _char_node != null else null
+	if typeof(top) == TYPE_FLOAT:
+		var top_y: float = (get_viewport().get_final_transform() * Vector2(0.0, float(top))).y
+		screen_pos = Vector2(screen_pos.x - 34.0, top_y - 4.0 - size.y)
+		bar_anchors_sprite_top = true
+	else:
+		# Legacy feet fallback (defensive): char node without sprite_top.
+		screen_pos += Vector2(-34, -32)
+		bar_anchors_sprite_top = false
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
 	# the bar is unclamped and free-following; grows only when a viewport edge
@@ -441,6 +475,10 @@ func follow_character() -> void:
 	global_position = Vector2(
 		clampf(screen_pos.x, 4.0, vp.x - size.x - 4.0),
 		clampf(screen_pos.y, STRIP_BOTTOM + 2.0, vp.y - size.y - 4.0))
+	# Publish the post-clamp live geometry observables (read AFTER the clamp
+	# assigns global_position; early-return paths retain previous values).
+	bar_top = global_position.y
+	bar_bottom = global_position.y + size.y
 	visible = true
 
 # ---------------------------------------------------------------------------
