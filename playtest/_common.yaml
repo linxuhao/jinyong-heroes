@@ -675,6 +675,7 @@ surface:
   - event_id
   - event_focus
   - entry_declared_gap_types
+  - entry_battle_id
   - silver
   - attr_bone
   - attr_inner
@@ -845,3 +846,4 @@ scenario_order:
 - map_node_event_mainline_east
 - map_node_event_mainline_return
 - map_hint_single
+- map_battle_node_huashan

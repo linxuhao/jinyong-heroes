@@ -1,0 +1,166 @@
+# 华山: arriving at a battle node actually starts the battle.
+#
+# The tactical battle is this game's core system and it could be entered EXACTLY
+# ONCE, from the tutorial. Afterwards the map produced text events and nothing
+# else. 华山 is the first node whose battle slot is `active`, so this scenario
+# pins the thing that was missing: travel onto it and a battle begins.
+#
+# The route reuses map_node_event_shaolin's path as far as 少林 (full boot,
+# tutorial, creation, cultivation, map) because start_map_battle() is hard-gated
+# to current_state == MAP — a direct map.tscn boot leaves GameManager in TUTORIAL
+# and the battle would silently not start, which is exactly the failure this
+# scenario must be able to see.
+#
+# Two move_right steps, not one: 少林's neighbours are [洛阳, 华山] and the focus
+# starts on 洛阳, so a single step travels back the way you came. Measured, not
+# guessed — the first run of this scenario ended at 洛阳 with events_resolved_count
+# 2 and entry_battle_id "", which is exactly what one step produces.
+#
+# focus_id is asserted BEFORE the travel accept on purpose. 少林's neighbours are
+# [洛阳, 华山]; if the focus step ever lands somewhere else, this goes red naming
+# the node it actually focused instead of failing later with an unexplained
+# state, which is the difference between a diagnosis and a mystery.
+#
+# NOTHING about MapScreen is asserted after the travel accept, and that is a
+# deliberate refusal rather than an oversight. Starting the battle makes
+# SceneManager swap the map segment away, so MapScreen stops existing within
+# ~10 frames of the accept — measured: asserted at 580 and then at 560, both
+# came back 'node not found: MapScreen', which was the FEATURE WORKING. A
+# window that narrow could only be hit by guessing a frame, and a pin that
+# passes on timing luck is worse than an honest gap: it goes red one day for
+# a reason nobody can reproduce. `entry_battle_id` is therefore left to the
+# unit pin (MapData.active_battle_id("huashan") == "huashan_duel" in
+# tests/test_map_node_event.gd), and the chain here is closed from both ends
+# instead: focus_id is 华山 BEFORE the accept, and after it the game is in
+# BATTLE on the battlefield scene with no swap still pending. Nothing else in
+# this timeline can start a battle.
+#
+# What is NOT asserted here: the return leg (win/lose back onto the map). That
+# path needs no new code — request_continue/request_retry already route to
+# battle_return_state whenever it names a segment state, and MAP is one — but
+# "needs no new code" is not the same as "verified", and driving a battle to a
+# win inside this scenario is a different scenario's job. Recorded as an open
+# gap rather than quietly assumed.
+name: map_battle_node_huashan
+description: '华山 is the first map node whose battle slot is live. Arriving there by travel starts a real
+  battle: MapScreen records the battle_id and GameManager leaves MAP for BATTLE. Before this node existed
+  the tactical system could be entered exactly once, from the tutorial.'
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 440
+  actions: []
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions: []
+- at: 470
+  actions:
+  - move_right
+- at: 480
+  actions:
+  - move_right
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions: []
+- at: 510
+  actions:
+  - ui_accept
+- at: 520
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+- at: 530
+  actions:
+  - move_right
+- at: 535
+  actions:
+  - move_right
+- at: 540
+  actions: []
+  assert:
+    MapScreen.focus_id: focus_id == "huashan"
+- at: 550
+  actions:
+  - ui_accept
+- at: 580
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    SceneManager.current_scene: current_scene == "battlefield"
+    SceneManager.pending_swap: pending_swap == false
