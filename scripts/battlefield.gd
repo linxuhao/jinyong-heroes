@@ -171,18 +171,19 @@ func _setup_tilemap(floor_tex: Texture2D, border_tex: Texture2D) -> void:
 	# source_id = 0 (the only source), atlas_coords = Vector2i(0,0) for floor
 	# and Vector2i(1,0) for border.
 
-	# Paint the grid: floor everywhere.
-	for y in range(GRID_HEIGHT):
-		for x in range(GRID_WIDTH):
+	# Paint the grid: floor everywhere (loop bounds read GridManager so a
+	# live board-size change is reflected without touching this file).
+	for y in range(GridManager.GRID_HEIGHT):
+		for x in range(GridManager.GRID_WIDTH):
 			_tilemap.set_cell(0, Vector2i(x, y), 0, Vector2i(0, 0))
 
 	# Paint border tiles on edges (overwrites floor).
-	for x in range(GRID_WIDTH):
+	for x in range(GridManager.GRID_WIDTH):
 		_tilemap.set_cell(0, Vector2i(x, 0), 0, Vector2i(1, 0))           # top edge
-		_tilemap.set_cell(0, Vector2i(x, GRID_HEIGHT - 1), 0, Vector2i(1, 0))  # bottom edge
-	for y in range(GRID_HEIGHT):
+		_tilemap.set_cell(0, Vector2i(x, GridManager.GRID_HEIGHT - 1), 0, Vector2i(1, 0))  # bottom edge
+	for y in range(GridManager.GRID_HEIGHT):
 		_tilemap.set_cell(0, Vector2i(0, y), 0, Vector2i(1, 0))           # left edge
-		_tilemap.set_cell(0, Vector2i(GRID_WIDTH - 1, y), 0, Vector2i(1, 0))  # right edge
+		_tilemap.set_cell(0, Vector2i(GridManager.GRID_WIDTH - 1, y), 0, Vector2i(1, 0))  # right edge
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +199,10 @@ func _fit_backdrop_to_board() -> void:
 	var tex_size: Vector2 = _backdrop.texture.get_size()
 	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
 		return
-	var board := Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE)  # (960, 704)
+	# Board geometry comes from GridManager (the single constant source), never
+	# from local mirrors — a live board-size change re-fits the backdrop with
+	# zero edits here.
+	var board: Vector2 = GridManager.board_rect().size
 	_backdrop.scale = Vector2(board.x / tex_size.x, board.y / tex_size.y)
 	_backdrop.position = board / 2.0
 	var half: Vector2 = tex_size * _backdrop.scale / 2.0
@@ -774,20 +778,16 @@ func _instantiate_player(data) -> Node:
 func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 	var enemies: Array[Node] = []
 
-	# Starting grid positions for each enemy. These are the CLAMP-ERA
-	# down-shifted rows (Central_Divine (7,3), East_Heretic (3,4),
-	# West_Poison (11,4)); grid row legality imposes no minimum row now —
-	# is_walkable is bounds + border ring only, so every interior row
-	# (1..GRID_HEIGHT-2) is legal and rows 0..2 are open again. Restoring
-	# the original spawns Central_Divine (7,1) / East_Heretic (3,2) /
-	# West_Poison (11,2) is the spawn-restore task's job, NOT this one —
-	# the values below are frozen.
+	# Starting grid positions for each enemy, restored to their original
+	# top-row spawns: Central Divine (7,1), East Heretic (3,2), West
+	# Poison (11,2). Grid row legality is bounds + border ring only, so rows
+	# 0..2 are open again and these spawns are legal interior tiles.
 	var positions: Dictionary = {
-		"East Heretic":   Vector2i(3, 4),
-		"West Poison":    Vector2i(11, 4),
+		"East Heretic":   Vector2i(3, 2),
+		"West Poison":    Vector2i(11, 2),
 		"South Emperor":  Vector2i(3, 8),
 		"North Beggar":   Vector2i(11, 8),
-		"Central Divine": Vector2i(7, 3),
+		"Central Divine": Vector2i(7, 1),
 	}
 
 	# AI class name → script path mapping.
