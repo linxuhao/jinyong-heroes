@@ -114,9 +114,27 @@ func _load() -> void:
 	sfx_volume_db = clampf(float(cfg.get_value("audio", "sfx_volume_db", DEFAULT_SFX_DB)), VOL_MIN_DB, VOL_MAX_DB)
 	music_volume_db = clampf(float(cfg.get_value("audio", "music_volume_db", DEFAULT_MUSIC_DB)), VOL_MIN_DB, VOL_MAX_DB)
 	fullscreen = bool(cfg.get_value("display", "fullscreen", false))
-	# Persisted language overrides the locale auto-detect — except headless,
-	# which stays pinned to "zh" for harness determinism (see `language` doc).
-	if DisplayServer.get_name() != "headless":
+	# A persisted choice overrides the auto-detect — but ONLY in an exported
+	# build, which is the only place a real player can have made one.
+	#
+	# The guard used to ask `DisplayServer.get_name() != "headless"`, and the
+	# play-test harness is never headless (it runs on Xvfb in render mode
+	# whenever a scenario captures frames), so the harness read settings.cfg
+	# like a player would. One scenario mis-counted its keystrokes, activated
+	# the 语言 row instead of 返回, and persisted language=en into the shared
+	# user dir — after which EVERY later run inherited English and the suite,
+	# which asserts the Chinese source strings byte-for-byte, went red. Fixing
+	# _detect_language() alone did not help: measured 2026-08-28, a frame
+	# captured two hours after that fix was still English, because this line
+	# was still handing the stale file's answer back.
+	#
+	# `template` is the right question. A player runs an EXPORTED build (web or
+	# desktop) and OS.has_feature("template") is true there; the harness runs
+	# the editor binary with --path and it is false. So a desktop player's
+	# language choice still survives a restart — the reason this guard was left
+	# alone the first time — while no harness run can be steered by a file some
+	# other scenario wrote.
+	if OS.has_feature("template"):
 		var lang := str(cfg.get_value("general", "language", ""))
 		if lang == "zh" or lang == "en":
 			language = lang
