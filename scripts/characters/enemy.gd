@@ -115,6 +115,12 @@ var portrait_ink_rect: Rect2 = Rect2()
 ## The unit's own floating HealthBar global_position; (-1,-1) when no bar
 ## resolves (before HUD.setup() or after battle exit) — 3-number probe #3.
 var portrait_bar_pos: Vector2 = Vector2(-1, -1)
+## Forwarded anchor of this unit's floating nameplate: the HealthBar's
+## health_bar_world_y / health_bar_screen_y this frame. Relayed in _process so
+## the six unit surface blocks can assert the camera nail pin without a second
+## rect computation.
+var health_bar_screen_y: float = 0.0
+var health_bar_world_y: float = 0.0
 ## Measurement pin proving whether the authored ClickTarget Control's gui_input
 ## ever fires (the brief demands measurement, not the comment's claim). Expected
 ## measured value 0: Godot's GUI picker does not route events to a Control whose

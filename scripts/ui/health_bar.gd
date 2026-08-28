@@ -75,6 +75,22 @@ var bar_top: float = 0.0
 ## previous-frame value on the early-return paths.
 var bar_bottom: float = 0.0
 
+## World y of this frame's follow anchor point (the widget's PRE-clamp desired
+## anchor in WORLD px, before any viewport clamp). Which branch produced it:
+## above-portrait = sprite_top - 4 - size.y; flipped = ink_bottom + 4; legacy
+## feet = char.global_position.y - 32. Retains its previous-frame value on the
+## early-return paths (same semantics as bar_top/bar_bottom).
+var health_bar_world_y: float = 0.0
+
+## Screen y of that same anchor after Coord.world_to_screen (canvas transform,
+## camera-aware) — the pre-clamp projected position of the widget's anchor.
+## The camera nail pin asserts the clamp-independent invariant
+##   health_bar_screen_y - health_bar_world_y == viewport_half_y - camera_position.y
+## which holds only under the canvas (camera) transform; under the final
+## transform (no camera) the left side is 0 and the pin turns red. Retains its
+## previous-frame value on the early-return paths.
+var health_bar_screen_y: float = 0.0
+
 ## True when the widget is anchored by the portrait-TOP rule: the unclamped
 ## desired widget bottom == sprite_top - 4 (the above-portrait anchor path ran).
 ## False on two paths: the legacy feet fallback (a character node without a
@@ -86,9 +102,9 @@ var bar_anchors_sprite_top: bool = false
 
 ## True when this bar took the FLIPPED side of the portrait for this frame:
 ## the widget TOP is anchored 4 px below the portrait ink bottom (used for
-## top-band units, e.g. Central_Divine at (7,1) whose sprite_top == 92 leaves
-## only 2 px between the strip floor STRIP_BOTTOM + 2 == 94 and the portrait
-## top, so an above-portrait bar would be clamped back onto the hair band).
+## top-band units, e.g. Central_Divine at (7,1), whose above-portrait anchor
+## would land inside the top strip floor STRIP_BOTTOM + 2 == 94 and pull the
+## bar back over the portrait's upper ink).
 ## False = the normal "widget bottom 4 px above sprite_top" anchoring. Published
 ## every frame in follow_character() and whitelisted on the HealthBar playtest
 ## surface, so the flip side a unit actually got is assertable (never inferred
@@ -553,64 +569,66 @@ func follow_character() -> void:
 	# so size.y is the measured children sum (widget contains its own children).
 	_relayout_children()
 
-	# get_final_transform() composes the viewport's global (stretch) transform
-	# with the canvas (camera) transform, mapping the character's world position
-	# into the window-pixel space where this non-following-layer Control lives.
-	# At the default scale-1 window it is numerically identical to the old
-	# camera.get_canvas_transform(), so existing assertions stay valid.
-	var screen_pos: Vector2 = get_viewport().get_final_transform() * _char_node.global_position
+	# Map the character's world position to screen through the CANVAS transform
+	# (Coord.world_to_screen) — the camera-aware mapping. The final transform is
+	# only stretch (no camera); once the Camera2D moves it would stop following
+	# the world. screen_pos is the base for the lateral (-34) and the anchor
+	# offsets below.
+	var screen_pos: Vector2 = Coord.world_to_screen(_char_node.global_position, get_viewport())
 	# Portrait-top anchor: the widget bottom sits 4 px above the character's
-	# per-frame sprite_top (world px, published by player.gd / enemy.gd in
-	# _refresh_sprite_clamp()), so the nameplate reads as belonging to the
-	# portrait instead of sitting on the shins. sprite_top is mapped through
-	# the same viewport transform used above; under the identity canvas
-	# transform it is numerically sprite_top. Read defensively via get() so a
+	# per-frame sprite_top (world px, published by player.gd / enemy.gd), so the
+	# nameplate reads as belonging to the portrait instead of sitting on the
+	# shins. sprite_top is mapped to screen through Coord.world_to_screen below
+	# (canvas transform, camera-aware). Read defensively via get() so a
 	# character node without the property falls back to the legacy feet anchor.
-	# Measured top-row landing (STRIP_BOTTOM + 2 = 94 clamp retained): for
-	# Central_Divine sprite_top == 92; the bar wants top 92 - 4 - 24 = 64
-	# (inside the top strip) and is clamped to top 94, spanning y 94..118 over
-	# the hair/forehead band [92, 132]; the face of a 128 px portrait starts
-	# ~ sprite_top + 40 = 132, so the clamped bar does NOT cover the face.
-	# Mid-board units sit strictly above sprite_top (no clamp bite).
 	var top: Variant = _char_node.get("sprite_top") if _char_node != null else null
 	bar_anchors_below_portrait = false
+	# World y of the anchor this branch selects (published to
+	# health_bar_world_y / health_bar_screen_y below).
+	var anchor_world_y: float = 0.0
 	if typeof(top) == TYPE_FLOAT:
-		var top_y: float = (get_viewport().get_final_transform() * Vector2(0.0, float(top))).y
+		var top_y: float = Coord.world_to_screen(Vector2(0.0, float(top)), get_viewport()).y
 		# Above-portrait anchor: widget BOTTOM 4 px above sprite_top.
 		var above_top: float = top_y - 4.0 - size.y
 		if above_top < STRIP_BOTTOM + 2.0:
-			# Top-band unit (sprite_top == 92): the above anchor lands inside the
-			# 0..92 strip floor (STRIP_BOTTOM + 2 == 94), which would pull the bar
-			# back over the face. FLIP to the other side of the portrait: anchor
-			# the widget TOP 4 px below the portrait ink bottom. A consistent gap
-			# on the far side keeps follow_delta honest everywhere (<= 24) instead
-			# of clamping the bar into the hair band. bar_anchors_sprite_top stays
-			# false on the flipped path (the above-anchor rule did NOT run).
+			# Top-band unit: the above-portrait anchor would land inside the
+			# 0..92 top strip floor (STRIP_BOTTOM + 2 == 94), pulling the bar
+			# back over the portrait's upper ink. FLIP to the other side of the
+			# portrait: anchor the widget TOP 4 px below the portrait ink
+			# bottom. A consistent gap on the far side keeps follow_delta honest
+			# everywhere instead of clamping the bar into the hair band.
+			# bar_anchors_sprite_top stays false on the flipped path (the
+			# above-anchor rule did NOT run).
 			var ink_bottom: float = _portrait_ink_bottom_world()
 			# The flipped bar anchors its TOP 4 px below the portrait ink bottom
-			# (ink_bottom == sprite_top + 128 == 220 for a clamped top-band unit),
-			# so it sits on the unit's own tile — the truthful "he stands here"
-			# statement the nameplate no longer makes from above. It clears both
-			# HUD neighbours the above-anchor position collided with:
-			#   * the top strip — 224 is far below STRIP_BOTTOM + 2 == 94 (the
-			#     retained clamp below stays the last resort);
-			#   * the right-column SkillDescLabel, moved down to offset_top 280 in
-			#     hud.tscn — a flipped nameplate (NameLabel <= 26 tall starting at
-			#     224) tops out around 250, clear of 280, so hint_nameplate_overlap
-			#     stays false. The action buttons (EndTurn 92..128 / Attack
-			#     136..172 / Undo 176..212) live at x 820..952; top-band unit
-			#     columns (7 -> x 448..512, 11 -> x 704..768) never reach them.
-			var flip_y: float = ink_bottom + 4.0
+			# (portrait_ink_rect.end.y + 4 — the unit's own feet + 4 once the ink
+			# bottom coincides with the feet, i.e. the truthful "stands here"
+			# statement from its own tile). It clears both HUD neighbours the
+			# above-anchor position collided with: the top strip (STRIP_BOTTOM +
+			# 2 == 94, the retained clamp below stays the last resort) and the
+			# right-column SkillDescLabel.
+			var flip_y: float = Coord.world_to_screen(Vector2(0.0, ink_bottom + 4.0), get_viewport()).y
 			screen_pos = Vector2(screen_pos.x - 34.0, flip_y)
+			anchor_world_y = ink_bottom + 4.0
 			bar_anchors_below_portrait = true
 			bar_anchors_sprite_top = false
 		else:
 			screen_pos = Vector2(screen_pos.x - 34.0, top_y - 4.0 - size.y)
+			# anchor_world_y mixes a world value (sprite_top) with viewport-px
+			# sizes (size.y); this identity relies on the frozen zoom = 1 the
+			# whole round already assumes, so do not "fix" the mixing.
+			anchor_world_y = float(top) - 4.0 - size.y
 			bar_anchors_sprite_top = true
 	else:
 		# Legacy feet fallback (defensive): char node without sprite_top.
 		screen_pos += Vector2(-34, -32)
+		anchor_world_y = _char_node.global_position.y - 32.0
 		bar_anchors_sprite_top = false
+	# Publish the selected branch's anchor in world and screen space (the two
+	# new observables pair with the camera follower's published
+	# viewport_half_y / camera_position.y for the clamp-independent pin).
+	health_bar_world_y = anchor_world_y
+	health_bar_screen_y = Coord.world_to_screen(Vector2(0.0, anchor_world_y), get_viewport()).y
 	# follow_delta: pre-clamp displacement of the root center from its desired
 	# position (Euclidean distance, computed BEFORE the clamp below). ~0 when
 	# the bar is unclamped and free-following; grows only when a viewport edge

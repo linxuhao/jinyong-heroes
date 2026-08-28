@@ -167,6 +167,12 @@ var portrait_tex_size: Vector2 = Vector2.ZERO
 ## The unit's own floating HealthBar global_position; (-1,-1) when no bar
 ## resolves (before HUD.setup() or after battle exit) — 3-number probe #3.
 var portrait_bar_pos: Vector2 = Vector2(-1, -1)
+## Forwarded anchor of this unit's floating nameplate: the HealthBar's
+## health_bar_world_y / health_bar_screen_y this frame. Relayed in _process so
+## the six unit surface blocks can assert the camera nail pin without a second
+## rect computation.
+var health_bar_screen_y: float = 0.0
+var health_bar_world_y: float = 0.0
 
 # ---------------------------------------------------------------------------
 # Click-path diagnostics (playtest observables — measurement only, never gates)
@@ -444,6 +450,14 @@ func _process(_delta: float) -> void:
 		portrait_bar_pos = (bar as Control).global_position
 	else:
 		portrait_bar_pos = Vector2(-1, -1)
+		# Relay this bar's anchor observables onto the unit (only after the bar
+		# resolves; 0.0 otherwise, so a missing bar never asserts a phantom).
+		if bar != null and bar.get("health_bar_screen_y") != null:
+			health_bar_screen_y = float(bar.get("health_bar_screen_y"))
+			health_bar_world_y = float(bar.get("health_bar_world_y"))
+		else:
+			health_bar_screen_y = 0.0
+			health_bar_world_y = 0.0
 
 	# Undo availability — recomputed EVERY frame (never event-written), so it is
 	# always in sync no matter which writer changed acted / grid_pos / moves_left.
