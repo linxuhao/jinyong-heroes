@@ -144,6 +144,14 @@ var selected_skill_index: int = -1
 ## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
 var sprite_top: float = 0.0
 
+## Live clamped portrait ink rect in world px (world == screen under the
+## identity canvas transform). Top-left == drawn texture top-left, size ==
+## texture size. Recomputed every frame from the LIVE clamped sprite offset
+## (clamp_sprite_offset refines _sprite.offset each frame) — never from grid
+## or the naive feet - 128 assumption. Consumed by the Defect-B portrait-rect
+## hit resolver and the playtest surface. Sentinel Rect2() when no texture.
+var portrait_ink_rect: Rect2 = Rect2()
+
 ## On-frame portrait visibility (all 6 layers pass). Computed each frame.
 var portrait_visible: bool = false
 ## First failing visibility layer id, "" when fully visible on-frame.
@@ -408,9 +416,18 @@ func _process(_delta: float) -> void:
 	if _sprite != null:
 		portrait_sprite_pos = _sprite.global_position
 		portrait_tex_size = _sprite.texture.get_size() if _sprite.texture != null else Vector2.ZERO
+		# Live clamped ink rect: reads the LIVE _sprite.offset (refined every
+		# frame by _refresh_sprite_clamp) and the fresh sprite_top — never
+		# grid or a feet-anchored assumption (top-row/edge units differ).
+		# Zero-area (null texture) falls back to the sentinel Rect2().
+		portrait_ink_rect = Rect2(
+			Vector2(_sprite.global_position.x + _sprite.offset.x - portrait_tex_size.x / 2.0, sprite_top),
+			portrait_tex_size,
+		) if portrait_tex_size != Vector2.ZERO else Rect2()
 	else:
 		portrait_sprite_pos = Vector2.ZERO
 		portrait_tex_size = Vector2.ZERO
+		portrait_ink_rect = Rect2()
 	var bar: Node = _resolve_portrait_bar()
 	if bar != null:
 		portrait_bar_pos = (bar as Control).global_position
