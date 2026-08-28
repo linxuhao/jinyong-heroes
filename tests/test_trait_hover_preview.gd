@@ -46,7 +46,15 @@ static func _make_bare():
 	c._traits = TraitData.all()
 	c.phase = "TRAITS"
 	c.trait_index = 0
-	c.trait_ids = []
+	# NOT `c.trait_ids = []`: creation.gd declares `var trait_ids: Array[String]`,
+	# and GDScript refuses an untyped Array literal there —
+	#     Invalid assignment of property 'trait_ids' with value of type 'Array'
+	# — which made _make_bare() return before `return c`, so every caller got Nil
+	# and all three remaining cases died on a Nil base. This file has failed on
+	# every case since it was written, unseen because no pipeline step runs
+	# tests/unit_test_runner.gd. Bind a TYPED empty array instead.
+	var no_traits: Array[String] = []
+	c.trait_ids = no_traits
 	c.points_left = 30
 	return c
 
