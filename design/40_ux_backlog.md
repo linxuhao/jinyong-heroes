@@ -50,3 +50,38 @@
 - 2026-08-28 `jinyong-map-events`(post-gate 收尾,5_design 证据步骤):本轮 `5_compile` 的 `playtest_summary.md`(本步上下文中的**本轮**产物)实测 **55/55 场景全 PASS**(硬闸门过、零 runtime error、断言失败 0/55)--新场景 `map_node_event_shaolin` **18/18**:进入少林即开事件(`phase == "EVENT"`、`event_id == "night_rain"` 确定性绑定钉、`current_node_id == "shaolin"`),两个选项都可聚焦选中(`event_focus` 0 -> 1 -> 0),回车解算后选项效果落地(`last_effect_types == ["silver", "attr"]` 结构钉 + `attr_bone: changed` 差分钉,数值断言一律相对表达、零绝对游戏值字面量)、`events_resolved_count` 阶梯 0 -> 1,已声明未实现缺口在节点上可断言(`entry_declared_gap_types` 含 battle 与 facility--诚实缺口是可断言事实),返程洛阳零事件零卡死;护线判据 `spine_to_ending` **32/32**(主线 5 节点槽位惰性在真实运行里成立,昆仑照常直达结局);既有 54 条场景零红,其中 `save_load_roundtrip` **14/14**(节点事件只在 travel 到达时触发、不落新持久键,存读档不复触发)与 `event_travel_effects` **19/19**、`cultivation_month_cycle_and_deck_bookkeeping` **17/17**、`cultivation_changes_combat` **30/30**(共享 `EventLogic` 后 cultivation 零回归、RNG 操作序未漂)。编译闸门 **77/77** 零错误(75 -> 77,新增 `scripts/data/event_logic.gd` 与 `tests/test_map_node_event.gd`);视觉闸门 blind(`endpoint_unreachable`,人眼代判)--本轮零新几何、零新调色板条目(事件面板走既有 `BodyLabel`,呈现层唯一改动是 EVENT 相位下隐藏旅行提示行,不留「回车启程」的过期承诺),不构成关闭障碍。**本轮不改任何 OPEN/CLOSED 状态**(队列无 OPEN 项):视觉闸门未产出新 finding、真人试玩未报新缺口,按规矩 3 不自动开卡;`20_content.md` §8 的同款实测确认由本行收口。
 - 2026-08-29 `jinyong-nodes(主线事件)`(post-gate 收尾,5_design 证据步骤):本轮 `5_compile` 的 `playtest_summary.md`(本步上下文中的**本轮**产物)实测 **57/57 场景全 PASS**(硬闸门过、零 runtime error、断言失败 0/57)--新场景 `map_node_event_mainline_east` **23/23**(直接 boot `map.tscn`,无名谷 -> 洛阳 -> 武当 -> 襄阳逐站钉 `merchant` / `quanzhen_scripture` / `dragon_scrap` 确定性绑定 + `events_resolved_count` 阶梯,收尾于昆仑一键之遥、`ended == false`)、`map_node_event_mainline_return` **20/20**(boot 帧零事件触发 + 返程 `tomb_bed` 触发并解算 + `HintLabel.text == "左右/上下选择相邻去处，回车启程"` 两处一文本钉 + `attr_inner: changed` 差分钉,数值断言一律相对);重排后的两条授权场景实测成立:`spine_to_ending` **42/42**(六段连着、走得到结局)、`map_node_event_shaolin` **32/32**(唯一重基线 `== 2` + 新增 `== 1` 阶梯钉);既有回归网零红:`save_load_roundtrip` **14/14**、`event_travel_effects` **19/19**、`cultivation_month_cycle_and_deck_bookkeeping` **17/17**、`cultivation_changes_combat` **30/30**、`terminal_victory_8_12_rounds_hp_15_40` **6/6**、`qi_cost_blocks_cast_no_energy` **23/23**。编译 **77/77** 零错误;视觉闸门 blind(`endpoint_unreachable`,人眼代判,57 场景 228 帧)--本轮零新几何、零新调色板条目(呈现层唯一改动是提示串逐字节换入既有 400px 居中 HintLabel),不构成关闭障碍。**本轮不改任何 OPEN/CLOSED 状态**(队列无 OPEN 项):地图页底部提示残缺(「左右选择」缺「上下」)是本轮 brief 点名的上一轮遗留,由本轮统一为面板同串并被新场景钉住,非本队列 finding;视觉闸门未产出新 finding、真人试玩未报新缺口,按规矩 3 不自动开卡;`20_content.md` §9 的同款实测确认由本行收口。
 - 2026-08-28 `interaction-defects`(记录;不改任何 OPEN/CLOSED 状态,**status 保持 OPEN——fix landed in code/tests, gate evidence pending**,关闭由 5_design 证据步骤按闸门实测单写):本轮处理三条玩家实测 finding——(A) 悬浮血条 `Bar`(ProgressBar 默认 STOP)吃掉脚下右键、退回失灵,修复(Bar `mouse_filter=2` + 每帧重断言)已落,并补齐审计残项(`NameLabel` 显式 IGNORE、ClickTarget 实测裁定)与新场景 `click_move_undo_feet` / `input_click_differential`;(B) 立绘比所站格子高一整格、血条压腿、照立绘攻击打不到人——名牌改挂 `sprite_top` + `TileMarkers` 地面标记、5 步命中 resolver(第 2 步限 in-reach)已落,新场景 `click_portrait_body_targets_enemy` / `health_bar_above_portrait`;(C) 特质介绍要点了才显示——`trait_hover_index` 悬停预览(不写 `trait_index`、不触发 toggle、不影响焦点 modulate)已落,新场景 `trait_hover_preview`。
+
+## 人工视觉判读的发现(2026-08-28,轮次所有者)
+
+`5_vision` 这一轮是**瞎的**:视觉判官 `localqwen/qwen3`
+(`http://100.68.74.107:8000`)连接被拒,260 帧一帧未判。闸门**正确地拒绝通过**
+(`blind: true, passed: false`,不是「没跑到所以算过」),`5_vision_judged` 于是转人工。
+
+人工判读是**抽样**,不是复审:看了 260 帧中的 4 帧(s11 战斗、s16 属性页与特质页)。
+结论是**本轮未引入视觉回归**,故放行;以下是抽样中看到的**既有欠账**,与本轮 brief
+(交互缺陷 B/C)无关,记在这里等立项。
+
+### 战斗屏:好
+
+山水背景、六名角色 96×128 立绘、名牌与血条浮于头顶、招式栏满格。
+**「美术仍是色块」这句已彻底不成立**,`00_roadmap.md` 第 4 阶段的描述已相应更新。
+
+### 创建角色屏:两页都差,而这是新玩家看到的第一屏
+
+1. **属性页的 ± 按钮竖直方向不成列。** 每行作为整体居中,而标签宽度不同
+   (`Bone 20` / `Agility 10` / `Fortune 10`),按钮因此左右参差——实测 `-` 的 x 在
+   470~487 之间跳。行与行之间没有对齐轴,眼睛要重新找一次。
+2. **特质页 12 条只有名字与数字,没有任何介绍区域。** 这是玩家报告的缺陷 C 的另一面:
+   本轮做了 `trait_hover_preview`,但抽到的帧里没有描述面板出现,需要在下一轮用一帧
+   悬停态确认它真的会显示(本轮的 `creation_hover_scenario` 断言了行为,没有断言可见)。
+3. **两页都是居中细长列,左右各空约三分之一、下方空约四分之一。** 960×704 的画布用了
+   不到一半。
+4. 属性页的说明是一段挤在一起的长句(`Bone:HP = Bone × 5 · Qi:Qi pool = ...`),
+   没有分行分组。
+
+### 一条与语言有关的观察
+
+抽样帧里满屏英文中夹着一个中文「退回」按钮(战斗屏右侧)。i18n 有覆盖缺口——
+该帧拍摄于语言修复之前,但**未翻译的串会以这种方式混排**这一点与语言设置无关,
+下一轮值得做一次覆盖率清点。
+
