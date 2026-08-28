@@ -661,17 +661,21 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 | `Bar` (ProgressBar) | 2 (IGNORE) | 本轮缺陷 A 的修复 + 每帧重断言 |
 | `EmptyCap` | 2 (IGNORE) | 原有显式 |
 | `HpLabel` | 2 (IGNORE) | 原有显式 + 每帧重断言 |
-| `NameLabel` | 2 (IGNORE) | 本轮补显式声明(原靠 Label 默认) |
+| `NameLabel` | 2 (IGNORE) | **无显式声明,靠 Label 类默认 IGNORE**(2026-08-28 闸门后勘误:交付的 `health_bar.tscn` 没有这一行,「本轮已补显式声明」系记载错误;运行时非 STOP,子树无洞的结论不变) |
 
 ——全子树无 STOP:一个悬浮在角色身上的 HUD 控件,不许有任何一个是 STOP 的后代。
 `scripts/ui/health_bar.gd` 在 `update_health` 里对 `Bar`/`HpLabel`/cap 三个每帧重断言。
 
-**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=0`)的裁定(实测,非照注释):**
-经 `debug_click_target_fires` 计数器 + `input_click_differential` 敌格腿实测,
-点击其矩形时 `gui_input` **触发 0 次**——Godot GUI 拾取器不把事件路由给祖先为
-Node2D 的 Control,它既收不到事件也吃不掉事件(死路由)。节点**保留**:
-它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),`mouse_filter`
-留原值零 diff(两态皆惰性)。
+**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=0`)的裁定(2026-08-28 闸门后勘误:实测没有发生,钉子待落):**
+本轮闸门实测 `input_click_differential` **12/13**——`Central_Divine.debug_click_target_fires`
+断言报 `Invalid named index ... for base type Object`:计数器**没有落进
+`scripts/characters/enemy.gd`**(`_common.yaml` 白名单与场景断言先行,实现缺席),
+「`gui_input` 触发 0 次」因此**不是实测结论**。当前裁定只能以代码路径为据:敌
+`_input` 中继先于 GUI 阶段接管本格按压,Godot 拾取器不把事件路由给祖先为 Node2D 的
+Control——ClickTarget 既收不到也吃不掉事件(死路由)。**「以实测裁定、不照注释」
+的要求尚未满足**,OPEN:把计数器落进 `enemy.gd`、让该腿转绿后再把本段改回实测结论。
+节点**保留**:它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),
+`mouse_filter` 留原值零 diff(两态皆惰性)。
 
 ## 名牌挂到立绘顶端 + 地面标记(2026-08-28,interaction-defects)
 
@@ -685,6 +689,26 @@ Node2D 的 Control,它既收不到事件也吃不掉事件(死路由)。节点**
 `sprite_top + 40 = 132` 起,**不被盖**。中排单位无钳制咬合,严格在立绘上方
 (`bar_bottom < sprite_top`)。顶行断言因此钉「文档化落地」(`bar_top == 94` 且
 `bar_bottom <= sprite_top + 40`),中排钉严格不等式。
+
+**抬锚的既测代价(2026-08-28 闸门,`ui_geometry_readability` 35/38 的两条几何红):**
+
+1. **`follow_delta == 30.0 > 24`。** `follow_delta` 是**钳制位移**(期望位与钳后位的
+   距离,`health_bar.gd` 在钳制线之前计算)。顶行单位期望顶 = `sprite_top − 4 − 24 = 64`,
+   被 `STRIP_BOTTOM + 2 = 94` 钳下 **30 px**——这不是缺陷,恰是上面的「文档化落地」
+   本身(`bar_top == 94` 已被 `health_bar_above_portrait` 钉死,`≤ 24` 信封与它对
+   顶行**互斥**;抬锚前顶行期望顶 = 脚底 − 32 = 96,位移仅 2)。B1 声明的 re-baseline
+   本轮**未落**(零既有 yaml 改动),下一轮必须带着这条理由落:或给顶行钳制位移
+   单列信封(= 94 − 64 = 30),或把该断言收窄到中排/玩家口径——与
+   `health_bar_above_portrait` 的两层钉法对齐;不许无理由放宽。
+2. **`hint_nameplate_overlap == true`。** 实测红(`hud.gd`:可见 hint 标签矩形与任一
+   名牌矩形内缩相交即为真)。按既有常数推算(待下一轮实测确认归属):B1 把每个
+   名牌抬高约 100px,本轮 UndoButton 又把 `SkillDescLabel` 下移(`offset_top`
+   176→216,底缘约 396,高度不变)——棋盘右缘单位(如 (11,7))抬高后的名牌
+   (y≈356..365)落进了 `SkillDescLabel` 的矩形(x≥820,纵向 216..396);修前同一
+   名牌在 y≈480,与之无交;即便 `SkillDescLabel` 不下移,抬锚后的名牌也已贴上其
+   旧底缘 356。这是**真实的压盖**(可读性硬要求第 6 条),不是语言缺陷下游——
+   下一轮实测确认后**解掉它**(挪 `SkillDescLabel` / 收窄其矩形 / 调名牌钳制),
+   不许顺手把钉放宽成 `== true`。
 
 **地面标记 `TileMarkers`**(`scripts/ui/tile_markers.gd`,Node2D `_draw`,挂在
 `scenes/battlefield.tscn` 中 `Characters` **之后**):为每个存活单位在
