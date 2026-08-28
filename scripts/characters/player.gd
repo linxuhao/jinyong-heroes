@@ -140,16 +140,19 @@ var is_moving: bool = false
 ## Index of the currently selected skill, or -1 for basic attack.
 var selected_skill_index: int = -1
 
-## World-px top edge of the sprite texture rect, updated every frame by
-## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
+## World-px top edge of the sprite texture rect, derived each frame from the
+## unclamped foot anchor (feet - tex_size.y). Exposed for playtest surface
+## assertions.
 var sprite_top: float = 0.0
 
-## Live clamped portrait ink rect in world px (world == screen under the
-## identity canvas transform). Top-left == drawn texture top-left, size ==
-## texture size. Recomputed every frame from the LIVE clamped sprite offset
-## (clamp_sprite_offset refines _sprite.offset each frame) — never from grid
-## or the naive feet - 128 assumption. Consumed by the Defect-B portrait-rect
-## hit resolver and the playtest surface. Sentinel Rect2() when no texture.
+## Portrait ink rect in world px. Top-left == drawn texture top-left, size ==
+## texture size. The sprite is never moved off its tile, so the rect is always
+## the unclamped foot anchor:
+##   ink = [feet.x - tex.w/2, feet.y - tex.h] .. [feet.x + tex.w/2, feet.y]
+## Recomputed every frame from _sprite.offset (the foot anchor set once by the
+## visual-apply step) and the fresh sprite_top — never from grid. Consumed by
+## the Defect-B portrait-rect hit resolver and the playtest surface. Sentinel
+## Rect2() when no texture.
 var portrait_ink_rect: Rect2 = Rect2()
 
 ## On-frame portrait visibility (all 6 layers pass). Computed each frame.
@@ -180,9 +183,10 @@ var health_bar_world_y: float = 0.0
 ##   ink_world_dx = ink horizontal centre - unit world x
 ##   ink_world_dy = ink bottom edge        - unit world y
 ## Both 0.0 means the drawn ink is centred on the tile the unit occupies (its
-## ink bottom == its own feet). A non-zero dy is the portrait drifting off its
-## tile — exactly what clamp_sprite_offset does to top-row units while the
-## clamp is live (measured dy 124 at row 1, 60 at row 2). Pinned by
+## ink bottom == its own feet) — which is the invariant now that the sprite is
+## pinned to its foot anchor. HISTORY: before the clamp was deleted, top-row
+## units drifted off their tiles; the measured dy then was 124 at row 1 and 60
+## at row 2 (past tense — no live code path produces it any more). Pinned by
 ## playtest/portrait_grid_alignment.yaml.
 var ink_world_dx: float = 0.0
 var ink_world_dy: float = 0.0
@@ -431,11 +435,16 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	# Clamp the sprite into the artwork rect every frame (before the state gate
-	# so sprite_top is updated during TUTORIAL too).
+	# Publish sprite_top every frame from the unclamped foot anchor (before the
+	# state gate so it is updated during TUTORIAL too). The sprite itself is
+	# never written here: its offset is the foot anchor set once by
+	# _apply_sprite_visuals(), and the camera — not the sprite — owns
+	# visibility.
 	# NOTE: cooldowns are int ROUNDS, decremented only by the turn engine at
 	# the unit's own turn start — no per-frame ticking here.
-	_refresh_sprite_clamp()
+	if _sprite != null and _sprite.texture != null:
+		var anchor_tex_size: Vector2 = _sprite.texture.get_size()
+		sprite_top = position.y + _sprite.offset.y - anchor_tex_size.y / 2.0
 	portrait_fail_layer = VisibilityProbe.first_fail_layer(self)
 	portrait_visible = portrait_fail_layer == ""
 
@@ -446,9 +455,9 @@ func _process(_delta: float) -> void:
 	if _sprite != null:
 		portrait_sprite_pos = _sprite.global_position
 		portrait_tex_size = _sprite.texture.get_size() if _sprite.texture != null else Vector2.ZERO
-		# Live clamped ink rect: reads the LIVE _sprite.offset (refined every
-		# frame by _refresh_sprite_clamp) and the fresh sprite_top — never
-		# grid or a feet-anchored assumption (top-row/edge units differ).
+		# Ink rect: reads the LIVE _sprite.offset (the foot anchor set once by the
+		# visual-apply step, never retuned per frame) and the fresh sprite_top —
+		# never a grid lookup or a re-derived rect.
 		# Zero-area (null texture) falls back to the sentinel Rect2().
 		portrait_ink_rect = Rect2(
 			Vector2(_sprite.global_position.x + _sprite.offset.x - portrait_tex_size.x / 2.0, sprite_top),
@@ -482,7 +491,7 @@ func _process(_delta: float) -> void:
 
 	# Alignment pin LAST, so it reads this frame's portrait_ink_rect (itself
 	# computed above from the live sprite offset + sprite_top). Derived from the
-	# published rect only — no grid lookup, no clamp call, no second rect.
+	# published rect only — no grid lookup, no second rect computation.
 	ink_world_dx = portrait_ink_rect.get_center().x - position.x
 	ink_world_dy = portrait_ink_rect.end.y - position.y
 
@@ -771,7 +780,7 @@ static func attack_reach_covers(player_grid: Vector2i, enemy_grid: Vector2i,
 ## Pure decision predicate for the §3.B2 five-step portrait-rect priority rule.
 ## Returns which step (1..5) fires for a left-click at `click_point` resolving to
 ## `click_tile`, given the current `player_grid`, the living enemies (each a
-## Dictionary with `grid_pos` and `rect` — the live clamped portrait ink rect),
+## Dictionary with `grid_pos` and `rect` — the unit's portrait ink rect),
 ## the reachable-empty-tile set from the move-range highlight (`reachable` maps
 ## Vector2i -> true), and the player's selection state (selected_skill_index +
 ## skills, consumed by attack_reach_covers). Pure static: no autoloads, no self —
@@ -810,11 +819,10 @@ static func resolve_click_step(click_point: Vector2, click_tile: Vector2i,
 ## to battlefield world space and delegate to the shared handle_world_click.
 func _handle_click_targeting(event: InputEvent) -> void:
 	# Use the click event's own viewport coordinates, converted to battlefield
-	# world space, instead of the viewport-cached pointer position. The canvas
-	# transform is identity today (no Camera2D offset in the battlefield; the
-	# main camera is centered with zero offset), so event.position already equals
-	# world coordinates; the affine inverse keeps the path correct if a camera
-	# ever moves or zooms.
+	# world space, instead of the viewport-cached pointer position. The camera now
+	# MOVES (the Camera2D follower owns visibility), so the canvas transform is
+	# not identity: its affine inverse is what maps the event's viewport px back
+	# to world px, and it is the only correct conversion for click targeting.
 	handle_world_click(get_canvas_transform().affine_inverse() * event.position)
 
 
@@ -850,8 +858,8 @@ func handle_world_click(world_pos: Vector2) -> void:
 	for t in plan.get("steps", {}).keys():
 		reachable[t] = true
 
-	# Flatten the living enemies into pure data (grid_pos + the LIVE clamped
-	# portrait ink rect) for the decision predicate, and keep the node array for
+	# Flatten the living enemies into pure data (grid_pos + the LIVE portrait
+	# ink rect) for the decision predicate, and keep the node array for
 	# the dispatch's _try_attack_target calls. Same living-enemy guards as the
 	# old feet-tile match (is_instance_valid + "grid_pos" in enemy).
 	var enemies: Array[Node] = GameManager.get_enemies_alive()
@@ -1079,7 +1087,7 @@ func _enemy_at(enemies: Array, tile: Vector2i) -> Node:
 	return null
 
 
-## Find the nearest living enemy whose live clamped portrait rect contains
+## Find the nearest living enemy whose live portrait ink rect contains
 ## `world_pos`, optionally gated to in-reach enemies only (step 2) — used by
 ## resolver steps 2/4. Strictly-nearest by Chebyshev distance from the clicked
 ## tile wins; ties keep registration order (the _pick_nearest_enemy_in_range
@@ -1235,20 +1243,6 @@ func _apply_sprite_visuals() -> void:
 	if _sprite == null or _sprite.texture == null:
 		return
 	_sprite.modulate = Color.WHITE
+	# Foot anchor, set exactly once: the sprite never compensates for the
+	# viewport or the HUD — the Camera2D follower owns visibility.
 	_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
-
-
-## Clamp the sprite's offset so the whole texture rect stays inside the board
-## artwork rect, and publish sprite_top for playtest assertions. Idempotent:
-## only writes _sprite.offset when the clamp changes it. Called every frame at
-## the top of _process() (before state gates), so top-row enemies are clamped
-## during TUTORIAL too. The clamp is authoritative per frame — it refines any
-## feet anchor set by _apply_sprite_visuals().
-func _refresh_sprite_clamp() -> void:
-	if _sprite == null or _sprite.texture == null:
-		return
-	var tex_size: Vector2 = _sprite.texture.get_size()
-	var desired: Vector2 = GridManager.clamp_sprite_offset(position, tex_size)
-	if _sprite.offset != desired:
-		_sprite.offset = desired
-	sprite_top = position.y + desired.y - tex_size.y / 2.0

@@ -89,8 +89,9 @@ var move_range: int = 0
 ## True while a movement tween is playing. Set/cleared by CombatManager.
 var is_moving: bool = false
 
-## World-px top edge of the sprite texture rect, updated every frame by
-## _refresh_sprite_clamp(). Exposed for playtest surface assertions.
+## World-px top edge of the sprite texture rect, derived each frame from the
+## unclamped foot anchor (feet - tex_size.y). Exposed for playtest surface
+## assertions.
 var sprite_top: float = 0.0
 
 ## On-frame portrait visibility (all 6 layers pass). Computed each frame.
@@ -105,12 +106,14 @@ var portrait_covered_frac: float = 0.0
 var portrait_sprite_pos: Vector2 = Vector2.ZERO
 ## The Sprite texture size in px — 3-number probe #2.
 var portrait_tex_size: Vector2 = Vector2.ZERO
-## Live clamped portrait ink rect in world px (world == screen under the
-## identity canvas transform). Top-left == drawn texture top-left, size ==
-## texture size. Recomputed every frame from the LIVE clamped sprite offset
-## (clamp_sprite_offset refines _sprite.offset each frame) — never from grid
-## or the naive feet - 128 assumption. Consumed by the Defect-B portrait-rect
-## hit resolver and the playtest surface. Sentinel Rect2() when no texture.
+## Portrait ink rect in world px. Top-left == drawn texture top-left, size ==
+## texture size. The sprite is never moved off its tile, so the rect is always
+## the unclamped foot anchor:
+##   ink = [feet.x - tex.w/2, feet.y - tex.h] .. [feet.x + tex.w/2, feet.y]
+## Recomputed every frame from _sprite.offset (the foot anchor set once by the
+## visual-apply step) and the fresh sprite_top — never from grid. Consumed by
+## the Defect-B portrait-rect hit resolver and the playtest surface. Sentinel
+## Rect2() when no texture.
 var portrait_ink_rect: Rect2 = Rect2()
 ## The unit's own floating HealthBar global_position; (-1,-1) when no bar
 ## resolves (before HUD.setup() or after battle exit) — 3-number probe #3.
@@ -127,9 +130,10 @@ var health_bar_world_y: float = 0.0
 ##   ink_world_dx = ink horizontal centre - unit world x
 ##   ink_world_dy = ink bottom edge        - unit world y
 ## Both 0.0 means the drawn ink is centred on the tile the unit occupies (its
-## ink bottom == its own feet). A non-zero dy is the portrait drifting off its
-## tile — exactly what clamp_sprite_offset does to top-row units while the
-## clamp is live (measured dy 124 at row 1, 60 at row 2). Pinned by
+## ink bottom == its own feet) — which is the invariant now that the sprite is
+## pinned to its foot anchor. HISTORY: before the clamp was deleted, top-row
+## units drifted off their tiles; the measured dy then was 124 at row 1 and 60
+## at row 2 (past tense — no live code path produces it any more). Pinned by
 ## playtest/portrait_grid_alignment.yaml.
 var ink_world_dx: float = 0.0
 var ink_world_dy: float = 0.0
@@ -280,11 +284,16 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	# Clamp the sprite into the artwork rect every frame (before the state gate
-	# so sprite_top is updated during TUTORIAL too).
+	# Publish sprite_top every frame from the unclamped foot anchor (before the
+	# state gate so it is updated during TUTORIAL too). The sprite itself is
+	# never written here: its offset is the foot anchor set once by
+	# _apply_character_visuals(), and the camera — not the sprite — owns
+	# visibility.
 	# NOTE: cooldowns are int ROUNDS, decremented only by the turn engine at
 	# the unit's own turn start — no per-frame ticking, no timer-driven AI.
-	_refresh_sprite_clamp()
+	if _sprite != null and _sprite.texture != null:
+		var anchor_tex_size: Vector2 = _sprite.texture.get_size()
+		sprite_top = position.y + _sprite.offset.y - anchor_tex_size.y / 2.0
 	portrait_fail_layer = VisibilityProbe.first_fail_layer(self)
 	portrait_visible = portrait_fail_layer == ""
 

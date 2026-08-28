@@ -21,10 +21,6 @@ const GRID_WIDTH: int = 15
 const GRID_HEIGHT: int = 11
 const GRID_ORIGIN: Vector2 = Vector2(32, 32)  # half-tile offset for centering
 
-## Bottom edge of the 0..92 top strip (presentation constant). Portrait ink may
-## not start above it, so the clamp keeps top-row textures below the strip.
-const BOARD_TOP_MARGIN_Y: float = 92.0
-
 ## Portrait texture height (px). A unit's 96x128 portrait is anchored at its
 ## feet; its ink top sits tex_size.y above the feet.
 const PORTRAIT_TEX_Y: int = 128
@@ -148,25 +144,6 @@ func is_walkable(grid_pos: Vector2i) -> bool:
 ## 11 -> 20) changes only the substituted numbers, never this body.
 static func board_rect() -> Rect2:
 	return Rect2(Vector2.ZERO, Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE))
-
-
-## Offset for a centered sprite whose feet sit at `position` (preferred offset
-## (0,-half.y)), clamped so the whole texture rect stays inside the board
-## artwork rect [0, GRID_WIDTH*TILE_SIZE] x [0, GRID_HEIGHT*TILE_SIZE].
-## Returns the preferred feet-anchor offset when no clamp is needed.
-static func clamp_sprite_offset(position: Vector2, tex_size: Vector2) -> Vector2:
-	var half: Vector2 = tex_size / 2.0
-	var board: Vector2 = Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE)
-	var offset := Vector2(0.0, -half.y)  # preferred: feet at node position
-	# Guard: if the texture is larger than the board on either axis, keep the
-	# preferred offset rather than inverting the clamp bounds.
-	if tex_size.x >= board.x or tex_size.y >= board.y:
-		return offset
-	var origin: Vector2 = position + offset
-	var clamped := Vector2(
-		clampf(origin.x, half.x, board.x - half.x),
-		clampf(origin.y, BOARD_TOP_MARGIN_Y + half.y, board.y - half.y))
-	return clamped - position
 
 
 ## Returns true if a unit currently occupies the given grid position.
