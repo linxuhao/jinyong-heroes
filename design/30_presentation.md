@@ -684,7 +684,9 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 被 `portrait_visibility.yaml` 钉住;无钳制变体实渲染顶行头部被顶栏盖住)。
 
 **名牌翻转规则(2026-08-28 几何修复,`bar_anchors_below_portrait`):** 顶带单位
-(`sprite_top == 92`,即 1~2 行的 Central_Divine / West_Poison / 走到顶行的玩家),
+(`sprite_top == 92`,即 1~2 行的 Central_Divine / West_Poison / 走到顶行的玩家;
+**已被下方 2026-08-28 定位章 BOARD 规则取代**——行 0/1/2 不可进入,Central_Divine
+移至 (7,3)、West_Poison 移至 (11,4) 后二者不再被钳制,此案例不再发生),
 上锚点 `sprite_top − 4 − size.y = 64` 落进顶栏区(`STRIP_BOTTOM + 2 == 94` 之下),
 会把名牌钳回脸上。规则改为**翻到立绘另一侧**:把名牌**顶边**挂在
 `portrait_ink_rect.end.y + 4 = 220 + 4 = 224`,即立绘墨迹底下方 4px、落在单位自家
@@ -726,4 +728,49 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 脚标盖掉——实测 `TileMarkers` 对全部六个单位(含顶行)可见,且 Node2D `_draw` 无 GUI
 参与,天然不吞点击。顶行诚实视觉事实:标记画在自家立绘袍子上(「袍子上的椭圆」),
 是「他站这里」的如实表述。
+
+## 定位章 — 棋盘规则:行 0/1/2 不可进入(2026-08-28,fix_toprow_spawn_positions)
+
+**规则(BOARD rule,不是单点出生修正):** 任何单位(含玩家)的起始/落点行号必须
+`>= MIN_LEGAL_ROW == 3`(0-based);行 0/1/2 对**所有单位**不可进入。推导直接从
+常量得出(不抄文档数字):
+
+```
+feet_y            = row*TILE_SIZE + GRID_ORIGIN.y
+立绘墨迹顶(未钳)  = feet_y − PORTRAIT_TEX_Y(128)
+合法 iff 顶 >= BOARD_TOP_MARGIN_Y(92)
+→ row >= ceil((BOARD_TOP_MARGIN_Y + PORTRAIT_TEX_Y − GRID_ORIGIN.y) / TILE_SIZE)
+     = ceil((92 + 128 − 32) / 64) = ceil(2.9375) = 3
+```
+
+GRID_HEIGHT 11 下,有效行 3..10(8 行;行 10 为底边框,`is_walkable` 另排除,故
+可通行格实际为 3..9)。实现落在 `GridManager.is_walkable` **唯一一处**(新增
+`if grid_pos.y < MIN_LEGAL_ROW: return false`),`setup_grid` / `get_move_range` /
+`plan_movement` / `move_unit` / `player._try_move` / AI / combat_manager 全部自动
+继承,无需改调用点;移动范围高亮读同一可达集,行 0/1/2 自动不再高亮。
+
+**为何选 (a)(rows<3 全部禁入)而非 (b)(改 `BOARD_TOP_MARGIN_Y` / `clamp_sprite_offset`):**
+(b) 触碰冻结常量并会重开 UX-01b(`portrait_covered_frac 0.333` 实测红,
+`portrait_visibility.yaml` 钉住),而 (a) 是纯几何规则——立绘 96×128 配上
+64px 格子在行 0/1/2 的墨迹顶必然越过 92px 顶栏,钳制会把立绘**向下**推出自家格,
+行 3 是第一个合法行。
+
+**新起始格(保持阵形):** 中神通 (7,1)→**(7,3)**、东邪 (3,2)→**(3,4)**、西毒
+(11,2)→**(11,4)**;南帝 (3,8)、北丐 (11,8)、玩家 (7,5) 不变。列 7 仍为中神通
+最上,东/西同排、南/北同排的阵形保留。
+
+**对名牌翻侧机制的影响:** 行 0/1/2 现在对任何单位不可进入,因此**再没有单位能
+走到被钳制的顶带**(`sprite_top == 92`)。中神通移 (7,3) 后 `sprite_top =
+3*64+32−128 = 96 >= 92`(未钳制),西毒 (11,4) 后 `sprite_top = 160`(未钳制)。
+上节「顶带名牌翻侧以 Central_Divine / West_Poison 为案例」的记载被本规则取代:
+`bar_anchors_below_portrait` 机制仍保留(防御性兜底),但当前棋盘无单位触发它;
+中排单位一律正常上锚(`bar_bottom < sprite_top`)。
+
+**对既有断言的影响(已路由,不改文件):** 依赖「顶带钳制 → 名牌翻侧
+`portrait_bar_pos.y > sprite_top + 40`」的 `health_bar_above_portrait.yaml` 顶行腿、
+依赖「被钳制墨迹中心 `Central_Divine +0,+60`」的 `click_portrait_body_targets_enemy`
+腿、以及目标落在行 2 的 `move_target_affordance` / `click_move_to_tile` 腿,均因本
+规则实测红,按「升级记录,不放松断言」处置,见任务输出路由表。
+`click_move_undo_right` / `click_move_commit_lock` 为**本规则授权重推导**(两个文件
+本身,不是绕开缺陷)。
 

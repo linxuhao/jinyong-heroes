@@ -10,28 +10,33 @@
 #   * Control probe FIRST: Player +0,0 right with nothing moved is a benign
 #     no-op (already at the turn-start tile with the full budget) — grid_pos
 #     (7,5) / moves_left 4 unchanged.
-#   * Player +0,-192 walks up three tiles to (7,2) (budget 4->1, moved true,
-#     undo_available true).
-#   * Player +0,0 right again: the whole turn's movement is undone — back to
+#   * Player +0,-64 walks up ONE tile to (7,4) — the furthest reachable LEGAL
+#     empty tile north of the player under board rule F1 (valid rows 3..10):
+#     (7,3) is now occupied by Central_Divine and rows 0..2 are unenterable, so
+#     a 3-tile `+0,-192` to (7,2) is no longer reachable (budget 4->3, moved
+#     true, undo_available true).
+#   * Player +64,0 right again: the whole turn's movement is undone — back to
 #     (7,5), budget refunded to 4, moved false, undo_available false. The f170
 #     equality block is the proof the `right` token selected the real
 #     right-button branch (a left-click at the same point would have been the
-#     own-tile no-op): a broken token leaves grid_pos (7,2) / moves_left 1 and
+#     own-tile no-op): a broken token leaves grid_pos (7,4) / moves_left 3 and
 #     the equality asserts fail. NOTE: no `changed` differential is asserted
 #     after the undo click — a full snapshot restore returns every observable
 #     to its frame-0 baseline, so `changed` is provably unsatisfiable there
 #     (do not restore it).
+# CHANGED due to rule F1 — valid rows 3..10 (spawns moved + rows 0..2 excluded).
 name: click_move_undo_right
 description: >-
   Right-click undo via a real right-button event: control probe first
   (Player +0,0 right with nothing moved is a benign no-op — grid_pos (7,5) /
-  moves_left 4 unchanged), then walk up three tiles to (7,2) (moves_left 1,
-  undo_available true), then right-click the player's own tile again and the
-  whole turn's movement is undone: back to (7,5), budget refunded to 4, moved
-  false, undo_available false (full snapshot restore — the f170 equality
-  asserts prove the right token truly selects the right button; a `changed`
-  differential cannot fire there because every observable returns to its
-  frame-0 baseline).
+  moves_left 4 unchanged), then walk up ONE tile to (7,4) — the furthest
+  reachable legal empty tile north of the player (board rule F1: valid rows
+  3..10, (7,3) occupied by Central_Divine; moves_left 3, undo_available true) —
+  then right-click the player's own tile again and the whole turn's movement is
+  undone: back to (7,5), budget refunded to 4, moved false, undo_available false
+  (full snapshot restore — the f170 equality asserts prove the right token truly
+  selects the right button; a `changed` differential cannot fire there because
+  every observable returns to its frame-0 baseline).
 timeline:
 - at: 3
   actions:
@@ -75,7 +80,7 @@ timeline:
 - at: 70
   actions: []
   clicks:
-  - Player +0,-192
+  - Player +0,-64
 - at: 75
   actions: []
   assert:
@@ -83,8 +88,8 @@ timeline:
 - at: 130
   actions: []
   assert:
-    Player.grid_pos: grid_pos == Vector2i(7, 2)
-    Player.moves_left: moves_left == 1
+    Player.grid_pos: grid_pos == Vector2i(7, 4)
+    Player.moves_left: moves_left == 3
     Player.undo_available: undo_available == true
 - at: 135
   actions: []
