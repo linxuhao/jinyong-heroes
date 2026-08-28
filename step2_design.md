@@ -1,11 +1,19 @@
 # Technical Architecture - Jinyong Tactics: Mouse & Info Interaction Defect Fixes
 
-Round: interaction-defects (2026-08-28). **Revision 3** - restructured per the round
-owner's feedback of 2026-08-28 07:00 UTC: the #1 defect (real-build left-click
-dead) is already characterized, located, fixed and live, so this design schedules
-**contract coverage, not characterization cards**; the `InputProbeOverlay` temporary
-is already deleted (verify-only). Revision 2's shape - the two-layer net, "a skip is
-never green", the honest web/touch boundary - is retained per the same feedback.
+Round: interaction-defects (2026-08-28). **Revision 4** - per the round owner's
+feedback of 2026-08-28 08:15 UTC: Revision 3 is accepted in substance; the one
+structural correction is that the Layer-2 **sidecar** half is already built,
+landed and proven (AItelier commit `abb1358`) and lives **outside this repo's
+boundary** (`repo_apply` targets jinyong-assets; `docker/godot/` is AItelier
+repo), so the sidecar task is **deleted** and the in-repo autoload (T3) is
+rewritten against the **landed** contract: activation by the environment variable
+`AITELIER_INPUT_GATE_REPORT` (not CLI user args), self-drive to the state under
+test by internal calls (no `buttons[]` name-preference walk - navigation is not
+the layer under test), and exactly the nine report keys `ready / player_world /
+grid / moves_left / raw_left / handled_left / raw_right / handled_right / eater`.
+Revision 3's shape is retained: the re-scope (no characterization cards), the
+two-layer net, "a skip is never green", the honest web/touch boundary, the
+priority order P0b touch undo -> B -> C.
 This is a **per-run** design (`design/README.md`); the durable `design/` archive is
 edited only by `5_design` after final verification passes - the **Design changes**
 section below is what `5_design` will land surgically. Everything is in English;
@@ -50,6 +58,7 @@ conflict with:**
 | P0 fix: `menu.tscn` `SegmentHost` gains `mouse_filter = 2` | `42637b7` | Real-X11 A/B measured: before `player_grid=(7,5) raw=3 handled=0 EATER SegmentHost(filter=0)`; after `player_grid=(7,4) raw=3 handled=1 EATERS none`. Player-confirmed working on web + desktop |
 | Two pytest guards in `tests/test_playtest_contract_smoke.py` | `42637b7` | 19 passed. `test_every_full_rect_host_is_click_through` scans every `.tscn` under `scenes/` and reddens any `SegmentHost` block without `mouse_filter = 2` (would have caught both occurrences); `test_the_contract_boot_scene_is_recorded_against_the_games_own` forces the contract-boot-vs-game-boot divergence to stay documented in the `_common.yaml` header (which now carries it, with the defect story) |
 | `InputProbeOverlay` deleted (script + `hud.tscn` node stanza + ext_resource line) | `1989be6` | Landed; 3.O is now a confirm-clean pass, NOT a re-implementation |
+| Windowed X11 input gate - **sidecar half**: `/x11_input_smoke` endpoint (206 lines in `docker/godot/godot_harness.py`) + xdotool baked into `Dockerfile.godot` | AItelier `abb1358` (**outside this repo's boundary - not a task here**) | Landed and proven end-to-end against a throwaway probe: reached `BATTLE`, published `player_world [480,352]`, a real click reported `raw_left 0->1, handled_left 0, eater='Body'` (correctly naming `TutorialOverlay/Panel/Body`); a missing report is `skipped` with a reason, never a pass. All four measured pitfalls implemented (copy-to-`/tmp`, double `--headless --import`, free display à la `xvfb-run -a`, no `pkill` in the slim image). This round contributes only the in-repo autoload (T3) matching its nine-key / env-var contract |
 
 **Why a 57/57-green suite could not see it (both recorded in `90_decisions.md`,
 3.P0):** (1) the contract's default `scene:` is `res://scenes/main.tscn` while the
@@ -81,12 +90,16 @@ Headless play-test (regression contract, unchanged pipeline)
   godot_harness clicks:/hovers: -> Input.parse_input_event -> SAME engine pipeline
   -> differential asserts (raw vs handled counters) pin the post-engine chain
 
-[NEW] Windowed X11 input gate (sidecar /x11_input_smoke; owner-prototyped 2026-08-28)
+Windowed X11 input gate (sidecar /x11_input_smoke - LANDED, AItelier abb1358;
+  this round adds ONLY the in-repo InputGate autoload)
   copy repo to a writable /tmp path -> godot --headless --import (TWICE) ->
   Xvfb display -> godot WINDOWED (not --headless), real menu.tscn boot ->
-  xdotool mousemove + click (driver targets buttons BY NAME from the live report,
-  never coordinates) -> real window layer -> engine pipeline -> InputGate report
-  JSON -> harness asserts raw counters advanced AND game state changed  (3.P0 L2)
+  env AITELIER_INPUT_GATE_REPORT=<report.json> switches the autoload on:
+  it SELF-DRIVES to the battle state by internal calls (no button walk -
+  navigation is not the layer under test), publishes ready:true + the nine-key
+  report -> xdotool mousemove + click at the published player_world ->
+  real window layer -> engine pipeline -> report JSON -> LANDED sidecar verdict
+  machinery (raw/handled/eater triad; a skip is never green)  (3.P0 L2)
 
 Hover (creation screen)
   Button.mouse_entered / mouse_exited -> trait_hover_index -> _render() -> TraitDescLabel
