@@ -91,9 +91,12 @@ static func _test_resolve_click_step(ok: bool) -> bool:
 			"reachable empty tile + in-reach rect crossing -> step 2 (attack)")
 
 	# Row 4 — out-of-reach body, non-highlighted -> step 4 (select/no-op).
-	# Click out_of_reach's own tile (7,1) at y=120; not in reachable, not in reach.
+	# The click point (440,120) is inside out_of_reach's rect (x[432,528]) but its
+	# resolved tile (6,1) is NOT that enemy's own tile (7,1) and is not reachable —
+	# clicking the enemy's own tile would be step 1, so step 4 needs a body point
+	# that hangs over an unoccupied, unreachable tile.
 	ok = _expect(ok, Player.resolve_click_step(
-			Vector2(450, 120), Vector2i(7, 1), player_grid,
+			Vector2(440, 120), Vector2i(6, 1), player_grid,
 			[out_of_reach, in_reach], reachable, -1, []) == 4,
 			"out-of-reach body, non-highlighted -> step 4")
 

@@ -758,6 +758,9 @@ static func resolve_click_step(click_point: Vector2, click_tile: Vector2i,
 				selected_skill_index, skills):
 			return 2
 	# Step 3 — a reachable empty tile in the move-range highlight.
+	# NOTE: plan_movement deliberately seeds steps[origin] = [] (grid_manager.gd),
+	# i.e. the reachable set INCLUDES the own tile; it is excluded here so a click
+	# on the own tile falls to step 5's silent no-op instead of a move call.
 	if reachable.has(click_tile) and click_tile != player_grid:
 		return 3
 	# Step 4 — a living enemy whose portrait rect contains P (out-of-reach body).
