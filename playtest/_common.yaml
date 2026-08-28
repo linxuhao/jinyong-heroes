@@ -772,6 +772,7 @@ surface:
   - sfx_volume_db
   - music_volume_db
   - fullscreen
+  - language
   AudioManager:
   - sfx_volume_db
   - music_volume_db
@@ -901,3 +902,4 @@ scenario_order:
 - click_portrait_body_targets_enemy
 - health_bar_above_portrait
 - trait_hover_preview
+- language_zh_default

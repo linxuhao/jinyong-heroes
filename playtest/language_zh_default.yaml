@@ -1,0 +1,51 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: language_zh_default
+description: 'Structural runtime pin for the zh-default language guard: the old _detect_language guard keyed on DisplayServer headless and never fired under the render-mode Xvfb harness, so 12 content scenarios rendered English. Both guards are now feature-keyed (_detect_language: not web -> zh; _load: persisted language only under OS.has_feature("template")), and this scenario pins the boot default zh BEFORE any navigation, then re-pins the zh->en->zh toggle differential through the same SETTINGS navigation settings_panel.yaml uses (debug_reset_settings first; it deliberately does not touch language). A future default flip must read as ONE red language pin instead of 12 content defects.'
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions: []
+  assert:
+    SettingsManager.language: language == "zh"
+- at: 20
+  actions:
+  - debug_reset_settings
+- at: 30
+  actions:
+  - move_down
+- at: 40
+  actions:
+  - move_down
+- at: 50
+  actions:
+  - ui_accept
+- at: 70
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SETTINGS"
+    SettingsManager.language: language == "zh"
+- at: 80
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - move_down
+- at: 100
+  actions:
+  - move_down
+- at: 110
+  actions:
+  - ui_accept
+- at: 130
+  actions: []
+  assert:
+    SettingsManager.language: language == "en"
+- at: 140
+  actions:
+  - ui_accept
+- at: 160
+  actions: []
+  assert:
+    SettingsManager.language: language == "zh"

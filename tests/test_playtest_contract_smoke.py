@@ -61,6 +61,7 @@ ROUND_SCENARIOS: list[str] = [
     "click_portrait_body_targets_enemy",
     "health_bar_above_portrait",
     "trait_hover_preview",
+    "language_zh_default",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
