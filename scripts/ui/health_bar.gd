@@ -48,6 +48,13 @@ const EMPTY_CAP_PX: float = 14.0
 ## so no bar ever enters the strip zone. Keep in sync with hud.tscn.
 const STRIP_BOTTOM: float = 92.0
 
+## Authored child-height floors (health_bar.tscn): Bar 12, NameLabel 9. These
+## are FLOORS, never the root-height source — _relayout_children() sets each
+## child to max(floor, measured combined minimum) and the root height to the
+## measured children sum.
+const _BAR_FLOOR_Y: float = 12.0
+const _NAME_LABEL_FLOOR_Y: float = 9.0
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -75,13 +82,7 @@ var bar_bottom: float = 0.0
 ## only the final position is clamped).
 var bar_anchors_sprite_top: bool = false
 
-## True when this frame the bar was FLIPPED to anchor its TOP 4 px BELOW the
-## portrait ink bottom (a still-clamped top-row unit whose above-portrait anchor
-## would sit inside the STRIP_BOTTOM+2 strip floor). False = the normal
-## above-portrait anchoring. Only a top-band unit (sprite_top == 92) flips.
-var bar_anchors_below_portrait: bool = false
 
-## The character display name shown on the label. Always set by setup(),
 ## even if the label node is missing, so it is safe to assert on.
 var name_text: String = ""
 
@@ -463,17 +464,18 @@ func _relayout_children() -> void:
 		_name_backing_sb.set_content_margin(SIDE_BOTTOM, 0.0)
 	if not is_instance_valid(_name_label):
 		return
-	# Re-measure the children: set each to its post-override combined minimum.
-	# A 0 minimum (a ProgressBar with no content margins and minimum_height 0)
-	# falls back to the authored scene floor (Bar size.y = 12 in health_bar.tscn;
-	# NameLabel size.y = 9) so a child never collapses to 0. The floors are the
-	# scene's authored values, not theme measurements.
-	_name_label.size.y = _name_label.get_combined_minimum_size().y
-	_bar.size.y = _bar.get_combined_minimum_size().y
-	if _name_label.size.y <= 0.0:
-		_name_label.size.y = 9.0
-	if _bar.size.y <= 0.0:
-		_bar.size.y = 12.0
+	# Re-measure the children: each height is max(authored scene floor,
+	# post-override combined minimum) — the theme can only GROW a child, never
+	# shrink it below what the scene authored (Bar 12, NameLabel 9 in
+	# health_bar.tscn). Measured 2026-08-28: after the overrides above Bar's
+	# combined minimum is 4.0 (below the authored 12) and NameLabel's is its
+	# font line height, so the floor — not the minimum — is what keeps the Q5
+	# empty-slot area (cap 14 x bar 12 = 168 px² >= 120) honest. The floors are
+	# the scene's authored values, NOT the sum source: the root height below is
+	# still the measured children sum.
+	_name_label.size.y = maxf(_NAME_LABEL_FLOOR_Y,
+			_name_label.get_combined_minimum_size().y)
+	_bar.size.y = maxf(_BAR_FLOOR_Y, _bar.get_combined_minimum_size().y)
 	# Bar strictly below NameLabel (never overlapping).
 	_name_label.position.y = 0.0
 	_bar.position.y = _name_label.size.y
