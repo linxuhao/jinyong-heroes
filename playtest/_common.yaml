@@ -199,6 +199,19 @@ surface:
   - end_overlay_text
   - creation_done
   - creation_entry
+  Camera:
+  - camera_position
+  - camera_x_lo
+  - camera_x_hi
+  - camera_y_lo
+  - camera_y_hi
+  - hud_band_top
+  - hud_band_bottom
+  - active_unit_screen_y
+  - active_unit_world_y
+  - viewport_half_y
+  - follow_target_id
+  - follow_target_is_active
   SaveManager:
   - seed
   - last_error
@@ -930,3 +943,4 @@ scenario_order:
 - trait_hover_preview
 - portrait_grid_alignment
 - language_zh_default
+- camera_transform_follows_unit
