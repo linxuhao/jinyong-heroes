@@ -38,8 +38,11 @@ was weakened.
   the two existing sibling assertions, with the rule written in the comment:
   **no descendant of a floating HUD control may be STOP**. The whole
   `health_bar.tscn` subtree audit table and the enemy `ClickTarget` verdict
-  (measured, not commented: `gui_input` fires 0 times — dead for routing,
-  cannot eat events; node kept as the harness click anchor) are recorded in
+  (the `debug_click_target_fires` counter is landed in
+  `scripts/characters/enemy.gd` and pinned by
+  `playtest/input_click_differential.yaml` (`== 0`); the measured
+  dead-for-routing verdict is the downstream gate's, not claimed here; node
+  kept as the harness click anchor) are recorded in
   `design/30_presentation.md`. New scenario
   `playtest/click_move_undo_feet.yaml` right-clicks **exactly `Player +0,0`**
   (the feet, inside the old dead zone) and asserts the retreat;
@@ -252,7 +255,8 @@ godot --headless --path . -s res://tests/test_cultivation.gd  # SceneTree-style 
   `debug_gui_eater` (predicted top GUI eater at the last press, via
   `InputCensus.top_eater`), `debug_last_raw_event_pos` /
   `debug_last_click_grid`. `Enemy.debug_click_target_fires` counts
-  ClickTarget `gui_input` fires (measured 0 — dead for routing).
+  ClickTarget `gui_input` fires; the counter is shipped and the `== 0` leg
+  is pinned by `input_click_differential` (gate evidence pending).
 - **HUD** (`scripts/ui/hud.gd`): EndTurn / Attack / **UndoButton** (退回,
   delegates to the shared undo entry, `disabled` mirrors `undo_available`);
   observables incl. `pressed_connected["UndoButton"]`,
@@ -309,8 +313,9 @@ The only authoritative gate evidence is the pipeline step products —
 the verifier step (the gates run after it). In short:
 
 - Every implementation-level goal of this round is direct-read verified:
-  the Bar filter fix + per-frame re-assert + subtree audit + measured
-  ClickTarget verdict, the feet-tile undo scenario (with
+  the Bar filter fix + per-frame re-assert + subtree audit + ClickTarget
+  measurement pin (counter landed, gate verdict pending), the feet-tile undo
+  scenario (with
   `click_move_undo_right.yaml` untouched), the nameplate re-anchor with the
   retained clamp and documented top-row landing, the click-inert
   after-`Characters` ground marker, the live-clamped `portrait_ink_rect` +

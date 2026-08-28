@@ -262,11 +262,12 @@ are written by the post-gate evidence step).
 
 ## What changed per item
 
-- **Defect A audit residue:** `NameLabel` now declares `mouse_filter = 2` explicitly in
-  `scenes/ui/health_bar.tscn` (defensive; Bar's fix landed earlier). Enemy `ClickTarget`
-  verdict is measured, not commented: `debug_click_target_fires` stays 0 through the
-  `input_click_differential` enemy-tile leg — `gui_input` never fires (dead for routing,
-  cannot eat events). The node is **kept**: it is the harness click anchor that
+- **Defect A audit residue:** the delivered `scenes/ui/health_bar.tscn` has **no** explicit
+  `mouse_filter` line on `NameLabel` — it rides the Label class-default IGNORE; the audit
+  conclusion "no STOP descendant in the subtree" stands. Enemy `ClickTarget` verdict: the
+  `debug_click_target_fires` counter is landed in `enemy.gd` (L123/L346) and pinned by
+  `input_click_differential` (`== 0`); the measured verdict is the downstream gate's
+  (evidence pending). The node is **kept**: it is the harness click anchor that
   `click_move_commit_lock.yaml` resolves by name; its `mouse_filter` left unchanged
   (zero diff).
 - **P0 coverage net Layer 1:** permanent differential observables in `player.gd` —
@@ -301,7 +302,8 @@ are written by the post-gate evidence step).
 
 1. `input_click_differential` — per-press raw-vs-handled differential; feet-tile
    right-click reaches the undo path with an empty GUI eater; the enemy-tile leg pins
-   `debug_click_target_fires == 0` (the ClickTarget measurement).
+   `debug_click_target_fires == 0` (the counter is landed; the measured verdict is the
+   downstream gate's — evidence pending, not claimed here).
 2. `undo_button_retreat` — UndoButton wiring/geometry, disabled-state mirroring, click →
    retreat via the shared entry.
 3. `click_portrait_body_targets_enemy` — clicking a **reachable** enemy's drawn portrait
@@ -348,5 +350,16 @@ as an OPEN coverage gap, never green.**
   port-attribution comment in `scripts/ui/input_census.gd:5` and design docs — not live
   references, and left untouched.
 - `scenes/ui/hud.tscn` still parses (ext_resources precede sub_resources).
+
+## Fix-loop note (docs alignment)
+
+This fix loop restored `ui_geometry_readability` (35/38 → target 38/38) **without touching
+any assertion**: `follow_delta` stays `<= 24` at **both** legs (f30 L39 / f85 L80; the yaml
+is byte-untouched) because the top-row nameplate now **flips** below the portrait
+(`bar_anchors_below_portrait`) instead of being clamped into the strip, and
+`hint_nameplate_overlap == false` was restored solely by shrinking `SkillDescLabel`
+(`offset_bottom` 396 → 384; landed box `offset_top 280 / offset_bottom 384`), clearing
+North_Beggar (11,8)'s raised nameplate. **No assertion was deleted, relaxed or
+re-baselined.**
 
 

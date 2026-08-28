@@ -666,16 +666,15 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 ——全子树无 STOP:一个悬浮在角色身上的 HUD 控件,不许有任何一个是 STOP 的后代。
 `scripts/ui/health_bar.gd` 在 `update_health` 里对 `Bar`/`HpLabel`/cap 三个每帧重断言。
 
-**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=0`)的裁定(2026-08-28 闸门后勘误:实测没有发生,钉子待落):**
-本轮闸门实测 `input_click_differential` **12/13**——`Central_Divine.debug_click_target_fires`
-断言报 `Invalid named index ... for base type Object`:计数器**没有落进
-`scripts/characters/enemy.gd`**(`_common.yaml` 白名单与场景断言先行,实现缺席),
-「`gui_input` 触发 0 次」因此**不是实测结论**。当前裁定只能以代码路径为据:敌
-`_input` 中继先于 GUI 阶段接管本格按压,Godot 拾取器不把事件路由给祖先为 Node2D 的
-Control——ClickTarget 既收不到也吃不掉事件(死路由)。**「以实测裁定、不照注释」
-的要求尚未满足**,OPEN:把计数器落进 `enemy.gd`、让该腿转绿后再把本段改回实测结论。
-节点**保留**:它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),
-`mouse_filter` 留原值零 diff(两态皆惰性)。
+**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=0`)的裁定(2026-08-28 修复轮勘误:计数器已落,实测钉子挂在该腿的闸门证据上):**
+计数器已落进 `scripts/characters/enemy.gd`(L123 声明、L346 在按键守卫之前自增,度量的
+正是「gui_input 到底会不会触发」),且 `input_click_differential.yaml` L105 的
+`debug_click_target_fires == 0` 那条腿**就是这条实测**。裁定「死路由、吃不掉事件、
+节点保留为 harness 点击锚」现挂在该闸门断言上,**闸门证据待跑**。时序:上一版勘误写
+「实测 0 次」时计数器尚未落地(闸门实测 `input_click_differential` 12/13,该断言报
+`Invalid named index`),此轮计数器与那条腿都已落,等闸门转绿即为实测结论。节点**保留**:
+它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),`mouse_filter` 留
+原值零 diff(两态皆惰性)。
 
 ## 名牌挂到立绘顶端 + 地面标记(2026-08-28,interaction-defects;几何修复 fix_geometry_overlap_rebaseline)
 
@@ -704,10 +703,13 @@ Control——ClickTarget 既收不到也吃不掉事件(死路由)。**「以实
 
 **SkillDescLabel 让位(2026-08-28 几何修复):** 名牌抬到顶 + UndoButton 轮把
 `SkillDescLabel` 下移后,右栏翻侧名牌(顶 224,NameLabel ≤ 26 高 → 底约 250)曾落进
-`SkillDescLabel`(x≥608,y 216..384) → `hint_nameplate_overlap == true`。把
-`SkillDescLabel.offset_top` 216→280(底 396 不变,框 344×104 仍全在 704 视口内),
-翻转名牌底 250 < 280,解除真实压盖(可读性硬要求第 6 条);`ui_geometry_readability`
-的 `hint_nameplate_overlap == false` 断言**原样保留**,不是放宽。
+`SkillDescLabel`(x≥608,y 216..396) → `hint_nameplate_overlap == true`。把
+`SkillDescLabel.offset_top` 216→280 **且底 396→384**(现框 `offset_left −352 / offset_top
+280 / offset_right −8 / offset_bottom 384`,344×104,仍全在 704 视口内),翻转名牌底
+250 < 280,解除真实压盖(可读性硬要求第 6 条);`ui_geometry_readability` 的
+`hint_nameplate_overlap == false` 断言**原样保留**,不是放宽。`follow_delta <= 24`
+两条腿(f30/f85)同样原样保留、`ui_geometry_readability.yaml` 一行未改、无 re-baseline
+——翻转(`bar_anchors_below_portrait`)已使顶行位移归 ~0,无需放阈值。
 
 **顶行/中排落地:** 中排单位(如玩家 (7,5),`sprite_top == 224`)严格在上方
 (`bar_bottom < sprite_top`,gap ≥ 4px);顶带单位翻侧后 `bar_top == 224`,而脸区从
