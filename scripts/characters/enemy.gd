@@ -304,10 +304,14 @@ func _process(_delta: float) -> void:
 	if _sprite != null:
 		portrait_sprite_pos = _sprite.global_position
 		portrait_tex_size = _sprite.texture.get_size() if _sprite.texture != null else Vector2.ZERO
-		# Live clamped ink rect: reads the LIVE _sprite.offset (refined every
-		# frame by _refresh_sprite_clamp) and the fresh sprite_top — never
-		# grid or a feet-anchored assumption (top-row/edge units differ).
-		# Zero-area (null texture) falls back to the sentinel Rect2().
+					# Live unclamped ink rect: reads the LIVE _sprite.offset (the foot
+			# anchor set once by _apply_character_visuals()) and the fresh
+			# sprite_top — never grid or a feet-anchored assumption (top-row/
+			# edge units differ). Zero-area (null texture) falls back to the
+			# sentinel Rect2().
+		
+		
+		
 		portrait_ink_rect = Rect2(
 			Vector2(_sprite.global_position.x + _sprite.offset.x - portrait_tex_size.x / 2.0, sprite_top),
 			portrait_tex_size,
@@ -467,19 +471,3 @@ func _apply_character_visuals() -> void:
 	sprite.texture = tex
 	sprite.modulate = Color.WHITE
 	sprite.offset = Vector2(0, -(tex.get_height() / 2.0))  # feet at tile centre
-
-
-## Clamp the sprite's offset so the whole texture rect stays inside the board
-## artwork rect, and publish sprite_top for playtest assertions. Idempotent:
-## only writes _sprite.offset when the clamp changes it. Called every frame at
-## the top of _process() (before state gates), so top-row enemies are clamped
-## during TUTORIAL too. The clamp is authoritative per frame — it refines any
-## feet anchor set by _apply_character_visuals().
-func _refresh_sprite_clamp() -> void:
-	if _sprite == null or _sprite.texture == null:
-		return
-	var tex_size: Vector2 = _sprite.texture.get_size()
-	var desired: Vector2 = GridManager.clamp_sprite_offset(position, tex_size)
-	if _sprite.offset != desired:
-		_sprite.offset = desired
-	sprite_top = position.y + desired.y - tex_size.y / 2.0
