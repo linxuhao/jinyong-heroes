@@ -2,10 +2,21 @@
 
 ## 分辨率与拉伸
 
-基准视口 **960 × 704**(= 15×11 格 × 64 px = 棋盘 = 背景图 = 相机视野)。
-`project.godot [display]`:`window/stretch/mode = "canvas_items"`、
-`window/stretch/aspect = "keep"`、`resizable = true`。窗口缩放时棋盘等比填满,
-外侧由引擎黑边补齐。
+分开说四件事,别再写成一条链:
+
+- **视口是显示尺寸**:基准视口 **960 × 704**。`project.godot [display]`:
+  `window/stretch/mode = "canvas_items"`、`window/stretch/aspect = "keep"`、
+  `resizable = true`。窗口缩放时棋盘等比填满,外侧由引擎黑边补齐。
+- **棋盘是内容尺寸**:`GRID_WIDTH × GRID_HEIGHT × TILE_SIZE = 15×11×64 =
+  960 × 704`,由 `GridManager` 常量(`GRID_*/TILE_SIZE/GRID_ORIGIN`)与
+  `board_rect()` 派生。**棋盘不再受视口约束**——它现在可以比视口大,
+  也可以比视口小(见 `90_decisions.md` 2026-08-28 条)。
+- **背景覆盖棋盘**:`SummitBackdrop` 按 `GridManager.board_rect().size` 铺满
+  棋盘矩形(见 `battlefield.gd::_fit_backdrop_to_board`,读 `GridManager`,
+  不再用镜像常量)。
+- **可见性归相机**:取景上限来自**跟随 Camera2D**(`scripts/camera_follower.gd`),
+  不来自视口。棋盘装不进视口时由相机负责把行动单位框进 HUD 顶栏与招式栏之间
+  的未遮挡带——「整盘看不全」是正常取景,不是缺陷。
 
 ## 画风
 
@@ -62,7 +73,7 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 | 技能栏 | 底部居中,视口内 |
 | 暂停按钮 | 右上角(坐在顶栏上) |
 | 结束回合 / 出招 / 技能说明 | 顶栏下方右侧 |
-| 血条 + 名字 | 悬浮于角色上方,名字在血条**之上**(有半透明底),不叠压;血条顶边夹在顶栏之下(`top ≥ 94`) |
+| 血条 + 名字 | 悬浮于角色上方,名字在血条**之上**(有半透明底),不叠压;血条随单位经**含相机的** canvas 变换(`Coord.world_to_screen`,见 `## 坐标变换`)投射到屏幕;顶栏遮挡带 `0..T` 由相机取景负责避开 |
 | 教程面板 | 屏幕居中,**不透明底色** |
 | 捏人屏 | 三阶段(捏人 / 特质 / 确认)内容整组在 **x=480 轴上居中**;每行 shrink-center(AttrLabel 最小宽贴文字;AttrRow0..4 / AttrNavRow / TraitNavRow / TraitToggle0..12 `size_flags_horizontal=4`);描述文字居中(AttrDescLabel / TraitDescLabel `horizontal_alignment=1`)。**属性页信息层**:AttrDescLabel 静止即全列五属性效果(名称前缀,逐字复用 `creation.gd::_ATTR_DESCS`);其正下方 `HpValueLabel` 显示当前气血(`气血 = 根骨 × 5` 的活值,仅 ATTRS 可见)。**确认页**:`ConfirmBox` 内 `ConfirmSummaryLabel` 列五项最终值(每行「名 值」),位于两个按钮之上,仅 CONFIRM 可见 |
 | 移动提示 (MoveHintLabel) | 跟随玩家所在格,在脚下 +44 px 处,中文状态跟随文案(左键点格移动 · 右键退回 / 右键退回起点 · 出手即确认 / 已出手 · 移动已确认),`mouse_filter = 2`(不拦截点击)。状态机 idle / undo_ready / committed / hidden 是既有引擎字段的纯函数;文案必须在锁定移动的**同一个转移**里换掉,不许留一条已经不成立的承诺。`move_target_affordance.yaml` 把 idle / undo_ready / committed(含退回后回 idle)三态文案钉住 |
@@ -127,6 +138,25 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 八层全部通过,立绘才算「看得见」。`playtest/portrait_visibility.yaml`
 断言了全部六个单位的 `portrait_visible == true`。
 
+> **可见性归相机(2026-08-28, camera-owns-visibility)。** 相机移动后,
+> `VisibilityProbe` 的 `off_viewport` 与 `covered` 两层语义改变:它们是
+> **取景事实,不是精灵缺陷**——一个立绘出视口或被顶栏盖住,现在是相机把
+> 行动单位框进未遮挡带时的正常取景,不再说明精灵摆错了位置。这两层**不再
+> 裁定立绘对位**。裁定立绘对位的是新 pin `playtest/portrait_grid_alignment.yaml`
+> (`abs(ink_world_dx) <= 1.0`、`abs(ink_world_dy) <= 1.0`,立绘站在自己的格子上,
+> 含玩家走到最北一格后的走位腿)。`playtest/portrait_visibility.yaml` 已改写为
+> **相机级闸门**——断言「当前行动单位处在未被遮挡的可见区内、相机钳在无空白
+> 范围内、跟随目标是活跃单位」(全部经 `Camera:` surface 块发布),不再断言
+> 精灵级属性。改写理由:可见性是相机/布局拥有的属性,不是精灵的;一条只能靠
+> 改动引擎本该自己算的 `offset/position/size/z-order` 来满足的闸门,该删的是
+> 闸门(见本节的通用规矩)。探针类仍可作他用,但其断言角色在本闸门中已被取代。
+>
+> **两条原则(2026-08-28)。** (a) **可见性由相机拥有,精灵只负责站在自己的
+> 格子上,二者不得互相代偿**——为此删掉 `GridManager.clamp_sprite_offset` 与
+> 它逼出来的补偿机器(见 `## 定位章 — 相机拥有可见性`)。(b) **闸门断言游戏级
+> 属性,不断言引擎级属性**:一条闸门只能靠改动引擎本该自己算的东西
+> (`offset/position/size/z-order`)来满足,那要删的是闸门,不是调精灵。
+
 > **判据由六层扩到八层(2026-08-25, jinyong-events)。** 本轮在 `null_texture` 之后
 > 插入 `blank_texture`(资产级 alpha 扫描,失败开放——`get_image()` 拿不到就当通过),
 > 在 `occluded` 之后插入 `covered`(部分遮挡 ≥ 25% / ≥ 64 px²)。旧 `occluded` 只认
@@ -143,6 +173,29 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 (`portrait_visibility.yaml` 10/10,六单位 `portrait_visible == true`、`portrait_fail_layer == ""`)。
 探针本身(godot-builder HTTP 500 ×9,后是本轮自身的 `Canvas` 编译错)从未落下修前实测值;
 按「先查明再修、不许猜」规则修集为空,判读的实测依据是修后闸门运行,不是探针读数。
+
+## 坐标变换(2026-08-28,camera-owns-visibility)
+
+相机一移动,世界↔屏幕映射就不再是恒等。唯一正确的映射是
+`Viewport.get_canvas_transform()`——**Camera2D 就写在这里**,它是「世界→视口」。
+它的入口只有 `Coord.world_to_screen(world, vp)` 与
+`Coord.screen_to_world(screen, vp)`(`scripts/coord.gd`,分别 =
+`vp.get_canvas_transform() * world` 与 `vp.get_canvas_transform().affine_inverse() * screen`),
+`player.gd` / `enemy.gd` 的点击入口、`health_bar.gd` 的跟随、follower 发布的
+`active_unit_screen_y` 全部走它。
+
+`Viewport.get_final_transform()` 是「视口→窗口像素」——**只有 stretch,没有相机**,
+**不得用于世界↔屏幕**。旧 `health_bar.gd::follow_character` 曾用
+`get_final_transform()` 做世界→屏幕,那是错的(相机一动,血条/名牌就停在原地
+不跟人走);本轮改为 `Coord.world_to_screen`,并删掉它那段「final transform 合成
+含相机的 canvas transform」的自我辩护注释——`get_final_transform()` 根本不含相机,
+那句注释是替缺陷辩护的散文。
+
+点击路径 `player.gd` / `enemy.gd` 的
+`get_canvas_transform().affine_inverse() * event.position` **本来就对**(含相机),
+`playtest/_common.yaml` 把这一形状记为实测契约;本轮只修了 `health_bar.gd`。
+harness 侧读 Node2D 点击锚用 `get_global_transform_with_canvas().origin`(相机感知),
+故无需改动。
 
 ### 这些怎么被检验
 
@@ -175,7 +228,8 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 左键点击世界点 `P` 在 `player.gd::handle_world_click` 内按以下顺序解算:
 
 1. `T = GridManager.world_to_grid(P)`,存活敌人占据 `T`(脚格)→ 攻击该敌人;
-2. 画出的立绘矩形(`portrait_ink_rect`,按每帧钳制后的实际墨迹,不是脚底−128 推算)
+2. 画出的立绘矩形(`portrait_ink_rect`,未钳位墨迹 = `[feet.x−48, feet.y−128] .. [feet.x+48, feet.y]`,
+   `PORTRAIT_TEX_Y`=128、纹理宽 96、offset 恒为脚锚 `(0,−tex.y/2)`)
    包含 `P` **且该敌人在攻击射程内**(in-reach)→ 攻击最近的那个(按 `grid_pos` 距离
    决胜)——本步闭合「贴身敌人打不到」的缺口;
 3. `T` 是移动范围高亮中的可达空格 → 走过去(高亮仲裁:玩家看得见谁赢);
@@ -680,20 +734,20 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 
 `health_bar.gd::follow_character` 的锚点从脚底 `+(-34, -32)` 改挂**立绘顶端**:
 `screen_pos = Vector2(char_x - 34, sprite_top - 4.0 - size.y)`(血条底边在
-`sprite_top` 上方 4px),`STRIP_BOTTOM + 2 = 94` 钳制**保留**(它是 UX-01b 的修复,
-被 `portrait_visibility.yaml` 钉住;无钳制变体实渲染顶行头部被顶栏盖住)。
+`sprite_top` 上方 4px)。`STRIP_BOTTOM` 仅作血条**内部地板常数**保留(几何冻结);
+立绘头顶是否落进顶栏**是相机取景问题**,不归血条/立绘负责——本轮已量得并记为
+已知接受代价(见 `## 定位章 — 相机拥有可见性`)。
 
-**名牌翻转规则(2026-08-28 几何修复,`bar_anchors_below_portrait`):** 顶带单位
-(`sprite_top == 92`,即 1~2 行的 Central_Divine / West_Poison / 走到顶行的玩家;
-**已被下方 2026-08-28 定位章 BOARD 规则取代**——行 0/1/2 不可进入,Central_Divine
-移至 (7,3)、West_Poison 移至 (11,4) 后二者不再被钳制,此案例不再发生),
-上锚点 `sprite_top − 4 − size.y = 64` 落进顶栏区(`STRIP_BOTTOM + 2 == 94` 之下),
-会把名牌钳回脸上。规则改为**翻到立绘另一侧**:把名牌**顶边**挂在
-`portrait_ink_rect.end.y + 4 = 220 + 4 = 224`,即立绘墨迹底下方 4px、落在单位自家
-格子上。`bar_anchors_below_portrait == true` 表示本轮翻侧;中排单位走正常上锚
-(`== false`)。翻转后无视口钳制咬合,`follow_delta` 在顶行也读 ~0(不再 30)。理由:
-翻转是唯一让「名牌既不盖脸、又不进顶栏」的落点,且它把名牌放在单位自家格上,
-与地面标记(下方)共同维持「他站哪」的可读性。
+**名牌翻转规则(2026-08-28,`bar_anchors_below_portrait`):** 未钳位时
+`sprite_top = feet − 128`(行 1 为负,`feet = 32+64 = 96` → `sprite_top = −32`),
+上锚点 `sprite_top − 4 − size.y` 落在负值区、会在顶栏带 `0..T` 之下,把名牌钳回
+脸上。规则**翻到立绘另一侧**:把名牌**顶边**挂在 `portrait_ink_rect.end.y + 4 =
+feet + 4`(行 1 = `96 + 4 = 100`),即立绘墨迹底下方 4px、落在单位**自家格**上。
+`bar_anchors_below_portrait == true` 表示翻侧;中排单位走正常上锚
+(`== false`)。理由(与钳位无关):立绘墨迹从脚格向上/外延伸超出 64px 格,
+可读控件悬于头顶、避开顶栏带 `0..T`,翻转落点 = 单位自己脚底 + 4,是诚实的
+「站这里」。这是防御性兜底,不是本轮缺陷的修复;对位由 `portrait_grid_alignment`
+负责,名牌只要不盖脸、不进顶栏即可。
 
 **名牌自带子布局(2026-08-28 几何修复):** 部件此前报告 68×24 而子节点量出
 30+22=52px 墨迹,溢出底缘且互相压 18px。现在 `_relayout_children()` 压缩主题通胀
@@ -713,64 +767,61 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 两条腿(f30/f85)同样原样保留、`ui_geometry_readability.yaml` 一行未改、无 re-baseline
 ——翻转(`bar_anchors_below_portrait`)已使顶行位移归 ~0,无需放阈值。
 
-**顶行/中排落地:** 中排单位(如玩家 (7,5),`sprite_top == 224`)严格在上方
-(`bar_bottom < sprite_top`,gap ≥ 4px);顶带单位翻侧后 `bar_top == 224`,而脸区从
-`sprite_top + 40 == 132` 起——`bar_top > sprite_top + 40` 比旧的「钳到 94 侵入
-发际带 26px」**更强**:名牌完全不在立绘上,更不可能盖脸。`health_bar_above_portrait.yaml`
-顶行断言改为钉翻侧几何(`portrait_bar_pos.y > sprite_top + 40.0`),并新增
-`HealthBar.bar_anchors_below_portrait` 中排 `== false` 钉;`_common.yaml` 白名单加入
-`bar_anchors_below_portrait`。
+**中排/顶行落地(未钳位几何):** 中排单位(如玩家 (7,5),`feet = 352` →
+`sprite_top = 352 − 128 = 224`)严格在上方(`bar_bottom < sprite_top`,gap ≥ 4px);
+顶行单位(行 1,`feet = 96`)翻侧后 `bar_top = feet + 4 = 100`,落在自家格上。
+`health_bar_above_portrait.yaml` 的断言已按未钳位几何重新推导
+(中排 `portrait_bar_pos.y > sprite_top + 40.0`、翻侧 `bar_anchors_below_portrait`
+钉),不再引用被删的钳位位移。
 
 **地面标记 `TileMarkers`**(`scripts/ui/tile_markers.gd`,Node2D `_draw`,挂在
 `scenes/battlefield.tscn` 中 `Characters` **之后**):为每个存活单位在
 `grid_to_world(grid_pos)` 画低透明度扁椭圆 + 细金边,标记「他站哪格」。必须挂在
-角色之后:逐单位 `_draw()` 先于子 Sprite2D,顶行(钳制把立绘压到自家格上)会把自己的
-脚标盖掉——实测 `TileMarkers` 对全部六个单位(含顶行)可见,且 Node2D `_draw` 无 GUI
-参与,天然不吞点击。顶行诚实视觉事实:标记画在自家立绘袍子上(「袍子上的椭圆」),
-是「他站这里」的如实表述。
+角色之后:逐单位 `_draw()` 先于子 Sprite2D,顶行立绘会把自己的脚标盖掉——实测
+`TileMarkers` 对全部六个单位(含顶行)可见,且 Node2D `_draw` 无 GUI 参与,天然不吞
+点击。**保留理由(与垂直对位无关):** 立绘 **96px 宽 vs 64px 格**,未钳位也**横向
+外溢相邻格子**;地面椭圆标记该单位**占据哪一格**——「可点的脚在这里」,与垂直对位
+(`portrait_grid_alignment`)无关。
 
-## 定位章 — 棋盘规则:行 0/1/2 不可进入(2026-08-28,fix_toprow_spawn_positions)
+## 定位章 — 相机拥有可见性(2026-08-28,camera-owns-visibility)
 
-**规则(BOARD rule,不是单点出生修正):** 任何单位(含玩家)的起始/落点行号必须
-`>= MIN_LEGAL_ROW == 3`(0-based);行 0/1/2 对**所有单位**不可进入。推导直接从
-常量得出(不抄文档数字):
+**行 0-2 重新合法。** 删掉 `clamp_sprite_offset` 后,棋盘唯一行限制是
+`GridManager.is_walkable` 的**边界环**(行/列 0 与 `GRID_*−1`),可通行行
+`1..GRID_HEIGHT−2`(= 今天 `1..9`),由常量导出。出生点恢复原样:
+**中神通 (7,1) / 东邪 (3,2) / 西毒 (11,2)**;南帝 (3,8)、北丐 (11,8)、
+玩家 (7,5) 不变。旧「某些行不可上」的规则已作废——它曾是钳位逼出来的
+第二层补丁,本轮随钳位一起删除,历史见 `99_changelog.md`。
+
+**相机数学(全符号,GRID_HEIGHT 改 20 只改代入数、零行相机逻辑改动)。**
+跟随 Camera2D(`scripts/camera_follower.gd`)把中心钳到**无空白范围**:
 
 ```
-feet_y            = row*TILE_SIZE + GRID_ORIGIN.y
-立绘墨迹顶(未钳)  = feet_y − PORTRAIT_TEX_Y(128)
-合法 iff 顶 >= BOARD_TOP_MARGIN_Y(92)
-→ row >= ceil((BOARD_TOP_MARGIN_Y + PORTRAIT_TEX_Y − GRID_ORIGIN.y) / TILE_SIZE)
-     = ceil((92 + 128 − 32) / 64) = ceil(2.9375) = 3
+cam_lo = board_lo + V/2 − cover_before      cam_hi = board_hi − V/2 + cover_after
 ```
 
-GRID_HEIGHT 11 下,有效行 3..10(8 行;行 10 为底边框,`is_walkable` 另排除,故
-可通行格实际为 3..9)。实现落在 `GridManager.is_walkable` **唯一一处**(新增
-`if grid_pos.y < MIN_LEGAL_ROW: return false`),`setup_grid` / `get_move_range` /
-`plan_movement` / `move_unit` / `player._try_move` / AI / combat_manager 全部自动
-继承,无需改调用点;移动范围高亮读同一可达集,行 0/1/2 自动不再高亮。
+每轴一个;`cover_before` = 该侧被 HUD 遮挡的深度,`cover_after` = 对侧。
+退化 `cam_lo > cam_hi`(棋盘 < 视口)⇒ 钉棋盘中心。
 
-**为何选 (a)(rows<3 全部禁入)而非 (b)(改 `BOARD_TOP_MARGIN_Y` / `clamp_sprite_offset`):**
-(b) 触碰冻结常量并会重开 UX-01b(`portrait_covered_frac 0.333` 实测红,
-`portrait_visibility.yaml` 钉住),而 (a) 是纯几何规则——立绘 96×128 配上
-64px 格子在行 0/1/2 的墨迹顶必然越过 92px 顶栏,钳制会把立绘**向下**推出自家格,
-行 3 是第一个合法行。
+- 今日代入(仅一次代入的校核,不入码):`V = get_viewport_rect().size` =
+  (960,704);HUD 遮挡 `T = 92`(`scenes/ui/hud.tscn` TopStrip `offset_bottom = 92.0`)、
+  `B = 648`(SkillBar 底锚 `offset_top = −56` → `704−56`),未遮挡带
+  `y ∈ [92, 648]`、高 `B − T = 556`;左右无全高侧栏 → x 遮挡 0。
+  - `cam_y ∈ [0 + 352 − 92, 704 − 352 + 56] = [260, 408]`,区间长
+    `148 = 704 − 556`(棋盘高 − 带高)。
+  - `cam_x ∈ [480, 480]`(单点)——这是「x 侧无遮挡」的**推导结果**,不是硬编码。
+- 相机会话:玩家回合跟随玩家、敌方回合跟随正在行动的敌人(读
+  `CombatManager.get_active_unit()`,每帧取 `unit.position`),跟随目标是活跃
+  单位这一事实由 `Camera.follow_target_is_active` 发布。
+- 世界↔屏幕一律经 `Coord`(见 `## 坐标变换`)。
 
-**新起始格(保持阵形):** 中神通 (7,1)→**(7,3)**、东邪 (3,2)→**(3,4)**、西毒
-(11,2)→**(11,4)**;南帝 (3,8)、北丐 (11,8)、玩家 (7,5) 不变。列 7 仍为中神通
-最上,东/西同排、南/北同排的阵形保留。
+**代价两条(已接受,均写进 `90_decisions.md` / `40_ux_backlog.md`):**
 
-**对名牌翻侧机制的影响:** 行 0/1/2 现在对任何单位不可进入,因此**再没有单位能
-走到被钳制的顶带**(`sprite_top == 92`)。中神通移 (7,3) 后 `sprite_top =
-3*64+32−128 = 96 >= 92`(未钳制),西毒 (11,4) 后 `sprite_top = 160`(未钳制)。
-上节「顶带名牌翻侧以 Central_Divine / West_Poison 为案例」的记载被本规则取代:
-`bar_anchors_below_portrait` 机制仍保留(防御性兜底),但当前棋盘无单位触发它;
-中排单位一律正常上锚(`bar_bottom < sprite_top`)。
-
-**对既有断言的影响(已路由,不改文件):** 依赖「顶带钳制 → 名牌翻侧
-`portrait_bar_pos.y > sprite_top + 40`」的 `health_bar_above_portrait.yaml` 顶行腿、
-依赖「被钳制墨迹中心 `Central_Divine +0,+60`」的 `click_portrait_body_targets_enemy`
-腿、以及目标落在行 2 的 `move_target_affordance` / `click_move_to_tile` 腿,均因本
-规则实测红,按「升级记录,不放松断言」处置,见任务输出路由表。
-`click_move_undo_right` / `click_move_commit_lock` 为**本规则授权重推导**(两个文件
-本身,不是绕开缺陷)。
+1. **整盘看不全。** 相机在无空白范围内移动时,棋盘南端(行 9-10)在北极
+   `cam_y = 260` 时落到底部招式栏后——**正常取景,非缺陷**;小地图 / 屏外单位
+   边缘指示记为 UX-09 待办,本轮不做。
+2. **行 1 立绘头顶约 32 px 落在顶栏带后。** 清掉顶栏需要相机再往北
+   `PORTRAIT_TEX_Y − GRID_ORIGIN.y − TILE_SIZE = 128 − 32 − 64 = 32` px,
+   超出无空白下限允许的量;这是可推导的缺口,本轮不扩背景。相机级闸门断
+   「活跃单位在未遮挡带内 / 立绘站在自己格上」(`portrait_grid_alignment`),
+   不断「整张立绘完整可见」。
 

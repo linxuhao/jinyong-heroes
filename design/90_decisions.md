@@ -176,3 +176,30 @@ EVENT 隐藏逻辑(`_apply_hint_visibility`)挂在它上面,删面板行的爆�
 「一屏一条,一条提示」——不许用「两处都留着但内容一致」算统一。上一轮统一方案的
 本条勘误按规矩以新行记录,不改旧行。
 
+## 棋盘不再受视口约束(2026-08-28,项目所有者裁定)
+
+**棋盘尺寸不再受视口约束。** 此前「棋盘 == 视口」(15×11×64 = 960×704)是一条
+偶然等式,不是定律,却让「移动相机」看起来不可能,逼出了 `clamp_sprite_offset` 这个
+把立绘挪离自家格的补丁。本轮拆开:视口是显示尺寸,棋盘是内容尺寸
+(`GRID_*×TILE_SIZE`);**大场景需要大地图**,内容轮不必再设计到 15×11
+(见 `00_roadmap.md`)。相机的无空白范围、跟随行为全部从 `GridManager` 符号派生
+(`scripts/camera_follower.gd`),`GRID_HEIGHT` 11→20 只改代入数、零行相机逻辑改动。
+
+**「整盘看不全」是正常取景,不是缺陷。** 相机把行动单位框进 HUD 顶栏与招式栏之间
+的未遮挡带时,棋盘南端会暂时落在招式栏后——这是相机拥有可见性之后的常态,不再是
+一张要修的缺陷图。小地图 / 屏外单位边缘指示记为 UX-09(本轮不做)。
+
+**UX-01b 前一次的 CLOSED 是钳位买来的,本轮把它拆掉。** UX-01b 曾因引入
+`clamp_sprite_offset`(顶边距 `BOARD_TOP_MARGIN_Y=92`)而 CLOSED;那一次关闭靠的是
+把立绘推出自家格来骗过 `portrait_covered_frac < 0.25`。本轮删除钳位、由相机拥有
+可见性,并新增对位 pin(`playtest/portrait_grid_alignment.yaml`)让「立绘站在自己
+格子上」成为可断言事实——这才算真正修好(证据路径:`scripts/camera_follower.gd`、
+`playtest/portrait_grid_alignment.yaml`、改写后的 `playtest/portrait_visibility.yaml`)。
+
+**「今天数值相同」不是等价的理由。** 一个替代方案只在它本该处理的条件**尚未发生**
+时才成立,那它就不是替代方案——正如旧 `health_bar.gd` 用 `get_final_transform()`
+做世界→屏幕,在缩放 1、相机不动时数值上与 canvas 变换恰好相同,于是一句
+「numerically identical today」被当成保留的理由;一旦相机移动(即它要处理的那种
+情况出现),它立刻失效。等价要写在条件成立时也成立的证明上,不是写在「现在还没
+发生」上。
+
