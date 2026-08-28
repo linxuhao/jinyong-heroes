@@ -1803,7 +1803,21 @@ func _external_fhd_for_skill(unit: Node, skill) -> float:
 ## internal_arts / external_arts / attribute fields the cascade reads. Falls
 ## back to DEFAULT_FA_HUI_DU when the gongfa has no cascade method.
 func get_fa_hui_du(gongfa, unit) -> float:
-	if gongfa != null and gongfa.has_method("get_fa_hui_du"):
+	# `gongfa` is untyped on purpose: callers pass a GongfaData Object, a plain
+	# Dictionary row, or null. has_method() exists only on Object, so on a
+	# Dictionary this line raised
+	#     Nonexistent function 'has_method' in base 'Dictionary'
+	# and THE GUARD THAT EXISTS TO REACH THE FALLBACK WAS THE CRASH — the
+	# docstring above promises a fallback that the check made unreachable for
+	# exactly the inputs that needed it. Ask the type first.
+	#
+	# `is Object` also subsumes the null test: null is not an Object.
+	#
+	# Found by tests/test_gongfa_cascade.gd, which has been red since it was
+	# written and which no pipeline step runs (2026-08-28: the DPE 5_test tool is
+	# a pytest runner and nothing invokes tests/unit_test_runner.gd). A red pin
+	# nobody executes is a bug report nobody filed.
+	if gongfa is Object and gongfa.has_method("get_fa_hui_du"):
 		return float(gongfa.get_fa_hui_du(unit))
 	return DEFAULT_FA_HUI_DU
 

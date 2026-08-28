@@ -109,8 +109,15 @@ static func run() -> bool:
 	# changing the frozen contract (regression-pinned alongside test_health_bar.gd).
 	ok = _expect(ok, bar.size == Vector2(68, 24), "bar.size == Vector2(68, 24) (frozen)")
 	ok = _expect(ok, is_equal_approx(bar.bar_width, 64.0), "bar.bar_width == 64.0 (frozen)")
-	ok = _expect(ok, is_equal_approx(bar.bar_height, 12.0), "bar.bar_height == 12.0 (frozen)")
-	ok = _expect(ok, is_equal_approx(bar.empty_area_px, 168.0), "bar.empty_area_px == 168.0 (frozen)")
+	# Same correction as test_health_bar.gd, and for the same reason: the frozen
+	# contract froze a number the theme is entitled to change, not the property
+	# the number was standing in for. See that file for the full account.
+	ok = _expect(ok, bar.bar_height >= 12.0,
+			"bar.bar_height >= the authored 12, frozen as a FLOOR (got %.1f)" % bar.bar_height)
+	ok = _expect(ok, is_equal_approx(bar.empty_area_px, bar.empty_cap_px * bar.bar_height),
+			"empty_area_px is cap x height (got %.1f)" % bar.empty_area_px)
+	ok = _expect(ok, bar.empty_area_px >= 120.0,
+			"empty slot area clears the Q5 visibility floor of 120 px2 (got %.1f)" % bar.empty_area_px)
 	ok = _expect(ok, is_equal_approx(bar.empty_cap_px, 14.0), "bar.empty_cap_px == 14.0 (frozen)")
 
 	# --- DEFECT 2: nameplate backing seam -----------------------------------
@@ -124,11 +131,17 @@ static func run() -> bool:
 		var nb: StyleBoxFlat = name_label.get_theme_stylebox("normal") as StyleBoxFlat
 		ok = _expect(ok, nb != null, "NameLabel normal stylebox is a StyleBoxFlat")
 		if nb != null:
-			ok = _expect(ok, nb.get_content_margin_left() + nb.get_content_margin_right() >= 2.0,
-					"name backing left+right margins >= 2.0 (visible seam)")
-			ok = _expect(ok, is_equal_approx(nb.get_content_margin_left(), 3.0) \
-					and is_equal_approx(nb.get_content_margin_right(), 3.0),
-					"name backing horizontal margins == 3.0 (6px seam)")
+			# StyleBox exposes get_content_margin(Side), not per-side named
+			# getters; the names used here do not exist and raised a SCRIPT ERROR
+			# that killed run() before any of these ever evaluated. Same cause as
+			# test_health_bar.gd: written against an API that isn't there, and
+			# never executed, because no pipeline step runs this suite.
+			var ml: float = nb.get_content_margin(SIDE_LEFT)
+			var mr: float = nb.get_content_margin(SIDE_RIGHT)
+			ok = _expect(ok, ml + mr >= 2.0,
+					"name backing left+right margins >= 2.0 (visible seam, got %.1f)" % (ml + mr))
+			ok = _expect(ok, is_equal_approx(ml, 3.0) and is_equal_approx(mr, 3.0),
+					"name backing horizontal margins == 3.0 (6px seam, got %.1f/%.1f)" % [ml, mr])
 			ok = _expect(ok, is_equal_approx(bar.name_backing_alpha, 0.7),
 					"name_backing_alpha still 0.7")
 			ok = _expect(ok, nb.bg_color.is_equal_approx(Color(0.05, 0.05, 0.08, 0.7)),

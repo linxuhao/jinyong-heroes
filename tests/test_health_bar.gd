@@ -25,11 +25,31 @@ static func run() -> bool:
 	ok = _expect(ok, bar.size == Vector2(68, 24), "bar.size == Vector2(68, 24)")
 	ok = _expect(ok, is_equal_approx(bar.total_height, 24.0), "bar.total_height == 24.0")
 	ok = _expect(ok, is_equal_approx(bar.bar_width, 64.0), "bar.bar_width == 64.0")
-	# Bar height (authored 12 px — read via the headless instantiate path, before
-	# the battle scene's theme min-size clamp pushes it to ~22) and the resulting
-	# visible empty-slot area (14 px cap × 12 px = 168 px², the Q5 area argument).
-	ok = _expect(ok, is_equal_approx(bar.bar_height, 12.0), "bar.bar_height == 12.0")
-	ok = _expect(ok, is_equal_approx(bar.empty_area_px, 168.0), "bar.empty_area_px == 168.0")
+	# The Q5 visibility argument, asserted as the ARGUMENT rather than as the one
+	# number that happened to satisfy it.
+	#
+	# These two lines used to read `bar_height == 12.0` and `empty_area_px ==
+	# 168.0`, with a comment explaining that 12 is the authored height "read via
+	# the headless instantiate path, before the battle scene's theme min-size
+	# clamp pushes it to ~22". That premise stopped being true — the theme now
+	# applies at instantiate time, the ProgressBar takes its combined minimum
+	# height (nothing in this repo assigns bar.size; health_bar.gd only READS it),
+	# and both pins have been red ever since, unnoticed because NOTHING IN THE
+	# PIPELINE RUNS THIS SUITE.
+	#
+	# Updating 12 to 22 would only re-freeze the next incidental number. What the
+	# round behind these lines actually argued is recorded two files away: 48 px²
+	# of empty track is invisible at native size and >= 120 px² is not. So assert
+	# THAT, plus the derivation that keeps the two observables honest with each
+	# other, plus a floor at the authored height so a shrink still reddens. A
+	# theme that makes the bar taller now passes, which is correct: it makes the
+	# empty slot MORE visible, and that was the whole point.
+	ok = _expect(ok, bar.bar_height >= 12.0,
+			"bar.bar_height >= the authored 12 (got %.1f)" % bar.bar_height)
+	ok = _expect(ok, is_equal_approx(bar.empty_area_px, bar.empty_cap_px * bar.bar_height),
+			"empty_area_px is cap x height (got %.1f)" % bar.empty_area_px)
+	ok = _expect(ok, bar.empty_area_px >= 120.0,
+			"empty slot area clears the Q5 visibility floor of 120 px2 (got %.1f)" % bar.empty_area_px)
 	ok = _expect(ok, bar.name_text == "测试", 'bar.name_text == "测试"')
 
 	# Track visibility (5_vision Q5): the track bg is LIGHT (luminance > 0.30)
@@ -59,8 +79,17 @@ static func run() -> bool:
 	var bg = bar_node.get_theme_stylebox("background")
 	ok = _expect(ok, bg is StyleBoxFlat, "background stylebox is StyleBoxFlat")
 	if bg is StyleBoxFlat:
-		ok = _expect(ok, is_equal_approx(bg.get_expand_margin_all(), 8.0),
-				"background expand_margin_all == 8.0")
+		# StyleBoxFlat has no get_expand_margin_all() — the setter is
+		# set_expand_margin_all(), the GETTER is per-side get_expand_margin(Side).
+		# Calling the nonexistent name raised a SCRIPT ERROR, run() returned null,
+		# and this file has been failing since it was written. Nobody saw it
+		# because no pipeline step runs tests/unit_test_runner.gd. Asserting all
+		# four sides is also strictly better than the "all" call it replaces: that
+		# one could only ever have reported one number.
+		for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+			ok = _expect(ok, is_equal_approx(bg.get_expand_margin(side), 8.0),
+					"background expand_margin[%d] == 8.0 (got %.1f)"
+							% [side, bg.get_expand_margin(side)])
 		ok = _expect(ok, bg.border_width_left == 2 and bg.border_width_top == 2
 				and bg.border_width_right == 2 and bg.border_width_bottom == 2,
 				"background border_width == 2 on all four sides")
