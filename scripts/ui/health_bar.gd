@@ -75,6 +75,12 @@ var bar_bottom: float = 0.0
 ## only the final position is clamped).
 var bar_anchors_sprite_top: bool = false
 
+## True when this frame the bar was FLIPPED to anchor its TOP 4 px BELOW the
+## portrait ink bottom (a still-clamped top-row unit whose above-portrait anchor
+## would sit inside the STRIP_BOTTOM+2 strip floor). False = the normal
+## above-portrait anchoring. Only a top-band unit (sprite_top == 92) flips.
+var bar_anchors_below_portrait: bool = false
+
 ## The character display name shown on the label. Always set by setup(),
 ## even if the label node is missing, so it is safe to assert on.
 var name_text: String = ""
@@ -317,6 +323,11 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 	# guard) so the playtest surface reads it even when the bar node is absent.
 	track_bg = _TRACK_BG
 
+	# Lay out children and derive the widget height (measured children sum) so
+	# the headless unit pin reads the laid-out root even without a tree / char
+	# node (follow_character() early-returns on the null-char path).
+	_relayout_children()
+
 	# Record the widget height observable unconditionally (outside the node
 	# guards) so the headless null-char test reads size.y (20.0) even though
 	# follow_character() returns early when _char_node is null.
@@ -411,6 +422,87 @@ func update_health(current: int, max_hp: int) -> void:
 		_bar.queue_redraw()
 
 
+## Compact the theme-derived child inflation so the widget actually CONTAINS its
+## measured children (the real defect: the widget reported 68x24 while its
+## children measured 30 + 22 = 52 px of painted content, spilling past the
+## bottom edge and overlapping each other by 18 px).
+##
+## Two levers, both applied to theme SOURCES (never to the resulting heights, so
+## the invariant holds under any future theme):
+##   - Bar: the ProgressBar "minimum_height" theme constant, plus the track
+##     StyleBoxFlat's VERTICAL expand margins (SIDE_TOP/SIDE_BOTTOM). The
+##     HORIZONTAL 8.0 is deliberately kept — it is the Q5 "track visible at
+##     full HP" fix (the 8px track halo). These feed the control's combined
+##     minimum size, which is what clamps the authored 12 upward to 22.
+##   - NameLabel: the cached backing stylebox's TOP/BOTTOM content margins
+##     (2.0 -> 0.0). SIDE_LEFT/SIDE_RIGHT stay 3.0 — that is the ~6px seam two
+##     adjacent nameplates depend on.
+## Then re-measure the children, lay the Bar strictly BELOW the NameLabel, and
+## set the root height to their measured sum. No child height is written as a
+## literal here — only READ and summed. Called from setup() (so the headless
+## unit pin reads the laid-out root) and at the top of follow_character().
+func _relayout_children() -> void:
+	if not is_instance_valid(_bar):
+		return
+	# Compact theme-derived inflation sources (never the resulting heights):
+	#   - Bar: ProgressBar "minimum_height" constant + the track StyleBoxFlat's
+	#     VERTICAL expand margins (the horizontal 8.0 stays — it is the Q5
+	#     "track visible at full HP" fix). These feed get_combined_minimum_size(),
+	#     which clamps Control.size upward; trimming the vertical pair is what
+	#     lets the Bar measure its authored height again.
+	#   - NameLabel: the cached backing StyleBoxFlat's TOP/BOTTOM content
+	#     margins (2.0 -> 0.0). SIDE_LEFT/SIDE_RIGHT stay 3.0 — that is the
+	#     ~6px seam two adjacent nameplates depend on.
+	_bar.add_theme_constant_override("minimum_height", 0)
+	var bg: StyleBox = _bar.get_theme_stylebox("background")
+	if bg is StyleBoxFlat:
+		bg.set_expand_margin(SIDE_TOP, 0.0)
+		bg.set_expand_margin(SIDE_BOTTOM, 0.0)
+	if _name_backing_sb != null:
+		_name_backing_sb.set_content_margin(SIDE_TOP, 0.0)
+		_name_backing_sb.set_content_margin(SIDE_BOTTOM, 0.0)
+	if not is_instance_valid(_name_label):
+		return
+	# Re-measure the children: set each to its post-override combined minimum.
+	# A 0 minimum (a ProgressBar with no content margins and minimum_height 0)
+	# falls back to the authored scene floor (Bar size.y = 12 in health_bar.tscn;
+	# NameLabel size.y = 9) so a child never collapses to 0. The floors are the
+	# scene's authored values, not theme measurements.
+	_name_label.size.y = _name_label.get_combined_minimum_size().y
+	_bar.size.y = _bar.get_combined_minimum_size().y
+	if _name_label.size.y <= 0.0:
+		_name_label.size.y = 9.0
+	if _bar.size.y <= 0.0:
+		_bar.size.y = 12.0
+	# Bar strictly below NameLabel (never overlapping).
+	_name_label.position.y = 0.0
+	_bar.position.y = _name_label.size.y
+	# Root height = measured children sum. No child height is written as a
+	# literal here — only READ (and floored at the authored scene value) and
+	# summed.
+	var h: float = _name_label.size.y + _bar.size.y
+	if not is_equal_approx(size.y, h):
+		size.y = h
+
+
+## The world-y of the bottom edge of the character's live clamped portrait ink.
+## Reads the per-frame `portrait_ink_rect` (a Rect2) published by player.gd /
+## enemy.gd; falls back to sprite_top + portrait_tex_size.y for a node that has
+## those but no ink rect (legacy / just-fallen path). Returns 0.0 when neither
+## exists (caller lets the retained STRIP_BOTTOM+2 clamp bite).
+func _portrait_ink_bottom_world() -> float:
+	if _char_node == null:
+		return 0.0
+	var ink: Variant = _char_node.get("portrait_ink_rect")
+	if typeof(ink) == TYPE_RECT2:
+		return float(ink.end.y)
+	var top: Variant = _char_node.get("sprite_top")
+	var tex: Variant = _char_node.get("portrait_tex_size")
+	if typeof(top) == TYPE_FLOAT and typeof(tex) == TYPE_VECTOR2:
+		return float(top) + float(tex.y)
+	return 0.0
+
+
 ## Called every frame from HUD._process(). Follows the character's world
 ## position, converting to screen coordinates. Hides bar when character
 ## is dead or invalid.
@@ -423,6 +515,10 @@ func follow_character() -> void:
 	if "health" in _char_node and _char_node.health <= 0:
 		visible = false
 		return
+
+	# Re-lay-out children and re-derive the widget height BEFORE any anchor math,
+	# so size.y is the measured children sum (widget contains its own children).
+	_relayout_children()
 
 	# get_final_transform() composes the viewport's global (stretch) transform
 	# with the canvas (camera) transform, mapping the character's world position
@@ -444,10 +540,27 @@ func follow_character() -> void:
 	# ~ sprite_top + 40 = 132, so the clamped bar does NOT cover the face.
 	# Mid-board units sit strictly above sprite_top (no clamp bite).
 	var top: Variant = _char_node.get("sprite_top") if _char_node != null else null
+	bar_anchors_below_portrait = false
 	if typeof(top) == TYPE_FLOAT:
 		var top_y: float = (get_viewport().get_final_transform() * Vector2(0.0, float(top))).y
-		screen_pos = Vector2(screen_pos.x - 34.0, top_y - 4.0 - size.y)
-		bar_anchors_sprite_top = true
+		# Above-portrait anchor: widget BOTTOM 4 px above sprite_top.
+		var above_top: float = top_y - 4.0 - size.y
+		if above_top < STRIP_BOTTOM + 2.0:
+			# Top-band unit (sprite_top == 92): the above anchor lands inside the
+			# 0..92 strip floor (STRIP_BOTTOM + 2 == 94), which would pull the bar
+			# back over the face. FLIP to the other side of the portrait: anchor
+			# the widget TOP 4 px below the portrait ink bottom. A consistent gap
+			# on the far side keeps follow_delta honest everywhere (<= 24) instead
+			# of clamping the bar into the hair band. bar_anchors_sprite_top stays
+			# false on the flipped path (the above-anchor rule did NOT run).
+			var ink_bottom: float = (get_viewport().get_final_transform()
+					* Vector2(0.0, _portrait_ink_bottom_world())).y
+			screen_pos = Vector2(screen_pos.x - 34.0, ink_bottom + 4.0)
+			bar_anchors_below_portrait = true
+			bar_anchors_sprite_top = false
+		else:
+			screen_pos = Vector2(screen_pos.x - 34.0, top_y - 4.0 - size.y)
+			bar_anchors_sprite_top = true
 	else:
 		# Legacy feet fallback (defensive): char node without sprite_top.
 		screen_pos += Vector2(-34, -32)
