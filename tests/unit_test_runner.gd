@@ -20,6 +20,7 @@ extends SceneTree
 const TESTS: Array[String] = [
 	"res://tests/test_battle_setup.gd",
 	"res://tests/test_card_data.gd",
+	"res://tests/test_click_priority.gd",
 		"res://tests/test_creation_info_texts.gd",
 	"res://tests/test_event_data.gd",
 	"res://tests/test_gongfa_cascade.gd",

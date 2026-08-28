@@ -209,6 +209,17 @@ var debug_undo_events: int = 0
 ## non-empty value can never mask a fixed STOP-filter hole.
 var debug_gui_eater: String = ""
 
+## The §3.B2 portrait-rect resolution step (1..5) of the last handle_world_click
+## that passed the battle gate; 0 when no click has resolved yet. Written ONLY
+## AFTER the gate passes, so a gated-out click leaves the previous value
+## untouched (debug_click_events still increments before the gate — the
+## click_move_to_tile.yaml f45 differential pin stays intact).
+var debug_click_rule_step: int = 0
+
+## The target enemy's name when the last resolved click hit step 1/2/4 (an
+## attack); "" for the move / no-op steps 3/5. Measurement only, never gates.
+var debug_click_rule_target: String = ""
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -702,6 +713,61 @@ func _on_move_completed() -> void:
 # Targeting (left-click)
 # ---------------------------------------------------------------------------
 
+## Pure range-only reach predicate for the §3.B2 portrait-rect resolver. Returns
+## whether `enemy_grid` is within the player's CURRENT attack reach measured from
+## `player_grid`: Chebyshev distance <= reach, where reach is the selected skill's
+## `range` (or 1 for a basic attack / out-of-range / null skill). Range ONLY —
+## cooldown / HP / energy / acted gates stay inside _try_attack_target, so a gated
+## click is a silent no-op exactly as today. Pure static: no autoloads, no self —
+## callable headlessly via load("res://scripts/characters/player.gd").
+static func attack_reach_covers(player_grid: Vector2i, enemy_grid: Vector2i,
+		selected_skill_index: int, skills: Array) -> bool:
+	var reach: int = 1
+	if selected_skill_index >= 0 and selected_skill_index < skills.size():
+		var skill = skills[selected_skill_index]
+		if skill != null:
+			var r = skill.get("range")
+			if r != null:
+				reach = int(r)
+	var dist: int = max(abs(player_grid.x - enemy_grid.x), abs(player_grid.y - enemy_grid.y))
+	return dist <= reach
+
+
+## Pure decision predicate for the §3.B2 five-step portrait-rect priority rule.
+## Returns which step (1..5) fires for a left-click at `click_point` resolving to
+## `click_tile`, given the current `player_grid`, the living enemies (each a
+## Dictionary with `grid_pos` and `rect` — the live clamped portrait ink rect),
+## the reachable-empty-tile set from the move-range highlight (`reachable` maps
+## Vector2i -> true), and the player's selection state (selected_skill_index +
+## skills, consumed by attack_reach_covers). Pure static: no autoloads, no self —
+## the headless unit truth-table pins it; handle_world_click acts on its return.
+static func resolve_click_step(click_point: Vector2, click_tile: Vector2i,
+		player_grid: Vector2i, enemies: Array, reachable: Dictionary,
+		selected_skill_index: int, skills: Array) -> int:
+	# Step 1 — an enemy occupies the clicked tile.
+	for e in enemies:
+		if e.get("grid_pos", Vector2i(-1, -1)) == click_tile:
+			return 1
+	# Step 2 — a living enemy whose portrait rect contains P AND is in reach.
+	# Fires ONLY for in-reach enemies (the reach gate is what keeps an empty tile
+	# clickable behind a tall out-of-reach unit — the §3.1 rule is rejected).
+	for e in enemies:
+		var rect: Rect2 = e.get("rect", Rect2())
+		if rect.has_point(click_point) and attack_reach_covers(
+				player_grid, e.get("grid_pos", Vector2i(-1, -1)),
+				selected_skill_index, skills):
+			return 2
+	# Step 3 — a reachable empty tile in the move-range highlight.
+	if reachable.has(click_tile) and click_tile != player_grid:
+		return 3
+	# Step 4 — a living enemy whose portrait rect contains P (out-of-reach body).
+	for e in enemies:
+		if e.get("rect", Rect2()).has_point(click_point):
+			return 4
+	# Step 5 — own tile no-op, else click-move.
+	return 5
+
+
 ## Handle a left mouse click: convert the click event's own viewport coordinates
 ## to battlefield world space and delegate to the shared handle_world_click.
 func _handle_click_targeting(event: InputEvent) -> void:
@@ -736,29 +802,73 @@ func handle_world_click(world_pos: Vector2) -> void:
 	var click_grid: Vector2i = GridManager.world_to_grid(world_pos)
 	debug_last_click_grid = click_grid
 
-	# Iterate living enemies to see if one occupies the clicked tile.
+	# Build the reachable-empty-tile oracle from the SAME cost model as
+	# _try_move_to (GridManager.plan_movement — walkable + unoccupied landing
+	# tiles, 身轻如燕 slide-through at cost 2). This is what the move-range
+	# highlight paints, so "reachable empty tile" here == "highlighted tile".
+	var plan: Dictionary = GridManager.plan_movement(
+		grid_pos, moves_left, traits.has("swallow_lightness"))
+	var reachable: Dictionary = {}
+	for t in plan.get("steps", {}).keys():
+		reachable[t] = true
+
+	# Flatten the living enemies into pure data (grid_pos + the LIVE clamped
+	# portrait ink rect) for the decision predicate, and keep the node array for
+	# the dispatch's _try_attack_target calls. Same living-enemy guards as the
+	# old feet-tile match (is_instance_valid + "grid_pos" in enemy).
 	var enemies: Array[Node] = GameManager.get_enemies_alive()
+	var enemy_data: Array = []
+	var enemy_nodes: Array[Node] = []
 	for enemy in enemies:
 		if not is_instance_valid(enemy):
 			continue
 		if not ("grid_pos" in enemy):
 			continue
-		if enemy.grid_pos != click_grid:
-			continue
+		enemy_data.append({"grid_pos": enemy.grid_pos, "rect": enemy.portrait_ink_rect})
+		enemy_nodes.append(enemy)
 
-		# Found an enemy at the clicked grid position — delegate to the shared
-		# targeting routine (skill vs basic attack, gates, range, auto-deselect).
-		_try_attack_target(enemy)
-
-		# Only act on the first matched enemy.
-		break
-
-	# No enemy on the clicked tile — click-move fallback (enemy-first resolution
-	# preserved: a click on an enemy tile still attacks). Clicking the player's
-	# own tile is a silent no-op.
-	if click_grid == grid_pos:
-		return
-	_try_move_to(click_grid)
+	# §3.B2 five-step portrait-rect priority rule (see design/30_presentation.md).
+	# Order is critical: step 2 (IN-REACH portrait body) fires before step 3
+	# (reachable empty tile) so an adjacent enemy is attackable even though its
+	# body hangs over an empty highlighted tile; step 3 still wins over step 4
+	# (out-of-reach body) so an empty tile never becomes unclickable because a
+	# tall OUT-OF-REACH unit stands behind it — the measured-broken §3.1 rule
+	# (click_move_undo_right 10->6 / click_move_commit_lock 9->1 /
+	# move_target_affordance 18->11) must never be reintroduced.
+	var step: int = resolve_click_step(world_pos, click_grid, grid_pos,
+		enemy_data, reachable, selected_skill_index, skills)
+	debug_click_rule_step = step
+	match step:
+		1:
+			# An enemy occupies the clicked tile — attack it (feet/own-tile).
+			var t1: Node = _enemy_at(enemy_nodes, click_grid)
+			debug_click_rule_target = t1.name if t1 != null else ""
+			_try_attack_target(t1)
+			return
+		2:
+			# IN-reach portrait body — attack the nearest (closes the reachable gap).
+			var t2: Node = _pick_nearest_rect_enemy(enemy_nodes, world_pos, true)
+			debug_click_rule_target = t2.name if t2 != null else ""
+			_try_attack_target(t2)
+			return
+		3:
+			# Reachable empty tile in the move-range highlight — move there.
+			debug_click_rule_target = ""
+			_try_move_to(click_grid)
+			return
+		4:
+			# Out-of-reach portrait body — attack (range gate stays in _try_attack_target).
+			var t4: Node = _pick_nearest_rect_enemy(enemy_nodes, world_pos, false)
+			debug_click_rule_target = t4.name if t4 != null else ""
+			_try_attack_target(t4)
+			return
+		_:
+			# Own tile silent no-op, else click-move.
+			debug_click_rule_target = ""
+			if click_grid == grid_pos:
+				return
+			_try_move_to(click_grid)
+			return
 
 
 ## Shared world right-click entry point (PUBLIC — called by the right-click
@@ -912,6 +1022,47 @@ func _pick_nearest_enemy_for_skill(skill) -> Node:
 			continue
 		var enemy_pos: Vector2i = enemy.grid_pos
 		var dist: int = max(abs(grid_pos.x - enemy_pos.x), abs(grid_pos.y - enemy_pos.y))
+		if dist < best_dist:
+			best_dist = dist
+			best = enemy
+	return best
+
+
+## Find the living enemy occupying `tile` (registration-order first). Returns
+## null if none. Used by resolver step 1's dispatch.
+func _enemy_at(enemies: Array, tile: Vector2i) -> Node:
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		if not ("grid_pos" in enemy):
+			continue
+		if enemy.grid_pos == tile:
+			return enemy
+	return null
+
+
+## Find the nearest living enemy whose live clamped portrait rect contains
+## `world_pos`, optionally gated to in-reach enemies only (step 2) — used by
+## resolver steps 2/4. Strictly-nearest by Chebyshev distance from the clicked
+## tile wins; ties keep registration order (the _pick_nearest_enemy_in_range
+## precedent). 96 px art vs 64 px tiles ⇒ 32 px overlaps resolve deterministically.
+## A zero-area sentinel rect never hits — correct to fall through.
+func _pick_nearest_rect_enemy(enemies: Array, world_pos: Vector2, require_in_reach: bool) -> Node:
+	var click_tile: Vector2i = GridManager.world_to_grid(world_pos)
+	var best: Node = null
+	var best_dist: int = 999999
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		if not ("grid_pos" in enemy):
+			continue
+		if not enemy.portrait_ink_rect.has_point(world_pos):
+			continue
+		if require_in_reach and not attack_reach_covers(
+				grid_pos, enemy.grid_pos, selected_skill_index, skills):
+			continue
+		var enemy_pos: Vector2i = enemy.grid_pos
+		var dist: int = max(abs(click_tile.x - enemy_pos.x), abs(click_tile.y - enemy_pos.y))
 		if dist < best_dist:
 			best_dist = dist
 			best = enemy
