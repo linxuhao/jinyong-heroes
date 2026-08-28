@@ -56,6 +56,10 @@ ROUND_SCENARIOS: list[str] = [
     "map_node_event_mainline_return",
     "map_hint_single",
     "map_battle_node_huashan",
+    "input_click_differential",
+    "undo_button_retreat",
+    "click_portrait_body_targets_enemy",
+    "health_bar_above_portrait",
     "trait_hover_preview",
 ]
 

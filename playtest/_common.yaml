@@ -93,6 +93,8 @@
 # (pointer moves before the press), so hover-WITHOUT-toggle can only be pinned
 # by a motion-only entry. A same-frame `hovers:` entry is pushed before any
 # `clicks:` entry (pointer-then-press, matching a real mouse).
+# Caveat: `hovers:` exists only in the REBUILT sidecar image — a scenario failing
+# with "unknown key" means a stale image, not a bad scenario.
 #
 # ── AUTHORED HEADER, carried verbatim from the monolithic
 #    playtest_spec.yaml this directory replaced ──
@@ -247,6 +249,10 @@ surface:
   - portrait_sprite_pos
   - portrait_tex_size
   - portrait_bar_pos
+  - debug_right_input_events
+  - debug_undo_events
+  - debug_gui_eater
+  - portrait_ink_rect
   East_Heretic:
   - health
   - max_health
@@ -263,6 +269,8 @@ surface:
   - portrait_sprite_pos
   - portrait_tex_size
   - portrait_bar_pos
+  - debug_click_target_fires
+  - portrait_ink_rect
   West_Poison:
   - health
   - max_health
@@ -278,6 +286,8 @@ surface:
   - portrait_sprite_pos
   - portrait_tex_size
   - portrait_bar_pos
+  - debug_click_target_fires
+  - portrait_ink_rect
   South_Emperor:
   - health
   - max_health
@@ -293,6 +303,8 @@ surface:
   - portrait_sprite_pos
   - portrait_tex_size
   - portrait_bar_pos
+  - debug_click_target_fires
+  - portrait_ink_rect
   North_Beggar:
   - health
   - max_health
@@ -308,6 +320,8 @@ surface:
   - portrait_sprite_pos
   - portrait_tex_size
   - portrait_bar_pos
+  - debug_click_target_fires
+  - portrait_ink_rect
   Central_Divine:
   - health
   - max_health
@@ -324,6 +338,8 @@ surface:
   - portrait_sprite_pos
   - portrait_tex_size
   - portrait_bar_pos
+  - debug_click_target_fires
+  - portrait_ink_rect
   HUD:
   - visible
   - size
@@ -340,6 +356,7 @@ surface:
   - hpbar_strip_overlap
   - hint_nameplate_overlap
   - nameplate_pairwise_overlap
+  - undo_desc_overlap
   MoveHintLabel:
   - state
   - text
@@ -582,6 +599,13 @@ surface:
   - mouse_filter
   - disabled
   - focus_mode
+  UndoButton:
+  - visible
+  - size
+  - mouse_filter
+  - disabled
+  - focus_mode
+  - text
   HealthBar:
   - visible
   - global_position
@@ -600,6 +624,9 @@ surface:
   - hp_value
   - hp_max
   - hp_text_width_ok
+  - bar_top
+  - bar_bottom
+  - bar_anchors_sprite_top
   Battlefield:
   - board_aligned
   - grid_lines_visible
@@ -614,6 +641,9 @@ surface:
   - fill_color
   - start_tile
   - undo_available
+  TileMarkers:
+  - tile_marker_count
+  - tile_marker_visible
   SceneManager:
   - current_scene
   - pending_swap
@@ -865,4 +895,8 @@ scenario_order:
 - map_node_event_mainline_return
 - map_hint_single
 - map_battle_node_huashan
+- input_click_differential
+- undo_button_retreat
+- click_portrait_body_targets_enemy
+- health_bar_above_portrait
 - trait_hover_preview
