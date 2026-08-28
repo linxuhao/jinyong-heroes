@@ -1,3 +1,24 @@
+# COUNTING KEYSTROKES IS NOT THE SAME AS KNOWING WHAT YOU PRESS.
+#
+# This scenario walked into the settings panel and pressed move_down three
+# times to land on 返回, which was true when the panel had four rows
+# (音效音量 / 音乐音量 / 全屏 / 返回). The i18n round inserted a 语言 row at
+# index 3 and 返回 moved to 4 — so three steps landed on 语言, ui_accept
+# TOGGLED THE LANGUAGE instead of leaving, and the run sat in SETTINGS for the
+# rest of the timeline. Every later assertion failed for that one reason:
+# current_state "SETTINGS" where MENU was expected, MenuPanel not found,
+# current_scene "settings" where "creation" was expected.
+#
+# It was worse than a red scenario. The accidental toggle PERSISTED language=en
+# into the user dir, which every later scenario in the same dir then inherited —
+# so one mis-counted keypress here was leaking English into a suite that asserts
+# Chinese source strings byte-for-byte.
+#
+# The fix is not the extra move_down. The fix is the assertion in front of the
+# accept: focus_index == 4 states WHICH ROW is about to be activated, so the
+# next person who inserts a row gets a red that names the problem instead of a
+# silent activation of the wrong thing. Counting steps encodes a layout; naming
+# the target encodes the intent.
 # One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
@@ -61,6 +82,13 @@ timeline:
 - at: 120
   actions:
   - move_down
+- at: 125
+  actions:
+  - move_down
+- at: 128
+  actions: []
+  assert:
+    SettingsPanel.focus_index: focus_index == 4
 - at: 130
   actions:
   - ui_accept
