@@ -61,6 +61,7 @@ const EN: Dictionary = {
 	"暂停": "Pause",
 	"继续": "Resume",
 	"结束回合": "End Turn",
+	"退回": "Undo",
 	"出招 (J)": "Strike (J)",
 	"点击招式按钮,查看招式说明": "Click a technique button to see what it does",
 	"发挥 ×": "Power ×",
