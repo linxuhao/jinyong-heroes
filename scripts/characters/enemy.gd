@@ -115,6 +115,12 @@ var portrait_ink_rect: Rect2 = Rect2()
 ## The unit's own floating HealthBar global_position; (-1,-1) when no bar
 ## resolves (before HUD.setup() or after battle exit) — 3-number probe #3.
 var portrait_bar_pos: Vector2 = Vector2(-1, -1)
+## Measurement pin proving whether the authored ClickTarget Control's gui_input
+## ever fires (the brief demands measurement, not the comment's claim). Expected
+## measured value 0: Godot's GUI picker does not route events to a Control whose
+## ancestor is a Node2D, so ClickTarget is dead for routing and cannot eat events.
+## Lifetime accumulator — never reset in _process/_ready/setup.
+var debug_click_target_fires: int = 0
 
 ## Current FSM state label. One of: "IDLE", "APPROACH", "ATTACK",
 ## "SKILL", "RETREAT". Updated from the AI evaluation result.
@@ -335,6 +341,9 @@ func _input(event: InputEvent) -> void:
 ## global canvas coordinates (canvas coords == world coords under the identity
 ## canvas transform, the same assumption _handle_click_targeting documents).
 func _on_click_target_gui_input(event: InputEvent) -> void:
+	# Count ANY gui_input delivery — placed BEFORE the mouse-button guard so the
+	# counter measures "does gui_input fire at all", not "how many left-presses".
+	debug_click_target_fires += 1
 	if not (event is InputEventMouseButton):
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
