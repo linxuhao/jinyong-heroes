@@ -1,33 +1,37 @@
 # Technical Architecture - Jinyong Tactics: Mouse & Info Interaction Defect Fixes
 
-Round: interaction-defects (2026-08-27). **Revision 2** - restructured per the round
-owner's feedback of 2026-08-27 23:48 UTC (scope re-ordered: one new higher-priority
-defect, three items already landed outside the pipeline, one temporary artifact to
-remove). This is a **per-run** design (`design/README.md`); the durable `design/`
-archive is edited only by `5_design` after final verification passes - the
-**Design changes** section below is what `5_design` will land surgically.
-Everything is in English; in-game UI copy stays Chinese.
+Round: interaction-defects (2026-08-28). **Revision 3** - restructured per the round
+owner's feedback of 2026-08-28 07:00 UTC: the #1 defect (real-build left-click
+dead) is already characterized, located, fixed and live, so this design schedules
+**contract coverage, not characterization cards**; the `InputProbeOverlay` temporary
+is already deleted (verify-only). Revision 2's shape - the two-layer net, "a skip is
+never green", the honest web/touch boundary - is retained per the same feedback.
+This is a **per-run** design (`design/README.md`); the durable `design/` archive is
+edited only by `5_design` after final verification passes - the **Design changes**
+section below is what `5_design` will land surgically. Everything is in English;
+in-game UI copy stays Chinese.
 
 ## 1. Overview
 
 This round fixes **measured** player-reported interaction defects. In priority order
 after the re-scope:
 
-- **P0 (new, this round's #1 item): the play-test contract cannot see the real input
-  path.** Players report left-click movement completely broken in the real web build,
-  the desktop native build, and touch - while the headless play-test suite is all
-  green. Root cause of the blindness: `godot_harness.py::_click_at` injects events via
-  `Input.parse_input_event()`, which enters the engine **after** the OS/window/browser
-  layer that real events traverse. This round's deliverable is **contract coverage for
-  that layer** (in-game differential observability + a windowed X11 input gate), plus
-  the fix for whatever the deployed `?debug=1` readings identify. It is **not**
-  pre-declared "fixed"; status is recorded honestly (see 3.P0).
+- **P0: the real-input defect is FIXED and live; this round makes the contract able
+  to see that class of defect.** Players reported left-click movement completely
+  broken in the real web, desktop-native and touch builds while the headless
+  play-test suite was 57/57 green. Root cause, measured by the owner with a real X11
+  window + xdotool: `scenes/menu.tscn`'s `SegmentHost` was missing
+  `mouse_filter = 2` - a full-rect Control, Godot default STOP, parked over the
+  board for the whole game (menu.tscn is `run/main_scene`; SceneManager only swaps
+  segments inside it), swallowing every press that did not land on a Button. The
+  Revision-2 decision tree's `raw > 0, handled == 0` branch fired; `under` named it.
+  Fix `42637b7` is live and player-confirmed on web + desktop. **No characterization
+  cards are scheduled** - what remains of P0 is the two-layer coverage net (3.P0):
+  Layer 1 permanent differential observables + Layer 2 the windowed X11 input gate,
+  whose prototype and four pitfalls the owner already ran.
 - **P0b: touch has no undo.** Touch support is landed (commit 0473447) but phones have
   no right-click, so 「右键退回」 is unreachable on touch. This round adds a
   finger-reachable undo control (3.T).
-- **Cleanup: `InputProbeOverlay`** (commit a673a42, `?debug=1`-gated diagnostic) must
-  be deleted before round end; its raw/handled/under triad is absorbed into permanent
-  observables (3.P0 layer 1, 3.O).
 - **Defect B** (portrait drawn a full tile above its grid cell; nameplate on the legs;
   clicking the drawn portrait does not target the unit) and **Defect C** (trait
   descriptions show only on click, not on hover) - both still to do, per the Step-1
@@ -35,21 +39,33 @@ after the re-scope:
 - **Small fixes:** delivery-notes heading round/date, one map hint (not two identical
   lines), full-width comma in the MAP EVENT branch.
 
-**Already landed outside the pipeline - verify only, do not re-implement:**
+**Already landed outside the pipeline - verify only, do not re-implement, do not
+conflict with:**
 
 | Item | Commit | State |
 |---|---|---|
 | Defect A fix: `Bar.mouse_filter = 2` in `scenes/ui/health_bar.tscn` + per-frame re-assert in `scripts/ui/health_bar.gd::update_health` (comment: a floating HUD control must have no STOP descendant) | `7d2daf7` | Red->green A/B verified on the owner's tree (3/7 red before, 7/7 after; full suite no regression). `playtest/click_move_undo_feet.yaml` (right-click at `Player +0,0`, the feet) is landed and two-place synced |
 | Touch support: `player.gd` click branch + `enemy.gd` relay accept `InputEventScreenTouch`; `_handle_click_targeting(event: InputEvent)` | `0473447` | Landed; touch undo gap remains (3.T) |
 | `config/name` -> 「华山论剑」 | `393a35e` | Landed; recorded in delivery notes only |
+| P0 fix: `menu.tscn` `SegmentHost` gains `mouse_filter = 2` | `42637b7` | Real-X11 A/B measured: before `player_grid=(7,5) raw=3 handled=0 EATER SegmentHost(filter=0)`; after `player_grid=(7,4) raw=3 handled=1 EATERS none`. Player-confirmed working on web + desktop |
+| Two pytest guards in `tests/test_playtest_contract_smoke.py` | `42637b7` | 19 passed. `test_every_full_rect_host_is_click_through` scans every `.tscn` under `scenes/` and reddens any `SegmentHost` block without `mouse_filter = 2` (would have caught both occurrences); `test_the_contract_boot_scene_is_recorded_against_the_games_own` forces the contract-boot-vs-game-boot divergence to stay documented in the `_common.yaml` header (which now carries it, with the defect story) |
+| `InputProbeOverlay` deleted (script + `hud.tscn` node stanza + ext_resource line) | `1989be6` | Landed; 3.O is now a confirm-clean pass, NOT a re-implementation |
+
+**Why a 57/57-green suite could not see it (both recorded in `90_decisions.md`,
+3.P0):** (1) the contract's default `scene:` is `res://scenes/main.tscn` while the
+game's `run/main_scene` is `res://scenes/menu.tscn` - every scenario graded the
+fixed twin; (2) `clicks:` injects via `Input.parse_input_event()`, which never
+reaches the GUI phase where a STOP control eats the event.
 
 ## 2. Architecture / data flow
 
 ```
 Real pointer (player's hand)
   browser JS bridge / X11 window / touch panel      <-- the layer parse_input_event()
-                                                       BYPASSES: untested by the
-                                                       headless harness today (P0)
+                                                       BYPASSES: the X11 leg is now
+                                                       covered by the windowed gate
+                                                       (3.P0 layer 2); the browser
+                                                       bridge stays manual-only
   -> OS event -> Window (content-scale transform) -> engine input pipeline
      player.gd::_input   (raw counters: debug_input_events / debug_right_input_events;
                           census: debug_gui_eater = predicted GUI eater at that point)
@@ -65,10 +81,12 @@ Headless play-test (regression contract, unchanged pipeline)
   godot_harness clicks:/hovers: -> Input.parse_input_event -> SAME engine pipeline
   -> differential asserts (raw vs handled counters) pin the post-engine chain
 
-[NEW] Windowed X11 input gate (sidecar /x11_input_smoke)
-  Xvfb display -> godot WINDOWED (not --headless) -> XTEST button events (python-xlib,
-  xdotool absent) -> real window layer -> engine pipeline -> InputGate report JSON
-  -> harness asserts raw counters advanced AND game state changed  (3.P0 layer 2)
+[NEW] Windowed X11 input gate (sidecar /x11_input_smoke; owner-prototyped 2026-08-28)
+  copy repo to a writable /tmp path -> godot --headless --import (TWICE) ->
+  Xvfb display -> godot WINDOWED (not --headless), real menu.tscn boot ->
+  xdotool mousemove + click (driver targets buttons BY NAME from the live report,
+  never coordinates) -> real window layer -> engine pipeline -> InputGate report
+  JSON -> harness asserts raw counters advanced AND game state changed  (3.P0 L2)
 
 Hover (creation screen)
   Button.mouse_entered / mouse_exited -> trait_hover_index -> _render() -> TraitDescLabel
@@ -96,11 +114,17 @@ verbatim.
 
 ### 3.0 Re-scope (recorded in `99_changelog.md` row + `90_decisions.md`)
 
-The round owner landed Defect A's fix, touch support, and `config/name` outside the
-pipeline (§1 table) and elevated real-input coverage above the original three. This
-design re-orders the program accordingly and does **not** re-schedule landed work.
-Defect A's audit residue (NameLabel filter, ClickTarget measurement) stays, because
-the brief demands those verdicts be **recorded in design/**, not just fixed.
+Two re-scopes, both by the round owner, both cumulative. (1) 2026-08-27 23:48 UTC:
+Defect A's fix, touch support and `config/name` landed outside the pipeline, and
+real-input coverage was elevated above the original three defects. (2) 2026-08-28
+07:00 UTC: the real-input defect itself is also landed (`42637b7`, root cause
+`menu.tscn`'s `SegmentHost`) together with two pytest guards, and the
+`InputProbeOverlay` temporary is deleted (`1989be6`). This design therefore
+schedules **no characterization work** - what remains of P0 is converting the
+owner's one-off X11 prototype and `?debug=1` triad into permanent, assertable
+contract coverage (Layer 1 + Layer 2). Defect A's audit residue (NameLabel filter,
+ClickTarget measurement) stays, because the brief demands those verdicts be
+**recorded in design/**, not just fixed.
 
 ### 3.A Defect A - landed; residual audit
 
@@ -133,14 +157,31 @@ The existing `click_move_undo_right.yaml` (`Player +64,0`) stays byte-untouched.
 
 ### 3.P0 The real input path: making the contract able to see it
 
-**Problem (owner's measurement, quoted):** real web + desktop-native + touch builds
-all fail left-click movement; the headless suite is 57/57 green. `?debug=1`
-instrumentation is deployed to characterize it (`raw` = presses reaching the player
-node, `handled` = entries into `handle_world_click`, `under` = topmost click-eating
-Control at the point). In-source hypotheses (a Control covering the board, Camera2D,
-segment CanvasLayer, tutorial overlay, input gating) were checked and cleared by a
-whole-tree census in the desktop build; what remains is the layer **before** the
-engine - the one `Input.parse_input_event()` skips.
+**Resolved root cause (measured by the owner, landed in `42637b7` - do not
+re-derive):** `scenes/menu.tscn`'s `SegmentHost` was missing `mouse_filter = 2`. The
+deployed `?debug=1` triad read `raw > 0, handled == 0` - exactly the Revision-2
+decision tree's "STOP Control in the GUI phase" branch - and `under` reported
+`EATER SegmentHost(filter=0, /root/Main/SegmentLayer/SegmentHost)`. Real-X11 A/B
+around the one-line fix: before `player_grid=(7,5) raw=3 handled=0 EATER
+SegmentHost(filter=0)`; after `player_grid=(7,4) raw=3 handled=1 EATERS none`.
+Players confirmed web + desktop left-click both work. This is the **second**
+full-rect STOP hole of the same node name (the first was `main.tscn`, recorded in
+the `_common.yaml` `clicks:` note); the fix landed there, its structural twin never
+got the line. The two reasons it dodged a 57/57-green suite are recorded in
+`90_decisions.md`: the contract's default `scene:` is `main.tscn` while the game's
+`run/main_scene` is `menu.tscn` (all scenarios graded the fixed twin), and `clicks:`
+injection via `Input.parse_input_event()` never reaches the GUI phase where a STOP
+control eats the event. Two machine guards landed with the fix and pin the class
+(§1 table): `test_every_full_rect_host_is_click_through` (every `.tscn` under
+`scenes/` must declare `mouse_filter = 2` on every `SegmentHost` block) and
+`test_the_contract_boot_scene_is_recorded_against_the_games_own` (the boot-scene
+divergence must stay documented in the `_common.yaml` header, which now carries it).
+
+**What remains of P0 this round: the two-layer coverage net.** The defect is fixed;
+the *blindness* is only half-fixed - the landed guards are static text scans, so
+they cannot see a STOP hole in any other node type, and nothing yet proves on the
+server that a real window-layer press survives to a state change. Layer 1 makes the
+post-engine chain assertable per-press; Layer 2 is that server-side proof.
 
 **Layer 1 - permanent in-game differential observables (in-repo, always on).**
 The repo already has `debug_input_events` (left presses + touches reaching `_input`),
@@ -155,8 +196,9 @@ existing vars' semantics stay byte-identical, they are documented in the
   before the gate, mirroring `debug_click_events`).
 - `debug_gui_eater: String` - at every press (left/right/touch) observed in `_input`,
   run the census walk and record the topmost visible non-IGNORE Control containing
-  the point ("" if none). Port the walk **verbatim** from
-  `scripts/ui/input_probe_overlay.gd::_process` (the measured `under` logic) into a
+  the point ("" if none). Port the walk from the deleted overlay's `_process`
+  (source of truth = git history, commit a673a42; the file itself was removed in
+  `1989be6`) into a
   new static helper `scripts/ui/input_census.gd` (`class_name InputCensus`,
   `static func top_eater(root: Node, pos: Vector2) -> String`) so the permanent
   observable is behavior-identical to the deployed probe. Cost: per-press only (the
@@ -177,41 +219,62 @@ existing vars' semantics stay byte-identical, they are documented in the
   `Enemy.debug_click_target_fires == 0` (the 3.A measurement pin). This turns
   "the event arrived AND was processed" into an assertable quantity in the existing
   headless contract - the class-level regression net for every future STOP-filter
-  hole (Defect A family), independent of where the click was aimed.
+  hole (Defect A family), independent of where the click was aimed. (This scenario
+  grades `main.tscn`, the contract default; the `menu.tscn` twin is covered by the
+  landed static guard + the Layer-2 real-boot walk - the divergence note and its
+  guard are already in the tree.)
 
-**Layer 2 - windowed X11 input gate (sidecar; the actual "players can click" proof).**
-`Input.parse_input_event()` can never fail the way the real builds fail, so the
-contract needs one run that traverses the real window layer. New sidecar endpoint
-`/x11_input_smoke` (AItelier-side harness change, **requires a sidecar image rebuild**,
-same as the `hovers:` extension):
-1. Start Xvfb (already present in the sidecar; xdotool is NOT) at 960×704×24.
-2. Run the game **windowed** (not `--headless`): `DISPLAY=<xvfb> godot --path <repo>
+**Layer 2 - windowed X11 input gate (sidecar; the server-side "players can click"
+proof). Owner-prototyped on 2026-08-28 - the pitfalls below are measured, not
+speculative; build on them, do not re-find them.** `Input.parse_input_event()` never
+traverses the window layer, so the contract needs one run that does. New sidecar
+endpoint `/x11_input_smoke` (AItelier-side harness change, **requires a sidecar
+image rebuild** - xdotool must be baked into the Dockerfile; an `apt-get install` at
+run time lives in the container's writable layer and evaporates on rebuild):
+1. **Copy the project to a container-writable path first** (the owner used `/tmp/rp`):
+   the repo mount is read-only inside `aitelier-godot` and `--import` must write
+   `res://.godot/` - otherwise `Cannot create file
+   res://.godot/editor/filesystem_cache10`.
+2. **Run `godot --headless --path <proj> --import` TWICE** before the windowed run -
+   once is not enough: fonts/themes fail to load, `preload()` becomes a parse error,
+   GameManager never comes up, and the log drowns in ~95000 script errors.
+3. Start Xvfb (already present in the sidecar) at 960×704×24; run the game
+   **windowed** (not `--headless`): `DISPLAY=<xvfb> godot --path <proj>
    --resolution 960x704 --position 0,0` with user args
    `-- --input-gate-report <abs path>.json --input-gate-timeout-ms 20000`. Window at
    (0,0), 960×704, content scale identity -> screen coordinates == viewport ==
-   board coordinates.
-3. Inject real X11 events via **XTEST** using `python-xlib` (`Xlib.ext.xtest`
-   fake_input + `XWarpPointer` for motion; pure-Python, pip-installable). Fallback
-   if python-xlib cannot be installed: `apt-get install xdotool` in the image. Button
-   1 = left, button 3 = right. The click script reads the live report to find its
-   targets (see the report below) - no hardcoded screen coordinates.
-4. Game side: new always-registered autoload `scripts/autoload/input_gate.gd`
-   (registered in `project.godot [autoload]` like `GameManager`; near-zero cost when
-   the user args are absent). In gate mode it (a) performs the deterministic skip to
-   the tutorial battle via the same internal segment entry the spine scenarios use -
-   **never** by synthesizing input (that is not the layer under test); (b) refreshes
-   a JSON report every 250 ms: `{debug_input_events, debug_click_events,
-   debug_right_input_events, debug_undo_events, debug_gui_eater,
-   debug_last_raw_event_pos, debug_last_click_grid, grid_pos, moves_left,
-   current_round, player_world}`; (c) quits after the timeout (deterministic exit,
-   rc=124 impossible by construction - the `test_game_manager_fsm` lesson).
-5. Harness asserts on the report after process exit: the scripted left-click advanced
-   `debug_input_events` **and** `debug_click_events` **and** changed `grid_pos`
-   (player_world published so the script can click `player_world + (0,-64)`); the
-   scripted right-click advanced `debug_right_input_events` and `debug_undo_events`
-   and restored `grid_pos`. Any raw==0 there reproduces the players' bug on the
-   server - the gate goes red with the counters saying which stage died.
-6. **Skip semantics are loud:** if Xvfb/XTEST cannot run, the endpoint returns
+   board coordinates. The windowed run boots the REAL `run/main_scene`
+   (`menu.tscn`) - the exact scene the headless contract does not grade.
+4. **Drive by name, never by coordinates.** The game-side report publishes, every
+   250 ms, all visible Button names + their screen centers alongside the counter
+   block; the driver script picks targets by name (preference `*Next*` /
+   `Confirm*` / `*Skip*`, then the known menu/creation buttons) and issues
+   `xdotool mousemove <x> <y> click 1` (button 3 = right; `xdotool key Return`
+   where the flow wants a key, e.g. the tutorial advance). No hardcoded screen
+   coordinates anywhere - a layout change cannot rot the script. Owner-measured:
+   this exact route walks menu -> creation -> tutorial -> `state=BATTLE` and clicks
+   the board. `python-xlib` XTEST stays a documented fallback only, for the case
+   where xdotool cannot be baked into the image.
+5. Game side: new always-registered autoload `scripts/autoload/input_gate.gd`,
+   registered in `project.godot [autoload]` **before `SceneManager`** (project.godot
+   states SceneManager must remain the LAST entry - its `_teardown_battle_refs`
+   references the other autoloads by name; inserting after it breaks compile
+   ordering). Near-zero cost when the user args are absent. In gate mode it (a)
+   refreshes the JSON report every 250 ms: `{state, scene, buttons: [{name, x, y}],
+   debug_input_events, debug_click_events, debug_right_input_events,
+   debug_undo_events, debug_gui_eater, debug_last_raw_event_pos,
+   debug_last_click_grid, grid_pos, moves_left, current_round, player_world}`;
+   (b) quits after the timeout (deterministic exit, rc=124 impossible by
+   construction - the `test_game_manager_fsm` lesson).
+6. Harness asserts on the report after process exit: the button walk reached
+   `state=BATTLE` (real clicks through the real boot scene); the scripted
+   left-click at `player_world + (0,-64)` advanced `debug_input_events` **and**
+   `debug_click_events` **and** changed `grid_pos`; the scripted right-click at
+   `player_world` advanced `debug_right_input_events` and `debug_undo_events` and
+   restored `grid_pos`. A `raw > 0, handled == 0` with a non-empty `debug_gui_eater`
+   at a board point reproduces the menu.tscn class of defect on the server - the
+   gate goes red naming the eater.
+7. **Skip semantics are loud:** if Xvfb/xdotool cannot run, the endpoint returns
    `skipped` with the reason; the pipeline records it in the gate report and
    `final/delivery_notes.md` as an **OPEN coverage gap** - a skip is never green.
 
@@ -219,37 +282,46 @@ same as the `hovers:` extension):
 covers the desktop window layer end-to-end (OS event -> window -> engine ->
 handler -> state change). The **web export's browser->engine bridge cannot be
 exercised server-side**; it is covered only by the shared engine-side code path, the
-deployed `?debug=1` readings, and a manual-playtest checklist entry. The touch path
-on real hardware is likewise only partially covered (XTEST injects mouse events; XI2
-touch injection is out of scope). This round delivers **coverage**, and the fix for
-whatever the readings identify - it does not pre-declare the real-build bug fixed.
+player confirmation already in hand (web + desktop both work after `42637b7`), and a
+manual-playtest checklist entry. The touch path
+on real hardware is likewise only partially covered (xdotool injects mouse events;
+XI2 touch injection is out of scope). The fix itself is landed and player-confirmed;
+what this round adds on top of it is **coverage**, so the next hole of this class
+goes red on the server instead of living under a green suite.
 
-**Decision tree (keyed on the `?debug=1` triad; each branch has an owner):**
+**Decision tree (keyed on the differential triad; retained as the reading manual for
+a future red - the branch that fired this round is marked resolved):**
 - `raw == 0` (event never reaches the player node): if `under` names a Control, it is
-  a pre-`_input` GUI/STOP eater -> in-repo `mouse_filter` fix + the Layer-1 pin; if
-  `under` is empty, the event never entered the engine -> window/browser layer ->
-  X11 gate is the server-side net; web-specific -> escalate to the round owner (may
-  be export-preset / JS-shell side, outside this repo's reach).
-- `raw > 0, handled == 0`: swallowed between receipt and handler -> STOP Control in
-  the GUI phase (the Defect A class) -> `under` names it -> in-repo fix.
+  a pre-`_input` GUI/STOP eater -> in-repo `mouse_filter` fix + the landed
+  SegmentHost guard + the Layer-1 pin; if `under` is empty, the event never entered
+  the engine -> window/browser layer -> X11 gate is the server-side net;
+  web-specific -> escalate to the round owner (may be export-preset / JS-shell
+  side, outside this repo's reach).
+- `raw > 0, handled == 0` - **the branch that fired this round (menu.tscn
+  `SegmentHost`, resolved in `42637b7`)**: swallowed between receipt and handler ->
+  STOP Control in the GUI phase -> `under` names it -> in-repo `mouse_filter` fix.
 - `handled > 0`, no state change: coordinate/logic - `debug_last_raw_event_pos` vs
   `debug_last_click_grid` reveal a transform mismatch (e.g. every click resolving to
   one tile) -> fix the conversion in repo.
-Whatever branch fires, the resulting fix is pinned by Layer 1 (differential) or the
-X11 gate (delivery layer) so it cannot regress silently.
+Whatever branch fires next, the resulting fix is pinned by the landed guards,
+Layer 1 (differential) or the X11 gate (delivery layer) so it cannot regress
+silently.
 
-### 3.O Delete the `InputProbeOverlay` temporary (last task of the round)
+### 3.O Confirm the `InputProbeOverlay` is fully deleted (verify-only - landed in `1989be6`)
 
-Remove all three pieces of commit a673a42: the `[ext_resource ... id="probe"]` line,
-the `[node name="InputProbeOverlay"]` stanza, and the script file
-`scripts/ui/input_probe_overlay.gd`. **Ordering hazard the owner already hit once:**
-`[ext_resource]` entries must all precede `[sub_resource]` entries in
-`scenes/ui/hud.tscn` or the scene fails to parse - removal preserves the invariant
-(only deleting lines, never inserting), but the edit must be verified by a `/compile`
-gate run immediately after. Sequence: Layer-1 permanent counters land **first**
-(they absorb the raw/handled/under triad); the `?debug=1` readings are collected and
-recorded; then the overlay is deleted so the diagnostic capability survives in-repo
-without the URL-gated temporary.
+Commit `1989be6` already removed all three pieces of a673a42: the
+`[ext_resource ... id="probe"]` line, the `[node name="InputProbeOverlay"]` stanza,
+and the script file `scripts/ui/input_probe_overlay.gd`. A repo-wide search this
+round finds **zero** remaining references outside this design doc - the deletion is
+clean. **Do NOT re-add anything.** The remaining work is verification and absorption
+only: (a) `scenes/ui/hud.tscn` must keep parsing - `[ext_resource]` entries must all
+precede `[sub_resource]` entries (the ordering hazard the owner hit once); the
+deletion only removed lines so the invariant holds, and the post-deletion `/compile`
+runs prove it; (b) the raw/handled/under triad the overlay carried must be absorbed
+by the Layer-1 permanent observables (`debug_*` counters + `InputCensus.top_eater`,
+3.P0) - that is what makes "the diagnostic capability survives in-repo" true rather
+than aspirational. Recorded in `90_decisions.md`: a URL-gated temporary is not how a
+repo keeps diagnostics; permanent observables are.
 
 ### 3.T Touch-reachable undo control (the landed-touch leftover gap)
 
@@ -465,10 +537,10 @@ separate, click-free path that can pin hover without toggling.
 | C-A1 | `scenes/ui/health_bar.tscn` | `NameLabel` add `mouse_filter = 2` (defensive; Bar already landed) |
 | C-A2 | `scripts/characters/enemy.gd` | `debug_click_target_fires` counter in `_on_click_target_gui_input` (the 3.A measurement pin) |
 | C-I1 | `scripts/characters/player.gd` | add `debug_right_input_events`, `debug_undo_events`, `debug_gui_eater` (+ census call on every press); existing counters untouched |
-| C-I2 | `scripts/ui/input_census.gd` (NEW) | static `top_eater(root, pos)` ported verbatim from the overlay's measured walk |
-| C-I3 | `scripts/autoload/input_gate.gd` (NEW) | gate-mode autoload: skip-to-battle, JSON report refresh, auto-quit |
+| C-I2 | `scripts/ui/input_census.gd` (NEW) | static `top_eater(root, pos)` - the overlay's measured walk, ported from git history (a673a42; the file was deleted in `1989be6`) |
+| C-I3 | `scripts/autoload/input_gate.gd` (NEW) | gate-mode autoload: JSON report refresh (counters + visible-Button names/centers), auto-quit; registers BEFORE `SceneManager` (must stay last) |
 | C-I4 | `project.godot` | `[autoload]` register `InputGate` (GameManager precedent) |
-| C-I5 | sidecar `docker/godot/godot_harness.py` | NEW `/x11_input_smoke` endpoint (Xvfb + XTEST/python-xlib; xdotool fallback). **Sidecar image rebuild required** |
+| C-I5 | sidecar `docker/godot/godot_harness.py` + sidecar Dockerfile | NEW `/x11_input_smoke` endpoint: copy-to-writable-path, double `--headless --import`, Xvfb + **xdotool baked into the Dockerfile** (image rebuild required), name-driven button walk. `python-xlib` XTEST fallback only |
 | C-T1 | `scenes/ui/hud.tscn` | `UndoButton` node (right column, y176–212); `SkillDescLabel` offset_top 176->216 |
 | C-T2 | `scripts/ui/hud.gd` | undo button wiring + per-frame disabled refresh + `pressed_connected["UndoButton"]` + `undo_desc_overlap` observable |
 | C-B1 | `scripts/ui/tile_markers.gd` (NEW) | Node2D ground-marker overlay (ellipse + outline at `grid_to_world`, all living units) |
@@ -478,17 +550,17 @@ separate, click-free path that can pin hover without toggling.
 | C-C1 | `scripts/segments/creation.gd` | `trait_hover_index`; wire `mouse_entered`/`mouse_exited` on `TraitToggle{0..12}`; `_render` prefers hover index for `TraitDescLabel` only |
 | C-S1 | `final/delivery_notes.md` | heading fix (§3.S) + this round's new section |
 | C-S2 | `scripts/segments/map.gd` | remove panel trailing hint line; EVENT comma -> full-width; MAP punctuation audit |
-| C-O1 | `scripts/ui/input_probe_overlay.gd` + `scenes/ui/hud.tscn` | DELETE the overlay (script + node stanza + ext_resource line); verify /compile immediately (ext_resources must stay before sub_resources) |
+| C-O1 | `scenes/ui/hud.tscn` | VERIFY-ONLY: the overlay is already deleted (`1989be6`); confirm zero references + the scene still parses (ext_resources before sub_resources) |
 | C-P1 | `playtest/input_click_differential.yaml` (NEW) | P0 Layer-1 differential pin (left / right / enemy-tile legs) |
 | C-P2 | `playtest/undo_button_retreat.yaml` (NEW) | touch undo button: click -> retreat; geometry + wiring pins |
 | C-P3 | `playtest/click_portrait_body_targets_enemy.yaml` (NEW) | Defect B body-click damages/acts |
 | C-P4 | `playtest/health_bar_above_portrait.yaml` (NEW) | bar bottom above sprite_top incl. top-row face-band; ground-marker pins |
 | C-P5 | `playtest/trait_hover_preview.yaml` (NEW) | Defect C hover preview, trait_index untouched |
 | C-P6 | `playtest/_common.yaml` | surface whitelist additions; `hovers:` header doc; `scenario_order` append (C-P1..P5) |
-| C-P7 | `tests/test_playtest_contract_smoke.py` | `ROUND_SCENARIOS` two-place sync (C-P1..P5) + surface-contract pins |
+| C-P7 | `tests/test_playtest_contract_smoke.py` | `ROUND_SCENARIOS` two-place sync (C-P1..P5) + surface-contract pins; the two landed guards (`test_every_full_rect_host_is_click_through`, `test_the_contract_boot_scene_is_recorded_against_the_games_own`) stay green and untouched |
 | C-U1 | `tests/test_click_priority.gd` (NEW) | pure `attack_reach_covers` + resolve-order truth table (headless) |
 | C-U2 | `tests/test_trait_hover_preview.gd` (NEW) | hover index never mutates trait_index / never toggles (headless) |
-| C-D1 | `design/` docs (landed by 5_design) | 3.A audit table + ClickTarget verdict, 3.P0 coverage decision + X11 gate + honest OPEN web boundary, 3.T undo button, 3.B1 landing/top-row, 3.B2 priority rule + rejected §3.1, 3.C hover, 3.S; `99_changelog.md` row |
+| C-D1 | `design/` docs (landed by 5_design) | 3.A audit table + ClickTarget verdict, 3.P0 root-cause record (menu.tscn `SegmentHost`, the two dodge reasons, landed guards) + two-layer coverage + X11-gate pitfalls + honest OPEN web boundary, 3.O deletion verdict, 3.T undo button, 3.B1 landing/top-row, 3.B2 priority rule + rejected §3.1, 3.C hover, 3.S; `99_changelog.md` row |
 | C-F1 | `final/delivery_notes.md` (round section) | what changed per item, new assertions, B priority rule, P0 coverage status (honest), manual web/touch playtest checklist |
 
 ## 5. Observable contract (exact surface names to whitelist in `playtest/_common.yaml`)
@@ -584,13 +656,18 @@ reverts to trait-`trait_index`'s text, `trait_index` still 0, no toggle fired
 (a click would toggle).
 
 **X11 gate acceptance (not a YAML - the sidecar endpoint's own contract, C-I5):**
-windowed run under Xvfb; XTEST script = [motion to `player_world + (0,-64)`, button-1
-press, button-1 release, wait, motion to `player_world`, button-3 press/release];
-report must show `debug_input_events` +1, `debug_click_events` +1, `grid_pos` changed
-by the left click, then `debug_right_input_events` +1, `debug_undo_events` +1 and
-`grid_pos` restored by the right click. A skipped run (no Xvfb/XTEST) is recorded as
-an OPEN coverage gap, never green. The sidecar's own unit tests cover the endpoint
-(the `hovers:` precedent: harness changes ship with sidecar tests + image rebuild).
+setup = copy to a writable path, `--headless --import` twice, Xvfb 960×704×24,
+windowed run of the real `menu.tscn` boot; script = [name-driven button walk
+menu -> creation -> tutorial -> `state=BATTLE` (driver picks `*Next*` / `Confirm*` /
+`*Skip*` from the live Button report, never coordinates), motion to
+`player_world + (0,-64)` + click 1, wait, motion to `player_world` + click 3];
+report must show the walk reached BATTLE, `debug_input_events` +1,
+`debug_click_events` +1, `grid_pos` changed by the left click, then
+`debug_right_input_events` +1, `debug_undo_events` +1 and `grid_pos` restored by the
+right click, and `debug_gui_eater == ""` at both board points. A skipped run (no
+Xvfb/xdotool) is recorded as an OPEN coverage gap, never green. The sidecar's own
+unit tests cover the endpoint (the `hovers:` precedent: harness changes ship with
+sidecar tests + image rebuild).
 
 ## 7. GDScript unit pins (headless `run() -> bool`, registered in `unit_test_runner.gd`)
 
@@ -606,12 +683,18 @@ an OPEN coverage gap, never green. The sidecar's own unit tests cover the endpoi
 
 ## 8. Edge cases -> how this design answers each
 
-- **P0: the harness cannot produce the failure.** Correct - that is the finding.
-  Layer 1 makes the post-engine chain assertable (and permanently pins the Defect-A
-  class); Layer 2 (Xvfb + XTEST windowed run) is the only server-side net for the
-  pre-engine layer; the web bridge is honestly out of server reach and stays covered
-  by the deployed `?debug=1` readings + a manual checklist. Nothing is declared
-  "fixed" until a branch of the 3.P0 decision tree fires with evidence.
+- **P0: the headless harness cannot produce the GUI-phase failure.** Correct - and
+  the class is now pinned three independent ways: the landed static guard (every
+  `SegmentHost` in every `.tscn` declares `mouse_filter = 2`), Layer 1 (per-press
+  differential asserts: `raw` vs `handled` vs `debug_gui_eater`), and Layer 2 (the
+  windowed X11 run through the REAL `menu.tscn` boot). The web bridge is honestly
+  out of server reach and stays covered by the player confirmation + a manual
+  checklist. The fix is landed; coverage is this round's deliverable.
+- **P0: the X11 gate's four measured pitfalls.** Read-only repo mount (copy to a
+  writable `/tmp` path first), the double `--headless --import`, autoload ordering
+  (`InputGate` before `SceneManager`), and xdotool living in the Dockerfile rather
+  than the container's writable layer. All four are in 3.P0 Layer 2 verbatim;
+  re-hitting any of them is a process failure, not bad luck.
 - **P0: counters must not change meaning.** `debug_input_events` /
   `debug_click_events` keep their documented semantics (header comment +
   `click_move_to_tile.yaml` f45 pin); right-path coverage is **new** vars, and the
@@ -621,10 +704,10 @@ an OPEN coverage gap, never green. The sidecar's own unit tests cover the endpoi
   relay pre-handles before the GUI phase). C-P1 therefore asserts emptiness only at
   Control-free points (feet/empty tile) and pairs the enemy-tile leg with
   `debug_click_events` + the `debug_click_target_fires == 0` pin.
-- **Overlay removal hazard.** ext_resources must precede sub_resources in
-  `hud.tscn`; deleting the three pieces preserves the invariant (removal never
-  reorders), and a `/compile` run gates the edit. Removal is the round's LAST task,
-  after Layer 1 lands and the readings are recorded.
+- **Overlay removal.** Already landed (`1989be6`); ext_resources still precede
+  sub_resources in `hud.tscn` (removal never reorders lines). The one remaining
+  hazard is re-adding the overlay instead of relying on the Layer-1 observables -
+  3.O forbids it explicitly.
 - **Touch undo moves HUD geometry.** UndoButton sits in the existing right action
   column (clear of the skill bar, MoveHintLabel, nameplates); `SkillDescLabel` shifts
   40 px down (no position pin exists; `hud_desc_overlap` is computed live); new
@@ -674,8 +757,8 @@ scene-stanza changes; `.tscn` and `.gd` are text and diff-revertible. The clamp,
 size, TILE_SIZE, BOARD_TOP_MARGIN_Y, and STRIP_BOTTOM+2 are **untouched** (frozen
 constants). The new `TileMarkers` node, `InputCensus`, `InputGate` autoload,
 `UndoButton`, and the five new scenarios are additive (drop-in). The overlay
-deletion (C-O1) is a pure removal of a `?debug=1`-only diagnostic, gated by an
-immediate compile run, revertible from git. `click_move_undo_right.yaml` and
+deletion is already landed (`1989be6`, revertible from git); C-O1 is verify-only.
+`click_move_undo_right.yaml` and
 `click_move_undo_feet.yaml` are **not modified**. The sidecar `/x11_input_smoke`
 endpoint is additive to the sidecar (image rebuild, same channel as `hovers:`); if
 it cannot run, it reports `skipped` loudly - the existing gates are unaffected. If
@@ -693,8 +776,8 @@ inserted into protected files.
 |---|---|---|---|
 | T1 | P0 Layer 1: right/undo counters + `debug_gui_eater` + `InputCensus` port | C-I1, C-I2 | - |
 | T2 | P0: ClickTarget measurement pin + NameLabel filter + audit table (design record) | C-A1, C-A2, C-D1(partial) | T1 |
-| T3 | P0: `InputGate` autoload + report writer + registration | C-I3, C-I4 | - |
-| T4 | P0: sidecar `/x11_input_smoke` endpoint (Xvfb + XTEST; python-xlib, xdotool fallback) + sidecar tests + image rebuild | C-I5 (sidecar) | T3 |
+| T3 | P0: `InputGate` autoload + report writer + registration (BEFORE `SceneManager`) | C-I3, C-I4 | - |
+| T4 | P0: sidecar `/x11_input_smoke` endpoint - copy-to-writable-path, double `--import`, Xvfb + xdotool (Dockerfile), name-driven driver + sidecar tests + image rebuild | C-I5 (sidecar) | T3 |
 | T5 | P0: `input_click_differential.yaml` scenario + surface/order sync | C-P1, C-P6(partial), C-P7(partial) | T1, T2 |
 | T6 | Touch undo: `UndoButton` + wiring + geometry observables + scenario | C-T1, C-T2, C-P2 | - |
 | T7 | Defect B visual: nameplate -> sprite_top (retain clamp) + top-row landing doc | C-B1(partial), C-D1(partial) | - |
@@ -706,8 +789,8 @@ inserted into protected files.
 | T13 | Remaining scenarios (C-P3..P5) + full surface whitelist + `hovers:` header doc + `scenario_order` | C-P3..P6 | T7–T11 |
 | T14 | pytest two-place sync + surface-contract pins | C-P7 | T13 |
 | T15 | Unit pins (click priority, hover preview) registered in the suite | C-U1, C-U2 | T10, T11 |
-| T16 | Collect + record the `?debug=1` readings; fix per the 3.P0 decision tree (honestly labeled) | (depends on readings) | T1, T4 |
-| T17 | **DELETE the InputProbeOverlay** (script + node + ext_resource) + immediate /compile verify | C-O1 | T1, T16 |
+| T16 | Record the resolved root cause + the two dodge reasons + the landed-guard inventory in `design/` (evidence already in hand, §1 table; **no characterization cards**) | C-D1 (partial) | T1 |
+| T17 | Verify the `InputProbeOverlay` deletion is clean (zero references; `hud.tscn` parses; the triad is absorbed by Layer 1) | C-O1 | T1 |
 | T18 | Design-archive declarations (5_design lands after verification) | C-D1 | T1–T17 |
 | T19 | `final/delivery_notes.md` round section: per-item changes, new assertions, B priority rule, P0 coverage status (honest OPEN boundary), manual web/touch checklist | C-F1 | T1–T18 |
 
@@ -718,9 +801,10 @@ Godot 4 built-ins only (no external packages in the repo):
 `Button.mouse_entered`/`mouse_exited`, `Node2D._draw`, `Rect2.has_point`,
 `GridManager.world_to_grid` / `grid_to_world` / `clamp_sprite_offset`,
 `OS.get_cmdline_user_args()`. GDScript for logic; `.tscn` is hand-editable text.
-Sidecar-side tooling (not repo dependencies): Xvfb (already present) + XTEST via
-`python-xlib` (pip, pure Python; `Xlib.ext.xtest.fake_input` + `XWarpPointer`), with
-`xdotool` (apt) as fallback. Tests: headless GDScript `extends SceneTree` unit pins +
+Sidecar-side tooling (not repo dependencies): Xvfb (already present) + **xdotool
+baked into the sidecar Dockerfile** (the owner's measured driver route; an
+`apt-get install` at run time lives in the writable layer and is lost on rebuild),
+with `python-xlib` XTEST as fallback only. Tests: headless GDScript `extends SceneTree` unit pins +
 the `playtest/` YAML contract + `tests/test_playtest_contract_smoke.py` pytest. All
 gates run through the `godot-builder` sidecar (`/compile`, `/playtest`, `/vision`,
 `/script`, and the NEW `/x11_input_smoke`).
