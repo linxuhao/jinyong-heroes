@@ -1,5 +1,8 @@
 # jinyong — Wuxia Crossover Tactics (Godot 4)
 
+**▶ Play it in your browser: https://linxuhao.github.io/jinyong-heroes/**
+(中文/English — auto-detected from your browser language, switchable in 设置/Settings)
+
 A time-scrambled wuxia world: characters, sects and martial arts from different
 parallel timelines collide in one jianghu. This is a fan-crossover brawler, not
 a recreation of any single novel. You create your own nobody, borrow the fully
