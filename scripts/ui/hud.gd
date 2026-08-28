@@ -59,6 +59,14 @@ var pressed_connected: Dictionary = {}
 var hud_button_overlap: bool = false
 var hud_desc_overlap: bool = false
 
+## Touch-reachable undo (Defect: no right-click on phones). `undo_desc_overlap`
+## is the per-frame geometry observable for the UndoButton: true iff the
+## SkillDescLabel rect and the UndoButton rect intersect (plain Rect2.intersects,
+## the same predicate hud_desc_overlap uses — NOT the 1px-inset variant). Static
+## geometry (UndoButton y[176,212] vs SkillDescLabel y[216,396], a 4 px gap)
+## keeps it false; asserted false while the HUD is visible.
+var undo_desc_overlap: bool = false
+
 ## Round-2 top-strip observables (playtest surface under HUD.): the five top
 ## texts (RoundLabel / ActiveLabel / OrderLabel / EnergyLabel, plus
 ## ActionHintLabel ONLY while visible) must be pairwise non-overlapping and
@@ -116,6 +124,7 @@ var _action_hint_player: Node = null
 @onready var _skill_desc_label: Label = $SkillDescLabel
 @onready var _end_turn_button: Button = $EndTurnButton
 @onready var _attack_button: Button = $AttackButton
+@onready var _undo_button: Button = $UndoButton
 
 ## Resolve a skill button by its deterministic name (SkillButton1..SkillButton12).
 ## Buttons live under SkillRow1/SkillRow2 in the two-row layout, so resolve
@@ -200,9 +209,15 @@ func _update_geometry_observables() -> void:
 		desc = get_node_or_null("SkillDescLabel") as Label
 		if desc != null:
 			_skill_desc_label = desc
+	var undo_btn: Button = _undo_button
+	if undo_btn == null or not is_instance_valid(undo_btn):
+		undo_btn = get_node_or_null("UndoButton") as Button
+		if undo_btn != null:
+			_undo_button = undo_btn
 
 	hud_button_overlap = false
 	hud_desc_overlap = false
+	undo_desc_overlap = false
 	if end_btn == null or atk_btn == null:
 		return
 
@@ -210,6 +225,8 @@ func _update_geometry_observables() -> void:
 		end_btn.get_global_rect(),
 		atk_btn.get_global_rect(),
 	]
+	if undo_btn != null:
+		button_rects.append(undo_btn.get_global_rect())
 	var hud_widgets: Array[Rect2] = []
 	if indicator != null:
 		hud_widgets.append(indicator.get_global_rect())
@@ -232,6 +249,12 @@ func _update_geometry_observables() -> void:
 		for r in button_rects:
 			if d.intersects(r):
 				hud_desc_overlap = true
+	# UndoButton vs SkillDescLabel: the specific pair the touch-undo scenario
+	# pins false. Plain Rect2.intersects (edge-inclusive), same predicate as
+	# hud_desc_overlap — NOT the 1px-inset variant.
+	if desc != null and undo_btn != null:
+		undo_desc_overlap = desc.get_global_rect().intersects(
+			undo_btn.get_global_rect())
 
 	# --- Round-2 top strip geometry (top-bar non-overlap) ---
 	# The five top texts live inside the TopStrip backing band, pairwise
@@ -645,11 +668,23 @@ func _wire_battle_action_buttons() -> void:
 			atk_btn.pressed.disconnect(_on_attack_pressed)
 		atk_btn.pressed.connect(_on_attack_pressed)
 
+	var undo_btn: Button = _undo_button
+	if undo_btn == null or not is_instance_valid(undo_btn):
+		undo_btn = get_node_or_null("UndoButton") as Button
+		if undo_btn != null:
+			_undo_button = undo_btn
+	if undo_btn != null:
+		if undo_btn.pressed.is_connected(_on_undo_button_pressed):
+			undo_btn.pressed.disconnect(_on_undo_button_pressed)
+		undo_btn.pressed.connect(_on_undo_button_pressed)
+
 	pressed_connected = {
 		"EndTurnButton": end_btn != null
 			and end_btn.get_signal_connection_list("pressed").size() > 0,
 		"AttackButton": atk_btn != null
 			and atk_btn.get_signal_connection_list("pressed").size() > 0,
+		"UndoButton": undo_btn != null
+			and undo_btn.get_signal_connection_list("pressed").size() > 0,
 	}
 
 
@@ -684,6 +719,26 @@ func _on_attack_pressed() -> void:
 		player._try_keyboard_attack()
 
 
+## UndoButton handler: delegates to the player's SHARED, self-gated undo entry
+## — the same call the right-click path makes (phones have no right-click, so
+## this finger-reachable button is the touch undo). NO synthetic InputEvent
+## (that would re-enter _unhandled_input and double-count the raw counter) and
+## NO forked undo logic: the deep gates (state / turn / pause / is_moving / the
+## acted lock and the 「已出手,无法退回」 rejection) and the turn-start restore
+## stay owned by player.handle_world_right_click. Uses a LIVE
+## GameManager.get_player() lookup (never a stored ref), like the siblings.
+## The `world_pos` argument is position-independent in that entry; the unit
+## node origin (= own tile centre) is the semantically correct value.
+func _on_undo_button_pressed() -> void:
+	if not _battle_input_allowed():
+		return
+	var player: Node = GameManager.get_player()
+	if player == null or not is_instance_valid(player):
+		return
+	if player.has_method("handle_world_right_click"):
+		player.handle_world_right_click(player.global_position)
+
+
 # ---------------------------------------------------------------------------
 # Process — update health bar positions
 # ---------------------------------------------------------------------------
@@ -702,6 +757,20 @@ func _process(_delta: float) -> void:
 		var allowed: bool = _battle_input_allowed()
 		_end_turn_button.disabled = not allowed
 		_attack_button.disabled = not allowed
+
+	# UndoButton: disabled unless the battle input gate is open AND the player
+	# reports undo_available (recomputed every frame in player._process — never
+	# a HUD-side copy of the turn-start state). A disabled Button emits nothing
+	# on click, so this is the visible lock surface; the handler gate is the
+	# second layer. Player null (pre-battle) short-circuits to disabled=true
+	# without ever reading undo_available. Must run BEFORE the player
+	# null-check below so the state is readable every frame.
+	if is_instance_valid(_undo_button):
+		var undo_p: Node = GameManager.get_player()
+		var undo_allowed: bool = _battle_input_allowed() and undo_p != null \
+			and is_instance_valid(undo_p) and "undo_available" in undo_p \
+			and bool(undo_p.undo_available)
+		_undo_button.disabled = not undo_allowed
 
 	for bar in _health_bars:
 		if is_instance_valid(bar) and bar.has_method("follow_character"):
