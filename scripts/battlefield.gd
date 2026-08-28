@@ -782,14 +782,14 @@ func _instantiate_player(data) -> Node:
 func _instantiate_enemies(all_data: Dictionary) -> Array[Node]:
 	var enemies: Array[Node] = []
 
-	# Starting grid positions for each enemy. All rows obey the board rule
-	# MIN_LEGAL_ROW == 3 (grid_manager.gd): a 96x128 portrait anchored at a
-	# unit's feet has its ink top at feet_y - 128, and feet_y must sit low
-	# enough that the ink top stays at/above BOARD_TOP_MARGIN_Y = 92, i.e.
-	# row >= ceil((92 + 128 - 32) / 64) = ceil(2.9375) = 3. Rows 0..2 would
-	# push the art DOWN off its own tile, so Central_Divine moves (7,1)->(7,3),
-	# East_Heretic (3,2)->(3,4), West_Poison (11,2)->(11,4) — formation shape
-	# preserved (East/West same row; South/North same row; Central column-7 topmost).
+	# Starting grid positions for each enemy. These are the CLAMP-ERA
+	# down-shifted rows (Central_Divine (7,3), East_Heretic (3,4),
+	# West_Poison (11,4)); grid row legality imposes no minimum row now —
+	# is_walkable is bounds + border ring only, so every interior row
+	# (1..GRID_HEIGHT-2) is legal and rows 0..2 are open again. Restoring
+	# the original spawns Central_Divine (7,1) / East_Heretic (3,2) /
+	# West_Poison (11,2) is the spawn-restore task's job, NOT this one —
+	# the values below are frozen.
 	var positions: Dictionary = {
 		"East Heretic":   Vector2i(3, 4),
 		"West Poison":    Vector2i(11, 4),

@@ -12,7 +12,14 @@ rows-0..2 unenterable branch in `is_walkable`. Clamp deletion is a SIBLING task.
 
 - `scripts/autoload/grid_manager.gd` — the doc block + `const MIN_LEGAL_ROW`
   (L32-45) deleted; the rows-0..2 branch in `is_walkable` (L156-163) deleted.
-- No other file referenced `MIN_LEGAL_ROW`.
+- One live residual was found and cleared in this task: a `MIN_LEGAL_ROW`
+  reference in a prose comment above the enemy spawn dict in
+  `scripts/battlefield.gd` (L786 of the pre-edit file). The comment claimed a
+  rows-0..2 unenterable rule that this task deleted, so it was a dangling
+  dead-symbol reference. It has been rewritten (this task) to name no deleted
+  constant and no minimum legal row; the `positions` dict values are frozen and
+  handed to the spawn-restore sibling task. After that rewrite, the sweep is
+  **zero hits** in `scripts/` + `scenes/` + `playtest/` + `tests/`.
 
 ## `is_walkable` new semantics (one line)
 
@@ -60,7 +67,9 @@ occupancy, A*, `plan_movement`, AoE all untouched. The only diff in
    sibling: row-1 unit feet_y = `GRID_ORIGIN.y + TILE_SIZE*1` = 32+64 = 96; its
    unclamped ink top = 96 - 128 = -32 — the same numbers as `ink_world_dy`
    124 -> 0 in that task. **Owner: spawn-restore sibling task; this task does
-   not touch the spawn dict.**
+   not touch the spawn dict.** This task DID rewrite the explanatory comment
+   above the dict (it was a dangling `MIN_LEGAL_ROW` reference), but left the
+   dict `positions` values themselves untouched.
 2. **Dependent-yaml upper-bound asserts (report-only).** `playtest/movement_range_highlight.yaml`
    frame 85 asserts `Player.moves_left == 1` (3x move_up) and
    `MoveRangeHighlight.tile_count: changed`; `playtest/click_portrait_body_targets_enemy.yaml`
