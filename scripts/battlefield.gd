@@ -22,14 +22,6 @@ const BattleSetup = preload("res://scripts/data/battle_setup.gd")
 const AISparring = preload("res://scripts/ai/ai_sparring.gd")
 
 # ---------------------------------------------------------------------------
-# Constants (mirror GridManager for convenience)
-# ---------------------------------------------------------------------------
-
-const TILE_SIZE: int = 64
-const GRID_WIDTH: int = 15
-const GRID_HEIGHT: int = 11
-
-# ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
 
@@ -122,12 +114,12 @@ func _create_tile_textures() -> Dictionary:
 	# so the game never hard-crashes.
 	if floor_tex == null:
 		push_warning("Battlefield: res://assets/terrain/floor.png missing — using procedural fallback")
-		var floor_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+		var floor_img: Image = Image.create(GridManager.TILE_SIZE, GridManager.TILE_SIZE, false, Image.FORMAT_RGBA8)
 		floor_img.fill(Color(0.3, 0.6, 0.2, 1.0))  # grass green
 		floor_tex = ImageTexture.create_from_image(floor_img)
 	if border_tex == null:
 		push_warning("Battlefield: res://assets/terrain/border.png missing — using procedural fallback")
-		var border_img: Image = Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
+		var border_img: Image = Image.create(GridManager.TILE_SIZE, GridManager.TILE_SIZE, false, Image.FORMAT_RGBA8)
 		border_img.fill(Color(0.35, 0.35, 0.35, 1.0))  # stone gray
 		border_tex = ImageTexture.create_from_image(border_img)
 
@@ -147,15 +139,15 @@ func _setup_tilemap(floor_tex: Texture2D, border_tex: Texture2D) -> void:
 	var tileset: TileSet = TileSet.new()
 
 	# Configure tile size.
-	tileset.tile_size = Vector2i(TILE_SIZE, TILE_SIZE)
+	tileset.tile_size = Vector2i(GridManager.TILE_SIZE, GridManager.TILE_SIZE)
 
 	# Build a single 2×1 atlas image: floor (0,0) at left half, border (1,0) at right.
 	var floor_img: Image = floor_tex.get_image()
 	var border_img: Image = border_tex.get_image()
-	var atlas_img: Image = Image.create(TILE_SIZE * 2, TILE_SIZE, false, Image.FORMAT_RGBA8)
+	var atlas_img: Image = Image.create(GridManager.TILE_SIZE * 2, GridManager.TILE_SIZE, false, Image.FORMAT_RGBA8)
 	atlas_img.fill(Color(0, 0, 0, 0))
-	atlas_img.blit_rect(floor_img, Rect2i(0, 0, TILE_SIZE, TILE_SIZE), Vector2i(0, 0))
-	atlas_img.blit_rect(border_img, Rect2i(0, 0, TILE_SIZE, TILE_SIZE), Vector2i(TILE_SIZE, 0))
+	atlas_img.blit_rect(floor_img, Rect2i(0, 0, GridManager.TILE_SIZE, GridManager.TILE_SIZE), Vector2i(0, 0))
+	atlas_img.blit_rect(border_img, Rect2i(0, 0, GridManager.TILE_SIZE, GridManager.TILE_SIZE), Vector2i(GridManager.TILE_SIZE, 0))
 
 	var atlas_tex: ImageTexture = ImageTexture.create_from_image(atlas_img)
 
