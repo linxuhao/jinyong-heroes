@@ -32,7 +32,7 @@ const MapScene: PackedScene = preload("res://scenes/segments/map.tscn")
 
 ## The 6 nodes and the 5 mainline ids — graph facts from step2_design §8.7
 ## (not the §8 declaration table), so they stay true however events are bound.
-const NODE_IDS: Array[String] = ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun", "shaolin"]
+const NODE_IDS: Array[String] = ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun", "shaolin", "huashan"]
 const MAINLINE_IDS: Array[String] = ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun"]
 const SLOT_TYPES: Array[String] = ["event", "battle", "facility"]
 
@@ -75,6 +75,7 @@ static func _test_map_data_schema(ok: bool) -> bool:
 	#     prose). battle/facility slots stay declared everywhere, so the total
 	#     active-slot count equals the active-event-slot count.
 	var active_event_nodes: Array[String] = []
+	var active_battle_nodes: Array[String] = []
 	var active_slot_total: int = 0
 	for nid in NODE_IDS:
 		var ec: Dictionary = MapData.entry_content(nid)
@@ -84,7 +85,18 @@ static func _test_map_data_schema(ok: bool) -> bool:
 				active_slot_total += 1
 				if slot_type == "event":
 					active_event_nodes.append(nid)
-	ok = _expect(ok, active_slot_total == 5, "exactly five active event slots across the table (got %d)" % active_slot_total)
+				elif slot_type == "battle":
+					active_battle_nodes.append(nid)
+	# Six live slots now, not five: the same five events plus 华山's battle — the
+	# first slot of a type other than event to go live. Counting the two kinds
+	# apart is what keeps this assertion honest; a single total would have gone
+	# on reading "five events" while one of them was something else entirely.
+	ok = _expect(ok, active_slot_total == 6, "exactly six active entry slots across the table (got %d)" % active_slot_total)
+	ok = _expect(ok, active_battle_nodes == ["huashan"],
+			"华山 is the only node with a live battle slot (got %s)" % str(active_battle_nodes))
+	ok = _expect(ok, MapData.active_battle_id("huashan") == "huashan_duel", "huashan binds huashan_duel")
+	ok = _expect(ok, MapData.active_battle_id("shaolin") == "", "a declared battle slot yields no id")
+	ok = _expect(ok, MapData.active_event_id("huashan") == "", "华山 carries no event, so no precedence rule is reachable")
 	ok = _expect(ok, active_event_nodes == ["wuming_valley", "luoyang", "wudang", "xiangyang", "shaolin"],
 			"the active event slots are the four live mainline nodes + shaolin, in NODE_IDS order (got %s)" % str(active_event_nodes))
 	var shaolin_id: String = MapData.active_event_id("shaolin")
@@ -110,6 +122,13 @@ static func _test_map_data_schema(ok: bool) -> bool:
 	var gaps_shaolin: Array = MapData.declared_gap_types("shaolin")
 	ok = _expect(ok, gaps_shaolin.has("battle") and gaps_shaolin.has("facility"),
 			"shaolin declares battle + facility as unimplemented gaps")
+
+	# The honesty observable has to MOVE when a gap is filled, or it degrades into
+	# decoration: 华山's battle is implemented, so 'battle' must be absent from its
+	# gap list while 'event' and 'facility' remain.
+	var gaps_huashan: Array = MapData.declared_gap_types("huashan")
+	ok = _expect(ok, gaps_huashan == ["event", "facility"],
+			"华山's gap list drops 'battle' now that slot is live (got %s)" % str(gaps_huashan))
 	ok = _expect(ok, not gaps_shaolin.has("event"), "shaolin's implemented event is NOT a gap")
 	# luoyang's event slot is now LIVE, so its only remaining declared gaps are
 	# battle + facility (2 slot types, fixed order) — the honesty observable

@@ -180,6 +180,27 @@ var debug_click_events: int = 0
 ## The world→grid tile resolved for the last handle_world_click call.
 var debug_last_click_grid: Vector2i = Vector2i(-1, -1)
 
+## Count of every RIGHT-button press event observed by this node's `_input`
+## (counting only; never marks the event handled). This is a NEW counter, not a
+## widening of debug_input_events — the undo path previously had no raw counter
+## at all, so a right-click swallowed in the GUI phase was invisible to the
+## contract (the Defect A signature: raw>0 but never reaching _unhandled_input).
+var debug_right_input_events: int = 0
+
+## Count of entries into handle_world_right_click (the shared undo entry point).
+## Incremented at the very top, BEFORE the state gate, mirroring how
+## debug_click_events increments before the gate at the top of handle_world_click
+## — so a gated-out right-click still counts as having reached the handler.
+var debug_undo_events: int = 0
+
+## Predicted GUI-phase event eater: at every press (left / right / touch) seen in
+## _input, the InputCensus.top_eater result for that point — the topmost visible,
+## non-IGNORE Control whose global rect contains it ("" when none). It is the
+## *prediction* of what would swallow the event if it survived to the GUI phase;
+## it is recomputed on EVERY press (never on release or motion) so a stale
+## non-empty value can never mask a fixed STOP-filter hole.
+var debug_gui_eater: String = ""
+
 # ---------------------------------------------------------------------------
 # Node references
 # ---------------------------------------------------------------------------
@@ -414,6 +435,19 @@ func _input(event: InputEvent) -> void:
 			or (event is InputEventScreenTouch and event.pressed):
 		debug_input_events += 1
 		debug_last_raw_event_pos = event.position
+	# NEW (P0 Layer 1): per-press predicted GUI eater + raw RIGHT-press counter.
+	# The left/touch branch above is kept byte-identical (its meaning is pinned by
+	# existing scenarios and documented in the _common.yaml header). debug_gui_eater
+	# is recomputed on EVERY press — left, right AND touch — so a stale non-empty
+	# value cannot mask a fixed hole. debug_right_input_events counts only RIGHT
+	# presses (never left / touch / release).
+	if event is InputEventMouseButton:
+		if event.pressed:
+			debug_gui_eater = InputCensus.top_eater(get_tree().root, event.position)
+			if event.button_index == MOUSE_BUTTON_RIGHT:
+				debug_right_input_events += 1
+	elif event is InputEventScreenTouch and event.pressed:
+		debug_gui_eater = InputCensus.top_eater(get_tree().root, event.position)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -719,6 +753,7 @@ func handle_world_click(world_pos: Vector2) -> void:
 ## engine sets acted on a successful action (attack/skill/item) and end-turn
 ## ends the player's turn, so commit == acted or not the player's turn.
 func handle_world_right_click(world_pos: Vector2) -> void:
+	debug_undo_events += 1
 	var state: String = GameManager.get_state()
 	if state != "BATTLE":
 		return

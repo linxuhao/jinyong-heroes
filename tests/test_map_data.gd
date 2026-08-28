@@ -5,7 +5,7 @@
 const MapData = preload("res://scripts/data/map_data.gd")
 const EventData = preload("res://scripts/data/event_data.gd")
 
-const NODE_IDS := ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun", "shaolin"]
+const NODE_IDS := ["wuming_valley", "luoyang", "wudang", "xiangyang", "kunlun", "shaolin", "huashan"]
 
 ## The §8.7 undirected graph, listed once per undirected edge.
 const EDGES := [
@@ -59,7 +59,13 @@ static func _test_adjacency(ok: bool) -> bool:
 	ok = _expect(ok, not MapData.is_adjacent("shaolin", "xiangyang"), "no shaolin-xiangyang")
 	ok = _expect(ok, not MapData.is_adjacent("wudang", "kunlun"), "no wudang-kunlun")
 	# neighbors exactly per the graph
-	ok = _expect(ok, MapData.neighbors("shaolin") == ["luoyang"], "shaolin adjacent only to luoyang")
+	# 少林 gained 华山 as a branch neighbour (the first live battle node). The
+	# mainline spine is untouched, which is why the travel scenarios that walk
+	# 无名谷→…→昆仑 never see it — asserted just below for 昆仑.
+	ok = _expect(ok, MapData.neighbors("shaolin") == ["luoyang", "huashan"], "shaolin adjacent to luoyang + huashan")
+	ok = _expect(ok, MapData.neighbors("huashan") == ["shaolin"], "huashan hangs off shaolin only")
+	ok = _expect(ok, MapData.is_adjacent("shaolin", "huashan") and MapData.is_adjacent("huashan", "shaolin"), "shaolin-huashan is undirected")
+	ok = _expect(ok, not MapData.is_adjacent("luoyang", "huashan"), "huashan is not on the mainline")
 	ok = _expect(ok, MapData.neighbors("kunlun") == ["xiangyang"], "kunlun adjacent only to xiangyang")
 	ok = _expect(ok, MapData.neighbors("nope").is_empty(), "neighbors unknown -> []")
 	return ok
@@ -96,16 +102,28 @@ static func _test_entry_content(ok: bool) -> bool:
 			var status: String = slot.get("status", "")
 			ok = _expect(ok, status == "active" or status == "declared",
 				nid + " slot " + slot_type + " status in {active,declared}")
-	# exactly five ACTIVE slots across the whole table — the five active EVENT
-	# slots (shaolin + the four mainline event slots: wuming_valley/luoyang/
-	# wudang/xiangyang). battle/facility slots stay declared everywhere, so the
-	# total active count equals the active event-slot count.
-	var active_count := 0
+	# Six ACTIVE slots across the table, of two kinds — and they are counted
+	# SEPARATELY on purpose. The old single total said "five active event slots"
+	# and was true only while every live slot happened to be an event; the moment
+	# 华山's battle went live, one total could have stayed green while describing
+	# the table wrongly. Five events (the four mainline + 少林) and one battle
+	# (华山, the first non-event slot to be implemented).
+	var active_event_count := 0
+	var active_battle_count := 0
+	var active_facility_count := 0
 	for nid in NODE_IDS:
 		for slot_type in ["event", "battle", "facility"]:
-			if MapData.entry_content(nid)[slot_type].get("status", "") == "active":
-				active_count += 1
-	ok = _expect(ok, active_count == 5, "exactly five active event slots across the table (shaolin + the four mainline)")
+			if MapData.entry_content(nid)[slot_type].get("status", "") != "active":
+				continue
+			if slot_type == "event":
+				active_event_count += 1
+			elif slot_type == "battle":
+				active_battle_count += 1
+			else:
+				active_facility_count += 1
+	ok = _expect(ok, active_event_count == 5, "five active event slots (the four mainline + 少林), got %d" % active_event_count)
+	ok = _expect(ok, active_battle_count == 1, "one active battle slot (华山), got %d" % active_battle_count)
+	ok = _expect(ok, active_facility_count == 0, "facility stays unimplemented everywhere, got %d" % active_facility_count)
 	# shaolin binding: shape + resolves in the pool + deep copy
 	var shaolin_event: Dictionary = MapData.entry_content("shaolin")["event"]
 	ok = _expect(ok, shaolin_event == {"status": "active", "event_id": "night_rain"},

@@ -28,6 +28,11 @@ var event_id: String = ""
 ## Surface: which event option the ▶ marks (0 = option_a, 1 = option_b).
 var event_focus: int = 0
 
+## Surface: battle_id of the node-entry battle this arrival started ("" when the
+## node has no live battle slot). Written before the state change, so a reader
+## that catches the frame still sees which encounter was entered.
+var entry_battle_id: String = ""
+
 ## Surface: declared-but-unimplemented entry-content slot types at the current
 ## node (the honesty observable — gaps are assertable, not just documented).
 var entry_declared_gap_types: Array[String] = []
@@ -127,6 +132,8 @@ func _travel() -> void:
 			GameManager.enter_segment("ENDING")
 			return
 	_maybe_start_entry_event()
+	if phase != "EVENT":
+		_maybe_start_entry_battle()
 	_render()
 
 
@@ -144,6 +151,25 @@ func _maybe_start_entry_event() -> void:
 	event_focus = 0
 	_sync_surface()
 	_render()
+
+
+## Start the node-entry battle for the current node, if its battle slot is live.
+##
+## Fires ONLY on arrival by travel, and ONLY when no node-entry event opened
+## first. A node carrying both an active event and an active battle would need a
+## precedence rule; there is no such node today (华山, the only live battle slot,
+## has no event), so this guard states that invariant rather than choosing a
+## winner. If one is ever authored, the rule belongs in the design file first.
+##
+## End-node routing has already run in _travel() by the time this is called, so
+## a battle can no more block the ending than an event can.
+func _maybe_start_entry_battle() -> void:
+	var bid: String = MapData.active_battle_id(current_node_id)
+	if bid == "":
+		return
+	entry_battle_id = bid
+	_sync_surface()
+	GameManager.start_map_battle()
 
 
 ## Resolve the modal node-event: pick the option by event_focus, apply its effects

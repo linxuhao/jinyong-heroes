@@ -34,6 +34,13 @@ const NODES: Array = [
 		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "shaolin", "display_name": "少林", "is_end": false,
 		"entry_content": {"event": {"status": "active", "event_id": "night_rain"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+	# 华山 is the first node whose BATTLE slot is live, and it carries no event
+	# on purpose: a node holding both would need a precedence rule, and inventing
+	# one belongs in a design decision, not in a data row. Hanging it off 少林
+	# (itself a branch) keeps the mainline spine byte-identical, so the travel
+	# scenarios that walk 无名谷→…→昆仑 never see it.
+	{"id": "huashan", "display_name": "华山", "is_end": false,
+		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "active", "battle_id": "huashan_duel"}, "facility": {"status": "declared", "facility_id": ""}}},
 ]
 
 ## Undirected adjacency — both directions are listed explicitly.
@@ -43,7 +50,8 @@ const ADJACENCY: Dictionary = {
 	"wudang": ["luoyang", "xiangyang"],
 	"xiangyang": ["wudang", "kunlun"],
 	"kunlun": ["xiangyang"],
-	"shaolin": ["luoyang"],
+	"shaolin": ["luoyang", "huashan"],
+	"huashan": ["shaolin"],
 }
 
 ## Ending tiers, descending by min_total (step2_design §8.8).
@@ -150,6 +158,27 @@ static func active_event_id(id: String) -> String:
 ## Slot types whose status == "declared" (unimplemented this round), in the
 ## fixed order event, battle, facility; [] if unknown. The honesty observable:
 ## declared-but-unimplemented content is assertable, not just documented.
+## The node's battle-slot id when that slot is live, else "".
+##
+## Deliberately NOT symmetric with active_event_id(): that one rejects an id
+## EventData cannot resolve, because a dangling event id would print empty prose
+## at the player. There is no battle registry to check against yet — the game has
+## exactly one battlefield — so the id is carried as a label for the encounter
+## and validated only for presence. When a battle table lands, this is where it
+## gets consulted, and the check belongs here rather than at the call site.
+static func active_battle_id(id: String) -> String:
+	var ec: Dictionary = entry_content(id)
+	var slot: Variant = ec.get("battle")
+	if typeof(slot) != TYPE_DICTIONARY:
+		return ""
+	if (slot as Dictionary).get("status", "") != "active":
+		return ""
+	var bid: Variant = (slot as Dictionary).get("battle_id", "")
+	if typeof(bid) != TYPE_STRING or bid == "":
+		return ""
+	return bid as String
+
+
 static func declared_gap_types(id: String) -> Array[String]:
 	var out: Array[String] = []
 	var ec: Dictionary = entry_content(id)

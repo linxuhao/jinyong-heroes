@@ -153,6 +153,33 @@ func start_encounter() -> void:
 	state_changed.emit(STATE_BATTLE)
 
 
+## Enter a node-entry battle from the map segment: MAP -> BATTLE with
+## battle_return_state == "MAP", so WON/LOST route back to the map.
+##
+## The return path needs no new code and none was added: request_continue() and
+## request_retry() already send the player to battle_return_state whenever it
+## names a segment state, and MAP is one of SEGMENT_STATES. Setting the field is
+## the whole of it.
+##
+## SEGMENT_PREDECESSORS says MAP may be entered from CULTIVATION, and that stays
+## true of enter_segment(); the WON/LOST return writes current_state directly and
+## has never consulted that table. start_encounter() already established exactly
+## this shape for CULTIVATION, so this is the existing seam used a second time,
+## not a new one.
+##
+## Deliberately does NOT reuse start_battle() (hard-gated to TUTORIAL) or
+## start_encounter() (hard-gated to CULTIVATION): each entry point states the one
+## state it may be reached from, so a stray call cannot smuggle the player into a
+## battle from somewhere the design never sanctioned. No-op outside MAP.
+func start_map_battle() -> void:
+	if current_state != STATE_MAP:
+		return
+	battle_return_state = STATE_MAP
+	current_state = STATE_BATTLE
+	battle_started.emit()
+	state_changed.emit(STATE_BATTLE)
+
+
 ## End the battle with a win or loss.
 ## Shows a centered overlay with victory or defeat text.
 ## No-op if the game is already in WON or LOST state.

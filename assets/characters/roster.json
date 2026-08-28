@@ -1,0 +1,54 @@
+{
+  "_why": [
+    "武虾 world constraint (design/90_decisions.md): every character in this",
+    "game is a shrimp — the ones here and every one added later. This file is",
+    "what makes that rule enforceable. tests/test_shrimp_roster.py holds it and",
+    "assets/characters/*.png to a strict one-to-one: an unregistered portrait",
+    "goes red, and so does a roster row with no portrait.",
+    "",
+    "The gate CANNOT look at a PNG and tell whether it depicts a shrimp. It is",
+    "not trying to. What it enforces is that adding a character forces you to",
+    "write down which shrimp it is — turning a rule that lives in someone's",
+    "memory into a door that stops you. A rule with no guard drifts; this",
+    "pipeline is agent-driven and the third round from now will not remember.",
+    "",
+    "species is prose, deliberately: it is read by a human authoring art, not",
+    "parsed. It must be non-empty, which is the whole machine-checkable part.",
+    "",
+    "DEADPAN: only the portrait and the title are shrimp. Event/gongfa/skill",
+    "prose stays straight wuxia. See the decision record before changing tone."
+  ],
+  "characters": {
+    "west_poison": {
+      "title": "西毒",
+      "species": "皮皮虾(雀尾螳螂虾) — 螯击约 23 m/s,单位体重出拳最狠的动物",
+      "art_status": "pending"
+    },
+    "north_beggar": {
+      "title": "北丐",
+      "species": "龙虾 — 降龙十八掌由一只龙虾使出",
+      "art_status": "pending"
+    },
+    "east_heretic": {
+      "title": "东邪",
+      "species": "待定虾种",
+      "art_status": "pending"
+    },
+    "south_emperor": {
+      "title": "南帝",
+      "species": "待定虾种",
+      "art_status": "pending"
+    },
+    "central_divine": {
+      "title": "中神通",
+      "species": "待定虾种",
+      "art_status": "pending"
+    },
+    "yang_guo": {
+      "title": "待定称号(去名化)",
+      "species": "待定虾种",
+      "art_status": "pending",
+      "note": "唯一带人名的资源。替换时一并改称号,人名不进公开构建。"
+    }
+  }
+}
