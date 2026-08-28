@@ -301,6 +301,16 @@ func toggle_pause() -> void:
 func is_player_turn() -> bool:
 	return phase == "PLAYER_TURN"
 
+## The unit whose turn is active: the player on PLAYER_TURN, the acting enemy
+## on ENEMY_TURN (its live `position` tracks the enemy even mid-move). Returns
+## null pre-battle, after reset_battle(), and when the acting unit has been
+## freed — callers must treat null as "no target this frame", not an error.
+func get_active_unit() -> Node:
+	var unit: Node = _active_unit
+	if unit == null or not is_instance_valid(unit):
+		return null
+	return unit
+
 # ---------------------------------------------------------------------------
 # Public API — Battle reset + DEBUG hooks (combat_cleanup)
 # ---------------------------------------------------------------------------
