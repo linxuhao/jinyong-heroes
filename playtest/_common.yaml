@@ -627,6 +627,7 @@ surface:
   - bar_top
   - bar_bottom
   - bar_anchors_sprite_top
+  - bar_anchors_below_portrait
   Battlefield:
   - board_aligned
   - grid_lines_visible

@@ -331,12 +331,14 @@ func setup(char_name: String, max_hp: int, char_node: Node) -> void:
 		# Horizontal insets left/right = 3.0 create a visible ~6px seam between
 		# adjacent units' nameplates: two adjacent widgets differ by exactly one
 		# 64px cell, so the backing seam = content_margin_left + content_margin_right,
-		# independent of absolute position. Top/bottom stay 2.0. The NameLabel rect
-		# (64x9), widget 68x24, Bar 64x12 and all other frozen geometry are
-		# untouched — this only insets the DRAWN backing box (StyleBox.get_stylebox_rect
-		# shrinks the draw rect by the content margins).
-		_name_backing_sb.set_content_margin(SIDE_TOP, 2.0)
-		_name_backing_sb.set_content_margin(SIDE_BOTTOM, 2.0)
+		# independent of absolute position. Top/bottom are 0.0 — the VERTICAL
+		# inflation source is compacted here and re-asserted in _relayout_children()
+		# so the widget contains its measured children. The NameLabel rect (64x9),
+		# widget 68x24, Bar 64x12 and all other frozen geometry are untouched —
+		# this only insets the DRAWN backing box (StyleBox.get_stylebox_rect shrinks
+		# the draw rect by the content margins).
+		_name_backing_sb.set_content_margin(SIDE_TOP, 0.0)
+		_name_backing_sb.set_content_margin(SIDE_BOTTOM, 0.0)
 		_name_backing_sb.set_content_margin(SIDE_LEFT, 3.0)
 		_name_backing_sb.set_content_margin(SIDE_RIGHT, 3.0)
 		label.add_theme_stylebox_override("normal", _name_backing_sb)
@@ -585,20 +587,20 @@ func follow_character() -> void:
 			# of clamping the bar into the hair band. bar_anchors_sprite_top stays
 			# false on the flipped path (the above-anchor rule did NOT run).
 			var ink_bottom: float = _portrait_ink_bottom_world()
-			# Own-tile fallback for the flipped anchor. Measured 2026-08-28: with
-			# the ink-bottom anchor, top-band (7,1) and (11,2) bars sat at y
-			# 224..251 — INSIDE the right-column action stack (EndTurnButton
-			# 92..128, AttackButton 136..172, UndoButton 176..212), because their
-			# columns 7 and 11 overlap those buttons' x range. A nameplate printed
-			# over three action buttons is not a fix, so the flipped bar goes under
-			# the unit's own tile instead: tile bottom = feet + TILE/2, giving a
-			# consistent 28 px gap under the feet, clear of the action stack and of
-			# the STRIP zone (the retained clamp below stays the last resort).
-			var feet: float = float(_char_node.global_position.y)
-			var tile_bottom: float = feet + 32.0
+			# The flipped bar anchors its TOP 4 px below the portrait ink bottom
+			# (ink_bottom == sprite_top + 128 == 220 for a clamped top-band unit),
+			# so it sits on the unit's own tile — the truthful "he stands here"
+			# statement the nameplate no longer makes from above. It clears both
+			# HUD neighbours the above-anchor position collided with:
+			#   * the top strip — 224 is far below STRIP_BOTTOM + 2 == 94 (the
+			#     retained clamp below stays the last resort);
+			#   * the right-column SkillDescLabel, moved down to offset_top 280 in
+			#     hud.tscn — a flipped nameplate (NameLabel <= 26 tall starting at
+			#     224) tops out around 250, clear of 280, so hint_nameplate_overlap
+			#     stays false. The action buttons (EndTurn 92..128 / Attack
+			#     136..172 / Undo 176..212) live at x 820..952; top-band unit
+			#     columns (7 -> x 448..512, 11 -> x 704..768) never reach them.
 			var flip_y: float = ink_bottom + 4.0
-			if tile_bottom > flip_y:
-				flip_y = tile_bottom
 			screen_pos = Vector2(screen_pos.x - 34.0, flip_y)
 			bar_anchors_below_portrait = true
 			bar_anchors_sprite_top = false

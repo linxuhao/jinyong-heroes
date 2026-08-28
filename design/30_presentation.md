@@ -677,38 +677,45 @@ Control——ClickTarget 既收不到也吃不掉事件(死路由)。**「以实
 节点**保留**:它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),
 `mouse_filter` 留原值零 diff(两态皆惰性)。
 
-## 名牌挂到立绘顶端 + 地面标记(2026-08-28,interaction-defects)
+## 名牌挂到立绘顶端 + 地面标记(2026-08-28,interaction-defects;几何修复 fix_geometry_overlap_rebaseline)
 
 `health_bar.gd::follow_character` 的锚点从脚底 `+(-34, -32)` 改挂**立绘顶端**:
 `screen_pos = Vector2(char_x - 34, sprite_top - 4.0 - size.y)`(血条底边在
 `sprite_top` 上方 4px),`STRIP_BOTTOM + 2 = 94` 钳制**保留**(它是 UX-01b 的修复,
 被 `portrait_visibility.yaml` 钉住;无钳制变体实渲染顶行头部被顶栏盖住)。
 
-**顶行实测落地(Central_Divine,`sprite_top == 92`):** 名牌想挂到 `92 - 4 - 24 = 64`
-(进顶栏),被钳到 **y 94..118**,落在发际/额头带 `[92, 132]` 上;脸区从约
-`sprite_top + 40 = 132` 起,**不被盖**。中排单位无钳制咬合,严格在立绘上方
-(`bar_bottom < sprite_top`)。顶行断言因此钉「文档化落地」(`bar_top == 94` 且
-`bar_bottom <= sprite_top + 40`),中排钉严格不等式。
+**名牌翻转规则(2026-08-28 几何修复,`bar_anchors_below_portrait`):** 顶带单位
+(`sprite_top == 92`,即 1~2 行的 Central_Divine / West_Poison / 走到顶行的玩家),
+上锚点 `sprite_top − 4 − size.y = 64` 落进顶栏区(`STRIP_BOTTOM + 2 == 94` 之下),
+会把名牌钳回脸上。规则改为**翻到立绘另一侧**:把名牌**顶边**挂在
+`portrait_ink_rect.end.y + 4 = 220 + 4 = 224`,即立绘墨迹底下方 4px、落在单位自家
+格子上。`bar_anchors_below_portrait == true` 表示本轮翻侧;中排单位走正常上锚
+(`== false`)。翻转后无视口钳制咬合,`follow_delta` 在顶行也读 ~0(不再 30)。理由:
+翻转是唯一让「名牌既不盖脸、又不进顶栏」的落点,且它把名牌放在单位自家格上,
+与地面标记(下方)共同维持「他站哪」的可读性。
 
-**抬锚的既测代价(2026-08-28 闸门,`ui_geometry_readability` 35/38 的两条几何红):**
+**名牌自带子布局(2026-08-28 几何修复):** 部件此前报告 68×24 而子节点量出
+30+22=52px 墨迹,溢出底缘且互相压 18px。现在 `_relayout_children()` 压缩主题通胀
+**源**(Bar 的 `ProgressBar minimum_height` 主题常量、NameLabel 底板 StyleBoxFlat 的
+上下 content margin 2.0→0.0),再**实测**子节点高度、把 Bar 严格排在 NameLabel 下方、
+根高取两者实测和(12+12=24)。根高永远来自实测子节点和,子高不许写死字面量。
+`tests/test_health_bar.gd` 的 `NameLabel.size.y + Bar.size.y <= total_height`(第 137 行)
+转绿即此不变式。
 
-1. **`follow_delta == 30.0 > 24`。** `follow_delta` 是**钳制位移**(期望位与钳后位的
-   距离,`health_bar.gd` 在钳制线之前计算)。顶行单位期望顶 = `sprite_top − 4 − 24 = 64`,
-   被 `STRIP_BOTTOM + 2 = 94` 钳下 **30 px**——这不是缺陷,恰是上面的「文档化落地」
-   本身(`bar_top == 94` 已被 `health_bar_above_portrait` 钉死,`≤ 24` 信封与它对
-   顶行**互斥**;抬锚前顶行期望顶 = 脚底 − 32 = 96,位移仅 2)。B1 声明的 re-baseline
-   本轮**未落**(零既有 yaml 改动),下一轮必须带着这条理由落:或给顶行钳制位移
-   单列信封(= 94 − 64 = 30),或把该断言收窄到中排/玩家口径——与
-   `health_bar_above_portrait` 的两层钉法对齐;不许无理由放宽。
-2. **`hint_nameplate_overlap == true`。** 实测红(`hud.gd`:可见 hint 标签矩形与任一
-   名牌矩形内缩相交即为真)。按既有常数推算(待下一轮实测确认归属):B1 把每个
-   名牌抬高约 100px,本轮 UndoButton 又把 `SkillDescLabel` 下移(`offset_top`
-   176→216,底缘约 396,高度不变)——棋盘右缘单位(如 (11,7))抬高后的名牌
-   (y≈356..365)落进了 `SkillDescLabel` 的矩形(x≥820,纵向 216..396);修前同一
-   名牌在 y≈480,与之无交;即便 `SkillDescLabel` 不下移,抬锚后的名牌也已贴上其
-   旧底缘 356。这是**真实的压盖**(可读性硬要求第 6 条),不是语言缺陷下游——
-   下一轮实测确认后**解掉它**(挪 `SkillDescLabel` / 收窄其矩形 / 调名牌钳制),
-   不许顺手把钉放宽成 `== true`。
+**SkillDescLabel 让位(2026-08-28 几何修复):** 名牌抬到顶 + UndoButton 轮把
+`SkillDescLabel` 下移后,右栏翻侧名牌(顶 224,NameLabel ≤ 26 高 → 底约 250)曾落进
+`SkillDescLabel`(x≥608,y 216..384) → `hint_nameplate_overlap == true`。把
+`SkillDescLabel.offset_top` 216→280(底 396 不变,框 344×104 仍全在 704 视口内),
+翻转名牌底 250 < 280,解除真实压盖(可读性硬要求第 6 条);`ui_geometry_readability`
+的 `hint_nameplate_overlap == false` 断言**原样保留**,不是放宽。
+
+**顶行/中排落地:** 中排单位(如玩家 (7,5),`sprite_top == 224`)严格在上方
+(`bar_bottom < sprite_top`,gap ≥ 4px);顶带单位翻侧后 `bar_top == 224`,而脸区从
+`sprite_top + 40 == 132` 起——`bar_top > sprite_top + 40` 比旧的「钳到 94 侵入
+发际带 26px」**更强**:名牌完全不在立绘上,更不可能盖脸。`health_bar_above_portrait.yaml`
+顶行断言改为钉翻侧几何(`portrait_bar_pos.y > sprite_top + 40.0`),并新增
+`HealthBar.bar_anchors_below_portrait` 中排 `== false` 钉;`_common.yaml` 白名单加入
+`bar_anchors_below_portrait`。
 
 **地面标记 `TileMarkers`**(`scripts/ui/tile_markers.gd`,Node2D `_draw`,挂在
 `scenes/battlefield.tscn` 中 `Characters` **之后**):为每个存活单位在
