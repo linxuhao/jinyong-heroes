@@ -29,21 +29,6 @@ const BOARD_TOP_MARGIN_Y: float = 92.0
 ## feet; its ink top sits tex_size.y above the feet.
 const PORTRAIT_TEX_Y: int = 128
 
-## Minimum legal grid row (0-based) for ANY unit — the player and every enemy.
-## A unit on row `r` has feet_y = r*TILE_SIZE + GRID_ORIGIN.y and an unclamped
-## portrait ink top at feet_y - PORTRAIT_TEX_Y. That top may not start above
-## BOARD_TOP_MARGIN_Y (otherwise clamp_sprite_offset would push the art DOWN
-## off its own tile), so a row is legal iff:
-##   r*TILE_SIZE + GRID_ORIGIN.y - PORTRAIT_TEX_Y >= BOARD_TOP_MARGIN_Y
-##   r >= ceil((BOARD_TOP_MARGIN_Y + PORTRAIT_TEX_Y - GRID_ORIGIN.y) / TILE_SIZE)
-##      = ceil((92 + 128 - 32) / 64) = ceil(2.9375) = 3
-## Rows 0..2 are therefore unenterable; walkable rows are 3..GRID_HEIGHT-2
-## (row 10 is the bottom border ring). is_walkable is the SINGLE validation
-## point — setup_grid, get_move_range, plan_movement, move_unit, player._try_move
-## and every move-target check inherit this rule.
-const MIN_LEGAL_ROW: int = int(ceil(
-	(BOARD_TOP_MARGIN_Y + PORTRAIT_TEX_Y - GRID_ORIGIN.y) / TILE_SIZE))
-
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -153,15 +138,16 @@ func is_walkable(grid_pos: Vector2i) -> bool:
 		return false
 	if grid_pos.y == 0 or grid_pos.y == GRID_HEIGHT - 1:
 		return false
-	# Rows 0..MIN_LEGAL_ROW-1 are unenterable for ANY unit (board rule F1): a
-	# 96x128 portrait on those rows would have ink starting above
-	# BOARD_TOP_MARGIN_Y, so the clamp would push the art DOWN off its own tile.
-	# Derivation lives beside MIN_LEGAL_ROW. This single filter is inherited by
-	# setup_grid / get_move_range / plan_movement / move_unit and every
-	# move-target validation.
-	if grid_pos.y < MIN_LEGAL_ROW:
-		return false
 	return true
+
+
+## Board artwork rect in world px: [0, GRID_WIDTH*TILE_SIZE] x
+## [0, GRID_HEIGHT*TILE_SIZE]. Single source for camera limits, backdrop fit
+## and assertions — never multiply the constants at each call site.
+## Today this evaluates to Rect2((0,0),(960,704)); changing GRID_HEIGHT (e.g.
+## 11 -> 20) changes only the substituted numbers, never this body.
+static func board_rect() -> Rect2:
+	return Rect2(Vector2.ZERO, Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE))
 
 
 ## Offset for a centered sprite whose feet sit at `position` (preferred offset
