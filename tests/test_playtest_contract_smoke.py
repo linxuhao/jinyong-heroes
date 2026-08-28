@@ -1002,3 +1002,144 @@ def test_the_contract_boot_scene_is_recorded_against_the_games_own():
             "scenarios. Document the gap in the header, and say which "
             "properties of the boot scene are therefore UNTESTED."
             % (boot, main_scene))
+
+
+# ---------------------------------------------------------------------------
+# fix_static_guards (2026-08-28): two more static guards in the family of
+# test_every_full_rect_host_is_click_through.
+# ---------------------------------------------------------------------------
+
+# Two-place sync for the language_zh_default scenario (fix_language_zh_pin):
+# "language_zh_default" must sit at the ROUND_SCENARIOS tail immediately after
+# "trait_hover_preview", and _common.yaml's scenario_order must list it last
+# (test_scenario_files_complete_and_ordered checks that pairing). The entry is
+# already present in both places — this comment documents the sync point; do
+# NOT add a duplicate.
+
+# Block -> script mapping for the whitelist-existence guard. The card's
+# "Enemy" is NOT a surface block name; it means scripts/characters/enemy.gd,
+# the shared script behind all five enemy-unit blocks (differently-named
+# instances). Sparring_Partner is intentionally outside the curated map.
+BLOCK_SCRIPT_MAP: dict = {
+    "Player": "scripts/characters/player.gd",
+    "East_Heretic": "scripts/characters/enemy.gd",
+    "West_Poison": "scripts/characters/enemy.gd",
+    "South_Emperor": "scripts/characters/enemy.gd",
+    "North_Beggar": "scripts/characters/enemy.gd",
+    "Central_Divine": "scripts/characters/enemy.gd",
+    "HUD": "scripts/ui/hud.gd",
+    "HealthBar": "scripts/ui/health_bar.gd",
+    "TileMarkers": "scripts/ui/tile_markers.gd",
+    "CreationScreen": "scripts/segments/creation.gd",
+    "MapScreen": "scripts/segments/map.gd",
+    "SettingsManager": "scripts/autoload/settings_manager.gd",
+}
+
+# Godot built-in Control/CanvasItem properties whitelisted on the surface but
+# NOT `var`-declared by the script (inherited, not script members). If a mapped
+# block starts whitelisting another inherited property, add it here WITH a
+# comment — never delete the check for a var that should be a script member.
+BUILTIN_CONTROL_PROPS: set = {
+    "visible", "size", "global_position", "text",
+    "mouse_filter", "focus_mode", "disabled", "rect_position",
+}
+
+# Anchored to a code line so a `# var x` comment cannot false-positive: its
+# first token after [ \t]* is `#`, not a var-prefix. `@?[a-z_]*` covers
+# `@onready` / `@export` / a bare `var`.
+_VAR_DECL_RE = r"^[ \t]*@?[a-z_]*\s*var\s+"
+
+
+def test_settings_language_zh_default() -> None:
+    """Pin the language-zh default structurally (2026-08-28 regression).
+
+    The regression this guards: a RENDER-mode harness run produced
+    SettingsManager.language=en, and 10 scenarios asserting the Chinese source
+    strings byte-for-byte went red. Two structural facts must hold forever:
+
+    (a) _detect_language() contains `if not OS.has_feature("web"):` immediately
+        followed by `return "zh"` — headless/RENDER/editor runs are always zh
+        ("am I a real player" is asked by the web feature, not by headlessness).
+    (b) _load() applies a persisted language value ONLY inside an
+        `if OS.has_feature("template"):` block — the editor/harness run must
+        never be steered by a settings.cfg another scenario wrote, while a
+        real exported player (template=true) still gets their choice back.
+
+    Coupling note: the SettingsManager surface block whitelists `language`
+    (a real var in settings_manager.gd), so this test and
+    test_whitelisted_observables_exist_in_scripts both read the same script —
+    keep them consistent if the persisted-key layout changes.
+    """
+    src = (REPO_ROOT / "scripts" / "autoload" / "settings_manager.gd").read_text(
+        encoding="utf-8")
+
+    det = re.search(r"func _detect_language\(\)[^:]*:.*?(?=\nfunc \w+|\Z)",
+                    src, re.DOTALL)
+    assert det is not None, "settings_manager.gd has no _detect_language()"
+    det_body = det.group(0)
+    assert re.search(
+        r'if not OS\.has_feature\("web"\):\s*\n\s*return "zh"', det_body
+    ), ("_detect_language() lost its `if not OS.has_feature(\"web\"):` -> "
+        "`return \"zh\"` guard: headless/RENDER runs would fall through to "
+        "locale detection and the Chinese-source assertions would go red.")
+
+    load = re.search(r"func _load\(\)[^:]*:.*?(?=\nfunc \w+|\Z)", src, re.DOTALL)
+    assert load is not None, "settings_manager.gd has no _load()"
+    load_body = load.group(0)
+
+    tmpl = re.search(r'^([ \t]*)if OS\.has_feature\("template"\):',
+                     load_body, re.MULTILINE)
+    assert tmpl is not None, ("_load() no longer gates the persisted-language "
+                              "read behind `if OS.has_feature(\"template\"):`")
+    indent = tmpl.group(1)
+
+    lang_writes = re.findall(r"^([ \t]*)language\s*=", load_body, re.MULTILINE)
+    assert lang_writes, "_load() writes `language` nowhere — the persisted " \
+        "value would be silently dropped"
+    deeper = [w for w in lang_writes if len(w) > len(indent)]
+    assert len(deeper) == len(lang_writes), (
+        "the ONLY place _load() may write `language` is inside the "
+        "`if OS.has_feature(\"template\"):` block; found a write at indent "
+        "%r while the block sits at %r" % (lang_writes, indent))
+
+    assert 'cfg.get_value("general", "language"' in load_body, (
+        "_load() no longer reads the persisted language value from "
+        "general/language — a desktop player's choice would not survive a "
+        "restart")
+
+
+def test_whitelisted_observables_exist_in_scripts() -> None:
+    """Every observable whitelisted under a mapped surface block must be a
+    real `var` declaration in the block's mapped script.
+
+    The negative case this exists to catch: a whitelisted var missing from its
+    script — the debug_click_target_fires regression, where the scenario read
+    `Invalid named index 'debug_click_target_fires'` because the counter was
+    never declared (and so never written — a never-written observable reads
+    exactly like a false reading). Blocks NOT in BLOCK_SCRIPT_MAP are skipped:
+    they are node/button blocks whose whitelist entries are Godot built-ins
+    (visible / text / size / ...). If a mapped block exposes a var via
+    get()/set() or inheritance rather than a declaration, narrow the mapping
+    or extend BUILTIN_CONTROL_PROPS with a comment — never delete the check
+    for a var that should be a script member.
+    """
+    blocks = _surface_blocks(COMMON.read_text(encoding="utf-8"))
+    # Guard against a silent no-op: if the parser ever collapses these blocks
+    # to empty lists, the inner loop below would vacuously pass forever.
+    for must_exist in ("Player", "HUD", "MapScreen"):
+        assert blocks.get(must_exist), (
+            "surface block %r parsed as empty — _surface_blocks() regexes no "
+            "longer match playtest/_common.yaml" % must_exist)
+    missing = []
+    for block, rel in BLOCK_SCRIPT_MAP.items():
+        script = (REPO_ROOT / rel).read_text(encoding="utf-8")
+        for name in blocks.get(block, []):
+            if name in BUILTIN_CONTROL_PROPS:
+                continue  # Control-inherited built-in, not a script member
+            if not re.search(_VAR_DECL_RE + re.escape(name) + r"\b",
+                             script, re.MULTILINE):
+                missing.append("%s.%s (expected in %s)" % (block, name, rel))
+    assert not missing, (
+        "whitelisted surface observables with no `var` declaration in their "
+        "mapped script (they would read as a parse error or a stale initial "
+        "value in Expression asserts): " + "; ".join(missing))
