@@ -97,6 +97,31 @@
 # are "changed" | YAML literal | single-quoted GDScript boolean expression;
 # frame cap 3000 (last assert <= 2999; spine <= 2900).
 
+# THE BOOT SCENE IS NOT THE GAME'S BOOT SCENE (2026-08-27). Read this before
+# trusting a green suite.
+#
+# The contract boots `res://scenes/main.tscn`. The GAME boots
+# `run/main_scene` = `res://scenes/menu.tscn`. They are structurally identical
+# twins — same Main / Camera / SceneHost / SegmentLayer / SegmentHost /
+# HUDLayer / TutorialLayer — and menu.tscn stays in the tree for the whole
+# session, because SceneManager swaps SEGMENTS inside it rather than changing
+# scenes. So every property of menu.tscn's own nodes is UNTESTED by all 57
+# scenarios, and a defect that lives in one of them is invisible here.
+#
+# That is not hypothetical. menu.tscn's `SegmentHost` was missing
+# `mouse_filter = 2` — a full-rect Control, default STOP, parked over the board
+# for the entire game, swallowing every mouse click that did not land on a
+# Button. Left-click movement did not work for any player, on web or desktop,
+# while this suite reported 57/57. main.tscn HAS the line (it is the fix from
+# the first time this happened, recorded in the `clicks:` note below); the
+# sibling never got it.
+#
+# It took a real X11 window driven by xdotool to see it, because `clicks:`
+# injects with Input.parse_input_event and never reaches the GUI phase where a
+# STOP Control decides the outcome. `tests/test_playtest_contract_smoke.py`
+# now pins both halves: every full-rect host must be click-through, and this
+# divergence must stay written down.
+#
 scene: res://scenes/main.tscn
 actions:
 - move_up

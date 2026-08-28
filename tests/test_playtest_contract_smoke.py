@@ -916,3 +916,81 @@ def test_edited_scenarios_assert_superset() -> None:
                 f"{scenario}.yaml: pre-edit baseline {node}.{var}: "
                 f"{expression!r} no longer present in the current file"
             )
+
+
+# ── The full-screen host that must never eat a click ────────────────────────
+#
+# `SegmentHost` is a full-rect Control that stays in the tree for the whole
+# session, so a missing `mouse_filter` on it swallows every mouse click that
+# does not land on a Button — the board included.
+#
+# This has now happened twice. `playtest/_common.yaml`'s own header records the
+# first time ("那次就是 main.tscn 的 SegmentHost 漏写 mouse_filter"). main.tscn
+# was fixed; menu.tscn, the sibling with the same structure, was not — and
+# menu.tscn is `run/main_scene`, the scene players actually boot. The play-test
+# contract boots main.tscn, so all 57 scenarios exercised the FIXED scene while
+# the shipped game ran the broken one, and the suite stayed green for as long as
+# the defect existed.
+#
+# Measured 2026-08-27 by driving a real X11 window with xdotool (the play-test
+# harness injects with Input.parse_input_event and never reaches the GUI phase
+# where this is decided): a real click on an empty tile left the player at (7,5)
+# with raw=3 handled=0, i.e. the press reached the player node and never reached
+# handle_world_click. With `mouse_filter = 2` restored: (7,4), raw=3 handled=1.
+_FULL_RECT_HOSTS = ("SegmentHost",)
+
+
+def _scene_files() -> list[Path]:
+    return sorted((REPO_ROOT / "scenes").rglob("*.tscn"))
+
+
+def test_every_full_rect_host_is_click_through():
+    offenders = []
+    for scene in _scene_files():
+        text = scene.read_text(encoding="utf-8")
+        for host in _FULL_RECT_HOSTS:
+            marker = '[node name="%s" ' % host
+            idx = text.find(marker)
+            while idx != -1:
+                # the node's own property block ends at the next [node / [sub_
+                end = text.find("\n[", idx + 1)
+                block = text[idx:end if end != -1 else len(text)]
+                if "mouse_filter = 2" not in block:
+                    offenders.append("%s: %s" % (scene.name, host))
+                idx = text.find(marker, idx + 1)
+    assert not offenders, (
+        "a full-rect host without mouse_filter = 2 swallows every board click: "
+        + ", ".join(offenders))
+
+
+def test_the_contract_boot_scene_is_recorded_against_the_games_own():
+    """The contract boots main.tscn; the game boots run/main_scene. When those
+    differ, every scenario grades a scene no player ever starts — which is
+    exactly how the SegmentHost defect above survived a green suite. This does
+    not force them equal (the 57 scenarios carry absolute frame numbers tied to
+    main.tscn); it forces the difference to stay VISIBLE."""
+    project = (REPO_ROOT / "project.godot").read_text(encoding="utf-8")
+    main_scene = ""
+    for line in project.splitlines():
+        if line.startswith("run/main_scene="):
+            main_scene = line.split("=", 1)[1].strip().strip('"')
+            break
+    assert main_scene, "project.godot declares no run/main_scene"
+
+    common = (REPO_ROOT / "playtest" / "_common.yaml").read_text(encoding="utf-8")
+    boot = ""
+    for line in common.splitlines():
+        if line.startswith("scene:"):
+            boot = line.split(":", 1)[1].strip()
+            break
+    assert boot, "the contract declares no boot scene"
+
+    if boot != main_scene:
+        assert "run/main_scene" in common, (
+            "the contract boots %s while the game boots %s, and _common.yaml "
+            "does not say so. A scenario suite that never starts the scene the "
+            "player starts cannot see a defect that lives in it — that is how "
+            "menu.tscn's SegmentHost swallowed every click through 57 green "
+            "scenarios. Document the gap in the header, and say which "
+            "properties of the boot scene are therefore UNTESTED."
+            % (boot, main_scene))
