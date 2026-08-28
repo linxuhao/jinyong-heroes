@@ -1,0 +1,95 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# The touch-reachable 「退回」 UndoButton (2026-08-28). Phones have no
+# right-click, so right-click undo was unreachable on touch; the button is an
+# additive delegate of the SAME shared undo entry that right-click uses
+# (player.handle_world_right_click), not a forked undo path.
+#
+#   (a) f35, turn start (nothing moved): the button is visible, non-empty size,
+#       mouse_filter 0 (STOP — an intentional button, unlike the floating bar),
+#       focus_mode 0, disabled true (nothing to undo yet), wired
+#       (pressed_connected["UndoButton"] == true), and overlaps nothing
+#       (hud_button_overlap / undo_desc_overlap false).
+#   (b) click Player +0,-64 -> walk to (7,4): undo_available mirrors into the
+#       button, so disabled flips to false.
+#   (c) click UndoButton -> the whole turn's movement is undone through the
+#       shared entry: debug_undo_events changes, back to (7,5), moves_left 4,
+#       moved false, undo_available false.
+#   (d) after the retreat the button is disabled again.
+name: undo_button_retreat
+description: >-
+  The HUD 「退回」 undo button — the touch-reachable retreat path: at turn start
+  the button is visible, non-empty, mouse_filter STOP, focus_mode 0, wired via
+  HUD.pressed_connected["UndoButton"], non-overlapping, and disabled (nothing to
+  undo). Walking one tile up (7,5)->(7,4) enables it; clicking it drives the
+  same shared undo entry as right-click (debug_undo_events changes) and lands
+  back on (7,5) with moves_left 4, moved false, undo_available false; the button
+  is disabled again after.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 35
+  actions: []
+  assert:
+    UndoButton.visible: visible == true
+    UndoButton.size: size.x > 0 and size.y > 0
+    UndoButton.mouse_filter: mouse_filter == 0
+    UndoButton.focus_mode: focus_mode == 0
+    UndoButton.disabled: disabled == true
+    HUD.pressed_connected: 'pressed_connected["UndoButton"] == true'
+    HUD.hud_button_overlap: hud_button_overlap == false
+    HUD.undo_desc_overlap: undo_desc_overlap == false
+- at: 40
+  actions: []
+  clicks:
+  - Player +0,-64
+- at: 90
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 4)
+    Player.moves_left: moves_left == 3
+    Player.undo_available: undo_available == true
+    UndoButton.disabled: disabled == false
+- at: 95
+  actions: []
+  clicks:
+  - UndoButton
+- at: 140
+  actions: []
+  assert:
+    Player.debug_undo_events: changed
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
+    Player.moves_left: moves_left == 4
+    Player.moved: moved == false
+    Player.undo_available: undo_available == false
+    UndoButton.disabled: disabled == true

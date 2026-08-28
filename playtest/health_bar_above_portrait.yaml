@@ -1,0 +1,97 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Defect B visual half (2026-08-28): the nameplate now reads as belonging to
+# the portrait (bar bottom sits 4 px above sprite_top) instead of on the legs,
+# and a ground marker under the feet keeps the occupied tile readable after the
+# nameplate moves up. All bar-vs-portrait relations are written on the UNIT
+# surface (portrait_bar_pos + sprite_top), never cross-surface, because assert
+# expressions see only one surface block. The widget height 24 (68x24) is the
+# PROBE-measured constant from final/health_bar_probe_notes.md.
+#
+# The single-surface scoping: Player carries sprite_top and portrait_bar_pos;
+# Central_Divine and West_Poison carry theirs; the HealthBar block (the PLAYER's
+# bar) only self-compares. Enemy start tiles cross-checked against
+# scripts/battlefield.gd: Player (7,5) sprite_top 224; Central_Divine (7,1) and
+# West_Poison (11,2) are both top-band-clamped by BOARD_TOP_MARGIN_Y
+# (BOARD_TOP_MARGIN_Y + half.y = 156 clamps their origin, sprite_top == 92), so
+# their bars are pulled to the STRIP_BOTTOM + 2 = 94 floor and land at y 94..118
+# — the hair/forehead band [92,132]; the face of a 128 px portrait starts about
+# sprite_top + 40 = 132, so the clamped bar does NOT cover the face. This is the
+# documented top-row landing (not a defect), pinned here as bar top == 94 AND
+# bar bottom <= sprite_top + 40.
+#
+# The click leg supplies the required differential: walk up one tile then retreat
+# (feet right-click), so the positional asserts are re-evaluated with the player
+# back at (7,5) (mid-board, unclamped).
+name: health_bar_above_portrait
+description: >-
+  The nameplate sits above the portrait top and a ground marker marks each
+  occupied tile. Mid-board player (7,5): sprite_top > 100 and the bar bottom is
+  >= 4 px above sprite_top. Top-band-clamped Central_Divine (7,1) and West
+  Poison (11,2): their bars land at the STRIP_BOTTOM+2 = 94 floor (bar top ==
+  94) with the bottom still <= sprite_top + 40 — the hair/forehead band, face
+  untouched. TileMarkers.tile_marker_count == 6 (player + five Greats) and
+  tile_marker_visible == true. A walk-then-retreat click leg carries the
+  differential assert.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 40
+  actions: []
+  clicks:
+  - Player +0,-64
+- at: 90
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 4)
+    Player.debug_input_events: changed
+- at: 95
+  actions: []
+  clicks:
+  - Player +0,0 right
+- at: 140
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 5)
+    Player.moves_left: moves_left == 4
+- at: 200
+  actions: []
+  assert:
+    Player.sprite_top: sprite_top > 100.0
+    Player.portrait_bar_pos: sprite_top - (portrait_bar_pos.y + 24.0) >= 4.0
+    HealthBar.bar_top: bar_top > 94.0
+    HealthBar.bar_bottom: bar_bottom > bar_top
+    Central_Divine.portrait_bar_pos: abs(portrait_bar_pos.y - 94.0) < 0.5 and sprite_top < 94.5 and portrait_bar_pos.y + 24.0 <= sprite_top + 40.0
+    West_Poison.portrait_bar_pos: portrait_bar_pos.y >= 94.0 and portrait_bar_pos.y + 24.0 <= sprite_top + 40.0
+    TileMarkers.tile_marker_count: tile_marker_count == 6
+    TileMarkers.tile_marker_visible: tile_marker_visible == true

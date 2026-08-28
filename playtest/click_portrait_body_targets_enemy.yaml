@@ -1,0 +1,97 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Defect B hit half (2026-08-28): a click on the DRAWN portrait body of an
+# enemy must attack that enemy, even when the body hangs over a tile that is
+# NOT the enemy's own feet tile — the §3.2 gap this round closes. Enemy start
+# tiles below are cross-checked against scripts/battlefield.gd initial
+# placement: Player (7,5), Central_Divine (7,1), North_Beggar (11,8), West
+# Poison (11,2), East Heretic (3,2), South Emperor (3,8).
+#
+#   * Move the player three tiles up to (7,2) with a single click
+#     (Player +0,-192; the move-range highlight covers all reachable tiles, so
+#     one click lands on the highlighted (7,2); budget 4 -> 1).
+#   * NEGATIVE CONTROL first: click North_Beggar's drawn body centre
+#     (North_Beggar +0,-64 — row 8 is unclamped, body centre is one tile above
+#     the feet). North_Beggar at (11,8) is out of basic reach (Chebyshev ~6),
+#     so the out-of-reach-body rule selects/no-ops: health unchanged, acted
+#     false, and the player does NOT move (grid stays (7,2)) — the body click
+#     must never silently walk.
+#   * POSITIVE: click Central_Divine's drawn ink centre (Central_Divine +0,+60).
+#     Central_Divine at (7,1) is clamped by BOARD_TOP_MARGIN_Y so its 96x128
+#     ink hangs at y in [92,220], sprite_top == 92, ink centre (480,156) = feet
+#     centre (480,96) + (0,+60) — the drawn rect, NOT the feet tile. The player
+#     at (7,2) is adjacent (Chebyshev 1, in reach), so the body click attacks:
+#     Central_Divine takes 39 (basic 30 x fa_hui_du 1.3; PROBE number, keep
+#     relative to max_health), Player.acted flips true, debug_click_events
+#     changes, and grid stays (7,2) (attack, not move).
+name: click_portrait_body_targets_enemy
+description: >-
+  Defect-B hit: after walking to (7,2), clicking Central_Divine's DRAWN body
+  centre (Central_Divine +0,+60, its clamped ink centre at sprite_top 92 — not
+  the feet tile) attacks it — 39 = 30 basic x fa_hui_du 1.3, Player.acted true,
+  grid unchanged (attack, not move). A body click on the out-of-reach
+  North_Beggar (+0,-64) is the negative control: health unchanged, acted false,
+  and the player does not silently move.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 40
+  actions: []
+  clicks:
+  - Player +0,-192
+- at: 90
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 2)
+    Player.moves_left: moves_left == 1
+- at: 95
+  actions: []
+  clicks:
+  - North_Beggar +0,-64
+- at: 140
+  actions: []
+  assert:
+    North_Beggar.health: unchanged
+    Player.acted: acted == false
+    Player.grid_pos: grid_pos == Vector2i(7, 2)
+- at: 145
+  actions: []
+  clicks:
+  - Central_Divine +0,+60
+- at: 200
+  actions: []
+  assert:
+    Central_Divine.health: health == max_health - 39
+    Player.acted: acted == true
+    Player.debug_click_events: changed
+    Player.grid_pos: grid_pos == Vector2i(7, 2)
