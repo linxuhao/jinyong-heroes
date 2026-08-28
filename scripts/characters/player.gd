@@ -448,17 +448,18 @@ func _process(_delta: float) -> void:
 	var bar: Node = _resolve_portrait_bar()
 	if bar != null:
 		portrait_bar_pos = (bar as Control).global_position
-	else:
-		portrait_bar_pos = Vector2(-1, -1)
-		# Relays this bar's anchor observables onto the unit (only after the bar
-# INDENTED_SIBLING_TEST (3-tab-ish)
+		# Relays this bar's anchor observables onto the unit (only when a bar
 		# resolves; 0.0 otherwise, so a missing bar never asserts a phantom).
-		if bar != null and bar.get("health_bar_screen_y") != null:
+		if bar.get("health_bar_screen_y") != null:
 			health_bar_screen_y = float(bar.get("health_bar_screen_y"))
 			health_bar_world_y = float(bar.get("health_bar_world_y"))
 		else:
 			health_bar_screen_y = 0.0
 			health_bar_world_y = 0.0
+	else:
+		portrait_bar_pos = Vector2(-1, -1)
+		health_bar_screen_y = 0.0
+		health_bar_world_y = 0.0
 
 	# Undo availability — recomputed EVERY frame (never event-written), so it is
 	# always in sync no matter which writer changed acted / grid_pos / moves_left.

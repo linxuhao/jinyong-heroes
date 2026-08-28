@@ -253,6 +253,8 @@ surface:
   - debug_undo_events
   - debug_gui_eater
   - portrait_ink_rect
+  - health_bar_screen_y
+  - health_bar_world_y
   East_Heretic:
   - health
   - max_health
@@ -271,6 +273,8 @@ surface:
   - portrait_bar_pos
   - debug_click_target_fires
   - portrait_ink_rect
+  - health_bar_screen_y
+  - health_bar_world_y
   West_Poison:
   - health
   - max_health
@@ -288,6 +292,8 @@ surface:
   - portrait_bar_pos
   - debug_click_target_fires
   - portrait_ink_rect
+  - health_bar_screen_y
+  - health_bar_world_y
   South_Emperor:
   - health
   - max_health
@@ -305,6 +311,8 @@ surface:
   - portrait_bar_pos
   - debug_click_target_fires
   - portrait_ink_rect
+  - health_bar_screen_y
+  - health_bar_world_y
   North_Beggar:
   - health
   - max_health
@@ -322,6 +330,8 @@ surface:
   - portrait_bar_pos
   - debug_click_target_fires
   - portrait_ink_rect
+  - health_bar_screen_y
+  - health_bar_world_y
   Central_Divine:
   - health
   - max_health
@@ -340,6 +350,8 @@ surface:
   - portrait_bar_pos
   - debug_click_target_fires
   - portrait_ink_rect
+  - health_bar_screen_y
+  - health_bar_world_y
   HUD:
   - visible
   - size
@@ -628,6 +640,8 @@ surface:
   - bar_bottom
   - bar_anchors_sprite_top
   - bar_anchors_below_portrait
+  - health_bar_screen_y
+  - health_bar_world_y
   Battlefield:
   - board_aligned
   - grid_lines_visible
