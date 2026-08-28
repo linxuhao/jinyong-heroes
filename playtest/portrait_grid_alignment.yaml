@@ -1,0 +1,175 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# THE ALIGNMENT PIN (first deliverable of the "camera owns visibility" round).
+# It asserts a property no assertion in this repo ever held: a portrait's drawn
+# ink stands on the tile the unit occupies. ink_world_dx / ink_world_dy are
+# recomputed every frame on the unit scripts STRICTLY from the already-published
+# portrait_ink_rect (dx = ink centre x - unit world x, dy = ink bottom y - unit
+# world y), so they measure what the sprite actually draws — not a rect re-derived
+# from grid constants. Both 0.0 == "stands on its own tile"; a non-zero dy ==
+# the portrait drifting off the tile it marks.
+#
+# EXPECTED RED AT THIS STEP — and that is the point. A pin that is green while
+# the defect exists has no value, so this file lands BEFORE the clamp deletion:
+# GridManager.clamp_sprite_offset is still live, so top-row portraits are still
+# pushed down off their tiles. Predicted failures at f40 (all six units at spawn,
+# spawns restored to Central_Divine (7,1) / East_Heretic (3,2) / West_Poison (11,2)):
+#   Central_Divine.ink_world_dy  predicted 124.0  -> RED
+#   East_Heretic.ink_world_dy    predicted  60.0  -> RED
+#   West_Poison.ink_world_dy     predicted  60.0  -> RED
+#   Player / South_Emperor / North_Beggar dy = 0.0 -> green (rows 5 and 8, unclamped)
+#   all six ink_world_dx = 0.0                      -> green (the clamp moves y only)
+# plus the walk leg's Player.ink_world_dy == 124.0 at the (9,1) arrival -> RED.
+# After the clamp-deletion task every one of the 24 ink lines must read <= 1.0
+# and the whole scenario must go green. NO threshold here is tunable: 1.0 px is
+# the sub-pixel slack of an exact equality, not a tolerance.
+#
+# PIXEL DERIVATION (re-derived from constants, no number taken from any brief or
+# probe note; TILE_SIZE = 64, GRID_ORIGIN = (32, 32), PORTRAIT_TEX_Y = 128 =
+# texture height, PORTRAIT_TEX_X = 96 = texture width, BOARD_TOP_MARGIN_Y = 92):
+#   feet world y of row r        = GRID_ORIGIN.y + TILE_SIZE * r = 32 + 64 r
+#   feet-anchored sprite offset  = (0, -tex.y / 2) = (0, -64)  (no clamp)
+#   unclamped ink rect           = x in [feet.x - 48, feet.x + 48],
+#                                  y in [feet.y - 128, feet.y]
+#     -> ink centre x == feet.x          => dx = 0
+#     -> ink bottom y == feet.y          => dy = 0
+#   clamp (still live here) pushes the rect TOP to BOARD_TOP_MARGIN_Y = 92 when
+#   the natural top would sit above it, i.e. it clamps the sprite ORIGIN to
+#   92 + tex.y/2 = 92 + 64 = 156 and rewrites offset.y = 156 - feet.y:
+#     row 1 (feet.y = 96):  natural origin.y = 96 - 64 = 32 < 156 -> clamped;
+#                           sprite_top = 92, ink bottom = 92 + 128 = 220,
+#                           dy = 220 - 96 = 124  (two tiles of drift)
+#     row 2 (feet.y = 160): natural origin.y = 96 < 156          -> clamped;
+#                           ink bottom = 220, dy = 220 - 160 = 60 (one tile)
+#     row 3 (feet.y = 224): natural origin.y = 160 >= 156        -> NOT clamped,
+#                           dy = 0  (why only rows 1-2 drift)
+#   row 0 and row GRID_HEIGHT-1 = 10 are the non-walkable border ring, so row 1
+#   IS the northernmost legal row and the walk leg's destination row.
+name: portrait_grid_alignment
+description: >-
+  Portrait-on-its-own-tile alignment pin (abs(ink_world_dx) <= 1.0 and
+  abs(ink_world_dy) <= 1.0 for the player and all five enemies, derived from the
+  published portrait_ink_rect — never a second rect computation). Static leg at
+  f40 (battle turn 1, all six units at spawn). Walk leg: round 1 the player
+  clicks Player +64,-192 and walks (7,5) -> (8,2) — exactly 4 steps, spending the
+  whole 4-move budget — then end_turn; round 2 it clicks Player +64,-64 and walks
+  (8,2) -> (9,1), a ROW-1 tile, and the same 12 ink lines are re-asserted on that
+  arrival frame together with Player.grid_pos == Vector2i(9, 1) and
+  Player.moves_left == 2.
+  EXPECTED RED WHILE THE CLAMP IS LIVE (this file deliberately lands before the
+  clamp deletion so the pin proves it can go red): at f40 Central_Divine (7,1)
+  reads dy = 124.0, East_Heretic (3,2) and West_Poison (11,2) read dy = 60.0,
+  while Player (7,5) / South_Emperor (3,8) / North_Beggar (11,8) read dy = 0.0
+  (rows >= 3 are outside the clamp), and on the walk-leg arrival the player at
+  row 1 reads dy = 124.0. ink_world_dx is 0.0 everywhere because
+  clamp_sprite_offset moves y only. After the clamp is deleted all 24 ink lines
+  must read 0.0 and the scenario goes fully green. Enemies that walk to rows >= 3
+  during the interleaved enemy turns flip their own ink lines green mid-scenario —
+  diagnostic only; the pin stays red from the row-1 units while the clamp exists.
+  DERIVATION (constants only — TILE_SIZE 64, GRID_ORIGIN (32,32), PORTRAIT_TEX_Y
+  128, PORTRAIT_TEX_X 96, BOARD_TOP_MARGIN_Y 92): feet world y = 32 + 64*row;
+  unclamped ink = [feet.x-48, feet.y-128] .. [feet.x+48, feet.y] so dx = 0 and
+  dy = 0; the clamp forces the ink top to y = 92 (sprite origin clamped to
+  92 + 128/2 = 156), giving ink bottom 220 and dy = 220 - feet.y = 124 for row 1
+  (feet 96) and 60 for row 2 (feet 160); row 3 (feet 224, natural origin 160) is
+  already below the margin, hence unclamped. Route legality: row 0 is the
+  non-walkable border ring, so row 1 is the northernmost legal row; (7,1) is
+  occupied by Central_Divine, which is why the leg ends at (9,1) — 2 steps from
+  (8,2), inside round 2's fresh 4-move budget (moves_left 4 -> 2).
+  TIMING (measured, not guessed): the end_turn -> round-2 player-turn span is
+  190 frames in dot_resolves_at_victim_turn_start (end_turn f60, PLAYER_TURN
+  pinned at f250), 370 in cooldowns_decrement_by_round (end_turn f130, round 2 at
+  f500) and 550 in qi_cost_blocks_cast_no_energy (end_turn f400, round 2 at f950).
+  The largest measured span plus margin sets the round-2 click at f760 = 610
+  frames after this scenario's end_turn at f150, and f750 carries an explicit
+  timing pin (active_unit_name == Yang Guo) so a mis-chosen frame fails as a
+  timing error and is fixed by moving a frame — never by touching a threshold.
+  The arrival frame f820 sits 60 frames after the click, the verified convention
+  in click_move_to_tile for a multi-step 0.15 s/step tween walk (~9 frames/step).
+  INTERLEAVED-TURN SAFETY for the locked destination (9,1) — no enemy may stand
+  there when the player arrives (scripts/ai/ai_base.gd::_approach_decision walks
+  the move budget and STOPS at the first tile whose Chebyshev distance to the
+  player is <= attack_range; character data in scripts/battlefield.gd): Central
+  Divine (7,1, range 1) is already Chebyshev-1 from (8,2) so it attacks in place
+  and never moves onto row 1's other tiles; East Heretic (3,2, range 3) attacks
+  in place or stops at <= (5,2); West Poison (11,2, range 1) walks (11,2) ->
+  (10,2) -> (9,2) and stops there — adjacent to (9,1), not on it; South Emperor
+  (3,8, range 2) and North Beggar (11,8, range 1) advance <= 3 tiles toward
+  (8,2) and are nowhere near row 1. If Player.grid_pos at f820 is NOT (9,1), that
+  is red-for-the-wrong-reason: report the five enemies' grid_pos (already
+  whitelisted) and re-route this leg; do not touch the ink thresholds.
+timeline:
+# Boot to battle exactly as portrait_visibility.yaml does (7x ui_accept through
+# the menu/creation flow, 3x tutorial_next), battle turn 1 settled at f40.
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [tutorial_next]}
+- {at: 25, actions: [tutorial_next]}
+- {at: 30, actions: [tutorial_next]}
+# ── STATIC LEG — all six units at spawn, battle turn 1 settled (f40). ──
+- at: 40
+  assert:
+    Player.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Player.ink_world_dy: abs(ink_world_dy) <= 1.0
+    Central_Divine.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Central_Divine.ink_world_dy: abs(ink_world_dy) <= 1.0
+    East_Heretic.ink_world_dx: abs(ink_world_dx) <= 1.0
+    East_Heretic.ink_world_dy: abs(ink_world_dy) <= 1.0
+    West_Poison.ink_world_dx: abs(ink_world_dx) <= 1.0
+    West_Poison.ink_world_dy: abs(ink_world_dy) <= 1.0
+    South_Emperor.ink_world_dx: abs(ink_world_dx) <= 1.0
+    South_Emperor.ink_world_dy: abs(ink_world_dy) <= 1.0
+    North_Beggar.ink_world_dx: abs(ink_world_dx) <= 1.0
+    North_Beggar.ink_world_dy: abs(ink_world_dy) <= 1.0
+# ── WALK LEG round 1: (7,5) -> (8,2), exactly 4 steps, budget 4 -> 0. ──
+- at: 75
+  actions: []
+  clicks:
+  - Player +64,-192
+# Arrival self-confirm (also the route pin: a blocked/illegal route leaves the
+# player elsewhere and this fails loudly as a timing/route error, not a tolerance).
+- at: 135
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(8, 2)
+    Player.moves_left: moves_left == 0
+- at: 150
+  actions:
+  - end_turn
+# Round-2 player turn live? Explicit timing pin BEFORE the walk click, so a too-early
+# frame reports here instead of silently no-oping the click below.
+- at: 750
+  actions: []
+  assert:
+    CombatManager.active_unit_name: active_unit_name == "Yang Guo"
+# ── WALK LEG round 2: (8,2) -> (9,1) — a row-1 tile — 2 steps, budget 4 -> 2. ──
+- at: 760
+  actions: []
+  clicks:
+  - Player +64,-64
+# ── ARRIVAL FRAME: the same 12 ink lines re-asserted on the row-1 unit, plus
+# the position/budget facts that make this frame self-verifying. ──
+- at: 820
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(9, 1)
+    Player.moves_left: moves_left == 2
+    Player.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Player.ink_world_dy: abs(ink_world_dy) <= 1.0
+    Central_Divine.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Central_Divine.ink_world_dy: abs(ink_world_dy) <= 1.0
+    East_Heretic.ink_world_dx: abs(ink_world_dx) <= 1.0
+    East_Heretic.ink_world_dy: abs(ink_world_dy) <= 1.0
+    West_Poison.ink_world_dx: abs(ink_world_dx) <= 1.0
+    West_Poison.ink_world_dy: abs(ink_world_dy) <= 1.0
+    South_Emperor.ink_world_dx: abs(ink_world_dx) <= 1.0
+    South_Emperor.ink_world_dy: abs(ink_world_dy) <= 1.0
+    North_Beggar.ink_world_dx: abs(ink_world_dx) <= 1.0
+    North_Beggar.ink_world_dy: abs(ink_world_dy) <= 1.0

@@ -121,6 +121,18 @@ var portrait_bar_pos: Vector2 = Vector2(-1, -1)
 ## rect computation.
 var health_bar_screen_y: float = 0.0
 var health_bar_world_y: float = 0.0
+## Portrait-stands-on-its-own-tile alignment (playtest surface observable,
+## recomputed every frame STRICTLY from the published portrait_ink_rect above —
+## never a second rect computation):
+##   ink_world_dx = ink horizontal centre - unit world x
+##   ink_world_dy = ink bottom edge        - unit world y
+## Both 0.0 means the drawn ink is centred on the tile the unit occupies (its
+## ink bottom == its own feet). A non-zero dy is the portrait drifting off its
+## tile — exactly what clamp_sprite_offset does to top-row units while the
+## clamp is live (measured dy 124 at row 1, 60 at row 2). Pinned by
+## playtest/portrait_grid_alignment.yaml.
+var ink_world_dx: float = 0.0
+var ink_world_dy: float = 0.0
 ## Measurement pin proving whether the authored ClickTarget Control's gui_input
 ## ever fires (the brief demands measurement, not the comment's claim). Expected
 ## measured value 0: Godot's GUI picker does not route events to a Control whose
@@ -310,6 +322,12 @@ func _process(_delta: float) -> void:
 		portrait_bar_pos = Vector2(-1, -1)
 		health_bar_screen_y = 0.0
 		health_bar_world_y = 0.0
+
+	# Alignment pin LAST, so it reads this frame's portrait_ink_rect (itself
+	# computed above from the live sprite offset + sprite_top). Derived from the
+	# published rect only — no grid lookup, no clamp call, no second rect.
+	ink_world_dx = portrait_ink_rect.get_center().x - position.x
+	ink_world_dy = portrait_ink_rect.end.y - position.y
 
 
 ## Catch left-clicks on this enemy's tile directly from the input pipeline.

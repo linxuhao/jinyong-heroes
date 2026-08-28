@@ -255,6 +255,8 @@ surface:
   - portrait_ink_rect
   - health_bar_screen_y
   - health_bar_world_y
+  - ink_world_dx
+  - ink_world_dy
   East_Heretic:
   - health
   - max_health
@@ -275,6 +277,8 @@ surface:
   - portrait_ink_rect
   - health_bar_screen_y
   - health_bar_world_y
+  - ink_world_dx
+  - ink_world_dy
   West_Poison:
   - health
   - max_health
@@ -294,6 +298,8 @@ surface:
   - portrait_ink_rect
   - health_bar_screen_y
   - health_bar_world_y
+  - ink_world_dx
+  - ink_world_dy
   South_Emperor:
   - health
   - max_health
@@ -313,6 +319,8 @@ surface:
   - portrait_ink_rect
   - health_bar_screen_y
   - health_bar_world_y
+  - ink_world_dx
+  - ink_world_dy
   North_Beggar:
   - health
   - max_health
@@ -332,6 +340,8 @@ surface:
   - portrait_ink_rect
   - health_bar_screen_y
   - health_bar_world_y
+  - ink_world_dx
+  - ink_world_dy
   Central_Divine:
   - health
   - max_health
@@ -352,6 +362,8 @@ surface:
   - portrait_ink_rect
   - health_bar_screen_y
   - health_bar_world_y
+  - ink_world_dx
+  - ink_world_dy
   HUD:
   - visible
   - size
@@ -916,4 +928,5 @@ scenario_order:
 - click_portrait_body_targets_enemy
 - health_bar_above_portrait
 - trait_hover_preview
+- portrait_grid_alignment
 - language_zh_default
