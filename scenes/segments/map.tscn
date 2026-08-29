@@ -47,3 +47,75 @@ offset_bottom = -16.0
 mouse_filter = 2
 horizontal_alignment = 1
 text = "左右/上下选择相邻去处，回车启程"
+
+[node name="TravelBox" type="Control" parent="."]
+offset_left = 60.0
+offset_top = 552.0
+offset_right = 620.0
+offset_bottom = 600.0
+mouse_filter = 2
+
+[node name="TravelButton0" type="Button" parent="TravelBox"]
+offset_left = 0.0
+offset_top = 4.0
+offset_right = 170.0
+offset_bottom = 48.0
+focus_mode = 0
+
+[node name="TravelButton1" type="Button" parent="TravelBox"]
+offset_left = 180.0
+offset_top = 4.0
+offset_right = 350.0
+offset_bottom = 48.0
+focus_mode = 0
+
+[node name="TravelButton2" type="Button" parent="TravelBox"]
+offset_left = 360.0
+offset_top = 4.0
+offset_right = 530.0
+offset_bottom = 48.0
+focus_mode = 0
+
+[node name="EventBox" type="Control" parent="."]
+offset_left = 300.0
+offset_top = 552.0
+offset_right = 700.0
+offset_bottom = 600.0
+mouse_filter = 2
+
+[node name="EventOptionButton0" type="Button" parent="EventBox"]
+offset_left = 0.0
+offset_top = 4.0
+offset_right = 190.0
+offset_bottom = 48.0
+focus_mode = 0
+
+[node name="EventOptionButton1" type="Button" parent="EventBox"]
+offset_left = 200.0
+offset_top = 4.0
+offset_right = 390.0
+offset_bottom = 48.0
+focus_mode = 0
+
+[node name="FacilityEnterButton" type="Button" parent="."]
+offset_left = 680.0
+offset_top = 552.0
+offset_right = 880.0
+offset_bottom = 600.0
+focus_mode = 0
+text = "进入设施"
+
+[node name="FacilityUseButton" type="Button" parent="."]
+offset_left = 640.0
+offset_top = 552.0
+offset_right = 810.0
+offset_bottom = 600.0
+focus_mode = 0
+
+[node name="FacilityLeaveButton" type="Button" parent="."]
+offset_left = 820.0
+offset_top = 552.0
+offset_right = 940.0
+offset_bottom = 600.0
+focus_mode = 0
+text = "离开"

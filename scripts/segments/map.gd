@@ -72,6 +72,14 @@ var last_facility_effect_types: Array[String] = []
 ## whatever _use_facility() just assigned (it is called after the assignment).
 var facility_result_text: String = ""
 
+## Surface: per-button pressed-connection flag map for the click delegate buttons
+## (TravelButton0/1/2, EventOptionButton0/1, FacilityEnterButton/FacilityUseButton/
+## FacilityLeaveButton). Filled by _wire_buttons() in _ready() and re-synced on any
+## (re)wire. Each value = pressed.is_connected(<handler>), so a wired-but-
+## disconnected button is assertable, not just declared. Whitelisted in
+## playtest/_common.yaml's MapScreen surface block.
+var pressed_connected: Dictionary = {}
+
 ## State-only (NOT a surface var, NOT a render source since 2026-08-29): true when
 ## the last use was refused for lack of silver. The refusal is displayed through
 ## facility_result_text alone, so the panel can never print it twice.
@@ -90,6 +98,7 @@ func _ready() -> void:
 		current_node_id = MapData.start_node()
 		SaveManager.profile.map_node = current_node_id
 	focus_id = current_node_id
+	_wire_buttons()
 	_sync_surface()
 	_render()
 
@@ -307,6 +316,84 @@ func _leave_facility() -> void:
 	_render()
 
 
+## Wire the click-delegate buttons once (stable scene pool, never rebuilt per
+## render). Every button is scene-declared focus_mode = 0, so ui_accept can never
+## reach them (no focus) and the keyboard branch stays byte-identical — exactly
+## one dismissal per key press, via _unhandled_input as today. pressed_connected
+## mirrors each connection so a wired-but-disconnected button is assertable.
+func _wire_buttons() -> void:
+	pressed_connected = {}
+	for i in range(3):
+		var b: Button = get_node_or_null("TravelBox/TravelButton%d" % i) as Button
+		if b == null:
+			continue
+		if not b.pressed.is_connected(_on_travel_pressed.bind(i)):
+			b.pressed.connect(_on_travel_pressed.bind(i))
+		pressed_connected["TravelButton%d" % i] = b.pressed.is_connected(_on_travel_pressed.bind(i))
+	for i in range(2):
+		var b: Button = get_node_or_null("EventBox/EventOptionButton%d" % i) as Button
+		if b == null:
+			continue
+		if not b.pressed.is_connected(_on_event_option_pressed.bind(i)):
+			b.pressed.connect(_on_event_option_pressed.bind(i))
+		pressed_connected["EventOptionButton%d" % i] = b.pressed.is_connected(_on_event_option_pressed.bind(i))
+	_connect_one("FacilityEnterButton", _on_facility_enter_pressed)
+	_connect_one("FacilityUseButton", _on_facility_use_pressed)
+	_connect_one("FacilityLeaveButton", _on_facility_leave_pressed)
+
+
+## Connect a single unbound-delay handler button and record its connection state.
+func _connect_one(node_name: String, handler: Callable) -> void:
+	var b: Button = get_node_or_null(node_name) as Button
+	if b == null:
+		return
+	if not b.pressed.is_connected(handler):
+		b.pressed.connect(handler)
+	pressed_connected[node_name] = b.pressed.is_connected(handler)
+
+
+## Click delegate for TravelButton{i}: travel to the i-th neighbor of the current
+## node. Out-of-range index no-ops (the pool is 3 but a node may have fewer
+## neighbors) — a hidden button can still be signal-emitted in a unit test, and
+## the adjacency-validated _travel() refuses anything the focus grammar could not
+## have reached.
+func _on_travel_pressed(i: int) -> void:
+	var nbrs: Array[String] = MapData.neighbors(current_node_id)
+	if i < 0 or i >= nbrs.size():
+		return
+	focus_id = nbrs[i]
+	_travel()
+
+
+## Click delegate for EventOptionButton{i}: focus option i and resolve it.
+func _on_event_option_pressed(i: int) -> void:
+	event_focus = i
+	_resolve_node_event()
+
+
+## Click delegate for FacilityEnterButton. MIRRORS the use_facility key branch's
+## gate exactly: only in TRAVEL with an active facility slot does a click open the
+## door the F key can open. _enter_facility() itself is ungated, so this guard
+## must never be dropped — it keeps the button a pure delegation (2026-08-29
+## reviewer ruling), never a new way into the phase.
+func _on_facility_enter_pressed() -> void:
+	if phase != "TRAVEL" or MapData.active_facility_id(current_node_id) == "":
+		return
+	_enter_facility()
+
+
+## Click delegate for FacilityUseButton: the facility's own advertised action.
+func _on_facility_use_pressed() -> void:
+	_use_facility()
+
+
+## Click delegate for FacilityLeaveButton: leave the FACILITY phase back to
+## TRAVEL. Without it a touch player who taps into a facility is stuck (the only
+## exit today is the direction keys), re-creating the dead-end this round removes.
+func _on_facility_leave_pressed() -> void:
+	_leave_facility()
+
+
 ## Max silver cost across the facility pool; 0 when empty. Used only by the debug
 ## injection to express the grant RELATIVE to the cost (never a tuned literal).
 func _max_facility_silver_cost() -> int:
@@ -370,8 +457,51 @@ func _apply_hint_visibility() -> void:
 	hint.visible = phase == "TRAVEL"
 
 
+## Sync the click-delegate button pool to the current phase/node: visibility and
+## runtime text (travel buttons carry the neighbor display names, event buttons
+## the option labels, the facility use button the facility's own advertised verb).
+## The two static labels 进入设施 / 离开 live ONLY in scenes/segments/map.tscn and
+## are never touched here (the §433 copy-location rule). Runs on every _render()
+## so a phase change or node change re-syncs it. Called BEFORE the body-null early
+## return so a missing BodyLabel cannot leave stale buttons on screen.
+func _sync_click_buttons() -> void:
+	var nbrs: Array[String] = MapData.neighbors(current_node_id)
+	for i in range(3):
+		var b: Button = get_node_or_null("TravelBox/TravelButton%d" % i) as Button
+		if b == null:
+			continue
+		var show: bool = phase == "TRAVEL" and i < nbrs.size()
+		b.visible = show
+		if show:
+			b.text = tr(str(MapData.node_def(nbrs[i]).get("display_name", nbrs[i])))
+	for i in range(2):
+		var b: Button = get_node_or_null("EventBox/EventOptionButton%d" % i) as Button
+		if b == null:
+			continue
+		b.visible = phase == "EVENT"
+		if b.visible:
+			var edef = EventData.def(event_id)
+			if edef != null:
+				var opt = edef.option_a if i == 0 else edef.option_b
+				b.text = tr(opt.label)
+	var enter_btn: Button = get_node_or_null("FacilityEnterButton") as Button
+	if enter_btn != null:
+		enter_btn.visible = phase == "TRAVEL" and MapData.active_facility_id(current_node_id) != ""
+	var use_btn: Button = get_node_or_null("FacilityUseButton") as Button
+	if use_btn != null:
+		use_btn.visible = phase == "FACILITY"
+		if use_btn.visible:
+			var fdef = FacilityData.def(facility_id)
+			if fdef != null:
+				use_btn.text = tr(fdef.action_label)
+	var leave_btn: Button = get_node_or_null("FacilityLeaveButton") as Button
+	if leave_btn != null:
+		leave_btn.visible = phase == "FACILITY"
+
+
 func _render() -> void:
 	_apply_hint_visibility()
+	_sync_click_buttons()
 	var body: Label = get_node_or_null("BodyLabel") as Label
 	if body == null:
 		return
