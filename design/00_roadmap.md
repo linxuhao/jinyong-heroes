@@ -125,6 +125,20 @@ Button)。本轮给全部六段加上可见、可点的控件,向既有 handler 
 屏上已有控件但文案没说可点的提示行号)。两条都按 `40_ux_backlog.md` 规则保持 OPEN,由
 5_design 证据步骤按本轮闸门实测单关闭。
 
+**「先红后绿」的红由实测确认,不再只是结构预测(2026-08-29,record_measured_red_first_and_reconcile):**
+上文 `clicks_only_storyline` 的「先红」已由一次解析干净的实测运行坐实 — 轮 `red_first_evidence_measured`
+用**临时回退法**(在 `scripts/autoload/game_manager.gd::_show_end_game_overlay` 注释掉 `continue_btn` /
+`retry_btn` 构造块、re-show 分支 `existing_continue` / `existing_retry` 重同步块、两处
+`_refresh_end_overlay_pressed_connected()` 调用点,保留函数定义与 `_unhandled_input`,每处标
+`# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`),跑 `godot_playtest_scenario(scenario="clicks_only_storyline")`
+(**直连同一外部边车** `aitelier/tools/godot_playtest/impl.py`,非 5_compile 闸门)实测四值:failing frame
+**265** / first failing assert **`ContinueButton.visible`**(f265,expr `visible == true`,error
+`node not found: ContinueButton`)/ exact error **`aim: node not found: ContinueButton (spec: ContinueButton)`**
+/ green asserts before red **8**;逐字节还原后复跑 **47/47** 全绿。早先记档的「f180 / 5 / 预测错误串」是
+**结构预测**(原时间线推导),由帧时序重投影修(全部 `at:` 帧重基线到屏就绪时序、教程开场腿 Next 点击数
+3→7、加 `scene: res://scenes/menu.tscn`)后实测为 **265** — 同一屏(教程结算)、同一首断断言,不得读作
+两次互相矛盾的测量。
+
 ## 这个顺序和业界做法的差异(2026-08-24 查证)
 
 大方向是一致的,但有两处业界不是这么做的,记下来免得以后当成教条:

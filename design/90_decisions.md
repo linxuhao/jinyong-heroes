@@ -373,3 +373,18 @@ Button,只委托到既有设施的具名 handler:`FacilityEnterButton` 镜像 F 
 
 **配套勘误**(与 `design/99_changelog.md` 同步):touch-reach 行「先红(f180)→ 转绿」是**结构预测而非实测**——`red_first_evidence_reproduction` 步无 shell/网络,调不动外部 harness;实测须来自一次解析干净的运行,复现配方(临时回退法)见 `final/delivery_notes_touch_reach_red_first.md`。在此之前档案只保留「预测 + 复现配方」,不写实测数字。
 
+**实测补充(2026-08-29,record_measured_red_first_and_reconcile):** 上两条所等的「实测数字」现已由一次
+解析干净的运行抵达 — 勘误所设的条件「在此之前档案只保留『预测 + 复现配方』,不写实测数字」**已满足**。
+轮 `red_first_evidence_measured` 用**临时回退法**复现(touch-reach 上方裁定 (a)–(e) 一律不动;在
+`scripts/autoload/game_manager.gd::_show_end_game_overlay` 注释掉两个 Button 构造块、re-show 分支的
+`existing_continue` / `existing_retry` 重同步块、两处 `_refresh_end_overlay_pressed_connected()` 调用点,
+保留函数定义与键盘分支,每处标 `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`),用
+`godot_playtest_scenario(scenario="clicks_only_storyline")`(**直连同一外部边车**
+`aitelier/tools/godot_playtest/impl.py`)实测:failing frame **265** / first failing assert
+**`ContinueButton.visible`**(f265,expr `visible == true`,error `node not found: ContinueButton`)/ exact
+error **`aim: node not found: ContinueButton (spec: ContinueButton)`** / green asserts before red **8**;
+逐字节还原后复跑 **47/47** 全绿。此前记档的 `f180` / 5 是**结构预测**(原时间线),由帧时序重投影修(全部
+`at:` 帧重基线到屏就绪时序、教程开场腿 Next 点击数 3→7、加 `scene: res://scenes/menu.tscn`)后实测为
+**265**,同一屏同一首断断言。该红**不以 5_compile 闸门为来源** — 本轮闸门运行仍解析失败 / 0 帧,实测
+来自对同一外部边车的直连每场景调用。档案自此持有实测数字,不再以预测充数。
+
