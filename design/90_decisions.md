@@ -203,3 +203,58 @@ EVENT 隐藏逻辑(`_apply_hint_visibility`)挂在它上面,删面板行的爆�
 情况出现),它立刻失效。等价要写在条件成立时也成立的证明上,不是写在「现在还没
 发生」上。
 
+## 点击锚不再挂在 *_ClickTarget 上(2026-08-29,record_clicktarget_anchor_decision)
+
+**`*_ClickTarget` 不再是 playtest 的点击锚点;点击锚指向单位自身的 Node2D 名字**
+(如 `Central_Divine`、`Player`),偏移由场景自己表达(例如 `Central_Divine +0,0`
+= 脚格),锚点解锚走相机感知的 `get_global_transform_with_canvas().origin`。
+
+### 根因:一个节点不可能同时是两样东西
+
+一个节点不可能既是「可按名解析、且真的点得着」的锚,又是「永远不该收到点击」的
+Control——两个要求**互斥**,且本轮**两边各红过一次**:
+
+- `mouse_filter = 0`(STOP):`Central_Divine.debug_click_target_fires == 1`,
+  立绘挡住单位格子、吃掉本该走 `_input` 中继的按下——控制元件把「该走玩家路径的
+  点击」拦在了 GUI 阶段;
+- `mouse_filter = 2`(IGNORE):锚点打不着,harness 直接在 aim 阶段
+  `push_error` → `aim: node has mouse_filter=IGNORE (cannot be hit): Central_Divine_ClickTarget`
+  → 硬闸门红(`click_targeting_fixed` / `click_move_commit_lock` /
+  `move_target_affordance` / `input_click_differential` 四条同时挂)。
+
+「既是可点锚、又不可点」在同一次交付里互相打架,说明问题不在 `mouse_filter` 取哪个
+值,而在**让一个 Control 去当点击锚**这件事本身。
+
+### 向后原则(通用规矩)
+
+控件的 `mouse_filter` 是**引擎实现细节**,场景**不许**把它钉成断言对象;playtest
+点击必须走真实玩家走的那条路——点单位本体。这与 `design/30_presentation.md` 已记的
+「**闸门断言游戏级属性,不断言引擎级属性**」是同一条规矩——本轮那次红正是这条规矩
+在点击锚上的**第二次现身**(第一次是 2026-08-25 的「容器矩形 ≠ 墨迹」教训)。
+
+### 被本条取代的旧文(点名,不改写)
+
+早先「`ClickTarget` 节点保留,因为它是 harness 按名解析的点击锚」的裁定(现
+`design/30_presentation.md` L723-731)由本条作废其后半句:节点仍在(仍是
+`debug_click_target_fires` 路由计数器的载体),但它**不再是锚点**——场景一律改用
+单位自己的 Node2D 名字,`_input` 中继才是敌人点击路径。
+
+### 实测证据路径(下一轮不必重查)
+
+- `final/delivery_notes_fix_clicktarget_ignore.md`:STOP 侧 `debug_click_target_fires`
+  计数 == 1 的实测;以及被撤回的「同一屏幕点会被单位 `_input` 中继接住,所以点
+  IGNORE 控件也能绿」的自我辩护。
+- `final/delivery_notes_fix_commit_lock_rebase.md`(第 30-49 行):IGNORE 下 aim
+  硬失败的原话;同一物理点改用 Node2D 锚 `Central_Divine +0,0`(== 脚格 ==
+  ClickTarget 矩形中心)后 **7/7 干净通过、硬闸门 True**。
+- `playtest/_common.yaml` L59-60:两种锚点契约(Control 取 `get_global_rect()`
+  中心、Node2D 取 `get_global_transform_with_canvas().origin`)与 L68(IGNORE 早已被
+  列为「事件收不到」的原因)。
+
+### 自我批评(必须写,否则同样的错会再犯)
+
+上一条交付备注曾用「同一屏幕点会被单位 `_input` 中继接住,所以点 IGNORE 控件也能
+绿」为自己辩护——那假设的是**重建后的**闸门镜像;装着的 harness 直接在 aim 阶段
+`push_error`。结论:**「行为在另一种 harness 下会正确」不是保留一条红锚点的理由**;
+锚点必须对当下装着的 harness 就成立,否则拿什么当实测证据。
+
