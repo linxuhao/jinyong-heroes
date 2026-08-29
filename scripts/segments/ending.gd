@@ -9,13 +9,33 @@ var tier: int = 0
 ## Surface: true after restart routed onward.
 var done: bool = false
 
+## Surface: button name -> pressed-signal wired.
+var pressed_connected: Dictionary = {}
+
 
 func _ready() -> void:
+	_wire_restart_button()
 	var total: int = 0
 	for key in PlayerProfile.ATTR_KEYS:
 		total += SaveManager.profile.get_attr(key)
 	tier = MapData.ending_tier(total)
 	_render()
+
+
+func _wire_restart_button() -> void:
+	var btn: Button = get_node_or_null("RestartButton") as Button
+	if btn == null:
+		return
+	btn.pressed.connect(_on_restart_pressed)
+	pressed_connected["RestartButton"] = btn.get_signal_connection_list("pressed").size() > 0
+
+
+func _on_restart_pressed() -> void:
+	if done:
+		return
+	done = true
+	if not SceneManager.pending_swap:
+		GameManager.restart_game()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -36,3 +56,7 @@ func _render() -> void:
 	var title: String = def.get("title", "") if not def.is_empty() else ""
 	var text_lines: String = def.get("text", "") if not def.is_empty() else ""
 	body.text = tr("【结局 · %s】\n\n%s\n\n按回车重新开始") % [tr(title), tr(text_lines)]
+	var restart_btn: Button = get_node_or_null("RestartButton") as Button
+	if restart_btn != null:
+		restart_btn.text = tr("重新开始")
+		restart_btn.visible = not done
