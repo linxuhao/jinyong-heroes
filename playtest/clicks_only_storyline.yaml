@@ -29,17 +29,54 @@
 #     mainline; the facility buttons' click-reachability is proven by the
 #     companion scenario map_facility_buttons_click.yaml).
 #
-# RED-FIRST EVIDENCE (measured at first run on the unfixed tree):
-#   failing_frame: 180
-#   first_failing_assert: "ContinueButton.visible" (node not found — harness
-#                         push_error: unresolvable node name)
-#   exact_error: "push_error: clicks target 'ContinueButton' — node not found
-#                         in the current scene tree (the overlay is built in
-#                         code with CanvasLayer + ColorRect + Panel + Label
-#                         only; no Button nodes exist)"
-#   green_asserts_before_red: 5
-#   (frames 30/90/110 asserts pass; frame 180 block fails on the first
-#    ContinueButton liveness assert before the click at frame 190)
+# RED-FIRST EVIDENCE — HONEST RECORD (2026-08-29).
+#   The four values below are a STRUCTURAL PREDICTION, NOT a measured run.
+#   The Godot playtest harness (aitelier/tools/godot_playtest/impl.py) is an
+#   external sidecar image invoked only by the pipeline 5_compile gate; it is
+#   NOT invokable from the implementing step (no shell, no network). Do NOT
+#   present these values as measured — the measured confirmation (or a
+#   discrepant red) is the 5_compile gate's verdict from an actual run.
+#
+#   Structural prediction (labelled, not measured):
+#     failing_frame: 180
+#     first_failing_assert: ContinueButton.visible (f180 assert) OR the f190
+#                           clicks:[ContinueButton] push_error, whichever the
+#                           harness reports first
+#     exact_error (predicted):
+#                           "push_error: clicks target 'ContinueButton' — node
+#                           not found in the current scene tree (the overlay is
+#                           built in code with CanvasLayer + ColorRect + Panel +
+#                           Label only; no Button nodes exist)"
+#     green_asserts_before_red: 5
+#                           (f30 block = 2 asserts pass; f90 block = 1 assert
+#                           passes; f110 is a CLICK not an assert; first two of
+#                           the 6-assert f180 block pass — current_state == WON
+#                           and end_overlay_text -> the third assert
+#                           ContinueButton.visible fails. 2 + 1 + 2 = 5.)
+#
+#   DO NOT COMMIT: reproduction needs the TEMPORARY RED-FIRST REVERT below
+#   applied to scripts/autoload/game_manager.gd (this file's timeline is the
+#   unfixed-tree expectation). The revert is DOCUMENTED ONLY — it is never
+#   committed (see final/delivery_notes_touch_reach_red_first.md).
+#   RED repro command (verbatim):
+#     apply the temporary revert below to scripts/autoload/game_manager.gd,
+#     then run the pipeline 5_compile playtest gate (external harness
+#     aitelier/tools/godot_playtest/impl.py — the same invocation that writes
+#     playtest_summary.md / playtest_report.json). The harness is a sidecar
+#     image outside this repo and is NOT invokable from the implementing step
+#     (no shell, no network).
+#   RED revert recipe (verbatim, mark # TEMPORARY RED-FIRST REVERT — DO NOT
+#   COMMIT). In _show_end_game_overlay (scripts/autoload/game_manager.gd)
+#   comment out:
+#     - the 'var continue_btn: Button = Button.new()' .. 'panel.add_child(continue_btn)' block;
+#     - the 'var retry_btn: Button = Button.new()' .. 'panel.add_child(retry_btn)' block;
+#     - in the re-show branch: the existing_continue and existing_retry
+#       re-sync blocks;
+#     - both _refresh_end_overlay_pressed_connected() call sites (re-show
+#       branch + construction tail).
+#   Keep the _refresh_end_overlay_pressed_connected() function definition
+#   itself, and leave _unhandled_input (keyboard branch) and all other screens'
+#   buttons intact.
 name: clicks_only_storyline
 description: >-
   The full six-segment main storyline driven by clicks only (zero keyboard
