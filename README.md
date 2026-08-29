@@ -137,7 +137,15 @@ disproven "gui_input never fires under a Node2D ancestor" comments in
 the stale Phase-1 comments in `portrait_grid_alignment.yaml` /
 `camera_transform_follows_unit.yaml` are replaced with "history only"
 framing, and both new scenarios are synced into
-`tests/test_playtest_contract_smoke.py`'s `ROUND_SCENARIOS`. The remaining
+`tests/test_playtest_contract_smoke.py`'s `ROUND_SCENARIOS`. The largest of
+the three reds, frozen-net member `click_move_commit_lock`, was a stale
+fixture rather than a camera regression — its attack click was authored
+against the old (7,3)-spawn geometry, the five-step resolver correctly
+rejected it as out of reach, and the right-click lawfully undid the move; it
+is re-derived for the restored spawns (walk (7,5)→(7,2), adjacent to
+Central_Divine (7,1); attack via the bare `Central_Divine` Node2D anchor;
+the undo refusal pinned by the co-asserts `grid_pos == Vector2i(7,2)` /
+`moves_left == 1`) with zero assertions relaxed. The remaining
 gap is runtime, not code: a fresh downstream gate re-run must confirm green
 (see Verification status).
 
