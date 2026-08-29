@@ -256,3 +256,103 @@ legitimate rename/rewrite must update the pin in the SAME change to match the
 equivalent new assertion rather than keeping a dead old-text line or bypassing the
 rename. This is the concrete application of the `design/30_presentation.md`
 "形态闸门必须自我解释" rule this same task lands.
+
+---
+
+# `facility_result_render` — turning the two visible-result nails green
+
+**Task:** make a facility use *visible on screen*, so that the pinned surface
+observable and the string the player reads are literally the same variable.
+
+## What the sibling pin task recorded (quoted, pre-fix)
+
+From the `PRE-FIX RED VALUE` section above, verbatim — the state this task started from:
+
+```
+at:600 MapScreen.facility_result_text: facility_result_text != ""
+  -> FAILED
+     observed=""
+
+at:790 MapScreen.facility_result_text: facility_result_text != ""
+  -> FAILED
+     observed=""
+```
+
+45/47 in that run: the two `facility_result_text != ""` nails were the only red, and
+their cause was that `facility_result_text` was *published but never assigned* — the
+only write to it sat in `_sync_surface()` as a constant `""`, and `_render()` printed
+nothing from it. "A never-written observable reads exactly like an always-false one."
+
+## What changed (5 write sites, all in the render path)
+
+1. **`_sync_surface()` no longer touches the var.** The constant
+   `facility_result_text = ""` publish line and its stale "facility_result_render
+   replaces THIS line" comment are deleted; a comment now names the two real write
+   sites and states why mirroring here would wipe the value (`_use_facility()` calls
+   `_sync_surface()` *after* assigning — this was the highest-risk edit, and a silent
+   re-creation of the defect if missed).
+2. **`_enter_facility()`** resets `facility_result_text = ""` before
+   `_sync_surface()` / `_render()`: entering is not using, and `facility_use_count`
+   persists across visits, so without this a returning player would see last visit's
+   result before doing anything (and the "entered, not yet used" state would be
+   unobservable).
+3. **`_use_facility()` refusal path** sets `facility_result_text = tr("银两不足")`
+   (count still not incremented, no effects applied — unchanged behaviour).
+4. **`_use_facility()` success path** sets, after `facility_use_count += 1`:
+   `facility_result_text = tr("修炼有得（第 %d 次）：%s") % [facility_use_count, gains]`
+   with `gains` taken verbatim from the existing `_facility_effect_summary(fdef)` —
+   i.e. composed from `def.effects`, never from literals. Carrying the session use
+   count is what makes use #1 read differently from use #2, so a second use cannot
+   pass as the first one's text being re-displayed.
+5. **`_render()` FACILITY branch** appends `"\n" + facility_result_text` when
+   non-empty — the var itself, not a re-computation, so the observable and the screen
+   cannot diverge. The superseded `if _facility_refused: body.text += tr("银两不足")`
+   block is **deleted**: on refusal `_facility_refused == true` AND
+   `facility_result_text == "银两不足"`, so keeping it printed the refusal twice while
+   the observable held it once. `facility_result_text` is now the single render source
+   for both the success result and the refusal (`_facility_refused` remains as internal
+   state only, with its doc comment corrected).
+
+Supporting, in the same commit (both are independent red sources — a green playtest
+with a red static guard is still a failed build):
+
+- `scripts/autoload/i18n.gd` — one new Chinese-as-key EN entry
+  `"修炼有得（第 %d 次）：%s": "Cultivation gained (use #%d): %s"`. The already-present
+  `银两不足` / `银两 −%d` / `根骨 +%d` / `内力 +%d` fragments are reused, not re-added.
+  `tests/test_i18n_coverage.py` green.
+- `tests/test_facility_copy_location.py` — the new template (6 CJK ideographs, over
+  `PROSE_MIN_CJK`) added to `ALLOWED` in the sanctioned-facility-chrome block, with a
+  comment saying it is the result-render format string, not narrative. It exists in no
+  data module, so `test_no_prose_duplicated_from_data_modules` stays green.
+- `tests/test_map_node_event.gd::_test_map_facility_phase()` — five relative pins on
+  the var (never an exact Chinese string; the semantics are the pin, not the wording):
+  empty after arrival, empty on entry (entering ≠ using), non-empty after use #1
+  (stored as `first_result`), non-empty **and different from `first_result`** after
+  use #2, and on the cost-gate refusal the count is unchanged while the text is
+  non-empty and again differs from `first_result`; plus the re-entry reset with
+  `facility_use_count > 0`.
+
+## Measured post-fix numbers (from `godot_playtest_scenario`, repo + staged edits)
+
+- `facility_use_reusable` — **PASS 49/49**, hard gate `passed: true`. Both
+  `facility_result_text != ""` nails (at:600 after use #1, at:790 after use #2) now
+  pass; the pre-fix observation for those two lines was `observed=""`. (The full-gate
+  run at `5_compile` reports its own per-scenario totals; the count printed here is
+  this step's single-scenario probe, so no number in this section is inferred.)
+- `spine_to_ending` — **PASS 42/42** (six segments still connected).
+- `map_hint_single` — **PASS 7/7** (the single-hint invariant holds with the extra
+  result line: the travel hint is still hidden outside TRAVEL).
+- `map_node_event_shaolin` — **PASS 32/32** (untouched scenario, no regression).
+
+## Explicitly NOT touched
+
+`playtest/facility_use_reusable.yaml` (byte-unchanged — the two nails were turned green
+by the code, not by editing the exam), `playtest/_common.yaml`,
+`tests/test_playtest_contract_smoke.py`, `scripts/data/map_data.gd`,
+`scripts/data/facility_data.gd`, `project.godot` (so the `use_facility` (F) binding and
+the debug action are unchanged), the camera / coordinate layer
+(`camera_follower.gd`, `coord.gd`, `ink_world_dx/dy`, `camera_offset_y`,
+`camera_transform_follows_unit.yaml`, `portrait_grid_alignment.yaml`),
+`spine_to_ending.yaml`, the superset fixture and `design/*`. Facility enter / leave /
+reuse semantics and all effect magnitudes are unchanged — **no number was tuned to turn
+an assert green**; only the display of an already-computed effect changed.

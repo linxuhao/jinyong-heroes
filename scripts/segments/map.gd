@@ -63,13 +63,18 @@ var facility_use_count: int = 0
 ## Surface: effect "type"s of the last facility use, in order (mirrors last_effect_types).
 var last_facility_effect_types: Array[String] = []
 
-## Surface: one-line summary of what the last facility use produced ("" until the
-## FACILITY result rendering lands; the `changed` nail in facility_use_reusable is
-## RED while this stays constant — that red is the pre-fix measurement).
+## Surface: the one-line result of the last facility use — and the SAME string
+## _render() prints in the FACILITY panel, so "the observable changed" and "the
+## player saw a change" cannot diverge (one source, no second computation).
+## Written at exactly two places: _enter_facility() resets it to "" (entering is
+## not using) and _use_facility() sets the success summary or the refusal text.
+## _sync_surface() deliberately does NOT mirror it — mirroring there would wipe
+## whatever _use_facility() just assigned (it is called after the assignment).
 var facility_result_text: String = ""
 
-## Render-only (NOT a surface var): true when the last use was refused for lack of
-## silver — the FACILITY panel appends 银两不足 when set.
+## State-only (NOT a surface var, NOT a render source since 2026-08-29): true when
+## the last use was refused for lack of silver. The refusal is displayed through
+## facility_result_text alone, so the panel can never print it twice.
 var _facility_refused: bool = false
 
 ## Debug injection: the granted silver = this multiple × the max facility silver cost
@@ -245,6 +250,10 @@ func _enter_facility() -> void:
 	facility_id = MapData.active_facility_id(current_node_id)
 	phase = "FACILITY"
 	_facility_refused = false
+	# Entering is not using: the panel must read empty until the first use — including
+	# on a RE-ENTRY after an earlier visit, where facility_use_count persists but the
+	# previous visit's result text must not still be on screen.
+	facility_result_text = ""
 	_sync_surface()
 	_render()
 
@@ -259,7 +268,9 @@ func _use_facility() -> void:
 	var cost: int = FacilityData.silver_cost(fdef)
 	if SaveManager.profile.silver < cost:
 		# Refusal: no effect application, no count increment, no silver/attr change.
+		# facility_result_text is the ONLY refusal display (the panel prints this var).
 		_facility_refused = true
+		facility_result_text = tr("银两不足")
 		_sync_surface()
 		_render()
 		return
@@ -274,6 +285,14 @@ func _use_facility() -> void:
 		last_facility_effect_types.append(eff.get("type", "none") as String)
 	facility_use_count += 1
 	_facility_refused = false
+	# The visible result. Composed from the def's own effects (no literals) and
+	# carrying the SESSION USE COUNT, so use #1 reads differently from use #2 —
+	# that is what makes "it worked again" observable rather than a repeat of the
+	# static price summary already printed above the prompt. Assigned BEFORE
+	# _sync_surface() (which must not touch this var) and before _render(), which
+	# prints this exact string.
+	var gains: String = _facility_effect_summary(fdef)
+	facility_result_text = tr("修炼有得（第 %d 次）：%s") % [facility_use_count, gains]
 	SaveManager.autosave()
 	_sync_surface()
 	_render()
@@ -329,9 +348,11 @@ func _sync_surface() -> void:
 	attr_wisdom = SaveManager.profile.get_attr("wisdom")
 	attr_fortune = SaveManager.profile.get_attr("fortune")
 	entry_declared_gap_types = MapData.declared_gap_types(current_node_id)
-	# Read-stable publish point for the facility result text. Constant "" for now;
-	# facility_result_render replaces THIS line with the derived summary.
-	facility_result_text = ""
+	# facility_result_text is intentionally NOT mirrored here. It has exactly two
+	# write sites — _enter_facility() (reset) and _use_facility() (success summary /
+	# refusal) — and _use_facility() calls THIS function after assigning it, so a
+	# constant here would wipe the value and re-create the never-rendered-result
+	# defect. It is the same string _render() prints: one source, no second computation.
 
 
 ## Single-operation-hint invariant: the bottom travel hint is the map's own
@@ -370,8 +391,13 @@ func _render() -> void:
 			return
 		var summary: String = _facility_effect_summary(fdef)
 		body.text = tr("【%s】\n\n%s\n\n%s\n%s\n\n%s") % [tr(fdef.title), tr(fdef.text), summary, "▶ " + tr(fdef.action_label), tr("回车使用 · 上下离开")]
-		if _facility_refused:
-			body.text += tr("银两不足")
+		# The result line and the refusal line BOTH come from the single var
+		# facility_result_text — the same string the surface publishes, so the
+		# player-visible change and the observable cannot diverge. (The old
+		# `if _facility_refused: body.text += tr("银两不足")` block printed the
+		# refusal a second time while the observable held it once.)
+		if facility_result_text != "":
+			body.text += "\n" + facility_result_text
 		return
 	var text: String = tr("【江湖行路】\n\n")
 	for node in MapData.node_ids():

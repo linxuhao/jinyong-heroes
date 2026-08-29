@@ -517,6 +517,7 @@ static func _test_map_facility_phase(ok: bool) -> bool:
 	ok = _expect(ok, map.phase != "FACILITY", "arrival never enters the FACILITY phase")
 	ok = _expect(ok, map.facility_id == "", "arrival leaves facility_id empty")
 	ok = _expect(ok, map.facility_use_count == 0, "arrival (and event resolution) used the facility zero times")
+	ok = _expect(ok, map.facility_result_text == "", "before anything is used there is no result line to show")
 
 	# --- fund, then opt IN explicitly (the choice half). Enough silver for two ---
 	# uses so the reuse ladder 0 -> 1 -> 2 is genuinely reachable; amount derived
@@ -526,12 +527,17 @@ static func _test_map_facility_phase(ok: bool) -> bool:
 	ok = _expect(ok, map.phase == "FACILITY", "the explicit use_facility key enters the FACILITY phase")
 	ok = _expect(ok, map.facility_id == "shaolin_wooden_men", "the entered facility is the node's bound id (got %s)" % map.facility_id)
 	ok = _expect(ok, map.facility_use_count == 0, "entering the facility does NOT auto-use it")
+	ok = _expect(ok, map.facility_result_text == "", "entering shows no result line either (entering is not using)")
 
 	# First use: ladder 0 -> 1, observable delta (pre-values captured for diffs).
 	var silver_before: int = fresh_profile.silver
 	var attr_before: int = fresh_profile.get_attr(attr_key) if attr_key != "" else 0
 	map._use_facility()
 	ok = _expect(ok, map.facility_use_count == 1, "the first use steps the ladder to 1 (got %d)" % map.facility_use_count)
+	ok = _expect(ok, map.facility_result_text != "", "the first use produced a VISIBLE result line (the var _render() prints is non-empty)")
+	# Semantics, not wording: the exact Chinese string is never pinned, only that the
+	# second use reads differently from the first (the line carries the use count).
+	var first_result: String = map.facility_result_text
 	ok = _expect(ok, map.last_facility_effect_types == expected_types,
 			"last_facility_effect_types mirrors the def's own effect types (%s)" % str(expected_types))
 	ok = _expect(ok, fresh_profile.silver < silver_before, "the use spent silver (before %d, got %d)" % [silver_before, fresh_profile.silver])
@@ -543,6 +549,9 @@ static func _test_map_facility_phase(ok: bool) -> bool:
 	var silver_before2: int = fresh_profile.silver
 	map._use_facility()
 	ok = _expect(ok, map.facility_use_count == 2, "the facility is reusable: a second use steps to 2 (got %d)" % map.facility_use_count)
+	ok = _expect(ok, map.facility_result_text != "", "the second use also produced a visible result line")
+	ok = _expect(ok, map.facility_result_text != first_result,
+			"the second use's result line DIFFERS from the first (a repeat is not a re-display of stale text)")
 	ok = _expect(ok, fresh_profile.silver < silver_before2, "the second use also spent silver (before %d, got %d)" % [silver_before2, fresh_profile.silver])
 
 	# Leave: phase closes, the use count persists across visits.
@@ -553,12 +562,16 @@ static func _test_map_facility_phase(ok: bool) -> bool:
 
 	# Cost-gate: too poor -> refusal leaves NO trace (count/effects/silver/attr unchanged).
 	map._enter_facility()
+	ok = _expect(ok, map.facility_result_text == "",
+			"a fresh entry clears the result line even when facility_use_count persists (got %d)" % map.facility_use_count)
 	fresh_profile.silver = maxi(cost - 1, 0)
 	var gate_count: int = map.facility_use_count
 	var gate_silver: int = fresh_profile.silver
 	var gate_attr: int = fresh_profile.get_attr(attr_key) if attr_key != "" else 0
 	map._use_facility()
 	ok = _expect(ok, map.facility_use_count == gate_count, "an unaffordable use does NOT step the ladder (got %d)" % map.facility_use_count)
+	ok = _expect(ok, map.facility_result_text != "", "the refusal IS a visible line (facility_result_text is its only display)")
+	ok = _expect(ok, map.facility_result_text != first_result, "the refusal line is not a stale copy of an earlier success line")
 	ok = _expect(ok, map.last_facility_effect_types == expected_types, "an unaffordable use leaves last_facility_effect_types unchanged")
 	ok = _expect(ok, fresh_profile.silver == gate_silver, "an unaffordable use spends no silver (got %d)" % fresh_profile.silver)
 	if attr_key != "":

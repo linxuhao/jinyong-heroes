@@ -370,6 +370,7 @@ const EN: Dictionary = {
 	"银两 −%d": "Silver −%d",
 	"根骨 +%d": "Bone +%d",
 	"内力 +%d": "Qi +%d",
+	"修炼有得（第 %d 次）：%s": "Cultivation gained (use #%d): %s",
 
 	# --- Cultivation ------------------------------------------------------
 	"方向键选择 · 回车执行": "Arrow keys to choose · Enter to act",

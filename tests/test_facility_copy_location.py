@@ -156,6 +156,11 @@ ALLOWED: frozenset[str] = frozenset({
     r"\n\n门派设施：%s（F 使用）",
     r"回车使用 · 上下离开",
     r"银两不足",
+    # The FACILITY result-line template (facility_result_render, 2026-08-29). UI
+    # chrome, not narrative: it is a format string composed from the def's own
+    # effects plus the session use count. It exists in no data module, so
+    # test_no_prose_duplicated_from_data_modules stays green alongside it.
+    r"修炼有得（第 %d 次）：%s",
 })
 
 
