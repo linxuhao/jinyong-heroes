@@ -48,13 +48,18 @@
 #   applied to scripts/autoload/game_manager.gd (this file's timeline is the
 #   unfixed-tree expectation). The revert is DOCUMENTED ONLY — it is never
 #   committed (see final/delivery_notes_touch_reach_red_first.md).
-#   RED repro command (verbatim):
+#   RED repro command (verbatim — the exact one this step ran):
 #     apply the temporary revert below to scripts/autoload/game_manager.gd,
-#     then run the pipeline 5_compile playtest gate (external harness
-#     aitelier/tools/godot_playtest/impl.py — the same invocation that writes
-#     playtest_summary.md / playtest_report.json). The harness is a sidecar
-#     image outside this repo and is NOT invokable from the implementing step
-#     (no shell, no network).
+#     then run godot_playtest_scenario(scenario="clicks_only_storyline")
+#     (the external sidecar aitelier/tools/godot_playtest/impl.py, invoked
+#     per-scenario from this implementing step; the pipeline 5_compile gate
+#     writes the same into playtest_summary.md / playtest_report.json).
+#   Measured runs (this step, real harness output):
+#     RED   -> 8/47, hard gate False. First runtime error:
+#              "aim: node not found: ContinueButton (spec: ContinueButton)".
+#              First failing assert: f265 ContinueButton.visible.
+#     GREEN -> after byte-identical restore of game_manager.gd, 47/47,
+#              hard gate True (staged file = repo baseline, no diff).
 #   RED revert recipe (verbatim, mark # TEMPORARY RED-FIRST REVERT — DO NOT
 #   COMMIT). In _show_end_game_overlay (scripts/autoload/game_manager.gd)
 #   comment out:

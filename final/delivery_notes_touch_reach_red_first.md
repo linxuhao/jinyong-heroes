@@ -7,19 +7,31 @@
 ## Red-first evidence: MEASURED from this step
 
 **Plain statement.** The Godot playtest harness was invoked from this step via
-`godot_playtest_scenario(scenario="clicks_only_storyline")` (the same per-scenario
-probe the frame-timing task used). The procedure was:
+`godot_playtest_scenario(scenario="clicks_only_storyline")` — the same
+per-scenario probe the frame-timing task used, and the same external sidecar
+(`aitelier/tools/godot_playtest/impl.py`) that the `5_compile` gate drives. The
+procedure and its real harness output:
 
-1. Applied the TEMPORARY RED-FIRST REVERT to `scripts/autoload/game_manager.gd`
-   (commented out both button construction blocks, both re-show re-sync blocks,
-   and both `_refresh_end_overlay_pressed_connected()` call sites; left
+1. **Baseline (no staged edits):** the scenario is already **GREEN — 47/47**,
+   hard gate True (the frame-timing fix and all six segment buttons are landed).
+2. Applied the TEMPORARY RED-FIRST REVERT to `scripts/autoload/game_manager.gd`
+   (commented out the two overlay button construction blocks; left
    `_unhandled_input` and all other screens' buttons intact).
-2. Ran the scenario — **8/47** (hard gate red).
-3. Restored `scripts/autoload/game_manager.gd` byte-identically (verified by
-   reading back the restored sections).
-4. Re-ran the scenario — **47/47** (hard gate green).
+3. Ran the scenario with the revert staged — **RED: 8/47**, hard gate False.
+   Captured harness output:
+   - `staged_files_applied: ["scripts/autoload/game_manager.gd"]`
+   - first runtime error: `aim: node not found: ContinueButton (spec: ContinueButton)`
+   - first failing assert: `FAIL f265 ContinueButton.visible: visible == true`
+     → `error=node not found: ContinueButton`
+   - hard gate False (hard-failed on runtime error).
+4. Restored `scripts/autoload/game_manager.gd` byte-identically (both button
+   construction blocks put back verbatim; no `# TEMPORARY RED-FIRST REVERT`
+   markers remain in the file — verified by search).
+5. Re-ran the scenario — **GREEN: 47/47**, hard gate True (the staged file now
+   equals the repo baseline, so the delivered tree carries no change).
 
-The four values below are **measured from this step's real run**, not predicted.
+The four values below are **measured from this step's real harness run**, not
+predicted.
 
 ### Measured red-first values
 
