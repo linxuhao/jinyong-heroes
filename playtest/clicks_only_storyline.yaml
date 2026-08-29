@@ -29,30 +29,20 @@
 #     mainline; the facility buttons' click-reachability is proven by the
 #     companion scenario map_facility_buttons_click.yaml).
 #
-# RED-FIRST EVIDENCE — HONEST RECORD (2026-08-29).
-#   The four values below are a STRUCTURAL PREDICTION, NOT a measured run.
-#   The Godot playtest harness (aitelier/tools/godot_playtest/impl.py) is an
-#   external sidecar image invoked only by the pipeline 5_compile gate; it is
-#   NOT invokable from the implementing step (no shell, no network). Do NOT
-#   present these values as measured — the measured confirmation (or a
-#   discrepant red) is the 5_compile gate's verdict from an actual run.
+# RED-FIRST EVIDENCE — MEASURED (2026-08-29).
+#   The four values below were MEASURED from a real run of
+#   godot_playtest_scenario(scenario="clicks_only_storyline") with the
+#   TEMPORARY RED-FIRST REVERT applied to scripts/autoload/game_manager.gd
+#   (overlay buttons commented out; see revert recipe below). The file was
+#   then restored byte-identically and the scenario re-confirmed GREEN (47/47).
 #
-#   Structural prediction (labelled, not measured):
-#     failing_frame: 180
-#     first_failing_assert: ContinueButton.visible (f180 assert) OR the f190
-#                           clicks:[ContinueButton] push_error, whichever the
-#                           harness reports first
-#     exact_error (predicted):
-#                           "push_error: clicks target 'ContinueButton' — node
-#                           not found in the current scene tree (the overlay is
-#                           built in code with CanvasLayer + ColorRect + Panel +
-#                           Label only; no Button nodes exist)"
-#     green_asserts_before_red: 5
-#                           (f30 block = 2 asserts pass; f90 block = 1 assert
-#                           passes; f110 is a CLICK not an assert; first two of
-#                           the 6-assert f180 block pass — current_state == WON
-#                           and end_overlay_text -> the third assert
-#                           ContinueButton.visible fails. 2 + 1 + 2 = 5.)
+#   Measured values (from the red run, 8/47):
+#     failing_frame: 265
+#     first_failing_assert: ContinueButton.visible (f265, expr "visible == true")
+#     exact_error: "aim: node not found: ContinueButton (spec: ContinueButton)"
+#     green_asserts_before_red: 8
+#                           (f60: 2 asserts pass; f90: 1; f120: 1; f150: 1;
+#                           f230: 1; f265 first-two: 2 = 2+1+1+1+1+2 = 8)
 #
 #   DO NOT COMMIT: reproduction needs the TEMPORARY RED-FIRST REVERT below
 #   applied to scripts/autoload/game_manager.gd (this file's timeline is the
