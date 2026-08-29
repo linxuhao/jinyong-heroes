@@ -26,6 +26,7 @@
 const MapData = preload("res://scripts/data/map_data.gd")
 const EventData = preload("res://scripts/data/event_data.gd")
 const EventLogic = preload("res://scripts/data/event_logic.gd")
+const FacilityData = preload("res://scripts/data/facility_data.gd")
 const PlayerProfileScript = preload("res://scripts/data/player_profile.gd")
 const ProgressionGongfaDataScript = preload("res://scripts/data/progression_gongfa_data.gd")
 const MapScene: PackedScene = preload("res://scenes/segments/map.tscn")
@@ -42,6 +43,7 @@ static func run() -> bool:
 	ok = _test_map_data_schema(ok)
 	ok = _test_event_logic_parity(ok)
 	ok = _test_map_event_phase(ok)
+	ok = _test_map_facility_phase(ok)
 	if ok:
 		print("PASS: test_map_node_event")
 	else:
@@ -472,6 +474,97 @@ static func _test_map_event_phase(ok: bool) -> bool:
 	ok = _expect(ok, MapData.is_end_node("kunlun"), "kunlun is the end node")
 	ok = _expect(ok, MapData.active_event_id("kunlun") == "", "kunlun declares no active event (ending unblocked)")
 
+	sm.profile = PlayerProfileScript.new()
+	return ok
+
+
+# ---------------------------------------------------------------------------
+# 3b. MapScreen FACILITY phase (opt-in, reusable, cost-gated)
+# ---------------------------------------------------------------------------
+
+static func _test_map_facility_phase(ok: bool) -> bool:
+	# The SaveManager autoload, resolved dynamically (MapScreen reads the autoload
+	# by design); the profile is swapped to a fresh fixture and restored at the end.
+	var sm = _save_manager()
+	if sm == null:
+		return _expect(ok, false, "SaveManager autoload reachable in the unit-test context")
+	var fresh_profile = PlayerProfileScript.new()
+	sm.profile = fresh_profile
+
+	var fdef = FacilityData.def("shaolin_wooden_men")
+	ok = _expect(ok, fdef != null, "shaolin's facility row resolves")
+	if fdef == null:
+		sm.profile = PlayerProfileScript.new()
+		return ok
+	# Every expected value derives from the def — no absolute game literals.
+	var cost: int = FacilityData.silver_cost(fdef)
+	var expected_types: Array[String] = []
+	for eff in fdef.effects:
+		expected_types.append(String(eff.get("type", "none")))
+	var attr_eff: Dictionary = _find_eff(fdef, "attr")
+	var attr_key: String = String(attr_eff.get("target", ""))
+	ok = _expect(ok, cost > 0, "the shaolin facility has a positive silver price (got %d)" % cost)
+
+	# --- arrival fires the EVENT, never the FACILITY (definitional negative half) ---
+	var map = MapScene.instantiate()
+	map.current_node_id = "luoyang"
+	map.focus_id = "shaolin"
+	map._travel()
+	ok = _expect(ok, map.phase == "EVENT", "arrival at shaolin opens the entry event (facility is not arrival content)")
+	map.event_focus = 0
+	map._resolve_node_event()
+	ok = _expect(ok, map.phase == "TRAVEL", "resolving the arrival event returns the map to TRAVEL")
+	ok = _expect(ok, map.phase != "FACILITY", "arrival never enters the FACILITY phase")
+	ok = _expect(ok, map.facility_id == "", "arrival leaves facility_id empty")
+	ok = _expect(ok, map.facility_use_count == 0, "arrival (and event resolution) used the facility zero times")
+
+	# --- fund, then opt IN explicitly (the choice half). Enough silver for two ---
+	# uses so the reuse ladder 0 -> 1 -> 2 is genuinely reachable; amount derived
+	# from cost (white-box fixture injection, sanctioned in a unit test).
+	fresh_profile.silver = cost * 2 + 1
+	map._enter_facility()
+	ok = _expect(ok, map.phase == "FACILITY", "the explicit use_facility key enters the FACILITY phase")
+	ok = _expect(ok, map.facility_id == "shaolin_wooden_men", "the entered facility is the node's bound id (got %s)" % map.facility_id)
+	ok = _expect(ok, map.facility_use_count == 0, "entering the facility does NOT auto-use it")
+
+	# First use: ladder 0 -> 1, observable delta (pre-values captured for diffs).
+	var silver_before: int = fresh_profile.silver
+	var attr_before: int = fresh_profile.get_attr(attr_key) if attr_key != "" else 0
+	map._use_facility()
+	ok = _expect(ok, map.facility_use_count == 1, "the first use steps the ladder to 1 (got %d)" % map.facility_use_count)
+	ok = _expect(ok, map.last_facility_effect_types == expected_types,
+			"last_facility_effect_types mirrors the def's own effect types (%s)" % str(expected_types))
+	ok = _expect(ok, fresh_profile.silver < silver_before, "the use spent silver (before %d, got %d)" % [silver_before, fresh_profile.silver])
+	if attr_key != "":
+		ok = _expect(ok, fresh_profile.get_attr(attr_key) > attr_before,
+				"the use raised '%s' (before %d, got %d)" % [attr_key, attr_before, fresh_profile.get_attr(attr_key)])
+
+	# Reusable: a second use while still inside FACILITY.
+	var silver_before2: int = fresh_profile.silver
+	map._use_facility()
+	ok = _expect(ok, map.facility_use_count == 2, "the facility is reusable: a second use steps to 2 (got %d)" % map.facility_use_count)
+	ok = _expect(ok, fresh_profile.silver < silver_before2, "the second use also spent silver (before %d, got %d)" % [silver_before2, fresh_profile.silver])
+
+	# Leave: phase closes, the use count persists across visits.
+	map._leave_facility()
+	ok = _expect(ok, map.phase == "TRAVEL", "leaving the facility returns to TRAVEL")
+	ok = _expect(ok, map.facility_id == "", "leaving clears facility_id")
+	ok = _expect(ok, map.facility_use_count == 2, "the use count persists after leaving (got %d)" % map.facility_use_count)
+
+	# Cost-gate: too poor -> refusal leaves NO trace (count/effects/silver/attr unchanged).
+	map._enter_facility()
+	fresh_profile.silver = maxi(cost - 1, 0)
+	var gate_count: int = map.facility_use_count
+	var gate_silver: int = fresh_profile.silver
+	var gate_attr: int = fresh_profile.get_attr(attr_key) if attr_key != "" else 0
+	map._use_facility()
+	ok = _expect(ok, map.facility_use_count == gate_count, "an unaffordable use does NOT step the ladder (got %d)" % map.facility_use_count)
+	ok = _expect(ok, map.last_facility_effect_types == expected_types, "an unaffordable use leaves last_facility_effect_types unchanged")
+	ok = _expect(ok, fresh_profile.silver == gate_silver, "an unaffordable use spends no silver (got %d)" % fresh_profile.silver)
+	if attr_key != "":
+		ok = _expect(ok, fresh_profile.get_attr(attr_key) == gate_attr, "an unaffordable use grants no attr (got %d)" % fresh_profile.get_attr(attr_key))
+
+	map.free()
 	sm.profile = PlayerProfileScript.new()
 	return ok
 

@@ -42,6 +42,7 @@ const TESTS: Array[String] = [
 	"res://tests/test_trait_effects.gd",
 	"res://tests/test_trait_hover_preview.gd",
 	"res://tests/test_visibility_probe_canvas_layer.gd",
+	"res://tests/test_facility_data.gd",
 ]
 
 
