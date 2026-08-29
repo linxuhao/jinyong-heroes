@@ -173,6 +173,10 @@ static func _test_entry_content(ok: bool) -> bool:
 		"active_facility_id huashan stays inert (declared)")
 	ok = _expect(ok, MapData.active_facility_id("kunlun") == "",
 		"active_facility_id kunlun stays inert (declared)")
+	ok = _expect(ok, MapData.active_facility_id("xiangyang") == "",
+		"active_facility_id xiangyang stays inert (declared)")
+	ok = _expect(ok, MapData.active_facility_id("wuming_valley") == "",
+		"active_facility_id wuming_valley stays inert (declared)")
 	ok = _expect(ok, MapData.active_facility_id("nope") == "",
 		"active_facility_id unknown -> \"\"")
 	# unknown node degrades inert

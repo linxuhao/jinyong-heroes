@@ -362,4 +362,63 @@ is byte-untouched) because the top-row nameplate now **flips** below the portrai
 North_Beggar (11,8)'s raised nameplate. **No assertion was deleted, relaxed or
 re-baselined.**
 
+---
+
+## jinyong-facility — map_data_facility_flip record (2026-08-29)
+
+Task `map_data_facility_flip` flips EXACTLY two `facility` slots from `declared`
+to `active` in `scripts/data/map_data.gd` `NODES`:
+
+- **少林 (shaolin)** → `{"status": "active", "facility_id": "shaolin_wooden_men"}`
+- **武当 (wudang)** → `{"status": "active", "facility_id": "wudang_meditation"}`
+
+`active_facility_id(shaolin) == "shaolin_wooden_men"`, `active_facility_id(wudang)
+== "wudang_meditation"`, every other node resolves to `""`.
+
+The other **five** nodes stay honestly `declared` / `""` (no faking to flatter the
+table). Post-flip `declared_gap_types()` (fixed order event, battle, facility):
+
+| node | gap list |
+|---|---|
+| shaolin | `["battle"]` (facility now live) |
+| wudang | `["battle"]` (facility now live) |
+| wuming_valley | `["battle", "facility"]` |
+| luoyang | `["battle", "facility"]` |
+| xiangyang | `["battle", "facility"]` |
+| kunlun | `["event", "battle", "facility"]` (terminal guarantee) |
+| huashan | `["event", "facility"]` (battle live) |
+
+**Authorized shaolin-scenario re-baseline (corrected on this retry).** Only the
+gap assert measured **at 少林** (f560, `events_resolved_count == 2`) tightens to
+`entry_declared_gap_types.has("battle") and not entry_declared_gap_types.has("facility")`
+— facility is live there. The gap assert measured at **洛阳** (f460,
+`events_resolved_count == 1`, the outbound luoyang resolution) keeps
+`has("battle") and entry_declared_gap_types.has("facility")`: luoyang's facility
+slot is STILL `declared`, so dropping `facility` there was a false assertion — the
+prior attempt over-rebased it. This retry reverts f460 (measured `["battle",
+"facility"]`), which strengthens honesty rather than relaxing it. The machine
+superset pin (`tests/fixtures/playtest_assert_superset.json`) keeps the tightened
+f560 expression as its single frozen baseline line (satisfied by f560; f460's
+positive form is an allowed superset addition), and the honesty pin (both
+"battle" and "facility" tokens present on every gap line) holds on both lines.
+
+**Red-then-green primary record lives in `final/delivery_notes_facility.md`** (the
+`facility_playtest_scenario` task's red-run measurements: `facility_use_reusable`
+f570 `facility_id` read `""` where `shaolin_wooden_men` is expected, f570 `phase`
+read `TRAVEL`, f600 `facility_use_count` read `0`, f760 `facility_id` read `""`,
+f790 `facility_use_count` read `0` — 34/47 pass, arrival half green / choice half
+red). After this flip, `facility_use_reusable` is measured **47/47 green** (choice
+half turned green by `active_facility_id` resolving; arrival/negative half stayed
+green). Not re-transcribed here to avoid divergence between the two notes.
+
+**Unit-suite fixes (retry, per t_impl review):**
+- `tests/test_map_node_event.gd`: `active_slot_total` `6 → 8` (5 events + 1 battle
+  + 2 facilities); added an `active_facility_nodes` tracking array (parallel to the
+  existing event/battle arrays) pinned `== ["wudang", "shaolin"]` in NODE_IDS order,
+  so a flipped WRONG node pair cannot fake the total; re-argued the two now-false
+  "battle/facility stay declared everywhere" / "six live slots" comments.
+- `tests/test_map_data.gd`: added the missing `active_facility_id("xiangyang") == ""`
+  and `active_facility_id("wuming_valley") == ""` inert pins (acceptance-criterion
+  coverage).
+
 

@@ -69,13 +69,15 @@ static func _test_map_data_schema(ok: bool) -> bool:
 			ok = _expect(ok, status == "active" or status == "declared",
 					"%s/%s: status '%s' in {active, declared}" % [nid, slot_type, str(status)])
 
-	# (b) exactly five ACTIVE event slots across the whole table — the four
-	#     live mainline nodes (wuming_valley/luoyang/wudang/xiangyang) plus
+	# (b) the live slots and their composition. Five ACTIVE event slots — the
+	#     four live mainline nodes (wuming_valley/luoyang/wudang/xiangyang) plus
 	#     shaolin's branch — each resolving inside the sanctioned pool (zero new
-	#     prose). battle/facility slots stay declared everywhere, so the total
-	#     active-slot count equals the active-event-slot count.
+	#     prose). battle is live on 华山 (huashan_duel) only; facility is live on
+	#     the two sects 少林 / 武当 (shaolin_wooden_men / wudang_meditation). The
+	#     remaining battle/facility slots stay declared on every other node.
 	var active_event_nodes: Array[String] = []
 	var active_battle_nodes: Array[String] = []
+	var active_facility_nodes: Array[String] = []
 	var active_slot_total: int = 0
 	for nid in NODE_IDS:
 		var ec: Dictionary = MapData.entry_content(nid)
@@ -87,13 +89,18 @@ static func _test_map_data_schema(ok: bool) -> bool:
 					active_event_nodes.append(nid)
 				elif slot_type == "battle":
 					active_battle_nodes.append(nid)
-	# Six live slots now, not five: the same five events plus 华山's battle — the
-	# first slot of a type other than event to go live. Counting the two kinds
-	# apart is what keeps this assertion honest; a single total would have gone
-	# on reading "five events" while one of them was something else entirely.
-	ok = _expect(ok, active_slot_total == 6, "exactly six active entry slots across the table (got %d)" % active_slot_total)
+				else:
+					active_facility_nodes.append(nid)
+	# Eight live slots now: the same five events, 华山's battle, and the two
+	# facility slots (少林 木人巷 + 武当 紫霄静修). Counting the three kinds apart
+	# is what keeps this honest — a single total would go on reading the table
+	# wrongly the moment one slot type's composition changes, and a flipped WRONG
+	# node pair could otherwise still add up to two.
+	ok = _expect(ok, active_slot_total == 8, "exactly eight active entry slots across the table (got %d)" % active_slot_total)
 	ok = _expect(ok, active_battle_nodes == ["huashan"],
 			"华山 is the only node with a live battle slot (got %s)" % str(active_battle_nodes))
+	ok = _expect(ok, active_facility_nodes == ["wudang", "shaolin"],
+			"少林 + 武当 are exactly the two nodes with a live facility slot, in NODE_IDS order (got %s)" % str(active_facility_nodes))
 	ok = _expect(ok, MapData.active_battle_id("huashan") == "huashan_duel", "huashan binds huashan_duel")
 	ok = _expect(ok, MapData.active_battle_id("shaolin") == "", "a declared battle slot yields no id")
 	ok = _expect(ok, MapData.active_event_id("huashan") == "", "华山 carries no event, so no precedence rule is reachable")
