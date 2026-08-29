@@ -720,15 +720,19 @@ VBox 内该标签矩形顶 == 首行墨迹顶,`horizontal_alignment=1` 使每行
 ——全子树无 STOP:一个悬浮在角色身上的 HUD 控件,不许有任何一个是 STOP 的后代。
 `scripts/ui/health_bar.gd` 在 `update_health` 里对 `Bar`/`HpLabel`/cap 三个每帧重断言。
 
-**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=0`)的裁定(2026-08-28 修复轮勘误:计数器已落,实测钉子挂在该腿的闸门证据上):**
-计数器已落进 `scripts/characters/enemy.gd`(L123 声明、L346 在按键守卫之前自增,度量的
-正是「gui_input 到底会不会触发」),且 `input_click_differential.yaml` L105 的
-`debug_click_target_fires == 0` 那条腿**就是这条实测**。裁定「死路由、吃不掉事件、
-节点保留为 harness 点击锚」现挂在该闸门断言上,**闸门证据待跑**。时序:上一版勘误写
-「实测 0 次」时计数器尚未落地(闸门实测 `input_click_differential` 12/13,该断言报
-`Invalid named index`),此轮计数器与那条腿都已落,等闸门转绿即为实测结论。节点**保留**:
-它是 harness 按名解析的点击锚(`click_move_commit_lock.yaml` 用到),`mouse_filter` 留
-原值零 diff(两态皆惰性)。
+**敌人 `ClickTarget`(`scenes/enemy.tscn`,`mouse_filter=2` IGNORE)的裁定(2026-08-29 闸门实测收口):**
+计数器已落进 `scripts/characters/enemy.gd`(声明 + `_input` 中继里在按键守卫之前自增,度量的
+正是「gui_input 到底会不会触发」),且 `input_click_differential.yaml` 的
+`debug_click_target_fires == 0` 那条腿**就是这条实测**。终局裁定(本轮 `5_compile` 的
+`playtest_summary.md` 实测 `input_click_differential` **13/13**,该腿转绿):**IGNORE 已落**——
+gui_input 不触发、计数器恒 0,点击路径是单位 `_input` 中继;STOP 侧的反例实测(计数 == 1,
+控件吃掉按下)见 `final/delivery_notes_fix_clicktarget_ignore.md`。时序勘误链:首版勘误写
+「实测 0 次」时计数器尚未落地(闸门实测 12/13,该断言报 `Invalid named index`);修复轮
+计数器落地但仍 STOP(12/13,实测 == 1);camera-owns-visibility 轮上报红因;本轮落
+`mouse_filter=2` 并由闸门复跑收口。节点**保留**,但只作为 `debug_click_target_fires` 路由
+计数器的载体,**不再是 playtest 的点击锚**——`mouse_filter=2` 下 harness 对它 aim 会硬失败,
+场景一律锚单位自身 Node2D 名字(裁定见 `90_decisions.md` 2026-08-29 条;旧文「保留为
+harness 点击锚、`mouse_filter` 留原值零 diff」的后半句由该条作废)。
 
 ## 名牌挂到立绘顶端 + 地面标记(2026-08-28,interaction-defects;几何修复 fix_geometry_overlap_rebaseline)
 
