@@ -357,6 +357,20 @@ const EN: Dictionary = {
 	"\n当前：%s": "\nCurrent: %s",
 	"【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺": "[%s]\n\n%s\n\n%s\n%s\n\nUp/down to choose, Enter to decide",
 
+	# --- Sect facilities (scripts/data/facility_data.gd + map.gd FACILITY) ---
+	"木人巷": "Wooden Men Alley",
+	"紫霄静修": "Purple Cloud Meditation",
+	"入巷练骨": "Enter the Alley to Temper the Body",
+	"静室修内": "Meditate for Inner Qi",
+	"木人巷中十八尊木人，\n拳脚如雨，是少林弟子练骨之地。": "Eighteen wooden men line the alley,\nfists like rain — where Shaolin disciples temper their bones.",
+	"紫霄宫静室檀香袅袅，\n吐纳之间，内力自生。": "Incense drifts through the quiet hall of the Purple Cloud Palace;\nwith each breath, inner qi gathers.",
+	"回车使用 · 上下离开": "Enter to use · Up/Down to leave",
+	"银两不足": "Not enough silver",
+	"\n\n门派设施：%s（F 使用）": "\n\nSect facility: %s (F to use)",
+	"银两 −%d": "Silver −%d",
+	"根骨 +%d": "Bone +%d",
+	"内力 +%d": "Qi +%d",
+
 	# --- Cultivation ------------------------------------------------------
 	"方向键选择 · 回车执行": "Arrow keys to choose · Enter to act",
 	"第 %d 年 · 第 %d 月    门派: %s\n": "Year %d · Month %d    Sect: %s\n",

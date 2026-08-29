@@ -51,6 +51,26 @@ var last_effect_types: Array[String] = []
 ## Surface: session count of resolved node-entry events (ladder 0 -> 1, ...).
 var events_resolved_count: int = 0
 
+## Surface: id of the active facility while in FACILITY phase ("" otherwise).
+## The facility is entered ONLY by the explicit use_facility key in TRAVEL —
+## never on arrival (that is the definitional event-vs-facility split).
+var facility_id: String = ""
+
+## Surface: session count of facility uses (ladder 0 -> 1 -> 2 ...; persists across
+## visits because MapScreen stays loaded). Bounded only by the silver cost this round.
+var facility_use_count: int = 0
+
+## Surface: effect "type"s of the last facility use, in order (mirrors last_effect_types).
+var last_facility_effect_types: Array[String] = []
+
+## Render-only (NOT a surface var): true when the last use was refused for lack of
+## silver — the FACILITY panel appends 银两不足 when set.
+var _facility_refused: bool = false
+
+## Debug injection: the granted silver = this multiple × the max facility silver cost
+## (a RELATIVE expression, enough for at least two uses; deliberately NOT a tuned number).
+const DEBUG_SILVER_GRANT_MULT := 4
+
 
 func _ready() -> void:
 	# Save-integrity fallback: a hand-edited or legacy save may carry an empty /
@@ -79,6 +99,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.is_action_pressed("ui_accept"):
 			get_viewport().set_input_as_handled()
 			_resolve_node_event()
+		return
+	if phase == "FACILITY":
+		# The facility modal: ui_accept USES (not travels); the directional leave
+		# keys mirror the EVENT grammar. Direction keys here must NEVER leak into
+		# travel — this branch returns regardless, so _cycle_focus/_travel are
+		# unreachable while a facility is open.
+		if event.is_action_pressed("ui_accept"):
+			get_viewport().set_input_as_handled()
+			_use_facility()
+		elif event.is_action_pressed("move_down") or event.is_action_pressed("move_left"):
+			get_viewport().set_input_as_handled()
+			_leave_facility()
+		return
+	if event.is_action_pressed("use_facility") and MapData.active_facility_id(current_node_id) != "":
+		# The opt-in door: the player actively chooses to enter the node's facility.
+		# ui_accept still travels (separate key, never a conflict).
+		get_viewport().set_input_as_handled()
+		_enter_facility()
 		return
 	if event.is_action_pressed("ui_accept"):
 		get_viewport().set_input_as_handled()
@@ -195,6 +233,83 @@ func _resolve_node_event() -> void:
 	_render()
 
 
+## Enter the FACILITY phase for the current node (opt-in, from the use_facility key
+## in TRAVEL). Does NOT auto-use — the player still must press ui_accept to actually
+## use the facility, keeping "arrival/entry never uses" true.
+func _enter_facility() -> void:
+	facility_id = MapData.active_facility_id(current_node_id)
+	phase = "FACILITY"
+	_facility_refused = false
+	_sync_surface()
+	_render()
+
+
+## Use the active facility: pay its silver cost (if affordable) and apply its effects
+## through the SAME pure-static EventLogic path events use — zero new economy. The
+## player STAYS in FACILITY, so they can use it again immediately or leave.
+func _use_facility() -> void:
+	var fdef = FacilityData.def(facility_id)
+	if fdef == null:
+		return
+	var cost: int = FacilityData.silver_cost(fdef)
+	if SaveManager.profile.silver < cost:
+		# Refusal: no effect application, no count increment, no silver/attr change.
+		_facility_refused = true
+		_sync_surface()
+		_render()
+		return
+	var opt = EventData.EventOption.new()
+	opt.effects = fdef.effects.duplicate(true)
+	EventLogic.apply_option_effects(SaveManager.profile, opt)
+	last_facility_effect_types = []
+	for eff in fdef.effects:
+		last_facility_effect_types.append(eff.get("type", "none") as String)
+	facility_use_count += 1
+	_facility_refused = false
+	SaveManager.autosave()
+	_sync_surface()
+	_render()
+
+
+## Leave the FACILITY phase back to TRAVEL. The use count persists across visits.
+func _leave_facility() -> void:
+	facility_id = ""
+	phase = "TRAVEL"
+	_facility_refused = false
+	_sync_surface()
+	_render()
+
+
+## Max silver cost across the facility pool; 0 when empty. Used only by the debug
+## injection to express the grant RELATIVE to the cost (never a tuned literal).
+func _max_facility_silver_cost() -> int:
+	var max_cost: int = 0
+	for fdef in FacilityData.all():
+		var c: int = FacilityData.silver_cost(fdef)
+		if c > max_cost:
+			max_cost = c
+	return max_cost
+
+
+## Debug-only silver injection, routed THROUGH the normal pipeline (the same
+## EventLogic.apply_option_effects path every event/card/facility silver effect takes —
+## roadmap rule 2: injection must not bypass the code the player actually exercises).
+## Never a bare profile.silver assignment.
+func _debug_grant_silver() -> void:
+	var opt = EventData.EventOption.new()
+	opt.effects = [{"type": "silver", "value": DEBUG_SILVER_GRANT_MULT * _max_facility_silver_cost(), "target": ""}]
+	EventLogic.apply_option_effects(SaveManager.profile, opt)
+	_sync_surface()
+	_render()
+
+
+func _process(_delta: float) -> void:
+	if ended:
+		return
+	if Input.is_action_pressed("debug_grant_silver"):
+		_debug_grant_silver()
+
+
 ## Mirror the profile + node content state into the playtest surface observables.
 func _sync_surface() -> void:
 	silver = SaveManager.profile.silver
@@ -208,17 +323,17 @@ func _sync_surface() -> void:
 
 ## Single-operation-hint invariant: the bottom travel hint is the map's own
 ## promise ("左右/上下选择相邻去处，回车启程") and must NOT survive into a modal event panel
-## that asks for 上下选择. The event panel's own prompt is the only hint that may
-## show while phase == "EVENT"; the travel hint is restored whenever phase is
-## anything else (TRAVEL today, and any future phase) so it can never silently
-## re-promise travel while the player is not in the travel flow. hint.text is the
+## that asks for 上下选择, nor into the FACILITY panel. The event/facility panel's own
+## prompt is the only hint that may show while a modal is up; the travel hint is
+## shown ONLY in TRAVEL (phase == "TRAVEL") so it can never silently re-promise
+## travel while the player is in the event or facility flow. hint.text is the
 ## static scene text and is never touched here — visibility toggling is the whole
 ## fix.
 func _apply_hint_visibility() -> void:
 	var hint: Label = get_node_or_null("HintLabel") as Label
 	if hint == null:
 		return
-	hint.visible = phase != "EVENT"
+	hint.visible = phase == "TRAVEL"
 
 
 func _render() -> void:
@@ -234,6 +349,16 @@ func _render() -> void:
 		var ea = "▶ %s" % tr(def.option_a.label) if event_focus == 0 else "  %s" % tr(def.option_a.label)
 		var eb = "▶ %s" % tr(def.option_b.label) if event_focus == 1 else "  %s" % tr(def.option_b.label)
 		body.text = tr("【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺") % [tr(def.title), tr(def.text), ea, eb]
+		return
+	if phase == "FACILITY":
+		var fdef = FacilityData.def(facility_id)
+		if fdef == null:
+			body.text = ""
+			return
+		var summary: String = _facility_effect_summary(fdef)
+		body.text = tr("【%s】\n\n%s\n\n%s\n%s\n\n%s") % [tr(fdef.title), tr(fdef.text), summary, "▶ " + tr(fdef.action_label), tr("回车使用 · 上下离开")]
+		if _facility_refused:
+			body.text += tr("银两不足")
 		return
 	var text: String = tr("【江湖行路】\n\n")
 	for node in MapData.node_ids():
@@ -252,4 +377,33 @@ func _render() -> void:
 	# them byte-identical and turned a near-duplicate into an exact one; the
 	# single-hint invariant this file documents above wants one, not two.
 	text += tr("\n当前：%s") % tr(str(MapData.node_def(current_node_id).get("display_name", current_node_id)))
+	# Facility hint: let the player SEE the node has a usable facility and which key
+	# enters it. The prose itself lives only in facility_data.gd (the §433 rule).
+	var fid: String = MapData.active_facility_id(current_node_id)
+	if fid != "":
+		var fdef = FacilityData.def(fid)
+		if fdef != null:
+			text += tr("\n\n门派设施：%s（F 使用）") % tr(fdef.title)
 	body.text = text
+
+
+## Compose the cost/effect summary line for a facility from its effects (e.g.
+## "银两 −8 · 根骨 +2"). Only silver-cost and attr-gain effects render; unknown
+## attr targets fall back to a plain non-CJK "+N" marker (never reached by the
+## current bone/inner-only facility pool).
+func _facility_effect_summary(fdef) -> String:
+	var parts: Array[String] = []
+	for eff in fdef.effects:
+		var etype: String = eff.get("type", "none") as String
+		var value: int = eff.get("value", 0) as int
+		if etype == "silver" and value < 0:
+			parts.append(tr("银两 −%d") % absi(value))
+		elif etype == "attr":
+			var target: String = eff.get("target", "") as String
+			if target == "inner":
+				parts.append(tr("内力 +%d") % value)
+			elif target == "bone":
+				parts.append(tr("根骨 +%d") % value)
+			else:
+				parts.append("+%d" % value)
+	return " · ".join(parts)
