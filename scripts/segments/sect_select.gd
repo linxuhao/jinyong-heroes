@@ -10,9 +10,28 @@ var focus_index: int = 0
 ## Surface: last picked sect id ("" until picked).
 var selected_sect_id: String = ""
 
+## Surface: button name -> pressed-signal wired.
+var pressed_connected: Dictionary = {}
+
 
 func _ready() -> void:
+	_wire_sect_buttons()
 	_render()
+
+
+func _wire_sect_buttons() -> void:
+	for i in 5:
+		var btn: Button = get_node_or_null("SectButton%d" % i) as Button
+		if btn == null:
+			continue
+		btn.pressed.connect(_on_sect_pressed.bind(i))
+		pressed_connected["SectButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
+
+
+func _on_sect_pressed(i: int) -> void:
+	focus_index = i
+	_render()
+	_pick()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -55,3 +74,7 @@ func _render() -> void:
 		]
 	text += tr("\n上下选择，回车拜入")
 	body.text = text
+	for i in range(rows.size()):
+		var btn: Button = get_node_or_null("SectButton%d" % i) as Button
+		if btn != null:
+			btn.text = tr(str(rows[i]["display_name"]))

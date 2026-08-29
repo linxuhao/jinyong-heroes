@@ -924,6 +924,26 @@ surface:
   - size
   - mouse_filter
   - text
+  SectButton1:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  SectButton2:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  SectButton3:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  SectButton4:
+  - visible
+  - size
+  - mouse_filter
+  - text
   CultOptionButton0:
   - visible
   - size

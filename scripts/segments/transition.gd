@@ -16,9 +16,26 @@ var lines_shown: int = 0
 ## Surface: true after the last page routed onward.
 var done: bool = false
 
+## Surface: button name -> pressed-signal wired.
+var pressed_connected: Dictionary = {}
+
 
 func _ready() -> void:
+	_wire_next_button()
 	_render()
+
+
+func _wire_next_button() -> void:
+	var btn: Button = get_node_or_null("NextButton") as Button
+	if btn == null:
+		return
+	btn.pressed.connect(_on_next_pressed)
+	pressed_connected["NextButton"] = btn.get_signal_connection_list("pressed").size() > 0
+
+
+func _on_next_pressed() -> void:
+	if not done:
+		_advance()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -43,3 +60,7 @@ func _render() -> void:
 	var label: Label = get_node_or_null("PageLabel") as Label
 	if label != null:
 		label.text = PAGES[mini(lines_shown, PAGES.size() - 1)]
+	var next_btn: Button = get_node_or_null("NextButton") as Button
+	if next_btn != null:
+		next_btn.text = tr("继续 ▶")
+		next_btn.visible = not done
