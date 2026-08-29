@@ -258,3 +258,68 @@ Control——两个要求**互斥**,且本轮**两边各红过一次**:
 `push_error`。结论:**「行为在另一种 harness 下会正确」不是保留一条红锚点的理由**;
 锚点必须对当下装着的 harness 就成立,否则拿什么当实测证据。
 
+## 门派设施:定义、不变量与复用上限(2026-08-29,`jinyong-facility` 轮)
+
+本条记 `jinyong-facility` 轮五项裁定。设施的定义与数据行见 `20_content.md` §10;
+本轮把地图第三类进入内容(facility)落地于少林 / 武当,并把「它凭什么不是第二个
+event」这一性质变成永久可观测的事实。
+
+### (a) event / facility 优先级:到达永不入设施,只由显式键进入
+
+**裁定:facility 从不接入到达分派(`_maybe_start_entry_event()` /
+`_maybe_start_entry_battle()`);它只在 TRAVEL 相位由玩家按 `use_facility` 键(F)
+主动进入 `FACILITY` 相位。** 这是 event(到达即触发的被动内容)与 facility(主动选择、
+可重复使用的主动内容)的定义性区别——若做不出这个区别,facility 就只是第二个 event。
+
+**由永久负向断言钉住,不只记档**:`playtest/facility_use_reusable.yaml` 的到达半场
+断 `phase == "EVENT" and phase != "FACILITY"`、`facility_id == ""`、
+`facility_use_count == 0`(event 解算回 TRAVEL 后再断一次 `facility_use_count == 0`,
+防解算夹带使用)。这确保任何未来轮次把 facility 悄悄接进到达分派都会**当场变红**——
+「定义一样东西的性质若没有观测点」是本项目的复发性失败形状,本条就是它的观测点。
+同一事实的第二层保护是 `tests/test_playtest_contract_smoke.py` 的防删钉(要求场景
+文件文本里 `phase != "FACILITY"` 与 `facility_use_count == 0` 两行都在)——因为一个
+静默可删的常驻断言,和从没写过的观测点是同一种失败。
+
+### (b) 少林场景 gap 断言重基线例外(机器记录,仅 f560 收紧)
+
+**裁定:facility 槽转 `active` 令 `declared_gap_types()` 这个诚实可观测量必须移动,
+经 superset fixture 授权重基线;但只动真正变了的那一条。**
+`playtest/map_node_event_shaolin.yaml`:
+- **仅 f560**(在少林、`events_resolved_count == 2`)收紧为
+  `entry_declared_gap_types.has("battle") and not entry_declared_gap_types.has("facility")`
+  ——少林 facility 已 live,不再是缺口。
+- **f460**(在洛阳、`events_resolved_count == 1`)保持
+  `has("battle") and has("facility")`——洛阳 facility 槽**仍 `declared`**,在此处去掉
+  `facility` 会是**假断言**(前一次尝试过度重基线了它,本轮如实回退,是加强诚实、非放宽)。
+`tests/fixtures/playtest_assert_superset.json` 以收紧后的 f560 表达式为其单条冻结基线
+行(f560 满足之;f460 的正向形式是允许的超集),honesty 钉(每条 gap 行含 "battle" 与
+"facility" 两 token)在两行上都成立。
+
+### (c) §433 文案位置守卫:已采纳(实测核实)
+
+**裁定:把「设施 / 事件文案只能住在其数据模块、绝不 inline 于 `map_data.gd` /
+`map.gd`」这条原为纯文档的规矩,升级为会拦人的静态守卫。**
+`tests/test_facility_copy_location.py`(纯标准库 pytest,照 `test_i18n_coverage.py` 形状):
+扫 `map_data.gd` / `map.gd` 中 ≥4 CJK 的双引号字面量,命中不在 allowlist 者即红;allowlist
+含设施 chrome(`"\n\n门派设施：%s（F 使用）"`、`"回车使用 · 上下离开"`、`"银两不足"`)
+与既有合法字面量(旅行动词、节点 display_name 等)。prose-scoped 而非「零 CJK」——
+更严的变体需要同一份 allowlist,额外严格买不到东西。动机与 `test_i18n_coverage.py`
+一致:一段 inline 的江湖轶事渲染中文毫无问题,没有任何自动检查看得见它。
+
+### (d) 红转绿记录是一次性证据,常驻性质由负向断言承载
+
+**裁定:新场景 flip 前实测的红值(34/47:到达半场绿、选择半场红——`phase` 读
+`TRAVEL`、`facility_id` 读 `""`、`facility_use_count` 读 `0`,逐条见
+`final/delivery_notes_facility.md`)是一次性证据——它证明这条钉子确实能红、不是永远
+绿的装饰;但它转绿即消失,此后保护不了任何东西。** 把「到达即触发 vs 主动进入」这一
+性质带向未来的,是 (a) 的常驻负向断言 + 防删钉,不是一次性的红。写在此处,以防后续读者
+误把红签名当成持久守卫。
+
+### (e) facility 复用上限 = 第 5 阶段待决数值(本轮仅以既有银两为限)
+
+**裁定:本轮复用上限只由既有银两决定(每次付费、付得起就能再用),零新资源 / 新
+货币 / 新经济。复用的真正上界——once-per-visit / once-per-period / pure-silver-limit
+三取一——是第 5 阶段数值精调的待决项,本轮不下结论。** 记在此处,是因为若只留当前
+银两门槛这一实现事实,下一轮极易把它读成已定的复用上限;把未决的东西显式记为 PENDING,
+正是 `90_decisions.md`「已决定但未实现 / 未决定」这一层的用途。「先记下」优于沉默。
+

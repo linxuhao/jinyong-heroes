@@ -597,3 +597,76 @@ map.tscn` 的 MAP 段 TRAVEL↔EVENT 切换——该段恰有两个常驻 Label:
 帧,本轮零新几何/零新调色板)。§8.3 缺口未因实测而关闭:battle / facility 仍已声明
 未实现,昆仑 event 槽仍为终点保证的有意 `declared`,三者待后续轮次实现时才关闭。
 
+---
+
+## 10. 门派设施(facility)内容类型 (2026-08-29,`jinyong-facility` 轮)
+
+上节末句「facility 仍已声明未实现……待后续轮次实现时才关闭」预告的那一后续轮次
+就是本节。本节把「门派设施」这一内容类型**定义并落地**:它填上 §8.1 六节点表里
+`facility` 槽此前**六个节点全是 `declared` / `""`** 的结构性缺口——本轮把其中两个
+(少林 / 武当,它们本来就是门派)从 `declared` 转 `active`,其余五节点(wuming_valley /
+luoyang / xiangyang / kunlun / huashan)仍诚实保持 `declared` / `""`(见 §8.1 表与
+§8.3 第 2 条,同一事实源)。「还剩什么没做」以 `MapData.declared_gap_types(id)` 为可
+断言的事实源,不靠本节的文字。
+
+### 10.1 定义性区别:event 被动触发、facility 主动进入
+
+「门派设施」若做不出与 event 的玩家可感区别,它就只是第二个 event。区别钉死如下:
+
+- **event = 到达即触发的被动内容。** `map.gd::_travel()` 在经 travel 到达节点时自动
+  调 `_maybe_start_entry_event()`,玩家无需选择。
+- **facility = 玩家主动选择进入、可重复使用的主动内容。** 它由玩家在 TRAVEL 相位按
+  专门的 **`use_facility` 键**(绑 `F`)才进入 `FACILITY` 相位;在 FACILITY 里按
+  `ui_accept` 使用一次、按 `move_down` / `move_left` 离开,下一次到访可再用。
+
+### 10.2 「到达永不入设施」不变量(定义性,非冗余)
+
+**facility 从不接入到达分派** —— 它绝不写进 `_maybe_start_entry_event()` /
+`_maybe_start_entry_battle()`。这是「facility 不是第二个 event」的全部所以然,也是
+`playtest/spine_to_ending.yaml`(武当一腿)按构造对它无感的理由:设施不自动触发、
+不消费到达输入,护线到达帧只解算 event、继续行走。
+
+### 10.3 两条数据行(文案唯一源 `scripts/data/facility_data.gd`)
+
+设施文案一律进 `FacilityData.TABLE`(镜像 `EventData.TABLE`,零 inline 于
+`map_data.gd` / `map.gd`,见 §10.5 守卫)。本轮两行,效果只走**既有 EventLogic 封闭
+域**(silver / attr / practice / none),不发明新经济:
+
+| facility id | 节点 | 标题 | 每次效果 |
+|---|---|---|---|
+| `shaolin_wooden_men` | `shaolin` 少林 | 木人巷 | 银两 −8 → 根骨 +2(`bone`) |
+| `wudang_meditation` | `wudang` 武当 | 紫霄静修 | 银两 −8 → 内力 +2(`inner`) |
+
+银两消耗即门槛(cost-gated):`profile.silver < cost` 时拒绝使用、不加计数、效果不
+落地(「银两不足」)。效果经由 `EventLogic.apply_option_effects` 落到既有
+`PlayerProfile` 的 `silver` / `add_attr`——设施是既有系统的**一个新入口**,不是一套
+并行玩法。数值「够用即止」,非精调(第 5 阶段)。
+
+### 10.4 可重复但有界(复用上限 = 第 5 阶段待决数值)
+
+本轮以**既有银两**为唯一复用门槛(每次付费、付得起就能再用)——引入零新资源 / 新
+货币 / 新经济。但**复用的上界尚未定死**:每访一次(once-per-visit)/ 每周期一次
+(once-per-period)/ 纯银两限(pure-silver-limit)三者取哪一个是**第 5 阶段数值精调的
+待决项**,已记入 `design/90_decisions.md` 裁定 (e)。**后续轮次不得把当前的银两门槛
+读成已定的复用上限** —— 这是本条必须显式写 PENDING 的原因。
+
+### 10.5 可观测性与守卫(本轮立的常驻观察点)
+
+- **永久负向断言**(`playtest/facility_use_reusable.yaml`,第 58 个场景):到达半场
+  钉 `phase == "EVENT" and phase != "FACILITY"`、`facility_id == ""`、
+  `facility_use_count == 0`(且在 event 解算回 TRAVEL 后再断一次 `facility_use_count
+  == 0`,防解算夹带使用)——与选择半场(主动进入 → 用一次 → 离开 → 再访再用)同处
+  一景,两面是同一事实的正反面。它永久防止未来某一轮把 facility 悄悄接进到达分派。
+- **防删钉**(`tests/test_playtest_contract_smoke.py
+  ::test_facility_use_reusable_surface_contract`):要求该场景文件文本里
+  `phase != "FACILITY"` 与 `facility_use_count == 0` 两行都在,否则红——常驻断言本身
+  也可删,故再钉一层。
+- **§433 文案位置守卫**(`tests/test_facility_copy_location.py`,本轮**已采纳**):prose-
+  scoped 静态 pytest,扫 `map_data.gd` / `map.gd` 里 ≥4 CJK 的新 inline 文案(白名单
+  含设施 chrome),使「设施文案只能住在其数据模块」从一句文档规矩变成会拦人的门。
+- **红值记录**:本场景在 facility 仍 `declared`(flip 未落)时实测 **34/47**:到达半场
+  全绿、选择半场全红(`phase` 读 `TRAVEL`、`facility_id` 读 `""`、`facility_use_count`
+  读 `0`)。flip 后 `facility_use_reusable` 实测 **47/47** 全绿。红值逐条见
+  `final/delivery_notes_facility.md`。红转绿是一次性证据(转绿即消失),承载该性质向
+  前的是上条的永久负向断言(见 `design/90_decisions.md` 裁定 (d))。
+
