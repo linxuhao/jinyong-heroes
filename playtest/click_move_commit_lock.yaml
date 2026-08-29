@@ -10,7 +10,8 @@
 # rows/cols 0 and GRID_*-1). Chebyshev(max(|7-7|, |2-1|)) = 1 — (7,2) is one of
 # the nearest legal tiles adjacent to Central_Divine (7,1), so the attack is IN
 # reach. Turn budget is 4 steps, so after 3 moves moves_left == 4 - 3 == 1.
-# Click Central_Divine_ClickTarget -> basic attack 30 x fa_hui_du 1.3 = 39
+# Click Central_Divine (the enemy's own Node2D body origin / feet tile) ->
+# basic attack 30 x fa_hui_du 1.3 = 39
 # damage vs Central_Divine.max_health 130. Player.acted false->true at f145 is
 # the changed differential (the click executed the action; execute_action
 # latency is 40 frames, proven by click_targeting_fixed); the equality + health
@@ -22,7 +23,8 @@
 name: click_move_commit_lock
 description: >-
   Commit lock: walk north 3 tiles (7,5)->(7,2) [Player +0,-192, 3 steps of a
-  4-step budget], click Central_Divine_ClickTarget -> basic attack 30 * 1.3 =
+  4-step budget], click Central_Divine (the enemy's own Node2D body origin /
+  feet tile) -> basic attack 30 * 1.3 =
   39 (Player.acted false->true; Central_Divine.health == max_health - 39
   PROBE), then right-click the player's own tile: undo is REFUSED (acted ==
   true) — grid_pos stays (7,2), moves_left stays 1, undo_available false.
@@ -74,7 +76,7 @@ timeline:
 - at: 105
   actions: []
   clicks:
-  - Central_Divine_ClickTarget
+  - Central_Divine
 - at: 145
   actions: []
   assert:

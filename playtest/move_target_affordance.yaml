@@ -9,7 +9,8 @@
 #   walk click f70 -> settled f130 (grid (7,2), undo_available, state undo_ready)
 #   undo click f135 -> settled f170 (back to (7,5), state idle again)
 #   second walk f175 -> f230 (grid (7,2), undo_ready again)
-#   Central_Divine_ClickTarget f235 -> f290 (acted, commit locks undo, committed)
+#   Central_Divine (enemy's Node2D body origin / feet tile) f235 -> f290 (acted,
+#   commit locks undo, committed)
 # Each MoveHintLabel.assert carries a comparison operator (repo discipline — no
 # bare-scalar silent-false asserts).
 name: move_target_affordance
@@ -64,7 +65,7 @@ timeline:
 - at: 235
   actions: []
   clicks:
-  - Central_Divine_ClickTarget
+  - Central_Divine
 - at: 290
   actions: []
   assert:
