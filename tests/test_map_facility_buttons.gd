@@ -118,12 +118,12 @@ static func _test_pressed_connected(ok: bool) -> bool:
 		# keyboard branch byte-identical (ui_accept can never reach a button that
 		# cannot hold focus, so exactly one dismissal per key press).
 		var b: Button = map.get_node_or_null(String(BUTTON_PATHS[key])) as Button
-		ok = _expect(ok, b != null, "the scene carries a %s node at '%s'" % [name, String(key)])
+		ok = _expect(ok, b != null, "the scene carries a %s node at '%s'" % [key_name, String(key)])
 		if b == null:
 			continue
-		ok = _expect(ok, b.focus_mode == Control.FOCUS_NONE, "%s is FOCUS_NONE (no ui_accept double-fire)" % name)
+		ok = _expect(ok, b.focus_mode == Control.FOCUS_NONE, "%s is FOCUS_NONE (no ui_accept double-fire)" % key_name)
 		ok = _expect(ok, b.mouse_filter != Control.MOUSE_FILTER_IGNORE,
-				"%s is not MOUSE_FILTER_IGNORE (an IGNORE anchor is unhittable)" % name)
+				"%s is not MOUSE_FILTER_IGNORE (an IGNORE anchor is unhittable)" % key_name)
 
 	# The two static labels live in map.tscn ONLY (the §433 copy-location rule):
 	# they must be present and distinct without this file naming their Chinese.
