@@ -515,23 +515,29 @@ func _on_option_pressed(index: int) -> void:
 	_on_accept()
 
 
-## Rebuild the OptionsBox pool for the CURRENT phase. Children are freed
-## immediately (remove_child + free, never queue_free — renders are synchronous
-## and event-driven, so a queued free would leave stale buttons hittable inside
-## the same frame). One CultOptionButton{i} per option, in the SAME order with
-## the SAME labels as the BodyLabel rows (minus the ▶ marker). The box hides
-## when the phase offers nothing to pick (GONGFA_PICK with an empty unmastered
-## list — the keyboard path auto-returns to ACTION_PICK there; a defensive
-## EVENT with an unresolvable event id), and pressed_connected is re-snapshotted
-## after every rebuild (empty when the box is hidden) so the observable stays
-## truthful.
+## Rebuild the OptionsBox pool for the CURRENT phase. Children are removed
+## immediately then queue_freed (remove_child + queue_free, never plain free):
+## renders are synchronous and event-driven, and a CLICK on a CultOptionButton
+## re-enters this rebuild from inside that button's own `pressed` emission —
+## `child.free()` on the currently-emitting button throws "Attempted to free a
+## locked object (calling or emitting)" (exposed by the clicks-only storyline,
+## which the keyboard path never reached). remove_child already detaches every
+## old button so it cannot be hit again this frame; queue_free only defers the
+## memory reclaim to end-of-frame (next click is frames later), which is safe
+## and lets the emission complete. One CultOptionButton{i} per option, in the
+## SAME order with the SAME labels as the BodyLabel rows (minus the ▶ marker).
+## The box hides when the phase offers nothing to pick (GONGFA_PICK with an
+## empty unmastered list — the keyboard path auto-returns to ACTION_PICK there;
+## a defensive EVENT with an unresolvable event id), and pressed_connected is
+## re-snapshotted after every rebuild (empty when the box is hidden) so the
+## observable stays truthful.
 func _rebuild_options_box() -> void:
 	var box: VBoxContainer = get_node_or_null("OptionsBox") as VBoxContainer
 	if box == null:
 		return
 	for child in box.get_children():
 		box.remove_child(child)
-		child.free()
+		child.queue_free()
 	var labels: Array[String] = []
 	match phase:
 		"YEAR_AUGMENT":

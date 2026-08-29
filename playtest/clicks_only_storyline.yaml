@@ -87,55 +87,106 @@ description: >-
   body itself (never *_ClickTarget). The single non-click action is
   debug_win_tutorial (battle-outcome seed, adjudicated). First-red at the
   tutorial-end overlay (ContinueButton does not exist pre-fix).
+#
+# FRAME-TIMING FIX (2026-08-29, task fix_clicks_only_storyline_frame_timing).
+#   ROOT CAUSE (measured, not predicted): the gate reds on this scenario with
+#   88 `aim: node not found` runtime errors — the FIRST is MenuEntry0 at frame
+#   10. The default boot scene is res://scenes/main.tscn, a BARE shell (Main /
+#   Camera / SceneHost / SegmentLayer / SegmentHost / HUD / TutorialOverlay —
+#   NO MenuPanel, NO MenuEntry0). The harness _resolve() ends with a recursive
+#   whole-tree name search, so `node not found` means ONLY "that node is not in
+#   the tree at that frame". MenuEntry0 never exists under a main.tscn boot =>
+#   the game never leaves the main menu => every later click aims at a screen
+#   never reached (measured first failing assert at f30: current_state observed
+#   "TUTORIAL" where "CHARACTER_CREATION" was expected).
+#   FIX: `scene: res://scenes/menu.tscn` below (the documented per-scenario
+#   override — boots this scenario straight into the real main menu, proven by
+#   main_menu_entries / menu_to_creation_to_tutorial_order), and every `at:`
+#   re-aligned so each click lands strictly AFTER its target node is in the
+#   tree. The tutorial intro leg now uses all SEVEN Next clicks (STEP_COUNT
+#   == 7), and the BATTLE assert sits strictly after the 7th. The proof is
+#   preserved: menu -> creation -> tutorial battle -> overlay -> transition ->
+#   sect -> 36-month cultivation -> map -> events -> ending -> restart, all
+#   driven by clicks, zero keyboard actions, single debug_win_tutorial seed.
+scene: res://scenes/menu.tscn
 timeline:
 # ── MENU → CREATION ────────────────────────────────────────────────────────
-- at: 10
+- at: 40
   actions: []
   clicks:
   - MenuEntry0
-- at: 30
+- at: 60
   actions: []
   assert:
     GameManager.current_state: current_state == "CHARACTER_CREATION"
     CreationScreen.visible: visible == true
-- at: 35
+- at: 70
   actions: []
   clicks:
   - AttrNextButton
-- at: 50
-  actions: []
-  clicks:
-  - TraitNextButton
-- at: 65
-  actions: []
-  clicks:
-  - ConfirmButton
-# ── TUTORIAL BATTLE (intro pages + real click + seed) ──────────────────────
 - at: 90
   actions: []
   assert:
+    CreationScreen.phase: phase == "TRAITS"
+- at: 100
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 120
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+- at: 130
+  actions: []
+  clicks:
+  - ConfirmButton
+# ── TUTORIAL INTRO (7 steps, each advanced by a Next click; STEP_COUNT == 7)
+- at: 150
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+- at: 160
+  actions: []
+  clicks:
+  - Next
+- at: 170
+  actions: []
+  clicks:
+  - Next
+- at: 180
+  actions: []
+  clicks:
+  - Next
+- at: 190
+  actions: []
+  clicks:
+  - Next
+- at: 200
+  actions: []
+  clicks:
+  - Next
+- at: 210
+  actions: []
+  clicks:
+  - Next
+- at: 220
+  actions: []
+  clicks:
+  - Next
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ────
+- at: 230
+  actions: []
+  assert:
     GameManager.current_state: current_state == "BATTLE"
-- at: 95
-  actions: []
-  clicks:
-  - Next
-- at: 110
-  actions: []
-  clicks:
-  - Next
-- at: 125
-  actions: []
-  clicks:
-  - Next
-- at: 140
+- at: 235
   actions: []
   clicks:
   - AttackButton
-- at: 150
+- at: 245
   actions:
   - debug_win_tutorial
 # ── TUTORIAL END OVERLAY (the nail — first-red frame) ─────────────────────
-- at: 180
+- at: 265
   actions: []
   assert:
     GameManager.current_state: current_state == "WON"
@@ -144,37 +195,37 @@ timeline:
     ContinueButton.size: size.x > 0 and size.y > 0
     ContinueButton.mouse_filter: mouse_filter == 0
     ContinueButton.focus_mode: focus_mode == 0
-- at: 190
+- at: 275
   actions: []
   clicks:
   - ContinueButton
 # ── TRANSITION (2 pages) ───────────────────────────────────────────────────
-- at: 220
+- at: 295
   actions: []
   assert:
     GameManager.current_state: current_state == "TRANSITION"
     NextButton.visible: visible == true
-- at: 230
+- at: 305
   actions: []
   clicks:
   - NextButton
-- at: 250
+- at: 325
   actions: []
   clicks:
   - NextButton
 # ── SECT SELECT ────────────────────────────────────────────────────────────
-- at: 270
+- at: 345
   actions: []
   assert:
     GameManager.current_state: current_state == "SECT_SELECTION"
     SectButton0.visible: visible == true
-- at: 280
+- at: 355
   actions: []
   clicks:
   - SectButton0
-# ── CULTIVATION (36 months: CultOptionButton0 = card/year-augment/year-end,
-#     CultOptionButton2 = 做工/work → month advances) ───────────────────────
-- at: 310
+# ── CULTIVATION (36 months: CultOptionButton0 = card / year-augment /
+#     year-end stay; CultOptionButton2 = 做工/work → month advances) ────────
+- at: 395
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
@@ -182,71 +233,7 @@ timeline:
     CultivationScreen.month: month == 1
     CultivationScreen.phase: phase == "CARD_PICK"
     CultOptionButton0.visible: visible == true
-# Year 1, months 1-11 (2 clicks each: card + work)
-- at: 320
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 325
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 330
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 335
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 340
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 345
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 350
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 355
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 360
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 365
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 370
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 375
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 380
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 385
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 390
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 395
-  actions: []
-  clicks:
-  - CultOptionButton2
+# YEAR 1 — months 1..11 (each: card + work), month 12 (card + work + stay)
 - at: 400
   actions: []
   clicks:
@@ -263,7 +250,6 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
-# Year 1, month 12 (card + work + year-end stay)
 - at: 420
   actions: []
   clicks:
@@ -278,10 +264,8 @@ timeline:
   - CultOptionButton0
 - at: 435
   actions: []
-  assert:
-    CultivationScreen.year: year == 2
-    CultivationScreen.month: month == 1
-# Year 2, month 1 (year-augment + card + work)
+  clicks:
+  - CultOptionButton2
 - at: 440
   actions: []
   clicks:
@@ -289,76 +273,74 @@ timeline:
 - at: 445
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 450
   actions: []
   clicks:
-  - CultOptionButton2
-# Year 2, months 2-11
+  - CultOptionButton0
 - at: 455
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 460
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 465
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 470
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 475
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 480
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 485
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 490
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 495
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 500
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 505
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# Year 1 month 12: card + work → YEAR_END; stay (留在本门)
 - at: 510
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 515
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 520
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 525
   actions: []
-  clicks:
-  - CultOptionButton0
-- at: 530
-  actions: []
-  clicks:
-  - CultOptionButton2
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+# YEAR 2 — m1 (augment + card + work), m2..m11 (card + work), m12 (card+work+stay)
 - at: 535
   actions: []
   clicks:
@@ -366,30 +348,27 @@ timeline:
 - at: 540
   actions: []
   clicks:
-  - CultOptionButton2
-# Year 2, month 12 (card + work + year-end stay)
+  - CultOptionButton0
 - at: 545
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 550
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 555
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 560
-  actions: []
-  assert:
-    CultivationScreen.year: year == 3
-    CultivationScreen.month: month == 1
-# Year 3, month 1 (year-augment + card + work)
-- at: 565
   actions: []
   clicks:
   - CultOptionButton0
+- at: 565
+  actions: []
+  clicks:
+  - CultOptionButton2
 - at: 570
   actions: []
   clicks:
@@ -398,7 +377,6 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
-# Year 3, months 2-12
 - at: 580
   actions: []
   clicks:
@@ -455,6 +433,7 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
+# Year 2 month 12: card + work → YEAR_END; stay
 - at: 650
   actions: []
   clicks:
@@ -469,16 +448,14 @@ timeline:
   - CultOptionButton0
 - at: 665
   actions: []
-  clicks:
-  - CultOptionButton2
-- at: 670
-  actions: []
-  clicks:
-  - CultOptionButton0
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 1
+# YEAR 3 — m1 (augment + card + work), m2..m11 (card + work), m12 (card + work → MAP)
 - at: 675
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 680
   actions: []
   clicks:
@@ -487,90 +464,179 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
-# ── MAP (4 travel legs, 3 events resolved, endpoint routes to ENDING) ─────
+- at: 690
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 695
+  actions: []
+  clicks:
+  - CultOptionButton2
 - at: 700
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 705
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 710
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 715
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 720
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 725
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 730
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 735
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 740
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 745
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 750
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 755
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 760
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 765
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 770
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 775
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 780
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 785
+  actions: []
+  clicks:
+  - CultOptionButton2
+# Year 3 month 12: card + work → _finish_to_map (year 3 month 12)
+- at: 790
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 795
+  actions: []
+  clicks:
+  - CultOptionButton2
+# ── MAP (4 travel legs, 3 events resolved, endpoint routes to ENDING) ─────
+- at: 845
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
     MapScreen.phase: phase == "TRAVEL"
     TravelButton0.visible: visible == true
-# Leg 1: wuming_valley → luoyang (event: merchant)
-- at: 710
+# Leg 1: wuming_valley → luoyang (event: merchant) — neighbor index 0
+- at: 855
   actions: []
   clicks:
   - TravelButton0
-- at: 720
+- at: 865
   actions: []
   assert:
     MapScreen.phase: phase == "EVENT"
     MapScreen.event_id: event_id == "merchant"
     MapScreen.current_node_id: current_node_id == "luoyang"
-- at: 725
+- at: 870
   actions: []
   clicks:
   - EventOptionButton0
-- at: 735
+- at: 880
   actions: []
   assert:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.events_resolved_count: events_resolved_count == 1
-# Leg 2: luoyang → wudang (event: quanzhen_scripture)
-- at: 740
+# Leg 2: luoyang → wudang (event: quanzhen_scripture) — neighbor index 1
+- at: 885
   actions: []
   clicks:
   - TravelButton1
-- at: 750
+- at: 895
   actions: []
   assert:
     MapScreen.phase: phase == "EVENT"
     MapScreen.event_id: event_id == "quanzhen_scripture"
     MapScreen.current_node_id: current_node_id == "wudang"
-- at: 755
+- at: 900
   actions: []
   clicks:
   - EventOptionButton0
-- at: 765
+- at: 910
   actions: []
   assert:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.events_resolved_count: events_resolved_count == 2
-# Leg 3: wudang → xiangyang (event: dragon_scrap)
-- at: 770
+# Leg 3: wudang → xiangyang (event: dragon_scrap) — neighbor index 1
+- at: 915
   actions: []
   clicks:
   - TravelButton1
-- at: 780
+- at: 925
   actions: []
   assert:
     MapScreen.phase: phase == "EVENT"
     MapScreen.event_id: event_id == "dragon_scrap"
     MapScreen.current_node_id: current_node_id == "xiangyang"
-- at: 785
+- at: 930
   actions: []
   clicks:
   - EventOptionButton0
-- at: 795
+- at: 940
   actions: []
   assert:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.events_resolved_count: events_resolved_count == 3
-# Leg 4: xiangyang → kunlun (endpoint → ENDING, no event)
-- at: 800
+# Leg 4: xiangyang → kunlun (endpoint → ENDING, no event) — neighbor index 1
+- at: 945
   actions: []
   clicks:
   - TravelButton1
 # ── ENDING → RESTART ───────────────────────────────────────────────────────
-- at: 810
+- at: 975
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"
     EndingScreen.tier: tier >= 1 and tier <= 3
     RestartButton.visible: visible == true
-- at: 820
+- at: 985
   actions: []
   clicks:
   - RestartButton
-- at: 840
+- at: 1005
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
