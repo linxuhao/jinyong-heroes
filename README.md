@@ -211,7 +211,7 @@ unverified, which is the intended behavior.
 ```bash
 GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
 python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard, keyboard-free pin, touch-reach surface contract)
-godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (23 files)
+godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (24 files)
 godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-style suites
 ```
 
@@ -304,7 +304,7 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   click companion `map_facility_buttons_click.yaml`.
 - **Unit tests**: GDScript files with a top-level `static func run() -> bool`
   are collected by `tests/unit_test_runner.gd`'s explicit append-only `TESTS`
-  registry (23 files), run headless. SceneTree-extending integration suites
+  registry (24 files), run headless. SceneTree-extending integration suites
   (`test_game_manager_fsm.gd` — extended this round with the overlay-button
   wiring pins — and friends) are driven with their own `-s` invocation. The
   pytest smoke (`tests/test_playtest_contract_smoke.py`) statically pins the
@@ -346,6 +346,15 @@ the verifier step (the gates run after it). In short:
   pins), the i18n coverage test, and the vision gate's check that the new
   controls render legibly at the design resolution (no new geometry, but the
   verdict is not pre-declared).
+- **Last recorded gate run for this round**: `design/99_changelog.md`'s
+  `record_parse_lesson_and_reconcile` row records that the round's `5_compile`
+  run so far measured `Parse failed — play-test skipped` (`spec_used: false`,
+  `frames: 0`): a parse error in a new `tests/*.gd` file reds Godot's
+  project-wide parse check, the playtest is skipped entirely, and the hard gate
+  still reads `passed: true` with zero frames. A **parse-clean measured run**
+  (compile 0 errors, scenarios actually executed) is the first thing the
+  downstream gate must produce; until then no green/red playtest number exists
+  for this round — including the clicks-only nail and the keyboard spine.
 - If the downstream playtest gate reddens any scenario, that is reported with
   its cause, never papered over: no assertion is removed or relaxed, no
   frozen yaml is edited to route around a defect, and thresholds are never
@@ -369,7 +378,7 @@ the verifier step (the gates run after it). In short:
   (72 yaml files); incl. the clicks-only storyline spine and the facility
   click companion; frozen yamls are append-only (authorized edits stay
   machine-pinned by the superset fixture)
-- `tests/` — GDScript unit suites (23 files in the TESTS registry),
+- `tests/` — GDScript unit suites (24 files in the TESTS registry),
   SceneTree-style integration suites (incl. `test_game_manager_fsm.gd` with
   the overlay-button pins), `test_playtest_contract_smoke.py` (incl. the
   keyboard-free pin + touch-reach surface contract),
