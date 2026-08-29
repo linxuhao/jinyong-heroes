@@ -367,3 +367,9 @@ Button,只委托到既有设施的具名 handler:`FacilityEnterButton` 镜像 F 
 挂在 *_ClickTarget 上」的裁定;本轮所有新锚点(overlay / 五段场景按钮、旅行 / 事件 / 设施按钮)
 都是 Button 本体,绝不挂 `*_ClickTarget`。
 
+## 解析错误拉倒整轮验证(record_parse_lesson_and_reconcile, 2026-08-29)
+
+**规矩:新增任何 `tests/*.gd` 测试文件后,交卡前先跑一次独立解析检查。** Godot 的解析检查是**项目级**的——任何一个测试 `.gd` 里的笔误 ⇒ 编译红 ⇒ play-test 被跳过 ⇒ 0 场景 / 0 帧 ⇒ 行为/可读性闸门集体失明。本轮 `5_compile` 的 `playtest_summary.md` 即该形状(`Parse failed — play-test skipped`、`spec_used: false`、`frames: 0`,而硬闸门 `passed: true`,因为硬闸门只报 crash / scene-load / 非法键 / 输入未收到,**不报「零帧」**——「闸门绿」与「闸门根本没跑」在报告里长得一样)。这条独立解析检查比任何断言都便宜,却能在「编译红 → 闸门盲」之前拦住。
+
+**配套勘误**(与 `design/99_changelog.md` 同步):touch-reach 行「先红(f180)→ 转绿」是**结构预测而非实测**——`red_first_evidence_reproduction` 步无 shell/网络,调不动外部 harness;实测须来自一次解析干净的运行,复现配方(临时回退法)见 `final/delivery_notes_touch_reach_red_first.md`。在此之前档案只保留「预测 + 复现配方」,不写实测数字。
+
