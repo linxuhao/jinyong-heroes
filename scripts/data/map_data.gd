@@ -16,7 +16,9 @@ const FacilityData = preload("res://scripts/data/facility_data.gd")
 
 ## Per-node entry-content declaration slots (design/20_content.md §8.1).
 ## Status domain: "active" (implemented + live) | "declared" (declaration-only,
-## unimplemented — battle/facility stay declared). Mainline event slots are LIVE:
+## unimplemented). Battle stays declared everywhere except 华山 (huashan_duel);
+## facility is live on 少林 (shaolin_wooden_men) and 武当 (wudang_meditation), the
+## two sects, and stays declared on the other five nodes. Mainline event slots are LIVE:
 ## wuming_valley/luoyang/wudang/xiangyang each bind a deterministic event_id from
 ## the pool (literal rows — never a pool draw, keeping the node-event and
 ## cultivation channels' events_seen independent). The end node (kunlun) stays
@@ -31,13 +33,13 @@ const NODES: Array = [
 	{"id": "luoyang", "display_name": "洛阳", "is_end": false,
 		"entry_content": {"event": {"status": "active", "event_id": "merchant"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "wudang", "display_name": "武当", "is_end": false,
-		"entry_content": {"event": {"status": "active", "event_id": "quanzhen_scripture"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+		"entry_content": {"event": {"status": "active", "event_id": "quanzhen_scripture"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "active", "facility_id": "wudang_meditation"}}},
 	{"id": "xiangyang", "display_name": "襄阳", "is_end": false,
 		"entry_content": {"event": {"status": "active", "event_id": "dragon_scrap"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "kunlun", "display_name": "昆仑", "is_end": true,
 		"entry_content": {"event": {"status": "declared", "event_id": ""}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
 	{"id": "shaolin", "display_name": "少林", "is_end": false,
-		"entry_content": {"event": {"status": "active", "event_id": "night_rain"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "declared", "facility_id": ""}}},
+		"entry_content": {"event": {"status": "active", "event_id": "night_rain"}, "battle": {"status": "declared", "battle_id": ""}, "facility": {"status": "active", "facility_id": "shaolin_wooden_men"}}},
 	# 华山 is the first node whose BATTLE slot is live, and it carries no event
 	# on purpose: a node holding both would need a precedence rule, and inventing
 	# one belongs in a design decision, not in a data row. Hanging it off 少林

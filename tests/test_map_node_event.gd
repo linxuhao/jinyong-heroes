@@ -120,8 +120,8 @@ static func _test_map_data_schema(ok: bool) -> bool:
 	# (d) declared_gap_types: the honesty observable (gap = not implemented,
 	#     never faked — so it must be assertable, not just documented).
 	var gaps_shaolin: Array = MapData.declared_gap_types("shaolin")
-	ok = _expect(ok, gaps_shaolin.has("battle") and gaps_shaolin.has("facility"),
-			"shaolin declares battle + facility as unimplemented gaps")
+	ok = _expect(ok, gaps_shaolin.has("battle") and not gaps_shaolin.has("facility"),
+			"shaolin's facility is now live (少林), battle remains its only declared gap")
 
 	# The honesty observable has to MOVE when a gap is filled, or it degrades into
 	# decoration: 华山's battle is implemented, so 'battle' must be absent from its

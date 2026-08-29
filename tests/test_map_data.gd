@@ -102,12 +102,13 @@ static func _test_entry_content(ok: bool) -> bool:
 			var status: String = slot.get("status", "")
 			ok = _expect(ok, status == "active" or status == "declared",
 				nid + " slot " + slot_type + " status in {active,declared}")
-	# Six ACTIVE slots across the table, of two kinds — and they are counted
+	# Eight ACTIVE slots across the table, of three kinds — and they are counted
 	# SEPARATELY on purpose. The old single total said "five active event slots"
 	# and was true only while every live slot happened to be an event; the moment
 	# 华山's battle went live, one total could have stayed green while describing
-	# the table wrongly. Five events (the four mainline + 少林) and one battle
-	# (华山, the first non-event slot to be implemented).
+	# the table wrongly. Five events (the four mainline + 少林), one battle
+	# (华山, the first non-event slot to be implemented) and two facilities
+	# (少林's 木人巷 + 武当's 紫霄静修, the two sects).
 	var active_event_count := 0
 	var active_battle_count := 0
 	var active_facility_count := 0
@@ -123,7 +124,7 @@ static func _test_entry_content(ok: bool) -> bool:
 				active_facility_count += 1
 	ok = _expect(ok, active_event_count == 5, "five active event slots (the four mainline + 少林), got %d" % active_event_count)
 	ok = _expect(ok, active_battle_count == 1, "one active battle slot (华山), got %d" % active_battle_count)
-	ok = _expect(ok, active_facility_count == 0, "facility stays unimplemented everywhere, got %d" % active_facility_count)
+	ok = _expect(ok, active_facility_count == 2, "two active facility slots (少林/武当), got %d" % active_facility_count)
 	# shaolin binding: shape + resolves in the pool + deep copy
 	var shaolin_event: Dictionary = MapData.entry_content("shaolin")["event"]
 	ok = _expect(ok, shaolin_event == {"status": "active", "event_id": "night_rain"},
@@ -153,8 +154,27 @@ static func _test_entry_content(ok: bool) -> bool:
 		"luoyang declared gap types (event slot now live -> fixed order [battle, facility])")
 	ok = _expect(ok, MapData.declared_gap_types("wuming_valley") == ["battle", "facility"],
 		"wuming_valley declared gap types (event slot now live -> fixed order [battle, facility])")
-	ok = _expect(ok, MapData.declared_gap_types("shaolin") == ["battle", "facility"],
-		"shaolin declared gap types (no event)")
+	ok = _expect(ok, MapData.declared_gap_types("shaolin") == ["battle"],
+		"shaolin declared gap types (facility now live -> [battle])")
+	# wudang is flipped too: facility drops from its gap list, battle remains. This
+	# per-node pin exists precisely so an implementer cannot fake the total (two
+	# active facility slots) while leaving wudang unimplemented — the honesty
+	# observable must MOVE per-node, not just add up.
+	ok = _expect(ok, MapData.declared_gap_types("wudang") == ["battle"],
+		"wudang declared gap types (facility now live -> [battle])")
+	# active_facility_id resolves the flipped bindings and stays inert elsewhere.
+	ok = _expect(ok, MapData.active_facility_id("shaolin") == "shaolin_wooden_men",
+		"active_facility_id shaolin -> shaolin_wooden_men")
+	ok = _expect(ok, MapData.active_facility_id("wudang") == "wudang_meditation",
+		"active_facility_id wudang -> wudang_meditation")
+	ok = _expect(ok, MapData.active_facility_id("luoyang") == "",
+		"active_facility_id luoyang stays inert (declared)")
+	ok = _expect(ok, MapData.active_facility_id("huashan") == "",
+		"active_facility_id huashan stays inert (declared)")
+	ok = _expect(ok, MapData.active_facility_id("kunlun") == "",
+		"active_facility_id kunlun stays inert (declared)")
+	ok = _expect(ok, MapData.active_facility_id("nope") == "",
+		"active_facility_id unknown -> \"\"")
 	# unknown node degrades inert
 	ok = _expect(ok, MapData.entry_content("nope").is_empty(), "entry_content unknown -> {}")
 	ok = _expect(ok, MapData.active_event_id("nope") == "", "active_event_id unknown -> \"\"")

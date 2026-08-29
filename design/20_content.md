@@ -341,16 +341,16 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 |---|---|---|---|---|
 | `wuming_valley` | 无名谷 | `active` / `tomb_bed` | `declared` / `""` | `declared` / `""` |
 | `luoyang` | 洛阳 | `active` / `merchant` | `declared` / `""` | `declared` / `""` |
-| `wudang` | 武当 | `active` / `quanzhen_scripture` | `declared` / `""` | `declared` / `""` |
+| `wudang` | 武当 | `active` / `quanzhen_scripture` | `declared` / `""` | `active` / `wudang_meditation` |
 | `xiangyang` | 襄阳 | `active` / `dragon_scrap` | `declared` / `""` | `declared` / `""` |
 | `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `declared` / `""` |
+| `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `active` / `shaolin_wooden_men` |
 
 (行序 = `map_data.gd` 的 `NODES` 顺序;`wuming_valley` 的 `tomb_bed` 是 `active`
 且诚实——它**只在经 return travel 到达时**触发,开机 / 读档不触发。2026-08-29
 `jinyong-nodes(主线事件)` 轮把主线 event 槽从「全部 `declared`」转为「4/5 live」,
-昆仑保持 `declared`(终点保证,见 §8.3 第 3 条);battle / facility 两槽六节点仍
-全为 `declared`。)可观测语义:`declared_gap_types(id)` =
+昆仑保持 `declared`(终点保证,见 §8.3 第 3 条);battle 槽六节点仍全 `declared`;
+facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点仍 `declared`。)可观测语义:`declared_gap_types(id)` =
 该节点所有 `status == "declared"` 的槽类型列表——「已声明未实现」因此是可断言
 的事实,不只是文档里的一句话;`active_event_id(id)` = 仅当 event 槽
 `status == "active"` 且 `EventData.def(event_id) != null` 时返回该 id,否则返回
@@ -430,8 +430,12 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 
 1. **battle 槽:已声明、未实现。** 6 个节点的 battle 槽全部是 `declared`、
    `battle_id` 保持空串;本轮没有任何「进节点触发战斗遭遇」的接线。
-2. **facility(门派设施)槽:已声明、未实现。** 全部节点 `facility_id` 空串;
-   「门派设施」这一内容类型本轮不存在,只有槽位。
+2. **facility(门派设施)槽:少林 / 武当已实现,其余五节点仍 `declared`。**
+   少林绑定 `shaolin_wooden_men`(木人巷)、武当绑定 `wudang_meditation`(紫霄静修),
+   两槽本轮转 `active`;其余五节点(wuming_valley / luoyang / xiangyang / kunlun /
+   huashan)`facility_id` 仍空串,诚实报 `declared`。设施是玩家在节点上**主动选择、
+   可重复使用**的进入内容(区别于到达即触发的 event),效果走既有系统(银两 / 属性),
+   不发明新经济。
 3. **主线 event 槽:本轮 4/5 live,昆仑保持 `declared`(终点保证,非上轮的护线惰性)。**
    无名谷 / 洛阳 / 武当 / 襄阳的 event 槽本轮转为 `active`(§8.1 表 / §8.2b 绑定),
    主线每一站在经 travel 到达时都触发内容。**唯昆仑仍 `declared` / `""`,理由已不是
@@ -441,8 +445,8 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
    的「主线 5 槽位惰性以保护不可修改的 spine_to_ending 时间线」这一理由,本轮由轮次
    所有者**有条件解除**:`playtest/spine_to_ending.yaml` 允许重排按键/帧预算(断言只加
    不减、先写理由再动 yaml),使主线站点的 event 可开可解、结局仍然走得到。理由与
-   before/after 帧表见本节 2026-08-29 记录 (a)。battle / facility 两槽六个节点**仍全
-   `declared`**(见本节前两条),「打听」行动仍**未实现**(见第 6 条)。
+   before/after 帧表见本节 2026-08-29 记录 (a)。battle 槽六节点仍全
+   `declared`(见本条前第 1 条);facility 槽少林 / 武当已 live(见第 2 条),「打听」行动仍**未实现**(见第 6 条)。
 4. **本轮不新编少林专属事件文案。** 「去的理由」用的是 §8.2 的既有池绑定。
    未来若要**新写**一段少林专属行(例如山门场景),那是**内容缺口**:
    必须先按本节风格记缺口,且新行只能写进 `event_data.gd` 的 `EventData.TABLE`
