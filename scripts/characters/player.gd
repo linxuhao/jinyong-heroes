@@ -190,6 +190,13 @@ var health_bar_world_y: float = 0.0
 ## playtest/portrait_grid_alignment.yaml.
 var ink_world_dx: float = 0.0
 var ink_world_dy: float = 0.0
+## Camera vertical translation (viewport_half_y - camera_position.y) this frame.
+## Published field ONLY — computed exclusively by scripts/camera_follower.gd
+## (written dynamically via Object.set); this unit never recomputes it. Lets a
+## single unit-block assertion reference health_bar_screen_y, health_bar_world_y
+## and camera_offset_y together (the harness cannot cross-block reference a
+## `Camera:` field from a `Player:` assert).
+var camera_offset_y: float = 0.0
 
 # ---------------------------------------------------------------------------
 # Click-path diagnostics (playtest observables — measurement only, never gates)

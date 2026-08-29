@@ -178,6 +178,27 @@ func _process(_delta: float) -> void:
 	position = desired
 	camera_position = position
 
+	# Publish the camera's vertical translation onto every unit's surface block.
+	# The harness assert evaluator cannot reference a `Camera:` field from a
+	# `Player:` assert, so the offset is written INTO the unit blocks (the ONLY
+	# computation site in the repo — units never recompute it themselves).
+	_publish_camera_offset()
+
+
+## Write `camera_offset_y = viewport_half_y - camera_position.y` onto the player
+## and every living enemy, exactly once per frame, from already-published
+## members (never a literal). This is the single computation site for the value;
+## unit scripts only declare the field. The non-following branch naturally
+## yields 0 (camera at the board centre), so no stale value survives.
+func _publish_camera_offset() -> void:
+	var offset: float = viewport_half_y - camera_position.y
+	var player: Node = GameManager.get_player()
+	if player != null and is_instance_valid(player):
+		player.set("camera_offset_y", offset)
+	for enemy in GameManager.get_enemies_alive():
+		if enemy != null and is_instance_valid(enemy):
+			enemy.set("camera_offset_y", offset)
+
 
 ## Per-axis no-blank clamp with the degenerate branch: when the no-blank range
 ## is empty (lo > hi, i.e. board < viewport on this axis) pin to the centre so

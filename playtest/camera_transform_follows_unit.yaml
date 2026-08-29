@@ -18,13 +18,14 @@
 # and the nail's two halves read the SAME 92 px offset:
 #   active_unit_screen_y - active_unit_world_y == viewport_half_y - camera_position.y
 #       (252 - 160 == 352 - 260 == 92)
-#   abs(health_bar_screen_y - health_bar_world_y) > 1.0
-#       (154 - 62 == 92 > 1 — the bar's screen y moved off its world y because
-#        the camera moved)
+#   abs((health_bar_screen_y - health_bar_world_y) - camera_offset_y) <= 1.0
+#       (154 - 62 == 92 == camera_offset_y, LHS == 0 — the bar's screen-minus-
+#        world offset equals the camera's vertical translation)
 # Under a WRONG final-transform implementation the active unit's screen y loses
-# the camera term entirely, so the first identity reads 0 != 92 and the bar's
-# screen y equals its world y (0 not > 1) -> the nail turns RED. That is its
-# purpose: canvas ≡ correct (green), final ≡ bug (red).
+# the camera term entirely, so the first identity reads 0 != 92, and the bar's
+# screen y loses the camera term too while the unit keeps it, so the bar's
+# offset (0) differs from camera_offset_y (92) by 92 -> the nail turns RED. That
+# is its purpose: canvas ≡ correct (green), final ≡ bug (red).
 #
 # ROW-1 DEVIATION (measured, not assumed). The card's plan wanted the arrival at
 # the northernmost ROW-1 tile. Row 1 is not reachable within a single player
@@ -48,20 +49,28 @@
 # motion is a pure translation. Nobody may re-derive or re-derive-away these
 # numbers.
 #
-# BAR-HALF DECOMPOSITION (harness contract). The assert expression evaluator
-# binds ONLY the keyed block's own variables — it cannot reference a value from
-# another block (an attempt at `Camera.active_unit_screen_y` inside a Player
-# assert fails with "Invalid named index 'Camera'"). So the bar half of the
-# original invariant
+# BAR-HALF INVARIANCE (harness contract). The original invariant — the bar's
+# screen offset equals its world offset:
 #   Player.health_bar_screen_y - Camera.active_unit_screen_y ==
 #       Player.health_bar_world_y - Camera.active_unit_world_y
-# is decomposed into a per-block form on the Player block:
-#   abs(health_bar_screen_y - health_bar_world_y) > 1.0
-# This is the same equality rearranged (both sides equal viewport_half_y -
-# camera_position.y at the pinned frame), expressed with only Player-block vars.
-# It is a strict discriminator between the two measured values (92 under canvas,
-# 0 under final) with a 1 px slack on an exact-equality intent — NOT a loosened
-# threshold, exactly like the alignment pin's <= 1.0.
+# — is the same statement as "the bar's screen-minus-world offset equals the
+# unit's screen-minus-world offset". The assert expression evaluator binds ONLY
+# the keyed block's own variables — it cannot reference a value from another
+# block (an attempt at `Camera.active_unit_screen_y` inside a Player assert
+# fails with "Invalid named index 'Camera'"). So `camera_offset_y` is published
+# INTO the unit block (computed once per frame by the follower as
+# viewport_half_y - camera_position.y, written onto every unit) so the whole
+# invariant fits in a single Player-block expression:
+#   abs((health_bar_screen_y - health_bar_world_y) - camera_offset_y) <= 1.0
+# Under the correct canvas transform both the bar's and the unit's screen y move
+# by the same camera translation, so the bar's offset equals camera_offset_y and
+# the LHS is ≈ 0 -> green. Under a WRONG final-transform implementation the
+# bar's screen y loses the camera term (viewport_half_y - camera_position.y,
+# today 92) while the unit's keeps it, so the LHS reads ≈ 92 -> red. This is the
+# real discriminating nail — the earlier
+# `abs(health_bar_screen_y - health_bar_world_y) > 1.0` form was NOT the same
+# equality rearranged: any non-zero offset (right or wrong) satisfied it, so it
+# only happened to catch the final ≡ 0 case and is withdrawn.
 #
 # The `camera_position.y in [camera_y_lo, camera_y_hi]` assertion is
 # tautologically satisfied by the clamp formula itself (position IS the clamp to
@@ -84,13 +93,16 @@ description: >-
   (not the board centre). The two clamp-state-independent translation
   invariants must hold: active_unit_screen_y - active_unit_world_y ==
   viewport_half_y - camera_position.y (today 92 == 92) and
-  abs(Player.health_bar_screen_y - Player.health_bar_world_y) > 1.0 (the bar's
-  screen y moved off its world y because the camera moved; 92 today). Under a
-  final-transform (no-camera) mapping the active unit's screen y loses the
-  camera term, so the first identity reads 0 != 92 and the bar reads 0 not > 1
-  -> the nail turns RED. canvas ≡ correct, final ≡ bug. Both halves are
-  camera-motion-pure-translation invariants, independent of any sprite_top /
-  nameplate flip and of the now-deleted clamp, so nobody re-derives them.
+  abs((Player.health_bar_screen_y - Player.health_bar_world_y) -
+  Player.camera_offset_y) <= 1.0 (the bar's screen-minus-world offset equals
+  the camera's vertical translation camera_offset_y, today 92; LHS == 0). Under
+  a final-transform (no-camera) mapping the active unit's screen y loses the
+  camera term, so the first identity reads 0 != 92, and the bar's screen y loses
+  the camera term while the unit keeps it, so the bar's offset (0) differs from
+  camera_offset_y (92) by 92 -> the nail turns RED. canvas ≡ correct, final ≡
+  bug. Both halves are camera-motion-pure-translation invariants, independent
+  of any sprite_top / nameplate flip and of the now-deleted clamp, so nobody
+  re-derives them.
   ALSO asserts follow_target_is_active == true (the
   camera follows the acting unit) and camera_position.y within
   [camera_y_lo, camera_y_hi] (a regression guard on clamping, not a
@@ -133,5 +145,5 @@ timeline:
     Player.moves_left: moves_left == 0
     Camera.follow_target_is_active: follow_target_is_active == true
     Camera.active_unit_screen_y: active_unit_screen_y - active_unit_world_y == viewport_half_y - camera_position.y
-    Player.health_bar_screen_y: abs(health_bar_screen_y - health_bar_world_y) > 1.0
+    Player.health_bar_screen_y: abs((health_bar_screen_y - health_bar_world_y) - camera_offset_y) <= 1.0
     Camera.camera_position: camera_position.y >= camera_y_lo and camera_position.y <= camera_y_hi

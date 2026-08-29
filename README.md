@@ -74,9 +74,13 @@ below the tiles they mark. This round inverts the ownership:
   walks the player to a row-2 tile, where the camera is pinned to `cam_y_lo`
   and asserts `active_unit_screen_y − active_unit_world_y ==
   viewport_half_y − camera_position.y` (92 == 92, constants-derived) plus
-  `abs(health_bar_screen_y − health_bar_world_y) > 1.0`. Under the **canvas**
-  transform (which contains the camera) both hold; under the legacy
-  **final** transform (stretch only) both read 0 and the nail turns red.
+  `abs((health_bar_screen_y − health_bar_world_y) − camera_offset_y) <= 1.0`
+  (the bar's screen-minus-world offset equals the camera's vertical translation
+  `camera_offset_y`, published on every unit block by the follower — the single
+  computation site). Under the **canvas** transform (which contains the camera)
+  both hold; under the legacy **final** transform (stretch only) the unit and
+  bar screen positions lose the camera term, so both read 0 vs 92 and the nail
+  turns red.
   `scripts/coord.gd` (`Coord.world_to_screen` / `screen_to_world`) is the
   single world↔screen utility, and the floating health bar's follow now goes
   through it — its internal geometry constants (including `STRIP_BOTTOM =
@@ -228,6 +232,8 @@ godot --headless --path . -s res://tests/test_cultivation.gd  # SceneTree-style 
 - **Alignment observables** (`player.gd` / `enemy.gd`): `portrait_ink_rect`
   (Rect2, live unclamped foot-anchored ink), `ink_world_dx` / `ink_world_dy`
   (derived from the rect only; both 0 = the portrait stands on its own tile),
+  `camera_offset_y` (published by the follower = `viewport_half_y −
+  camera_position.y`; units only declare the field, never compute it),
   `sprite_top` (= feet − tex height once unclamped; negative on row 1),
   `portrait_sprite_pos` / `portrait_tex_size` /
   `portrait_bar_pos` / `health_bar_screen_y` / `health_bar_world_y`, plus the

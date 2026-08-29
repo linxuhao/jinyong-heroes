@@ -270,6 +270,7 @@ surface:
   - health_bar_world_y
   - ink_world_dx
   - ink_world_dy
+  - camera_offset_y
   East_Heretic:
   - health
   - max_health
@@ -292,6 +293,7 @@ surface:
   - health_bar_world_y
   - ink_world_dx
   - ink_world_dy
+  - camera_offset_y
   West_Poison:
   - health
   - max_health
@@ -313,6 +315,7 @@ surface:
   - health_bar_world_y
   - ink_world_dx
   - ink_world_dy
+  - camera_offset_y
   South_Emperor:
   - health
   - max_health
@@ -334,6 +337,7 @@ surface:
   - health_bar_world_y
   - ink_world_dx
   - ink_world_dy
+  - camera_offset_y
   North_Beggar:
   - health
   - max_health
@@ -355,6 +359,7 @@ surface:
   - health_bar_world_y
   - ink_world_dx
   - ink_world_dy
+  - camera_offset_y
   Central_Divine:
   - health
   - max_health
@@ -377,6 +382,7 @@ surface:
   - health_bar_world_y
   - ink_world_dx
   - ink_world_dy
+  - camera_offset_y
   HUD:
   - visible
   - size
