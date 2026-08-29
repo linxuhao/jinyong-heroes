@@ -323,3 +323,47 @@ event」这一性质变成永久可观测的事实。
 银两门槛这一实现事实,下一轮极易把它读成已定的复用上限;把未决的东西显式记为 PENDING,
 正是 `90_decisions.md`「已决定但未实现 / 未决定」这一层的用途。「先记下」优于沉默。
 
+## 主线六段触屏可达(touch-reach, 2026-08-29)
+
+「手机上过不了教程」的根因此前已核实:教程结算 overlay 是**代码现搭**(`game_manager.gd:194/199`
+调 `_show_end_game_overlay`,CanvasLayer + ColorRect + Panel + Label,零 Button),五个段场景
+(transition / sect_select / cultivation / map / ending)是 `Backdrop + Label` 零按钮 ——
+视角上「触屏能玩的范围正好到教程打完为止」。本轮给全部六段补可见、可点的控件,并立一条
+`clicks:`-only 场景把「不碰键盘能不能走到结局」变成游戏级闸门。五款裁定逐条如下。
+
+(a) **clicks-only 脊柱里 `debug_win_tutorial` 是唯一非点击动作。** `playtest/clicks_only_storyline.yaml`
+全程只走 `clicks:`;除 `debug_win_tutorial` 外不允许任何 `ui_accept` / `move_*` / `skill_*` 等键盘
+动作。`debug_win_tutorial` 是**未绑定的 DEBUG 动作**(在 `_process` 里消费,不是键盘输入),是
+`spine_to_ending` 在 f20 用的同一个结局种子。理由:全击打战斗**放不进帧上限**(一次 39 伤命中
+序列就要约 1750 帧);战斗屏的可点性由四张既有点击场景(`battle_end_turn_attack_buttons` /
+`click_targeting_fixed` / `undo_button_retreat` / `click_portrait_body_targets_enemy`)加场景内
+一次真实 `AttackButton` 点击证明;拆成两条场景则做不到「overlay → … → ending 一条龙可点」。
+该种子记入场景头 + 交付报告 + 本文件(三处)。
+
+(b) **选项按钮 = 设焦点 + `_on_accept()` 委托,零分叉点击逻辑。** cultivation / map 的动态选项
+列表(卡片 / 行动 / 功法 / 属性 / 事件 / 节点旅行)是文本行(▶ 标记),没有逐选项节点可点;
+本轮新增 `CultOptionButton{i}` / `TravelButton{i}` / `EventOptionButton{0,1}`,点击 = 把阶段的
+焦点变量设到该下标(键盘方向键本来就读它),再调**同一个** `_on_accept()`。键盘分支(bytes)不动,
+这使「加,不是换」由构造成为真。
+
+(c) **文案对齐范围 = overlay 仅此一处。** `game_manager.gd:194/199` 的调用点字面量与
+`i18n.gd:101/102` 的键值一起换,把「按回车继续」/「按回车重试」对齐为描述真实可点操作的
+「点击「继续」进入江湖」/「点击「重试」再战」(两处同改,漏一处查表静默落回中文)。**其余**
+键盘味提示(结局重开 / 过场 / 拜师 / 地图启程 / 事件定夺 / 设施 F 提示 / 教程开场见
+`i18n.gd:350/354/359/364/369/378/380/122` 等)一律**不修**,记作 UX-12 测量欠账。
+
+(d) **FACILITY 委托按钮 —— 进入/使用/离开,delegation-only + 双结果协议。** 地图屏新增三个
+Button,只委托到既有设施的具名 handler:`FacilityEnterButton` 镜像 F 键(`use_facility`)分支
+**自己的门卫**(`phase == "TRAVEL"` 且 `MapData.active_facility_id(current_node_id) != ""`)
+再调 `_enter_facility()` —— 点击只开 F 键能开的门;`FacilityUseButton` → `_use_facility()`;
+`FacilityLeaveButton` → `_leave_facility()`(**必需,非可选**:没有它,点进 FACILITY 的触屏玩家
+会被困在相位里 —— 方向键是今天唯一的出口,那会原样复现本轮要消除的死路)。**双结果协议**:
+若实现中加这三个按钮需要改变设施逻辑(进入/离开/复用语义、F 键绑定与门、`map_data.gd` /
+`facility_data.gd` / `20_content.md` §8.1/§10 / `playtest/facility_use_reusable.yaml` 任一),
+**停手**,把「委托做不到」的原因写进报告与本文件,回退到「无设施按钮」(设施面板回记 UX-12
+为已测量欠账)。两种结论都接受;沉默不接受。
+
+(e) **点击锚挂控件/单位本体,重申 `*_ClickTarget` 禁令。** 沿用本条上方 2026-08-29「点击锚不再
+挂在 *_ClickTarget 上」的裁定;本轮所有新锚点(overlay / 五段场景按钮、旅行 / 事件 / 设施按钮)
+都是 Button 本体,绝不挂 `*_ClickTarget`。
+

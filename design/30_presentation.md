@@ -854,3 +854,39 @@ cam_lo = board_lo + V/2 − cover_before      cam_hi = board_hi − V/2 + cover_
    「活跃单位在未遮挡带内 / 立绘站在自己格上」(`portrait_grid_alignment`),
    不断「整张立绘完整可见」。
 
+## 指针可达性 (pointer reachability, 2026-08-29, touch-reach)
+
+主线六段从教程结算屏起就不再可点:教程结算 overlay 是**代码现搭**的
+(`scripts/autoload/game_manager.gd::_show_end_game_overlay`,
+`CanvasLayer + ColorRect + Panel + Label`,零 Button),而 transition / sect_select /
+cultivation / map / ending 五个段场景是 `Backdrop(Panel) + Label` 一张一个按钮都没有。
+手机玩家打完整部教程就卡死在「按回车继续」。本轮给六段全程补上可见、可点的控件,
+向既有 handler 委托,玩法与数值一字未动。
+
+(a) **每一屏都必须有一个可见、可点的控件,delegate 到既有 handler。** 六段 = 主菜单 →
+捏人 → 教程战 → 教程结算 overlay → 过场 → 拜师 → 养成(36 个月)→ 大地图 → 事件 → 结局。
+主菜单 / 捏人 / 教程战 / 教程 overlay 原本就有按钮;本轮给代码搭的 overlay
+(`ContinueButton` / `RetryButton`)与五个段场景(`NextButton` / `SectButton0..4` /
+`CultOptionButton{i}` / `TravelButton{i}` / `EventOptionButton0/1` /
+`FacilityEnterButton` / `FacilityUseButton` / `FacilityLeaveButton` / `RestartButton`)
+各加可见控件。控件一律委托到**同一个** handler——`request_continue` / `request_retry` /
+`_advance` / `_pick` / `_on_accept` / `_travel` / `_resolve_node_event` /
+`restart_game`、以及设施既有 `_enter_facility` / `_use_facility` / `_leave_facility`。
+
+(b) **观测结论:`actions:` 键注入看不见这类缺陷。** playtest 的 `actions:` 走
+`Input.parse_input_event` 注入,绕过 GUI 命中测试直接喂给 `_input`——所以一个**零可点
+控件**的屏也能通过键驱动的契约(69/69 全绿,玩家却卡在教程结算屏,同一个根,见下)。
+`clicks:` 是真命中测试:命中不到目标即 `push_error` → 硬闸门红,是看见这类缺陷的仪器。
+本轮立了全程只走 `clicks:` 的 `playtest/clicks_only_storyline.yaml`,让它**先红**
+(教程结算屏 `ContinueButton` 不存在)、后转绿。这与已记录的 `SegmentHost` 全屏 STOP
+吞咽缺陷同一个根:**契约看不见玩家真正走的那条路**。
+
+(c) **button-delegate 教义。** 新控件一律 `focus_mode = FOCUS_NONE`(不抢焦点、不双触发
+`pressed` + `_unhandled_input`)、`pressed` 委托到既有 handler;键盘分支**逐字节不变**,
+按钮是键盘快捷键叫同一个 handler 的**汇聚点**——本轮加输入方式,不是换输入方式。
+`playtest/spine_to_ending.yaml`(键盘路径的证明)本轮未动并保持全绿。
+
+(d) **点击锚挂控件/单位本体,绝不挂 `*_ClickTarget`。** 重申 `90_decisions.md` 2026-08-29
+条(「点击锚不再挂在 *_ClickTarget 上」):一个节点不能既是可命中的锚、又是不该收到点击的
+控件。本轮所有新锚点都是 Button / 单位本体。
+

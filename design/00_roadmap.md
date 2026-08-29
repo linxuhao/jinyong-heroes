@@ -106,6 +106,25 @@ re-loop(2026-08-29)钉死(证据场景 `portrait_grid_alignment` /
 华山 battle 的行为路径尚无场景钉死(现只验到数据层与编译)。这些是「槽位还在,内容
 没填满」的常规内容活,不再有「某类节点内容根本不存在」的结构性空白。
 
+## 第 2 阶段(交互)更新:触屏主线缺口已关闭(2026-08-29, touch-reach)
+
+**「主线六段在触屏上断在教程结算屏」这一缺口已由本轮关闭。** 上一轮结束时把主线断触屏的
+根因核实为两类:**code-built 教程结算 overlay**(`game_manager.gd::_show_end_game_overlay`,
+CanvasLayer + ColorRect + Panel + Label,零 Button,文案还是「按回车继续」)和**五个仅
+`Backdrop + Label` 的段场景**(transition / sect_select / cultivation / map / ending,零
+Button)。本轮给全部六段加上可见、可点的控件,向既有 handler 委托(overlay `ContinueButton` /
+`RetryButton`;五段场景 `NextButton` / `SectButton0..4` / `CultOptionButton{i}` /
+`TravelButton{i}` / `EventOptionButton0/1` / `FacilityEnterButton` / `FacilityUseButton` /
+`FacilityLeaveButton` / `RestartButton`),`focus_mode = FOCUS_NONE`、键盘分支逐字节不动,
+`spine_to_ending.yaml`(键盘路径证明)未动保持全绿。新增 `clicks:`-only 场景
+`clicks_only_storyline`(零键盘动作、先红后绿)把「不碰键盘能否从主菜单走到结局」变成一道
+游戏级闸门。
+
+**Phase 2 剩余只含两条测量欠账(不设闸门):** UX-11(主线可点控件在 960×704 下的真实触控
+目标尺寸,measure-only,禁止 `size >= 48` 引擎级形态断言)与 UX-12(残留仅讲键盘操作、
+屏上已有控件但文案没说可点的提示行号)。两条都按 `40_ux_backlog.md` 规则保持 OPEN,由
+5_design 证据步骤按本轮闸门实测单关闭。
+
 ## 这个顺序和业界做法的差异(2026-08-24 查证)
 
 大方向是一致的,但有两处业界不是这么做的,记下来免得以后当成教条:
