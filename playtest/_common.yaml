@@ -897,9 +897,6 @@ surface:
   HintLabel:
   - visible
   - text
-  # ── Touch-reach round (2026-08-29): new clickable control blocks ────────
-  # Each [visible, size, mouse_filter, text]; ContinueButton/RetryButton
-  # additionally get [disabled, focus_mode].
   ContinueButton:
   - visible
   - size
@@ -994,7 +991,6 @@ surface:
   - size
   - mouse_filter
   - text
-  # Existing tutorial-overlay Next button (now used as a click target)
   Next:
   - visible
   - size
