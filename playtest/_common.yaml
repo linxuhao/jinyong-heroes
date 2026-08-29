@@ -780,6 +780,7 @@ surface:
   - facility_id
   - facility_use_count
   - last_facility_effect_types
+  - facility_result_text
   EndingScreen:
   - tier
   - done

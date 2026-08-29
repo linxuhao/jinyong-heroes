@@ -21,6 +21,15 @@ description: >-
   after travelling away and back the facility is used again (facility_use_count
   == 2, attr_bone changed again) — reusable across visits, observable every use,
   no new economy (silver cost via the shared EventLogic path).
+  Two differential nails also pin "using the facility must produce a VISIBLE
+  result": at each use frame (at: 600 and at: 790) facility_result_text must be
+  non-empty. That var is a published surface observable that stays "" while the
+  FACILITY result rendering has not landed yet, so `facility_result_text != ""`
+  is RED right now (observed "") — that red is the pre-fix measurement for the
+  "facility result is never rendered" defect. (A `changed` differential cannot
+  express this red here: the harness's baseline is the frame-0 snapshot, where the
+  MapScreen is not yet loaded and reads null, so `changed` is trivially green from
+  null -> "".)
 timeline:
 - at: 3
   actions:
@@ -163,6 +172,7 @@ timeline:
     MapScreen.silver: changed
     MapScreen.attr_bone: changed
     MapScreen.last_facility_effect_types: 'last_facility_effect_types == ["silver", "attr"]'
+    MapScreen.facility_result_text: facility_result_text != ""
 - at: 610
   actions:
   - move_down
@@ -237,6 +247,7 @@ timeline:
   assert:
     MapScreen.facility_use_count: facility_use_count == 2
     MapScreen.attr_bone: changed
+    MapScreen.facility_result_text: facility_result_text != ""
 - at: 800
   actions:
   - move_down

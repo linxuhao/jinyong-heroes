@@ -143,3 +143,116 @@ No assertion was weakened, and no playtest contract threshold was changed.
   `map_node_event_shaolin.yaml` / `spine_to_ending.yaml` / the superset fixture.
 - Facility effects stay in the closed {silver, attr} domain via the landed
   FacilityData def and the shared EventLogic path — no new economy.
+
+---
+
+# Delivery notes — facility_result_pin (jinyong-facility) · 2026-08-29
+
+Task: land the differential nail for the **"facility result is never rendered"**
+defect FIRST, so its red is measured before the rendering fix
+(`facility_result_render`, a sibling task) lands. This task adds **no rendering
+logic** — it only makes the result a read-stable, whitelisted, published surface
+observable and nails it with `changed` differentials that are RED while the
+rendering is absent.
+
+Root cause being fixed (human frame review 2026-08-29):
+`scripts/segments/map.gd` writes `facility_use_count` / `last_facility_effect_types`
+into surface vars but NOTHING renders them, so after using a facility the player
+sees zero change — the 8 post-use frames are md5-identical
+(`e5010a5095349f67913d15f888e1a18f`) and the map frames 550/620/810 are
+md5-identical too (`6dd9d444ecc47005cf781c5d4c5c29f7`).
+
+## Files changed
+
+- `scripts/segments/map.gd` — NEW surface var `var facility_result_text: String = ""`
+  beside the existing facility three (facility_id / facility_use_count /
+  last_facility_effect_types). `_sync_surface()` gains one publish line
+  (`facility_result_text = ""`), the read-stable publish point the `changed` nail
+  reads. **No business value is ever assigned and `_render()` is untouched** —
+  the var stays `""` constant, which is exactly why the `changed` nail below is
+  RED.
+- `playtest/_common.yaml` — MapScreen surface block appends `facility_result_text`
+  after `last_facility_effect_types` (append-only; nothing removed).
+- `playtest/facility_use_reusable.yaml` — the two existing "after a use" frames
+  (at: 600 where `facility_use_count == 1`, at: 790 where `facility_use_count ==
+  2`) each gain `MapScreen.facility_result_text: facility_result_text != ""`;
+  `description:` gains the "using the facility must produce a VISIBLE result"
+  rationale. The arrival-half
+  negative pins (`phase != "FACILITY"`, `facility_use_count == 0`) are untouched.
+- `tests/test_playtest_contract_smoke.py` — `FACILITY_SURFACE_VARS` grows 3 → 4
+  (appends `facility_result_text`); `test_facility_use_reusable_surface_contract`
+  adds a verbatim pin that the scenario file carries a
+  `facility_result_text != ""` line, and gives all three verbatim pins
+  (that one + `phase != "FACILITY"` + `facility_use_count == 0`) a
+  self-explaining failure message with the rename/rewrite escape hatch.
+- `design/30_presentation.md` — the gate-principle section gains the sibling rule
+  "形态闸门必须自我解释" (morphological gates must self-explain), dated 2026-08-29,
+  with the recorded cause (the prior `test_facility_copy_location.py` allowlist
+  pardoned the very violation it existed to prevent and guaranteed a red on any
+  one-character change).
+- `final/delivery_notes_facility.md` — this section.
+
+Untouched (by design): `scripts/data/facility_data.gd`, `scripts/data/map_data.gd`,
+`project.godot`, the camera / coordinate layer (`camera_follower.gd` / `coord.gd` /
+`ink_world_dx/dy` / `camera_offset_y`), `camera_transform_follows_unit.yaml`,
+`portrait_grid_alignment.yaml`, `spine_to_ending.yaml`, and the superset fixture.
+This task adds **zero new UI copy** (`facility_result_text` stays `""`), so
+`tests/test_i18n_coverage.py` and the §433 copy-location guard are untouched, and
+writing any CJK literal into `map.gd` would be out of scope.
+
+## PRE-FIX RED VALUE (recorded — the acceptance criterion)
+
+The `facility_result_text != ""` value-inequality was run against the current
+tree (via `godot_playtest_scenario`, staged edits overlaid; real boot). Because
+the var is published but never set, it reads `""` at every frame — the
+value-inequality is RED at both use frames. The harness output for the two
+failing asserts, verbatim:
+
+```
+at:600 MapScreen.facility_result_text: facility_result_text != ""
+  -> FAILED
+     observed=""
+
+at:790 MapScreen.facility_result_text: facility_result_text != ""
+  -> FAILED
+     observed=""
+```
+
+So the scenario that was 47/47 green is now RED on exactly these two
+value-inequality nails (45/47), the only red being the intended pre-fix
+measurement. This is the ONE-TIME red signature required by the reviewer's
+acceptance criterion: a green-only nail does not count. `facility_result_render`
+(the sibling task) turns these two nails green by assigning the derived summary
+text to `facility_result_text` at each use, replacing the `_sync_surface()`
+publish line's constant `""`.
+
+### Why `!= ""` rather than `changed` (measured, documented deviation)
+
+The task card and t_plan prescribe `MapScreen.facility_result_text: changed`.
+The harness's differential semantics are **baseline = the frame-0 snapshot**,
+and at frame 0 the MapScreen is not yet loaded (the scenario boots through
+tutorial → creation → cultivation before MAP), so `MapScreen.*` reads `null` at
+frame 0. `changed` therefore compares `null → ""` at the use frames and reports
+**changed** — trivially green, exactly the silent-false shape this project
+guards against. Measured on the real tree:
+
+```
+at:600 MapScreen.facility_result_text: changed   -> PASS (baseline null at frame 0, current "")
+```
+
+The genuinely red-then-green differential for "the result text was not rendered"
+is the value-inequality `facility_result_text != ""` (red while the var is
+constant "", green after the render fix assigns the summary). The scenario, the
+smoke-test pin, and this record therefore use `!= ""` — the equivalent new
+assertion the escape hatch sanctions. The measured red values above are from
+that `!= ""` form.
+
+## Escape hatch on the verbatim pins (self-explaining gates)
+
+All three verbatim anti-deletion pins in `test_facility_use_reusable_surface_contract`
+now carry a failure message (not just a docstring) that states the gate exists
+ONLY so the differential/definitional nail cannot be silently deleted, and that a
+legitimate rename/rewrite must update the pin in the SAME change to match the
+equivalent new assertion rather than keeping a dead old-text line or bypassing the
+rename. This is the concrete application of the `design/30_presentation.md`
+"形态闸门必须自我解释" rule this same task lands.

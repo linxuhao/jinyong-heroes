@@ -75,10 +75,11 @@ MAP_NODE_EVENT_SURFACE_VARS: tuple[str, ...] = (
     "attr_fortune", "last_effect_types", "events_resolved_count",
 )
 
-# The 3 observables the jinyong-facility round appends to the MapScreen surface
+# The 4 observables the jinyong-facility round appends to the MapScreen surface
 # block (in playtest/_common.yaml), in the same order they are appended.
 FACILITY_SURFACE_VARS: tuple[str, ...] = (
     "facility_id", "facility_use_count", "last_facility_effect_types",
+    "facility_result_text",
 )
 
 # The 2 actions the jinyong-facility round appends to the actions list.
@@ -874,10 +875,10 @@ def test_facility_use_reusable_surface_contract() -> None:
     """Static contract pin for the jinyong-facility round.
 
     Pins ``facility_use_reusable`` against ``playtest/_common.yaml`` and
-    ``ROUND_SCENARIOS`` (two-place sync): the 3 new observables
-    (facility_id / facility_use_count / last_facility_effect_types) are
-    whitelisted on the MapScreen surface block, the 2 new actions
-    (use_facility / debug_grant_silver) are in the actions list, the scenario
+    ``ROUND_SCENARIOS`` (two-place sync): the 4 new observables
+    (facility_id / facility_use_count / last_facility_effect_types /
+    facility_result_text) are whitelisted on the MapScreen surface block, the 2
+    new actions (use_facility / debug_grant_silver) are in the actions list, the scenario
     is in scenario_order AND in ROUND_SCENARIOS, the file exists with ``name:``
     equal to its basename, every timeline ``at:`` is a single integer, every
     4-space dotted assert line carries a comparison operator or the differential
@@ -902,7 +903,7 @@ def test_facility_use_reusable_surface_contract() -> None:
     map_items = blocks["MapScreen"]
     assert map_items, "MapScreen surface block parsed empty (vacuous pass guard)"
 
-    # The 3 new observables are whitelisted on the MapScreen surface block.
+    # The 4 new observables are whitelisted on the MapScreen surface block.
     for var in FACILITY_SURFACE_VARS:
         assert var in map_items, f"MapScreen.{var} not whitelisted on the surface"
 
@@ -951,12 +952,35 @@ def test_facility_use_reusable_surface_contract() -> None:
     # HARD ANTI-DELETION PIN — the permanent negative assertion corridor.
     # See the docstring: these two lines are the definitional property of the
     # content type (arrival never enters a facility) made permanent.
+    _escape = (
+        " (verbatim anti-deletion gate). This gate exists ONLY so this "
+        "differential/definitional nail cannot be silently deleted. If you are "
+        "RENAMING or REWRITING the assertion, update THIS PIN in the same "
+        "change to match the equivalent new assertion — do not keep a dead "
+        "old-text line in the scenario just to turn it green, and do not "
+        "bypass a legitimate rename."
+    )
     assert re.search(
         r'phase\s*!=\s*"FACILITY"', ftext
-    ), f"{name}.yaml must contain a `phase != \"FACILITY\"` line (anti-deletion)"
+    ), f"{name}.yaml must contain a `phase != \"FACILITY\"` line" + _escape
     assert re.search(
         r"facility_use_count\s*==\s*0", ftext
-    ), f"{name}.yaml must contain a `facility_use_count == 0` line (anti-deletion)"
+    ), f"{name}.yaml must contain a `facility_use_count == 0` line" + _escape
+
+    # The differential nail for "using a facility must produce a VISIBLE
+    # result" — the scenario must keep a `facility_result_text != ""` line at
+    # each use frame (at: 600 / at: 790). While the FACILITY result rendering is
+    # absent this var stays "" so those value-inequality asserts are RED — the
+    # pre-fix measurement for the never-rendered-result defect. (A `changed`
+    # differential cannot express that red: the harness's differential baseline
+    # is the frame-0 snapshot, where the MapScreen is not yet loaded and reads
+    # null, so `changed` is trivially green from null -> "".)
+    assert re.search(
+        r"facility_result_text\s*:\s*facility_result_text\s*!=\s*\"\"", ftext
+    ), (
+        f"{name}.yaml must contain a `facility_result_text != \"\"` line "
+        "(the visible-result differential nail)" + _escape
+    )
 
 
 def _normalize_assert(s: str) -> str:

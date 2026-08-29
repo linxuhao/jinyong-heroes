@@ -63,6 +63,11 @@ var facility_use_count: int = 0
 ## Surface: effect "type"s of the last facility use, in order (mirrors last_effect_types).
 var last_facility_effect_types: Array[String] = []
 
+## Surface: one-line summary of what the last facility use produced ("" until the
+## FACILITY result rendering lands; the `changed` nail in facility_use_reusable is
+## RED while this stays constant — that red is the pre-fix measurement).
+var facility_result_text: String = ""
+
 ## Render-only (NOT a surface var): true when the last use was refused for lack of
 ## silver — the FACILITY panel appends 银两不足 when set.
 var _facility_refused: bool = false
@@ -324,6 +329,9 @@ func _sync_surface() -> void:
 	attr_wisdom = SaveManager.profile.get_attr("wisdom")
 	attr_fortune = SaveManager.profile.get_attr("fortune")
 	entry_declared_gap_types = MapData.declared_gap_types(current_node_id)
+	# Read-stable publish point for the facility result text. Constant "" for now;
+	# facility_result_render replaces THIS line with the derived summary.
+	facility_result_text = ""
 
 
 ## Single-operation-hint invariant: the bottom travel hint is the map's own
