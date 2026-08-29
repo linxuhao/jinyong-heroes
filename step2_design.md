@@ -1,344 +1,285 @@
-# 技术架构设计 — 门派设施 (Sect Facility Nodes)
+# 技术架构设计 — Touch-Reach Main Storyline (Play Full Game Without Keyboard)
 
-**Project:** Sect Facility Nodes — implement the third jianghu map-node content type (`facility`), alongside `event` and `battle`.
-**Round:** jinyong-facility · **Architect date:** 2026-08-29
-**Input:** Step 1 SOTA report (passed review), Project Brief/Spec, design/ archive (20_content §8, 40_progression §5, 00_roadmap, 90_decisions). All file/symbol references below are direct-read verified against the current repo tree.
+**Step 2 — Architect.** Date of record: **2026-08-29**.
+Inputs: Project Brief + Project Spec (verbatim conversation), `step1_sota.md` (Researcher, all in-repo facts verified by direct file read), `design/` archive, current repo tree.
 
----
-
-## 概述 (Overview)
-
-Facility is the third entry-content type on the jianghu map node. The **definitional distinction** from the event slot — event is passive content that auto-fires on arrival; facility is something the player **actively chooses to use and can use repeatedly** — is the round's reason for being, and the architecture is built around making that distinction mechanically real and permanently observable, not just documented.
-
-The design adds **no new economy**: facility effects route through the existing `EventLogic.apply_option_effects` / `PlayerProfile` mutators (silver / attr / practice / none — the closed effect domain from `event_data.gd` L10). A facility is a cost-gated (silver) opt-in action, reusable as long as the player can pay — naturally reusable, differentially assertable every use, and bounded by an existing resource rather than inventing a new one.
-
-**Two nodes flip** from `declared` to `active`: **少林 (shaolin)** and **武当 (wudang)** — both are already sects, both already carry an active arrival event (`night_rain` / `quanzhen_scripture`), so the event+facility coexistence case is the norm, not an edge case, and is designed head-on. The remaining five nodes keep their facility slots honestly `declared`.
-
-**Scope of irreversible / state-moving edits** (rollback plan in §10):
-1. `scripts/data/map_data.gd` NODES table — flip 2 facility slots (data row edits; the const table is the source of truth, no migration needed — `declared_gap_types()` re-derives automatically).
-2. `tests/fixtures/playtest_assert_superset.json` — re-baseline the shaolin frozen-scenario gap assert (documented exception, same precedent as the `events_resolved_count 1→2` re-baseline).
-3. `playtest/map_node_event_shaolin.yaml` — re-derive the gap assertion lines (facility drops from the gap list; battle stays). Superset fixture guards "只许加,不许减" — the re-baseline exception is baked into the fixture FIRST, so the smoke test stays green through the edit.
+Everything in this design is expressed against repo-root-relative paths (implementers write files at exactly these paths).
 
 ---
 
-## 架构图 (Architecture — components and data flow)
+## 1. Overview
 
-```
-                    ┌─────────────────────────────┐
-                    │  scripts/data/facility_data.gd  │  NEW — FacilityData.TABLE
-                    │  (class_name FacilityData)       │  id / node / title / text /
-                    │  def(id) · all() · _build()      │  action_label / effects[]
-                    └──────────────┬──────────────────┘
-                                   │ validated by
-                    ┌──────────────▼──────────────────┐
-                    │  scripts/data/map_data.gd         │  EDIT — NODES: flip 2 slots;
-                    │  active_facility_id(id) -> Str    │  NEW accessor (symmetric with
-                    │  declared_gap_types(id) (unchanged│  active_event_id / active_battle_id)
-                    │  — auto re-derives)               │
-                    └──────────────┬──────────────────┘
-                                   │ resolved on travel, NOT on arrival
-                    ┌──────────────▼──────────────────┐
-                    │  scripts/segments/map.gd  (MapScreen)│  EDIT — new FACILITY phase
-                    │  _travel() → _maybe_start_entry_   │  in the phase model. NEVER wired
-                    │    event() → _maybe_start_entry_   │  into the arrival dispatch.
-                    │    battle()  (UNCHANGED arrival)    │  Entered by explicit key only.
-                    │                                      │
-                    │  TRAVEL: use_facility key → enter   │  NEW surface observables:
-                    │  FACILITY: ui_accept → _use_facility │  facility_id / facility_use_count
-                    │            move_down/left → leave   │  last_facility_effect_types
-                    └──────────────┬──────────────────┘
-                                   │ effects via the SAME path as events
-                    ┌──────────────▼──────────────────┐
-                    │  scripts/data/event_logic.gd      │  UNCHANGED — EventLogic.apply_
-                    │  (EventLogic, pure-static)        │  option_effects(profile, opt)
-                    └──────────────┬──────────────────┘
-                                   │ mutates
-                    ┌──────────────▼──────────────────┐
-                    │  scripts/data/player_profile.gd   │  UNCHANGED — add_attr / silver /
-                    │  (PlayerProfile, RefCounted)       │  add_gongfa / ATTR_FLOOR
-                    └─────────────────────────────────┘
+The main storyline is **pointer-dead from the tutorial end screen onward**: the tutorial-end overlay is built in code with zero buttons (`scripts/autoload/game_manager.gd::_show_end_game_overlay`, call sites `:194`/`:199`), and five later segment scenes (`transition` / `sect_select` / `cultivation` / `map` / `ending`) are `Backdrop(Panel) + Label` with zero buttons. A phone player can reach WON/LOST and is then stuck on a screen whose only affordance is "按回车继续".
 
-  Observability surface (playtest/_common.yaml MapScreen block — append-only):
-    facility_id · facility_use_count · last_facility_effect_types   ← NEW (3 vars)
-    phase (now carries "FACILITY") · entry_declared_gap_types (auto) ← existing, extended
+This round is **additive pointer reachability**, designed around the repo's own twice-proven doctrine (*the button is the convergence point; the keyboard degrades to a shortcut calling the same handler*):
 
-  Keyboard:
-    project.godot [input]:  use_facility (F)  ← NEW player-facing action
-                            debug_grant_silver     ← NEW debug-injection action
-```
+1. **Add `Button` nodes** whose `pressed` delegates to the **existing** single-entry handlers (`request_continue` / `request_retry` / `_advance` / `_pick` / `_on_accept` / `_travel` / `_resolve_node_event` / `restart_game`). Zero gameplay/logic change: month advancement, reachability rules, event option effects are untouched.
+2. **Re-align exactly one piece of copy** — the overlay strings (`i18n.gd:101/102` + call sites `game_manager.gd:194/199`) — so the prompt describes a real, tappable action. All other keyboard-flavored hint copy becomes a **measurement-only debt** (`design/40_ux_backlog.md`), per the brief.
+3. **Prove it with a `clicks:`-only playtest scenario** (no keyboard action anywhere) that boots `main.tscn` and walks menu → creation → tutorial battle → **tutorial end overlay** → transition → sect select → cultivation (36 months) → map → events → ending → restart. It is authored **before** the fixes and must **first run red** at the overlay; the measured first-failure value goes into the report. `playtest/spine_to_ending.yaml` (keyboard proof) is **not touched** and must stay green — this round adds an input path, it does not replace one.
+
+Non-negotiables carried from the brief: playtest contract append-only (surface whitelist only grows); no numeric changes; no engine-level form gates ("has a Button", "size >= 48" are forbidden as gates); click anchors sit on control bodies, never `*_ClickTarget`; new UI copy is Chinese and every new string lands in `scripts/autoload/i18n.gd`'s EN dictionary (`tests/test_i18n_coverage.py` stays green); frozen camera/Coord layers and the just-landed facility files are not touched.
 
 ---
 
-## 组件列表 (Component list)
+## 2. 设计变更 (declared design-doc changes)
 
-### Component 1 — FacilityData module  [NEW]
-- **File:** `scripts/data/facility_data.gd`
-- **Responsibility:** The single sanctioned text source for all facility prose (the §433 rule — no inline anecdotes in `map_data.gd` / `map.gd`). Mirrors `EventData.TABLE` + `def(id)` / `all()` builder pattern byte-for-byte.
-- **Schema:**
-  - `class FacilityOption extends RefCounted` — NOT needed; a facility has one action, not a binary choice (that is the event shape; a facility with option_a/option_b would be "a second event"). Instead, the facility carries a flat `effects` array.
-  - `class FacilityDef extends RefCounted`:
-    - `id: String` — e.g. `"shaolin_wooden_men"`
-    - `node: String` — the node id this facility binds to (`"shaolin"` / `"wudang"`)
-    - `title: String` — Chinese, e.g. `"木人巷"`
-    - `text: String` — 2-line Chinese body
-    - `action_label: String` — the use prompt, e.g. `"入巷练骨"`
-    - `effects: Array[Dictionary]` — same shape as `EventData.EventOption.effects`: each `{"type": "silver"|"attr"|"practice"|"none", "value": int, "target": String}`. The silver cost is carried as a `silver` effect with a negative value (exactly like `night_rain` option A: `[{"type":"silver","value":-6},{"type":"attr","value":1,"target":"bone"}]`).
-  - `const TABLE: Array` — 2 rows (shaolin, wudang). Concrete copy (placeholder magnitudes, NOT tuned):
-    - **shaolin_wooden_men** (少林·木人巷): `[{"type":"silver","value":-8},{"type":"attr","value":2,"target":"bone"}]` — pay 8 silver, gain 2 根骨 (the body-hardening facility; distinct from night_rain's bone gain).
-    - **wudang_meditation** (武当·紫霄静修): `[{"type":"silver","value":-8},{"type":"attr","value":2,"target":"inner"}]` — pay 8 silver, gain 2 内力 (the qi-cultivation facility).
-  - `static func def(id) -> FacilityDef` — fresh instance; null if unknown.
-  - `static func all() -> Array[FacilityDef]` — table order.
-  - `static func _build(row) -> FacilityDef` / `_build` helpers — mirror EventData.
-  - `static func for_node(node_id) -> FacilityDef` — convenience: the facility bound to a node (scans TABLE for `row.node == node_id`); null if none. This is the single resolution point `active_facility_id()` in MapData delegates to.
-  - `static func silver_cost(def) -> int` — the absolute silver price, derived from the `silver` effects (sum of negative values, absolute). This is what the cost-gate in map.gd checks against `profile.silver`.
-
-### Component 2 — MapData edits  [EDIT existing]
-- **File:** `scripts/data/map_data.gd`
-- **Changes:**
-  1. **NODES table** — flip the `facility` slot on `shaolin` and `wudang` from `{"status": "declared", "facility_id": ""}` to `{"status": "active", "facility_id": "shaolin_wooden_men"}` / `{"status": "active", "facility_id": "wudang_meditation"}`. All other nodes' facility slots stay `declared / ""`.
-  2. **NEW accessor** `active_facility_id(id) -> String` — symmetric with `active_event_id` / `active_battle_id`: returns the `facility_id` iff the slot `status == "active"` AND `FacilityData.def(facility_id) != null`; `""` otherwise (typo-safe inert, fail-safe, never crashes). This is the single resolution point — `declared_gap_types()` needs NO change (it already reads whatever `status` each slot carries; flipping 2 slots to `active` makes it auto-drop `facility` from shaolin/wudang gap lists).
-  3. Add `const FacilityData = preload("res://scripts/data/facility_data.gd")` at the top (one-way edge: facility_data.gd is pure data and does not reference map_data.gd, mirroring the EventData preload).
-- **No second computation:** `declared_gap_types(id)` is unchanged — it reports whatever is still `declared`. After the flip: shaolin → `[battle]`, wudang → `[battle]`, wuming_valley/luoyang/xiangyang → `[battle, facility]`, kunlun → `[event, battle, facility]`, huashan → `[event, facility]`. The honesty observable MOVES — that is its job.
-
-### Component 3 — MapScreen FACILITY phase  [EDIT existing]
-- **File:** `scripts/segments/map.gd`
-- **Changes:**
-  1. **NEW surface vars** (mirrors the event observable set):
-     - `var facility_id: String = ""` — the active facility id while in FACILITY phase ("" otherwise).
-     - `var facility_use_count: int = 0` — session count of facility uses (ladder 0→1→2…; persists across visits because MapScreen stays loaded).
-     - `var last_facility_effect_types: Array[String] = []` — effect "type"s of the last facility use, in order (mirrors `last_effect_types`).
-  2. **Phase model:** `phase` gains a `"FACILITY"` value. The phase string is already a surface var; no new var, just a new value.
-  3. **Input — `_unhandled_input`** (keyboard-driven, no new click target, no `*_ClickTarget`, no mouse_filter work):
-     - In **TRAVEL**: if `Input.is_action_pressed("use_facility")` AND `MapData.active_facility_id(current_node_id) != ""` → enter FACILITY phase (`_enter_facility()`). This is the opt-in — the player actively chooses to use the facility. `ui_accept` still travels (unchanged); the facility entry is a separate key, so travel and facility-enter never conflict.
-     - In **FACILITY**: `ui_accept` → `_use_facility()` (pay cost, apply effects, stay in FACILITY so it can be used again); `move_down` or `move_left` → leave (`_leave_facility()` → back to TRAVEL). This mirrors the EVENT phase's `move_up/left` ↔ `move_down/right` + `ui_accept` grammar.
-  4. **`_enter_facility()`**: set `facility_id = MapData.active_facility_id(current_node_id)`, `phase = "FACILITY"`, `_sync_surface()`, `_render()`. Does NOT auto-use — the player still must press `ui_accept` to actually use it.
-  5. **`_use_facility()`**: 
-     - `var def = FacilityData.def(facility_id)`; if null, return.
-     - **Cost-gate:** `var cost = FacilityData.silver_cost(def)`; if `SaveManager.profile.silver < cost` → refuse (do NOT apply effects; render a "银两不足" refusal; `facility_use_count` does not increment). This is the natural reuse limiter (existing silver resource), not a new economy. **Reuse is bounded only by silver this round** (i.e. effectively unbounded above the cost — silver→attr has no cap here); a per-visit / per-period / pure-silver-limit cap is a **PENDING phase-5 numerical decision** (recorded for `design/90_decisions.md` in the Docs table), NOT settled balance — a later round must not read the silver gate as the final word on the reuse ceiling.
-     - If affordable: build a transient `EventData.EventOption` with `opt.effects = def.effects.duplicate(true)`, call `EventLogic.apply_option_effects(SaveManager.profile, opt)` (the SAME pure-static path events use). Record `last_facility_effect_types` from `def.effects`. Increment `facility_use_count`. `SaveManager.autosave()`. `_sync_surface()`, `_render()`. **Stays in FACILITY** — the player can use it again immediately or leave.
-  6. **`_leave_facility()`**: `facility_id = ""`, `phase = "TRAVEL"`, `_sync_surface()`, `_render()`.
-  7. **`_sync_surface()`**: append `facility_id` and `facility_use_count` and `last_facility_effect_types` mirroring (the profile mirrors `silver`/`attr_*` are already synced — the facility's silver/attr effects land through the same profile, so the existing mirrors pick them up with no extra code).
-  8. **`_apply_hint_visibility()`**: change `hint.visible = phase != "EVENT"` → `hint.visible = phase == "TRAVEL"`. The travel hint shows ONLY in TRAVEL; it is hidden in both EVENT and FACILITY (the FACILITY panel renders its own prompt in BodyLabel). The smoke test pin (`"visible = phase" in src`) stays green — `hint.visible = phase == "TRAVEL"` still contains the substring `"visible = phase"`.
-  9. **`_render()`** — add a FACILITY branch (before the TRAVEL fallback):
-     - If `phase == "FACILITY"`: render `tr("【%s】\n\n%s\n\n%s\n\n%s") % [tr(def.title), tr(def.text), <cost/effect summary>, tr("回车使用 · 上下离开")]`. The cost/effect summary is composed from `def.effects` (e.g. `"银两 −8 · 根骨 +2"`). If the last use was refused (silver < cost), append `tr("银两不足")`.
-     - In the TRAVEL branch: if `MapData.active_facility_id(current_node_id) != ""`, append a facility-hint line to the BodyLabel text: `tr("\n\n门派设施：%s（F 使用）") % tr(FacilityData.def(...).title)` — so the player can SEE the facility exists at this node and knows which key enters it.
-  10. **CRITICAL — arrival dispatch is UNCHANGED:** `_travel()` calls `_maybe_start_entry_event()` then (if not EVENT) `_maybe_start_entry_battle()`. The facility is NEVER added to this chain. A facility is entered ONLY by the explicit `use_facility` key in TRAVEL phase. This is the definitional property: arrival never enters a facility; only an explicit choice does.
-
-### Component 4 — Input actions  [EDIT project.godot]
-- **File:** `project.godot` `[input]` section
-- **NEW player-facing action:** `use_facility` — bound to physical key `F` (lower + upper). Mnemonic: "Facility". This is the ONLY new player-facing key.
-- **NEW debug action:** `debug_grant_silver` — bound to an unused physical key (implementer's choice; debug-only, not player-facing). Injects silver into the profile for the facility scenario's cost precondition (the `_fast_forward` cultivation path always picks practice/cultivate, never "work" — verified: `cultivation.gd::_fast_forward` L506-516 — so the player arrives at the map with 0 silver). `debug_grant_silver` is handled in `map.gd::_process` (same dispatch shape as `cultivation.gd::_process` debug actions), but it **MUTATES silver through the normal pipeline — NEVER a bare field assignment**. Concretely: it builds a transient `EventData.EventOption` carrying a single `{"type":"silver","value":<fixed amount>}` effect and calls `EventLogic.apply_option_effects(SaveManager.profile, opt)` — the SAME pure-static path the facility's own `_use_facility()` silver cost (Component 3) and every event/card silver effect take (the `apply_option_effects` silver branch = `profile.silver = maxi(profile.silver + value, 0)`, verbatim with `cultivation.gd:268-269`; `PlayerProfile` exposes no dedicated silver mutator, so this IS the existing silver-mutation path). **Rationale** (roadmap "测试怎么写" rule 2 — 注入一律走正常管线,不直接改字段): a bare `SaveManager.profile.silver += N` would validate a mutation path the player can never reach AND bypass the clamp-to-≥0 floor; routing through `apply_option_effects` tests the exact code the player exercises, floor included. The amount is a single literal; it is NOT tuned — it just needs to be ≥ 2 × facility cost so the scenario can use the facility twice.
-- Both actions MUST be added to `playtest/_common.yaml` `actions:` list (append-only).
-
-### Component 5 — i18n strings  [EDIT existing]
-- **File:** `scripts/autoload/i18n.gd` EN dictionary
-- **NEW strings** (Chinese-as-key; every one gets an EN entry so `tests/test_i18n_coverage.py` stays green):
-  - Facility titles: `"木人巷"` → `"Wooden Men Alley"`, `"紫霄静修"` → `"Purple Cloud Meditation"`
-  - Facility body text (2 lines each) — verbatim from `facility_data.gd` TABLE
-  - Facility action labels: `"入巷练骨"` → `"Enter the Alley to Tempermord"`, `"静室修内"` → `"Meditate for Inner Qi"`
-  - Facility prompt: `"回车使用 · 上下离开"` → `"Enter to use · Up/Down to leave"`
-  - Refusal: `"银两不足"` → `"Not enough silver"`
-  - Travel facility hint: `"\n\n门派设施：%s（F 使用）"` → `"\n\nSect facility: %s (F to use)"`
-  - Cost/effect summary fragments: `"银两 −%d"` → `"Silver −%d"`, `"根骨 +%d"` → `"Bone +%d"`, `"内力 +%d"` → `"Qi +%d"` (composed at runtime — wrapped in `tr()`)
-- **Constraint:** `tests/test_i18n_coverage.py` checks scene `text=`, `tr()` call sites, and `.text =` direct assigns. All new strings are either in the EN dict (keys) or composed via `tr()` at runtime. The coverage test stays green.
-
-### Component 6 — Playtest scenario (58th)  [NEW]
-- **File:** `playtest/facility_use_reusable.yaml`
-- **Basename == `name:`** = `facility_use_reusable`.
-- **Two-place sync:** added to `_common.yaml scenario_order` tail (after `camera_transform_follows_unit`, becoming the 58th) AND to `tests/test_playtest_contract_smoke.py ROUND_SCENARIOS` tail (same order).
-- **Surface whitelist** (append to `MapScreen` block in `_common.yaml`, in the SAME edit as the scenario — never land a scenario with unpublished observables, even transiently):
-  - `facility_id`, `facility_use_count`, `last_facility_effect_types`
-  - `use_facility` and `debug_grant_silver` added to `actions:` list (same edit)
-- **Scenario skeleton** (the implementer/PM fills exact `at:` frames and thresholds; the Architect defines the structure and the assertions' shapes):
-  - Boot: full boot (main.tscn → 7× ui_accept → debug_win_tutorial → creation → cultivation → debug_fast_forward → MAP), mirroring `map_node_event_shaolin.yaml`'s boot prefix (the facility needs the same MAP-state setup). Route to shaolin (wuming_valley → luoyang → shaolin, resolving intermediate events).
-  - **Arrival half (the permanent negative assertion — definitional property):**
-    - At the shaolin arrival frame: assert `MapScreen.phase == "EVENT"` (the arrival event fired) **PLUS** `MapScreen.phase != "FACILITY"` **PLUS** `MapScreen.facility_id == ""` **PLUS** `MapScreen.facility_use_count == 0` — merely arriving has used the facility zero times.
-    - Resolve the arrival event (ui_accept) → TRAVEL. Re-assert `MapScreen.facility_use_count == 0` and `MapScreen.facility_id == ""` — resolving an event cannot smuggle a facility use in.
-  - **Choice half (the positive assertion — active, reusable, observable):**
-    - No travel between these frames. `debug_grant_silver` (fund the profile — verified: 0 silver after fast-forward). Then `use_facility` → assert `MapScreen.phase == "FACILITY"`, `MapScreen.facility_id == "shaolin_wooden_men"`, `MapScreen.facility_use_count == 0` (entered but not yet used).
-    - `ui_accept` → use. Assert `MapScreen.facility_use_count == 1`, `MapScreen.silver: changed`, `MapScreen.attr_bone: changed`, `MapScreen.last_facility_effect_types == ["silver", "attr"]` (all differential/relative — no absolute game-value literals).
-    - `move_down` → leave. Assert `MapScreen.phase == "TRAVEL"`, `MapScreen.facility_id == ""`, `MapScreen.facility_use_count == 1` (count persists).
-    - Travel away and back (shaolin → luoyang → shaolin, resolving intermediate events). Arrive again.
-    - `use_facility` → `MapScreen.phase == "FACILITY"`, `MapScreen.facility_use_count == 1` (still 1).
-    - `ui_accept` → use again. Assert `MapScreen.facility_use_count == 2`, `MapScreen.attr_bone: changed` again.
-  - **`description:`** must state that the arrival half (negative assertion) is the DEFINITIONAL PROPERTY of the content type (event = fires on arrival; facility = entered by choice), not redundancy — deleting it deletes what this round established.
-- **Assert grammar** (verified in-repo, no harness change needed): `!=` appears in `each_unit_acts_once_per_round_initiative_order.yaml` and `event_travel_effects.yaml`; compound `and` appears in `qi_cost_blocks_cast_no_energy.yaml`. The negative assertion `phase != "FACILITY"` and compound `phase == "EVENT" and phase != "FACILITY"` use the same grammar.
-
-### Component 7 — Anti-deletion guard  [HARD REQUIREMENT — elevated from SOTA "recommended"]
-- **File:** `tests/test_playtest_contract_smoke.py`
-- **Pin:** a static text guard requiring `playtest/facility_use_reusable.yaml` to contain BOTH a `phase != "FACILITY"` line AND a `facility_use_count == 0` line — exactly the shape of the existing honesty pin that requires `map_node_event_shaolin`'s gap line to reference both `"battle"` and `"facility"` (`test_map_node_event_surface_contract` L762-772).
-- **Why HARD, not "recommended":** the permanent negative assertion (Component 6's arrival half) is the ONLY guard against a future round wiring the facility into the arrival dispatch — the project's recurring failure shape where the property that defines a thing has no observation point, and the recurring failure shape ONE LEVEL UP where the observation point itself is silently deletable. Without this pin, the permanent assert is itself silently deletable. The Step 1 review explicitly recommended elevating it; this design makes it a hard requirement.
-- Also pin (same test): the facility scenario's `name:` equals its basename, every timeline `at:` is a single integer, every 4-space dotted assert line carries a comparison operator or the `changed`/`unchanged` differential token (same shape as all other round-scenario static checks).
-
-### Component 8 — Re-baseline the shaolin scenario gap asserts  [EDIT existing — authorized]
-- **Files:** `playtest/map_node_event_shaolin.yaml`, `tests/fixtures/playtest_assert_superset.json`
-- **What moves:** shaolin's `facility` slot flips to `active`, so `entry_declared_gap_types` at shaolin drops `facility` → `[battle]`. The two existing gap-assert lines in `map_node_event_shaolin.yaml` (f460, f560) currently read `entry_declared_gap_types.has("battle") and entry_declared_gap_types.has("facility")`. They must be re-derived to `entry_declared_gap_types.has("battle") and not entry_declared_gap_types.has("facility")` (facility is no longer a gap; battle still is).
-- **Superset fixture:** the frozen baseline in `playtest_assert_superset.json` currently bakes the pre-edit expression `entry_declared_gap_types.has("battle") and entry_declared_gap_types.has("facility")` for shaolin (L52). The fixture must be updated FIRST (bake the post-edit expression), mirroring the `events_resolved_count == 1 → == 2` sanctioned-exception precedent (L3-9). This keeps `test_edited_scenarios_assert_superset` green through the edit.
-- **Red-then-green discipline:** the measured red value from BEFORE the flip (facility still `declared`) must be recorded in the delivery report: the new facility scenario's first facility assert reads the empty/absent state — e.g. `MapScreen.phase == "FACILITY"` reads `"TRAVEL"`, or `MapScreen.facility_id == "shaolin_wooden_men"` reads `""`, or `facility_use_count` is undefined (surface not yet whitelisted). The measured value from that red run is recorded; a green-only nail does not count.
-- **One-time vs standing:** the red-then-green evidence (item 12 in SOTA) is ONE-TIME-ONLY — it vanishes the moment the scenario turns green and protects nothing afterwards. The standing negative assertion (Component 6's arrival half + Component 7's anti-deletion pin) is what carries the definitional property forward. The design states these together so a later reader does not mistake the red signature for a lasting guard.
-- **Spine stays green:** `spine_to_ending.yaml` walks 武当 (a facility node) at f480. The facility never auto-fires and never consumes input on arrival, so the spine is invisible to it. The spine's 武当 block handles the arrival event and walks on. No edit to `spine_to_ending.yaml` needed.
-
-### Component 9 — §433 copy-location guard  [NEW — recommended, scoped to prose]
-- **File:** `tests/test_facility_copy_location.py` (stdlib-only pytest, the `test_i18n_coverage.py` shape — no PyYAML, no Godot)
-- **What:** scans `scripts/data/map_data.gd` and `scripts/segments/map.gd` for **prose-length CJK string literals** (regex for `"..."` containing ≥ 4 CJK chars) and fails if any NEW one appears that is not in a sanctioned allowlist. Goes red only on newly-inlined copy; green on day one.
-- **Sanctioned day-one allowlist (enumerated explicitly, per Step 1 review suggestion):**
-  - The travel hint: `"左右/上下选择相邻去处，回车启程"`
-  - The map header: `"【江湖行路】\n\n"`
-  - The here/reachable markers: `"▶ %s（此处）\n"`, `"  %s（可前往）\n"`
-  - The current-node footer: `"\n当前：%s"`
-  - The event-panel template: `"【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺"`
-  - Node `display_name` values: `"无名谷"`, `"洛阳"`, `"武当"`, `"襄阳"`, `"昆仑"`, `"少林"`, `"华山"` (these are data, not prose, but they are CJK literals in `map_data.gd`)
-  - The facility travel-hint template (NEW this round, sanctioned): `"\n\n门派设施：%s（F 使用）"`
-- **Why scoped to prose, not "zero CJK":** a stricter "zero CJK in map_data.gd" variant needs the same allowlist, so the extra strictness buys nothing. Prose-length (≥4 CJK) catches newly-inlined anecdotes while letting short identifiers/markers through.
-- **Accepted alternative (if judged over-defence):** skip the guard AND record in `design/99_changelog.md` / `design/90_decisions.md` that §433 remains an unguarded documentation-only rule. Either conclusion is acceptable; an unexamined silence is not.
-
----
-
-## 技术栈 (Technical stack)
-
-- **Godot 4.4 + GDScript** — the project runtime; no new engine, no new libraries, no art, no numerical tuning.
-- **`scripts/data/facility_data.gd`** — new dedicated data module (EventData.TABLE mirror) = the single home for all facility copy.
-- **`scripts/data/map_data.gd`** — 2-slot flip + `active_facility_id()` accessor (symmetric with `active_event_id` / `active_battle_id`).
-- **`scripts/segments/map.gd`** — `FACILITY` phase, opt-in/keyboard-driven, **never** in the arrival dispatch; observables through `_sync_surface()` (existing convention, not recomputed).
-- **`scripts/data/event_logic.gd`** — UNCHANGED. Facility effects route through `EventLogic.apply_option_effects` (the same pure-static path events use) by constructing a transient `EventData.EventOption` with the facility's `effects` array. Zero new economy.
-- **`scripts/data/player_profile.gd`** — UNCHANGED. The facility touches `silver` / `add_attr` through the same mutators.
-- **`scripts/autoload/i18n.gd`** — EN dictionary gains all new facility strings.
-- **`project.godot [input]`** — `use_facility` (F) + `debug_grant_silver` (debug).
-- **Playtest:** one new scenario (58th) + re-baseline of shaolin gap asserts + anti-deletion pin + (optional) §433 copy-location guard.
-- **Unit tests:** extend `tests/test_map_data.gd` / `tests/test_map_node_event.gd`, new `tests/test_facility_data.gd` (registered in `tests/unit_test_runner.gd` TESTS — append-only).
-
----
-
-## 接口规范 (Interface specifications)
-
-### FacilityData ↔ MapData
-```
-# map_data.gd
-const FacilityData = preload("res://scripts/data/facility_data.gd")
-
-static func active_facility_id(id: String) -> String:
-    # Returns facility_id iff slot.status == "active" AND FacilityData.def(facility_id) != null
-    # else "" (typo-safe inert — a dangling facility id reads as inert, never crashes)
-```
-
-### MapData ↔ MapScreen
-```
-# map.gd reads (TRAVEL phase, deciding whether to show the facility hint / allow entry):
-var fid: String = MapData.active_facility_id(current_node_id)   # "" or the id
-# map.gd reads (FACILITY phase, resolving the def):
-var def = FacilityData.def(facility_id)                          # FacilityDef or null
-var cost: int = FacilityData.silver_cost(def)                    # the silver gate
-```
-
-### MapScreen ↔ EventLogic (effect application — the SAME path as events)
-```
-# _use_facility():
-var opt = EventData.EventOption.new()
-opt.effects = def.effects.duplicate(true)   # the facility's silver-cost + gain effects
-EventLogic.apply_option_effects(SaveManager.profile, opt)   # SAME pure-static path
-```
-
-### MapScreen surface observables (playtest contract)
-```
-MapScreen (append to _common.yaml surface block, in this order):
-  - facility_id            # "" in TRAVEL/EVENT; the id in FACILITY
-  - facility_use_count     # session ladder 0 -> 1 -> 2 ...
-  - last_facility_effect_types  # ["silver", "attr"] etc — mirrors last_effect_types
-# phase already whitelisted; now carries "FACILITY" as a value
-# entry_declared_gap_types already whitelisted; auto-reflects the 2-slot flip
-# silver / attr_bone / attr_inner already whitelisted; facility effects land through them
-```
-
-### Keyboard contract
-```
-project.godot [input]:
-  use_facility = KEY_F (physical, lower+upper)    # NEW player-facing
-  debug_grant_silver = <unused key>                # NEW debug-only
-
-map.gd _unhandled_input:
-  TRAVEL:    use_facility + active_facility_id != "" -> _enter_facility()
-  FACILITY:  ui_accept -> _use_facility()  |  move_down/move_left -> _leave_facility()
-  (EVENT and all other phases: unchanged)
-```
-
----
-
-## 测试计划 (Test plan)
-
-### GDScript unit suite (register in `tests/unit_test_runner.gd` TESTS — append-only)
-1. **`tests/test_facility_data.gd`** [NEW] — FacilityData schema pins:
-   - `TABLE` has exactly 2 rows; each `def(id)` resolves; `for_node("shaolin")` / `for_node("wudang")` return the right def; `for_node("luoyang")` returns null (no facility there).
-   - Each def's `effects` use only the closed domain {silver, attr, practice, none}; the silver cost (`silver_cost(def)`) is > 0 and matches the silver effect magnitude (cost-gate consistency).
-   - Each effect lands through `EventLogic.apply_option_effects` on a local `PlayerProfile` (silver deducts with clamp; attr gains land floor-aware) — the parity test shape from `test_map_node_event.gd::_test_event_logic_parity`.
-2. **`tests/test_map_data.gd`** [EDIT] — extend `_test_entry_content`:
-   - `active_facility_count == 2` (was 0); `active_facility_id("shaolin") == "shaolin_wooden_men"`, `active_facility_id("wudang") == "wudang_meditation"`, `active_facility_id("luoyang") == ""` (declared stays inert).
-   - **Per-node gap pins — the load-bearing evidence; the count alone is NOT sufficient.** The existing test (`test_map_data.gd` ~L152-156) pins `declared_gap_types` only for `luoyang` / `wuming_valley` / `shaolin`; **`wudang` has NO per-node pin today.** An implementer who flips shaolin+luoyang (not shaolin+wudang) would still see `active_facility_count == 2` go green while wudang stays unimplemented — the recurring "honest observable degrades into a count" failure shape. Closed by moving the observable PER-NODE:
-     - **ADD** `declared_gap_types("wudang") == ["battle"]` — NEW pin, same shape as the existing three; wudang flipped ⇒ `facility` drops from its gap list.
-     - **RE-DERIVE** the existing `declared_gap_types("shaolin")` line to `["battle"]` (facility dropped).
-     - **KEEP** `declared_gap_types("luoyang") == ["battle", "facility"]` and `declared_gap_types("wuming_valley") == ["battle", "facility"]` UNCHANGED — the "not-flipped-still-honest" controls proving the flip did not fake the remaining nodes to look better.
-   - The active-slot total is now 8 (5 events + 1 battle + 2 facilities), counted separately by type. The count is retained as a cross-check but is NO LONGER the sole evidence — the per-node gap pins are. (A wudang playtest scenario is optional, not required; the unit pin is the hard guard.)
-3. **`tests/test_map_node_event.gd`** [EDIT] — extend with a facility phase test (`_test_map_facility_phase`):
-   - Instantiate MapScreen, set up at shaolin, travel there (arrival event fires → resolve → TRAVEL).
-   - **Negative:** after arrival, `phase != "FACILITY"`, `facility_id == ""`, `facility_use_count == 0`.
-   - Fund the profile (local, `profile.silver = cost + 1`). Call `_enter_facility()` (or simulate the key) → `phase == "FACILITY"`, `facility_id` set, `facility_use_count == 0`.
-   - Call `_use_facility()` → `facility_use_count == 1`, `last_facility_effect_types == ["silver","attr"]`, silver decreased, attr increased (all derived from the def, no absolute literals).
-   - Call `_use_facility()` again → `facility_use_count == 2` (reusable).
-   - Call `_leave_facility()` → `phase == "TRAVEL"`, `facility_id == ""`, `facility_use_count == 2` (count persists).
-   - Cost-gate: set `profile.silver = cost - 1`, call `_use_facility()` → refused, `facility_use_count` unchanged, effects not applied.
-
-### Playtest contract
-- **New scenario:** `playtest/facility_use_reusable.yaml` (Component 6) — 58th, two-place sync, both halves of the definitional property.
-- **Re-baseline:** `playtest/map_node_event_shaolin.yaml` gap asserts (Component 8) + superset fixture.
-- **Smoke test pins:** `tests/test_playtest_contract_smoke.py` — new scenario presence/order/whitelist, the authorized shaolin re-derivation, the anti-deletion pin (Component 7).
-- **All existing scenarios stay green:** the facility never auto-fires, never consumes arrival input, never touches the camera/coordinate layer. `spine_to_ending` (42/42), `save_load_roundtrip` (14/14), `event_travel_effects` (19/19), `map_battle_node_huashan` — all untouched.
-
-### Compile + i18n + contract smoke
-- `gdscript_check` gate: 0 errors (new `facility_data.gd` + edited `map_data.gd` / `map.gd` + new test files).
-- `tests/test_i18n_coverage.py`: green (all new strings in EN dict).
-- `tests/test_playtest_contract_smoke.py`: green (the edits are the authorized re-baseline + new scenario pin + anti-deletion pin).
-
----
-
-## 文档同步 (Docs updates — docs-first, in sync)
+This run **is** a design-doc round (acceptance criteria mandate it). `5_design` will apply:
 
 | File | Change |
 |---|---|
-| `design/20_content.md` §8.1 | Six-node table: shaolin + wudang facility slots `declared → active` with their `facility_id`s. |
-| `design/20_content.md` §8.3 | Gap note 2 ("facility: declared, unimplemented") → updated: facility is now implemented at shaolin/wudang; the remaining 5 nodes stay declared. |
-| `design/20_content.md` | NEW §10 or append to §8: the facility definition (event = fires on arrival; facility = entered by choice, reusable, cost-gated by silver, effects via EventLogic), the 2 facility data rows, the arrival-never-enters-facility invariant. |
-| `design/00_roadmap.md` | Completeness table entry 2: `facility ❌ 仅声明` → `facility ✅ (少林/武当)`. Entry 4: `❌ 立绘几何四条缺口` → `✅` (the four gaps — portrait-height, nameplate-on-leg, trait-click-to-show, no-mobile-retreat — all landed in prior rounds; this is the stale/outdated entry the brief calls out). |
-| `design/99_changelog.md` | One row (2026-08-29): facility implemented at shaolin/wudang; the definitional property + permanent negative assertion; the re-baseline; the red-then-green record. |
-| `design/90_decisions.md` | NEW rulings: (a) event/facility precedence — arrival never enters a facility, only an explicit key does, pinned by a permanent negative assertion; (b) the re-baseline exception for the shaolin gap assert; (c) the §433 guard conclusion (adopted guard or recorded unguarded); (d) the red-then-green record is one-time, the standing negative assertion carries the property forward; (e) **facility reuse upper limit is a PENDING numerical decision (phase 5)** — this round gates reuse on the existing silver resource ("pay each use") so it introduces NO new resource/economy; the open question (once-per-visit? once-per-period? pure-silver-limit?) is recorded as undecided so a later round does not read the silver gate as settled balance. |
+| `design/30_presentation.md` | New section "指针可达性 (pointer reachability)": every storyline screen must expose a visible, tappable control delegating to the existing handler; **the observation conclusion** — `actions:`-driven key injection (`Input.parse_input_event`) bypasses GUI hit-testing, so a screen with zero clickable controls can pass a key-driven contract; `clicks:` is the true hit test and is the instrument that sees this defect class. Also: the button-delegate doctrine (focus_mode = 0, keyboard stays byte-identical) and "click anchors sit on control bodies" reaffirmation. |
+| `design/40_ux_backlog.md` | Two **measurement-only** debts (UX-11, UX-12, `OPEN`, no gate): (i) touch-target sizes of storyline tappable controls at the 960×704 design resolution — measured values + the smallest few, explicitly no threshold; (ii) residual keyboard-only hint copy with line numbers (list in §3.8 below). |
+| `design/00_roadmap.md` | Phase 2 (交互) entry updated: the "storyline unreachable by touch" gap closed this round; what remains in Phase 2 is exactly the two measurement debts (no gate). |
+| `design/90_decisions.md` | Five adjudications (§8 of this doc): battle-outcome seed in the clicks-only spine; option-button = focus+accept delegation; copy re-align scope; FACILITY phase out of scope; anchors on control bodies. |
+| `design/99_changelog.md` | One row dated 2026-08-29. |
 
-`design/20_content.md` §8.1 table and §8.3 gap notes are the SAME fact source — they must be consistent (the brief's "两份文档是同一事实源,必须一致").
-
----
-
-## 回滚与不可逆操作 (Rollback / irreversibility)
-
-The design involves no destructive migrations. The "irreversible" edits are frozen-scenario re-baselines, handled by the backup-first protocol:
-
-1. **`tests/fixtures/playtest_assert_superset.json` re-baseline:** snapshot the current fixture → bake the post-edit shaolin gap expression → verify `test_edited_scenarios_assert_superset` still passes against the edited `map_node_event_shaolin.yaml` → only then commit. If the new expression is wrong, restore the snapshot (the old expression is still in git). The fixture is the frozen baseline; updating it FIRST means the smoke test never sees a mismatch.
-2. **`map_node_event_shaolin.yaml` gap assert re-derivation:** the superset fixture guards "只许加,不许减" — the re-baseline exception is baked into the fixture BEFORE the yaml is edited, so the machine proof holds through the edit. The re-derivation only TIGHTENS (facility drops from the gap list — an honesty observable that MOVES when a gap is filled, which is its job).
-3. **`map_data.gd` NODES flip:** a data-row edit to a const table. No migration — `declared_gap_types()` re-derives automatically. Rollback = revert the 2 rows (git). The unit tests (`test_map_data.gd`) pin the exact post-edit counts.
-4. **No file deletions, no batch rewrites.** Every edit is additive (append-only contract: surface whitelist grows, scenario_order grows, TESTS registry grows, EN dict grows) or a surgical re-derivation of a single existing assert line.
+No numeric/content/system rule in `10_systems.md` / `20_content.md` / `40_progression.md` changes.
 
 ---
 
-## 扩展性考虑 (Extensibility)
+## 3. Architecture
 
-- **Adding a 3rd facility** (e.g. a kunlun facility after the ending-routing guarantee is lifted): add a row to `FacilityData.TABLE`, flip the node's facility slot in `map_data.gd` NODES, and `declared_gap_types()` auto-drops `facility` for that node. No code change in `map.gd` (the FACILITY phase is generic — it reads `active_facility_id(current_node_id)` and resolves via `FacilityData.def`). The cost-gate, effect application, and surface sync are all data-driven.
-- **Facility with multiple options:** the current design deliberately has NO option_a/option_b (that is the event shape; a facility with a binary choice would be "a second event"). If a future facility genuinely needs a choice, it belongs in a design decision first, not in a data row. The `FacilityDef.effects` array can carry multiple gain effects (e.g. silver −8 + bone +2 + agility +1) without schema change.
-- **Non-silver cost gates:** the cost-gate is currently silver-only. If a future facility needs a qi or practice ceiling as the limiter, the gate check in `_use_facility()` is the single place to extend. The effect domain stays the closed {silver, attr, practice, none} set.
-- **The permanent negative assertion is the load-bearing extensibility guard:** it ensures that no future round can wire the facility into the arrival dispatch without going red. That is what keeps "facility = entered by choice" true as the codebase grows — not the data schema, not a comment, an observation point.
+### 3.1 Component map (text diagram)
+
+```
+                       playtest contract (verification plane)
+   playtest/clicks_only_storyline.yaml ── clicks: ──► real GUI hit test (push_error on miss)
+        ▲  registered in _common.yaml scenario_order + tests ROUND_SCENARIOS (two-place sync)
+        │  static pins: keyboard-free pin + surface contract pin (tests/test_playtest_contract_smoke.py)
+        │
+   GAME PLANE (all changes additive; keyboard paths byte-identical)
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │ GameManager (autoload)                                                      │
+   │   _show_end_game_overlay(): CanvasLayer(50) → Dim(STOP) → Panel → Label     │
+   │        → NEW ContinueButton / RetryButton (focus_mode 0, pressed →          │
+   │          request_continue / request_retry — the same calls _unhandled_input │
+   │          makes; keyboard branch untouched)                                  │
+   │   end_overlay_text (:194/:199 literals re-aligned; i18n.gd:101/102 keys)    │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │ Segment screens (scene + script pairs; button pools mirror phase options)   │
+   │   transition.tscn/gd      → NextButton            → _advance()             │
+   │   sect_select.tscn/gd     → SectButton0..4        → _pick() (focus then)   │
+   │   cultivation.tscn/gd     → OptionsBox/CultOptionButton0..N (rebuilt per    │
+   │                             render)               → focus var + _on_accept()│
+   │   map.tscn/gd             → TravelBox/TravelButton{i}  → focus_id + _travel()│
+   │                             EventBox/EventOptionButton{0,1} → event_focus +  │
+   │                             _resolve_node_event(); FACILITY phase: NO buttons│
+   │                             (frozen facility files — debt recorded)          │
+   │   ending.tscn/gd          → RestartButton          → restart_game()         │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │ i18n (scripts/autoload/i18n.gd)                                             │
+   │   replace keys :101/:102 with tap-describing copy; add 继续/重试/重新开始     │
+   ├─────────────────────────────────────────────────────────────────────────────┤
+   │ Guards: tests/test_game_manager_fsm.gd (overlay wiring, headless-safe)      │
+   │         tests/test_i18n_coverage.py (unchanged, must stay green)            │
+   │         tests/test_playtest_contract_smoke.py (ROUND_SCENARIOS + 2 new pins)│
+   └─────────────────────────────────────────────────────────────────────────────┘
+   Docs plane: design/30 (reachability), design/40_ux_backlog (2 debts),
+               design/00_roadmap (Phase 2), design/90_decisions (5 rulings),
+               design/99_changelog (1 row)
+```
+
+**Data flow of a tap (the property the gate asserts):** finger/click → GUI hit test picks the topmost non-IGNORE Control at the point → `Button.pressed` → delegate → the **same** function the keyboard shortcut calls → existing state machine advances. The gate is game-level: "the storyline can be traversed with clicks only", never engine-level ("a Button exists").
+
+### 3.2 Component A — end-game overlay buttons (`scripts/autoload/game_manager.gd`)
+
+**Responsibility:** give the code-built WON/LOST overlay two hit-testable, visible controls, without touching the keyboard branch.
+
+**Interface (exact):**
+
+- Inside `_show_end_game_overlay(text)`, after the existing `Panel` + `Label` construction, add:
+  - `var continue_btn := Button.new()`; `continue_btn.name = "ContinueButton"`; `continue_btn.text = tr("继续")`; `continue_btn.focus_mode = Control.FOCUS_NONE`; `continue_btn.custom_minimum_size = Vector2(200, 48)`; positioned in the panel's lower band (panel is 500×250; e.g. offsets `(150, 178) .. (350, 226)`); `continue_btn.pressed.connect(request_continue)`; `panel.add_child(continue_btn)`. Also narrow the label's full-rect to the upper band (set `label.offset_bottom ≈ 170`) so text and button do not visually overlap — layout-only, no theme/font changes.
+  - `var retry_btn := Button.new()`; `name = "RetryButton"`; `text = tr("重试")`; same focus_mode/size; `retry_btn.pressed.connect(request_retry)`; `panel.add_child(retry_btn)`.
+  - Per-state visibility in the **same** function: `continue_btn.visible = current_state == "WON"`, `retry_btn.visible = current_state == "LOST"`.
+- **Re-show branch** (`:456-463`, overlay exists): extend the `get_node_or_null` sync to also re-resolve `"Panel/ContinueButton"` / `"Panel/RetryButton"` and re-apply `text`/`visible`. (Today `clear_battle()` frees the overlay on every retry/segment route and `scene_manager.gd:192` teardown frees it on any scene swap, so re-show is rare — but the branch must not silently leave stale buttons.)
+- **New surface observable:** `var end_overlay_pressed_connected: Dictionary = {}` on GameManager, updated in both branches: `{"ContinueButton": continue_btn.pressed.is_connected(request_continue), "RetryButton": ...}`. Whitelisted in `_common.yaml`.
+- **Call-site copy** (`:194` / `:199`) and **i18n keys** (`i18n.gd:101/102`) change together (two-sided edit; see §3.7).
+- **Keyboard branch `_unhandled_input` (`:515-523`) stays byte-identical.** Only its stale comment ("no focusable controls") is refreshed: the new buttons are `focus_mode = FOCUS_NONE`, so keyboard events still reach `_unhandled_input` untouched.
+
+**Double-fire analysis (must survive review):** a `Button` only activates on `ui_accept` when it *has focus*; `FOCUS_NONE` means it can never grab focus, so `ui_accept` cannot reach the button — exactly one dismissal per key press, via `_unhandled_input` as today. Mouse clicks reach only the button. `request_continue` / `request_retry` already guard on `current_state` (`!= STATE_WON` / `!= "LOST"` → no-op), so even a double delivery cannot advance two segments. This is the same shape the HUD/creation buttons already ship (`focus_mode: 0` is asserted in `playtest/undo_button_retreat.yaml`).
+
+**Overlay lifetime (verified this step):** `request_retry()` and any scene swap (`scene_manager.gd:192` → `GameManager.clear_battle()`) free the overlay, so a stale clickable button never lingers over a later screen. The tutorial WON path (`battle_return_state == "TUTORIAL"`) frees nothing in `request_continue` itself, but the TRANSITION scene swap it triggers runs the teardown that frees the overlay — no dead button over the next screen.
+
+### 3.3 Component B — five segment screens (`scenes/segments/*.tscn` + `scripts/segments/*.gd`)
+
+**Shared shape (per screen):** buttons live in the scene as siblings **after** `Backdrop` (topmost-first picking → buttons win; `Backdrop` gets `mouse_filter = 2` where missing — presentation-layer hygiene mirroring `map.tscn`, not a gate). Every button: global theme (fonts come free), `focus_mode = FOCUS_NONE` (no focus stealing, no double-fire), `pressed.connect(<delegate>)`. Screen scripts gain one observable:
+
+```gdscript
+## Surface: button name -> pressed-signal wired (mirror of CreationScreen.pressed_connected).
+var pressed_connected: Dictionary = {}
+```
+
+(static screens set it in `_ready`; cultivation/map re-sync it whenever they rebuild their pools).
+
+| Screen | Nodes to add | Delegate (existing code, unchanged) | Notes |
+|---|---|---|---|
+| `transition` | `NextButton` (text `tr("继续 ▶")` — key exists) | `if not done: _advance()` (mirror of the `_unhandled_input` body incl. the `SceneManager.pending_swap` guard inside `_advance`) | `visible = not done`, synced in `_render()` |
+| `sect_select` | `SectButton0..4` (labels = `tr(display_name)` of `ProgressionGongfaData.SECTS`, set in `_render()`) | `_on_sect_pressed(i: int)`: `focus_index = i; _render(); _pick()` | exactly 5, static; `_pick()`'s own guards (`selected_sect_id != ""`, `pending_swap`) still apply |
+| `cultivation` | `OptionsBox` (VBoxContainer in .tscn, right of/below `BodyLabel`); script **rebuilds** its children each `_render()` as `CultOptionButton{i}` | `_on_option_pressed(i: int)`: set the phase's focus var (`_card_focus` / `_action_focus` / `_gongfa_focus` / `_attr_focus` / `_event_focus` / `_year_choice` / `_switch_focus`) to `i`, then call the existing `_on_accept()` | see pool spec below |
+| `map` | `TravelBox` → `TravelButton{i}` per neighbor; `EventBox` → `EventOptionButton0/1` | `_on_travel_pressed(i)`: `focus_id = MapData.neighbors(current_node_id)[i]; _travel()`; `_on_event_option_pressed(i)`: `event_focus = i; _resolve_node_event()` | boxes visible **only** in their phase (mirror `_apply_hint_visibility()`); **FACILITY branch untouched** (frozen files) |
+| `ending` | `RestartButton` (text `tr("重新开始")`) | `_on_restart_pressed()`: `if done: return; done = true; if not SceneManager.pending_swap: GameManager.restart_game()` | mirror of the `_unhandled_input` body |
+
+**Cultivation pool spec (the only nontrivial one):**
+
+- In `_render()`, rebuild `OptionsBox` children (free + recreate — pools are ≤ ~10 nodes, renders are event-driven; HUD's per-setup skill-button rebuild is the precedent): one `CultOptionButton{i}` per option of the current phase, labeled from the **same** strings the `BodyLabel` branch renders (card names, action verbs 功法/属性/打工/游历/保存/读取/删除, event option labels, sect rows, year choices) — every label via `tr()`; hide the box entirely in phases with no options (e.g. `GONGFA_PICK` when `_unmastered_ids()` is empty — the keyboard path auto-returns to `ACTION_PICK` there; a player picks another action).
+- Delegation is exact: keyboard play is "cycle focus, then accept"; a click is "set that focus, then accept" — one handler, two triggers, zero forked logic. `_on_accept()`'s own `_delete_armed = false` and per-phase guards stay authoritative.
+- Buttons per phase: `YEAR_AUGMENT`/`CARD_PICK` 3, `ACTION_PICK` 7, `GONGFA_PICK` dynamic (unmastered ids), `ATTR_PICK` 5, `EVENT` 2, `YEAR_END` 2, `SECT_SWITCH` 5.
+- **No 「推进一个月」 extra control is needed**: the month advances through the *existing* path (`card pick → action pick`), and the deterministic click loop is 2 clicks/month (see §4 skeleton) — the mitigation the reviewer suggested is unnecessary at the measured frame budget, and omitting it avoids inventing a verb the screen never had.
+
+**Determinism guards:** option *texts* vary per month (card draws) but the scenario anchors **node names**, never texts; assert blocks pin phase/year/month ladders only (structural facts, precedent: `spine_to_ending` asserts `year: 1` / `month: 1`), never card contents or attribute values.
+
+### 3.4 Component C — i18n (`scripts/autoload/i18n.gd`)
+
+Two-sided edit rule (the dict key **is** the literal Chinese string): change call site + key + EN value together, or the lookup silently falls through to raw Chinese. Exact strings:
+
+```gdscript
+# :101/:102 replaced in place (keeps 胜利/战败 tokens the FSM test + spine assert on; no ellipsis):
+"胜利！华山论剑的胜者！\n\n点击「继续」进入江湖":
+    "Victory! Champion of the Duel at Mount Hua!\n\nTap Continue to enter the jianghu",
+"战败于华山论剑\n\n点击「重试」再战":
+    "Defeated at the Duel at Mount Hua\n\nTap Retry to fight again",
+# new button labels:
+"继续": "Continue",
+"重试": "Retry",
+"重新开始": "Restart",
+```
+
+Before deleting any old key, grep for other call sites (the two old overlay strings are used only at `game_manager.gd:194/199`; `按回车继续` at `:343` is a *different* key and stays this round — it is debt, not in scope). All other new labels reuse existing keys (`继续 ▶`, sect display names, node display names, event option labels, action verbs) — implementer greps each; any literal that turns out unkeyed gets an EN entry. Discipline: never assign a raw Chinese literal via `.text =`; go through `tr()`. `tests/test_i18n_coverage.py` (scene `text=`, `tr()` sites, `.text =` direct assignment) is the gate that keeps this honest and must stay green.
+
+### 3.5 Component D — playtest scenario `playtest/clicks_only_storyline.yaml`
+
+One new file, `name:` == basename, `scene:` inherited (`res://scenes/main.tscn`), **zero keyboard actions**. Allowed non-click timeline action: **only** `debug_win_tutorial` (the documented battle-outcome seed — the same instrument the keyboard spine uses at f20; it is an unbound DEBUG action consumed in `_process`, not a keyboard input; the battle *screen's* clickability is separately proven by `battle_end_turn_attack_buttons`, `click_targeting_fixed`, `undo_button_retreat`, `click_portrait_body_targets_enemy`, plus an in-scenario real click on `AttackButton` below). The scenario header documents this adjudication and reserves a "RED-FIRST EVIDENCE" block for the measured first failure.
+
+Skeleton (frame numbers indicative ±; final values are the implementer's, subject to: every `at:` a single integer, **last assert ≤ 2900**, asserts operator-or-`changed`, differential/relational game-level values only — no absolute game numbers beyond structural ladders already precedented like `month`/`events_resolved_count`):
+
+```yaml
+# MENU → CREATION (clicks)
+- {at: 10,  clicks: [MenuEntry0]}                       # 新的冒险
+- {at: 30,  assert: CHARACTER_CREATION; CreationScreen.visible; AttrNextButton liveness}
+- {at: 40,  clicks: [AttrNextButton]}                   # ATTRS → TRAITS
+- {at: 55,  clicks: [TraitNextButton]}                  # TRAITS → CONFIRM
+- {at: 70,  clicks: [ConfirmButton]}                    # → TUTORIAL (battlefield)
+# TUTORIAL BATTLE — screen click-path proof + documented outcome seed
+- {at: 110, assert: BATTLE; HUD 4 buttons liveness (visible/size/mouse_filter)}
+- {at: 120, clicks: [AttackButton]}                     # real click; out-of-range reject is harmless
+- {at: 130, actions: [debug_win_tutorial]}              # the ONE non-click action (seed)
+# TUTORIAL END OVERLAY — the nail
+- {at: 150, assert: current_state == "WON"; end_overlay_text contains 胜利;
+            ContinueButton.visible/size/mouse_filter==0/focus_mode==0}
+- {at: 160, clicks: [ContinueButton]}                   # ← first-red frame lives here
+- {at: 190, assert: TRANSITION; NextButton liveness}
+- {at: 200, clicks: [NextButton]}                       # page 1 → page 2
+- {at: 220, clicks: [NextButton]}                       # → SECT_SELECTION (creation_done == true)
+- {at: 250, assert: SECT_SELECTION; SectButton0 liveness}
+- {at: 260, clicks: [SectButton0]}                      # → CULTIVATION
+- {at: 300, assert: CULTIVATION year 1 month 1 phase CARD_PICK; CultOptionButton0 liveness}
+# 36-MONTH LOOP (uniform: CultOptionButton0 = card/year-augment/year-end-stay,
+#                CultOptionButton2 = work → month advances through the existing path)
+#   per month: clicks [CultOptionButton0] at f, [CultOptionButton2] at f+3
+#   year ends (m12 work click lands in YEAR_END): extra click CultOptionButton0 (留在本门)
+#   year starts y2/y3 (YEAR_AUGMENT): extra click CultOptionButton0
+#   assert checkpoints at m2 / y2m1 / y3m1 / m36: phase + year + month ladders only
+#   ≈ 78 clicks ≈ 320 frames incl. checkpoints
+# MAP (reached automatically after month 36's action resolves → _finish_to_map)
+- {at: ~1150, assert: MAP; phase TRAVEL; TravelButton0 liveness}
+- travel legs: click TravelButton{i} → arrival opens EVENT (assert event_id/current_node_id)
+-   → click EventOptionButton0 → assert TRAVEL + events_resolved_count ladder (== 1/2/3)
+-   legs: 无名谷→洛阳(merchant)→武当(quanzhen_scripture)→襄阳(dragon_scrap)→昆仑 (endpoint
+-   routes to ENDING before any entry event — no event click at kunlun; index resolved from
+-   MapData.neighbors order, the current_node_id assert makes a wrong index an honest red)
+- {at: ~1500, assert: ENDING; tier >= 1 and tier <= 3; RestartButton liveness}
+- {at: 1510, clicks: [RestartButton]}
+- {at: 1550, assert: current_state == "TUTORIAL"}        # storyline closed by taps; ≤ 2900
+```
+
+Budget: ≈ 90 clicks × ~3–4 frames + ~15 assert blocks ≈ **1500–1700 frames** — comfortably inside the 2900 spine cap; no screen is left undriven, so no escape hatch is exercised (if the real run proves otherwise, the brief's rule applies: report the screen + reason, never inject `ui_accept`).
+
+**LOST/RetryButton click path:** proven at unit level (`tests/test_game_manager_fsm.gd` asserts both buttons exist/visible/wired in headless mode and that the retry delegate lands in `request_retry`) plus the untouched keyboard scenario `tutorial_loss_restarts_tutorial` keeps LOST routing green. A second playtest scenario for it was considered and cut: same code shape as the WON button, marginal gate value, extra registry surface.
+
+### 3.6 Component E — contract registry + pins (`playtest/_common.yaml`, `tests/test_playtest_contract_smoke.py`)
+
+1. **Two-place sync (append-only):** `playtest/clicks_only_storyline` appended at the tail of **both** `_common.yaml::scenario_order` and `ROUND_SCENARIOS` in `tests/test_playtest_contract_smoke.py` (the existing `test_round_scenarios_present_on_disk_and_in_order` enforces the pairing; `test_timeline_at_values_are_integers` auto-covers the new file).
+2. **Surface whitelist additions (append-only, adds never remove):**
+   - New blocks: `ContinueButton`, `RetryButton`, `NextButton`, `SectButton0`, `CultOptionButton0`, `CultOptionButton2`, `TravelButton0`, `EventOptionButton0`, `RestartButton` — each `[visible, size, mouse_filter, text]` (overlay buttons additionally `disabled, focus_mode`).
+   - Existing blocks grow by one var each: `TransitionScreen`, `SectSelectScreen`, `CultivationScreen`, `MapScreen`, `EndingScreen` get `pressed_connected`; `GameManager` gets `end_overlay_pressed_connected`.
+3. **New pin `test_clicks_only_storyline_is_keyboard_free`** (stdlib parse of the scenario file, family of `test_facility_use_reusable_surface_contract`): every timeline `actions:` list may contain only `debug_win_tutorial`; the file must contain ≥ 5 `clicks:` entries; no clicks token may end in `_ClickTarget`. Failure message is **self-explaining** per the 2026-08-29 `30_presentation.md` rule: name the correct fix ("if you are legitimately changing the seed or adding a non-keyboard action, update this pin in the same change — do not delete the pin to go green, and never smuggle in `ui_accept`/`tutorial_next`/`move_*`/`skill_*`/`end_turn`/`attack_confirm`/`pause_game`/`use_facility`").
+4. **New pin `test_touch_reach_surface_contract`:** the nine new surface blocks + five `pressed_connected` additions exist in `_common.yaml`.
+5. **Stale-doc fix (reviewer suggestion):** correct the `_common.yaml` clicks-grammar example (`~L55`) from `Central_Divine_ClickTarget` to the unit-body anchor (`Central_Divine +0,0`), citing the 2026-08-29 `90_decisions.md` ruling — the new scenario's author reads this file first.
+6. **Untouched:** `spine_to_ending.yaml`, `tests/fixtures/playtest_assert_superset.json` (its `baselines` key-set check still passes), all frozen camera/visibility scenarios, all facility files.
+
+### 3.7 Component F — unit guard (`tests/test_game_manager_fsm.gd`)
+
+Extend the overlay test (headless `-s` safe — `Button.new()` + `add_child` + `connect` create no scene-tree dependencies): after `end_battle(true)`, assert the overlay contains `Panel/ContinueButton` with `visible == true`, `focus_mode == 0`, `pressed.is_connected(request_continue)`, and `RetryButton` hidden/wired to `request_retry`; mirror after `end_battle(false)`; assert `end_overlay_pressed_connected` values; keep the existing 胜利/战败/no-ellipsis text pins (they stay green under the new copy). Registered in `tests/unit_test_runner.gd`'s suite list as today (same file extended, no new runner entry).
+
+### 3.8 The two measurement debts (data for `design/40_ux_backlog.md`)
+
+**UX-11 (measurement-only, no gate): touch-target sizes.** After the gate run, transcribe each storyline control's `get_global_rect().size` at the 960×704 design resolution (physical size on a phone = design px × content-scale factor) into the backlog row; call out the smallest few (expected: creation `AttrPlus{i}`/`TraitToggle{i}` and the new option buttons). Platform reference points for the record only: Material 48 dp / HIG 44 pt / WCAG 2.5.8 24 px. Asserting a threshold is forbidden (engine-level form gate).
+
+**UX-12 (measurement-only, no gate this round): residual keyboard-only hint copy with line numbers.** Baseline (verified in step 1; re-verify line numbers when transcribing): `i18n.gd:338` + `:339` (ending restart), `:343` (transition), `:348` (sect join), `:353` (map travel), `:358` (event decide), `:367` (facility use/leave), `:369` (facility F-hint — no F on touch), `:111` (tutorial intro names 回车 alongside the existing 继续 button), and scene-file literals `transition.tscn:48`, `sect_select.tscn:46`, `cultivation.tscn:46`, `ending.tscn:46` (+ `scripts/segments/sect_select.gd:56` body tail). After this round each of these screens *has* a control; the copy still names only the keyboard route — recorded as the remaining copy-alignment debt, explicitly not fixed this round (scope = overlay `:101/102` only, per the brief).
 
 ---
 
-## 设计自检 (Pre-submission checklist)
+## 4. Task decomposition proposal (ordered; the red-first ordering is binding)
 
-- [x] Covers all MVP goals: facility defined + distinguished from event; ≥2 nodes active; declared_gap_types honest; reusable + observable; no new economy; data-table copy; new playtest scenario with red-then-green; roadmap entries 2+4 updated; changelog + decisions.
-- [x] Component responsibilities single and clear: FacilityData (data), MapData (resolution), MapScreen (phase), EventLogic (unchanged effect path). No unnecessary coupling — the facility touches EventLogic/PlayerProfile through the same interface events use.
-- [x] Prioritizes SOTA-recommended tools: EventData.TABLE pattern, EventLogic pure-static path, map.gd phase model, active_*_id accessor, append-only playtest contract, anti-deletion pin. Nothing reinvented.
-- [x] Interfaces clear enough for PM to decompose: each component has a named file, named functions, named surface vars, and named keyboard actions.
-- [x] No over-design: no new economy, no new abstract layer, no option_a/option_b for facilities, no new click target, no camera/coordinate changes.
-- [x] `linter_manifest.json` produced, matching the file types in this project (`.gd` excluded — handled by the gdscript_check gate per addon guidance).
+1. **T1 — nail authored, first red.** Write `playtest/clicks_only_storyline.yaml`, `_common.yaml` surface additions + `scenario_order` append, both smoke pins, and the `_common.yaml` L55 doc fix. Run the playtest gate. **Expected red:** at the f150 block — `ContinueButton` unresolvable (harness `push_error` at aim) and/or the pre-click liveness asserts failing on a missing node, with `current_state == "WON"` where the overlay click was meant to advance. Record the measured value (failing frame, first failing assert line, exact error string, green-assert count before red) into the scenario header + the report.
+2. **T2 — overlay.** Component A + i18n keys + FSM unit extension. Overlay leg turns green; `tutorial_win_routes_to_transition` / `tutorial_loss_restarts_tutorial` (keyboard) must stay green untouched.
+3. **T3 — transition + sect_select.** Component B rows 1–2 (+ Backdrop `mouse_filter = 2`).
+4. **T4 — cultivation.** Component B pool (biggest single piece).
+5. **T5 — map.** Travel/Event boxes; FACILITY branch byte-untouched.
+6. **T6 — ending.** RestartButton.
+7. **T7 — full regression gate.** All scenarios green (incl. `spine_to_ending` 42/42), 0 runtime errors, hard gates `passed: true`, GDScript unit suite green, compile 0 errors, `test_i18n_coverage.py` + `test_playtest_contract_smoke.py` green.
+8. **T8 — docs.** All `design/` updates (§2), including UX-11 measured values and UX-12 line-number audit transcribed from the T7 run; changelog row dated 2026-08-29; decisions into `90_decisions.md`.
+
+Rollback: pure file edits in git, no data migration; contract changes are append-only so a revert restores the previous contract byte-for-byte. No irreversible operation is designed.
+
+---
+
+## 5. Tech stack (unchanged; nothing new to install)
+
+Godot 4.4 / GDScript; `Button` + `pressed` delegates; scene files as diffable text; the external `aitelier/tools/godot_playtest/impl.py` harness (`clicks:` true hit test, `push_error` hard-red); stdlib pytest smoke pins; existing `global_theme.tres` + NotoSansSC (no art assets, no engine config, no touch-emulation change). Rejected alternatives and why (from step 1, ratified): tap-anywhere hot-zone (full-rect STOP footgun, cannot express N destinations), Godot focus/`ui_accept` (collapses click and keyboard routes — reopens the observation gap), `_input` mouse route (not per-control hit-testable), `TouchScreenButton`/touch emulation (changes semantics for ~70 scenarios), `AcceptDialog` (new visual idiom + focus/modal behavior), `_draw()` pseudo-buttons (invisible to the hit test).
+
+---
+
+## 6. Invariants & risk register
+
+1. **Additive, not replacement.** Every `_unhandled_input`/`_process` keyboard branch byte-identical; buttons delegate to the same handlers; `spine_to_ending.yaml` untouched and green.
+2. **No double-fire.** `focus_mode = FOCUS_NONE` everywhere; state guards in `request_continue`/`request_retry`/`_pick`/`ending` are the second net.
+3. **Hit-test ordering.** Overlay: Dim(STOP) → Panel → Label → buttons (buttons last = topmost). Segments: buttons as siblings after `Backdrop`; decorative full-rect hosts get `mouse_filter = 2`; no new full-rect STOP nodes are introduced (`test_every_full_rect_host_is_click_through` family stays meaningful).
+4. **Dynamic pools.** Rebuilt per render; unused buttons never linger (a hidden-but-anchored button is an honest red — that is the gate working).
+5. **Frame budget.** ≈1500–1700 frames, last assert ≤ 2900; cultivation loop uses only advancing actions (work) so no phase can stall the loop (empty `GONGFA_PICK` never entered).
+6. **Frozen surfaces.** No edits to `scripts/camera_follower.gd`, `scripts/coord.gd`, `ink_world_dx/dy`, `camera_offset_y`, `camera_transform_follows_unit.yaml`, `portrait_grid_alignment.yaml`, facility files, or any existing scenario's `at:` frames.
+7. **Gate discipline.** Assertions are game-level and differential/relational (state strings, `changed`, ladders `== 1/2/3`, `tier >= 1 and tier <= 3`); no "must contain a Button" form gate, no size gate, no absolute game values.
+8. **Copy discipline.** Chinese UI copy; every new literal keyed in the EN dict; two-sided edits; no ellipsis anywhere (repo-wide rule, FSM test polices the overlay).
+9. **Environment caveat.** The harness lives outside the repo (sidecar image); before believing any red, confirm the image is fresh (a new surface var can report "unknown key" rather than a game defect).
+
+---
+
+## 7. Extensibility
+
+- The option-pool pattern (`OptionsBox` rebuild mirroring phase options) generalizes to any future dynamic menu (event pool growth, new map nodes) without new machinery.
+- Because the gate is game-level ("traverse with clicks only"), a future round may legitimately replace buttons with gestures/hot-zones/self-drawn controls without touching the scenario — exactly what a form gate would have broken.
+- UX-11/UX-12 are closeable by a later round by the backlog's own rules (close = an action with evidence, not an inference).
+
+---
+
+## 8. Decisions requiring `design/90_decisions.md` entries (with rationale)
+
+(a) **Battle-outcome seed in the clicks-only spine.** `debug_win_tutorial` is allowed as the single non-click action: the battle screen's clickability is proven by four existing click scenarios plus an in-scenario `AttackButton` click; a full click-fought battle cannot fit the frame cap, and the alternative (splitting the spine) would leave "overlay → … → ending reachable by taps" unproven in one run. The seed is documented in the scenario header and the report.
+(b) **Option buttons = focus + accept delegation.** No forked click logic; keyboard branches untouched; this is what makes "adds, not replaces" true by construction.
+(c) **Copy re-align scope = overlay only** (`i18n.gd:101/102` + `game_manager.gd:194/199`); all other keyboard-flavored hints become the recorded UX-12 debt — per the brief's explicit split.
+(d) **FACILITY phase gets no buttons this round** (frozen facility files); its keyboard-only panel is recorded in UX-12.
+(e) **Click anchors on control bodies** reaffirmed for all new buttons (no `*_ClickTarget`); `_common.yaml`'s stale example is corrected in the same change.
+
+---
+
+## 9. Acceptance-criteria mapping
+
+| Criterion | Where satisfied |
+|---|---|
+| Visible tap-control on every storyline screen | Components A + B (six work sites; menu/creation/HUD/tutorial-overlay already have buttons) |
+| Overlay fixed + `i18n.gd:101/102` aligned | Component A + C |
+| Keyboard path not regressed; `spine_to_ending.yaml` green untouched | §6.1; T7 |
+| New clicks-only scenario green, zero keyboard actions, first-red measured | Component D + E pins; T1 evidence block |
+| Measurement debts recorded (sizes; residual copy + line numbers) | §3.8 → `design/40_ux_backlog.md` |
+| Docs updated (30/40/00/90/99) | §2 |
+| All gates: playtest green + 0 runtime errors + hard gate true; unit suite; compile 0; i18n coverage + contract smoke green | T7 |

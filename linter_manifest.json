@@ -1,7 +1,6 @@
 {
   ".py": "ruff",
-  ".json": "basic",
-  ".md": "basic",
   ".yaml": "basic",
-  ".cfg": "basic"
+  ".md": "basic",
+  ".json": "basic"
 }
