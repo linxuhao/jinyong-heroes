@@ -77,6 +77,14 @@ anchors; no art assets; `focus_mode = FOCUS_NONE` everywhere so no double-fire):
 - **Companion scenario**: `playtest/map_facility_buttons_click.yaml` proves the
   three facility delegate buttons by clicks while `facility_use_reusable.yaml`
   stays byte-untouched.
+- **The clicks-only path paid for itself twice**: aligning it to screen-ready
+  timing re-projected every `at:` frame and grew the tutorial-intro leg to 7
+  `Next` clicks (`TutorialManager.STEP_COUNT == 7`), and it exposed a real game
+  bug the keyboard path never hits — `cultivation.gd`'s `_rebuild_options_box()`
+  called `free()` on the button mid-emission of its own `pressed` signal
+  ("Attempted to free a locked object"; measured 21/47 red). Fixed minimally
+  with `queue_free()` (no month-advance/phase logic change; seven related
+  scenarios re-measured green, `spine_to_ending` 42/42 among them).
 - **Contract guards** (append-only): both new scenarios appended to
   `playtest/_common.yaml::scenario_order` **and** `ROUND_SCENARIOS` in
   `tests/test_playtest_contract_smoke.py` (two-place sync); surface whitelist
@@ -86,14 +94,19 @@ anchors; no art assets; `focus_mode = FOCUS_NONE` everywhere so no double-fire):
   and `test_touch_reach_surface_contract` (the new observables cannot be
   silently deleted). The stale `*_ClickTarget` example in `_common.yaml`'s
   clicks-grammar docs was corrected to a unit-body anchor.
-- **Red-first record (honest status)**: the nail is authored to first go red at
-  the tutorial-end overlay (`ContinueButton` did not exist pre-fix). The values
-  recorded in `final/delivery_notes_touch_reach_red_first.md` — failing frame
-  180, first failing assert `ContinueButton.visible`, expected
-  `push_error: clicks target 'ContinueButton' — node not found` — are a
-  **structural prediction** (the external harness could not be invoked from the
-  implementation step); the measured confirmation is the downstream gate's
-  verdict. See *Verification status* below.
+- **Red-first record (measured)**: the nail is authored to first go red at the
+  tutorial-end overlay (`ContinueButton` did not exist pre-fix) — and it DID,
+  measured: with the documented TEMPORARY RED-FIRST REVERT applied to
+  `game_manager.gd`, a real direct harness invocation
+  (`godot_playtest_scenario(scenario="clicks_only_storyline")`) ran
+  **RED 8/47** — failing frame **265**, first failing assert
+  **`ContinueButton.visible`**, exact error **`aim: node not found:
+  ContinueButton (spec: ContinueButton)`**, green asserts before red **8**;
+  after the byte-identical restore it re-ran **47/47 green**. Values live in
+  `final/delivery_notes_touch_reach_red_first.md`, the scenario header and
+  `design/00_roadmap.md` / `90_decisions.md`; the earlier f180/5 numbers were
+  the structural prediction and are superseded (same screen, same first
+  assert).
 - **Measurement-only debts** (`design/40_ux_backlog.md`, no gates):
   **UX-11** — touch-target sizes of every storyline control at the 960×704
   design resolution (measure and record the smallest few; Material 48 dp /
@@ -118,7 +131,7 @@ zero keyboard):
 |---|---|
 | 主菜单 | `MenuEntry0` (新的冒险) |
 | 捏人 · 属性/特质/确认 | `AttrNextButton` → `TraitNextButton` → `ConfirmButton` |
-| 教程战 · 开场页 | `Next` ×3 |
+| 教程战 · 开场页 | `Next` ×7 |
 | 教程战 · 战斗 | `AttackButton` (one real click; outcome seeded with `debug_win_tutorial` — see above) |
 | 教程结算 overlay | `ContinueButton` ← **the first-red screen** |
 | 过场 | `NextButton` ×2 |
@@ -331,13 +344,18 @@ the verifier step (the gates run after it). In short:
   two-place sync (`_common.yaml::scenario_order` tail + `ROUND_SCENARIOS`
   tail); the two new smoke pins; the extended `test_game_manager_fsm.gd`
   overlay pins; the design-archive records (30/40/00/90/99).
-- **Red-first status**: the recorded first-red values (tutorial-end overlay,
-  frame 180, `ContinueButton.visible`, node-not-found) are the structural
-  prediction in `final/delivery_notes_touch_reach_red_first.md`; the harness
-  could not be invoked from the implementation step, so the **measured**
-  first-red and the post-fix green belong to the downstream gate run, which
-  must transcribe them (and correct `design/99_changelog.md`'s row if the
-  measured values differ).
+- **Red-first status (measured)**: the first-red and the post-fix green are now
+  MEASURED — via direct per-scenario invocation of the same external sidecar
+  the gate drives (not via the `5_compile` gate): RED 8/47 at f265
+  (`ContinueButton.visible`, exact error `aim: node not found: ContinueButton
+  (spec: ContinueButton)`, 8 green asserts before red) with the documented
+  temporary revert applied, then GREEN 47/47 after the byte-identical restore;
+  a second parse-clean measured run (frame-timing re-projection plus the
+  `cultivation.gd` `free()` → `queue_free()` fix) re-measured the nail 47/47
+  green with seven regression probes green (`spine_to_ending` 42/42,
+  `map_facility_buttons_click` 38/38, `facility_use_reusable` 49/49, plus four
+  cultivation/sect scenarios). The earlier f180/5 numbers were the structural
+  prediction (superseded).
 - **Pending the downstream gate run, not claimed**: the measured green of all
   71 playtest scenarios (incl. `clicks_only_storyline`,
   `map_facility_buttons_click` and `spine_to_ending` still fully green — the
@@ -346,15 +364,18 @@ the verifier step (the gates run after it). In short:
   pins), the i18n coverage test, and the vision gate's check that the new
   controls render legibly at the design resolution (no new geometry, but the
   verdict is not pre-declared).
-- **Last recorded gate run for this round**: `design/99_changelog.md`'s
+- **Gate runs for this round**: `design/99_changelog.md`'s
   `record_parse_lesson_and_reconcile` row records that the round's `5_compile`
-  run so far measured `Parse failed — play-test skipped` (`spec_used: false`,
+  run measured `Parse failed — play-test skipped` (`spec_used: false`,
   `frames: 0`): a parse error in a new `tests/*.gd` file reds Godot's
   project-wide parse check, the playtest is skipped entirely, and the hard gate
-  still reads `passed: true` with zero frames. A **parse-clean measured run**
-  (compile 0 errors, scenarios actually executed) is the first thing the
-  downstream gate must produce; until then no green/red playtest number exists
-  for this round — including the clicks-only nail and the keyboard spine.
+  still reads `passed: true` with zero frames. Since then **parse-clean
+  measured runs did happen via direct per-scenario sidecar invocation** (see
+  the red-first bullet above) — the nail and its regression probes have real
+  numbers — but the **official full-suite gate run** (all 71 scenarios +
+  compile 0 errors + the unit suite + the pytest smoke) remains the downstream
+  `5_compile` / `5_test` product and is still pending; none of those numbers
+  is claimed here.
 - If the downstream playtest gate reddens any scenario, that is reported with
   its cause, never papered over: no assertion is removed or relaxed, no
   frozen yaml is edited to route around a defect, and thresholds are never
