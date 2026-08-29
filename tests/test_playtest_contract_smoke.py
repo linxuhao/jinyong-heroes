@@ -65,6 +65,8 @@ ROUND_SCENARIOS: list[str] = [
     "language_zh_default",
     "camera_transform_follows_unit",
     "facility_use_reusable",
+    "clicks_only_storyline",
+    "map_facility_buttons_click",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1261,3 +1263,230 @@ def test_whitelisted_observables_exist_in_scripts() -> None:
         "whitelisted surface observables with no `var` declaration in their "
         "mapped script (they would read as a parse error or a stale initial "
         "value in Expression asserts): " + "; ".join(missing))
+
+
+# ---------------------------------------------------------------------------
+# Touch-reach round pins (2026-08-29): clicks-only keyboard-free + surface
+# existence.
+# ---------------------------------------------------------------------------
+
+# The verified seeding/debug prefix token set from facility_use_reusable.yaml
+# (read the ACTUAL file, never a design list): ui_accept, move_right,
+# debug_win_tutorial, debug_fast_forward, debug_grant_silver.
+_FACILITY_COMPANION_ALLOWED_ACTIONS: frozenset = frozenset({
+    "ui_accept", "move_right", "debug_win_tutorial",
+    "debug_fast_forward", "debug_grant_silver",
+})
+
+
+def _extract_action_tokens(text: str) -> list[tuple[int, str]]:
+    """Extract (line_number, token) pairs for every action item in a scenario.
+
+    Parses the YAML text using stdlib regex only (no PyYAML). An action item
+    is a line matching `^  - (\\S+)$` that follows a `^  actions:$` line
+    (within the same timeline entry, before the next `^  [a-z_]+:$` key or
+    `^- ` timeline entry).
+    """
+    lines = text.splitlines()
+    results: list[tuple[int, str]] = []
+    in_actions = False
+    for lineno, raw in enumerate(lines, start=1):
+        stripped = raw.strip()
+        if stripped == "actions:":
+            in_actions = True
+            continue
+        if in_actions:
+            m = re.match(r"^  - (\S+)$", raw)
+            if m:
+                results.append((lineno, m.group(1)))
+            elif stripped == "" :
+                continue
+            else:
+                # Any other key or timeline entry ends the actions block
+                in_actions = False
+    return results
+
+
+def _extract_click_tokens(text: str) -> list[tuple[int, str]]:
+    """Extract (line_number, token) pairs for every click item in a scenario."""
+    lines = text.splitlines()
+    results: list[tuple[int, str]] = []
+    in_clicks = False
+    for lineno, raw in enumerate(lines, start=1):
+        stripped = raw.strip()
+        if stripped == "clicks:":
+            in_clicks = True
+            continue
+        if in_clicks:
+            m = re.match(r"^  - (\S+)", raw)
+            if m:
+                results.append((lineno, m.group(1)))
+            elif stripped == "":
+                continue
+            else:
+                in_clicks = False
+    return results
+
+
+def test_clicks_only_storyline_is_keyboard_free() -> None:
+    """The clicks-only spine and its facility companion must not smuggle in
+    keyboard actions.
+
+    This is a self-explaining pin: if you are legitimately changing a
+    documented seed or adding a non-keyboard action, update THIS pin's
+    allowance in the same change — do not delete the pin to go green, and
+    never smuggle a keyboard action where a click is required.
+
+    Rules:
+      clicks_only_storyline.yaml:
+        - Every actions: token must be `debug_win_tutorial` (the ONE
+          documented battle-outcome seed).
+      map_facility_buttons_click.yaml:
+        - actions: tokens restricted to the verified seeding/debug prefix
+          set {ui_accept, move_right, debug_win_tutorial, debug_fast_forward,
+          debug_grant_silver}.
+        - NO actions: entry after the first FacilityEnterButton click line.
+      Both files:
+        - >= 5 clicks: entries.
+        - No clicks token may end in `_ClickTarget`.
+    """
+    # ── clicks_only_storyline.yaml ─────────────────────────────────────────
+    spine_path = PLAYTEST_DIR / "clicks_only_storyline.yaml"
+    assert spine_path.is_file(), "clicks_only_storyline.yaml missing"
+    spine_text = spine_path.read_text(encoding="utf-8")
+    spine_actions = _extract_action_tokens(spine_text)
+    bad_actions = [
+        (ln, tok) for ln, tok in spine_actions if tok != "debug_win_tutorial"
+    ]
+    assert not bad_actions, (
+        "clicks_only_storyline.yaml contains non-allowed actions: %s. "
+        "The ONLY allowed action is `debug_win_tutorial` (the documented "
+        "battle-outcome seed). If you are legitimately changing a documented "
+        "seed, update this pin's allowance in the same change — do not "
+        "delete the pin to go green, and never smuggle a keyboard action "
+        "where a click is required." % (bad_actions,)
+    )
+    spine_clicks = _extract_click_tokens(spine_text)
+    assert len(spine_clicks) >= 5, (
+        "clicks_only_storyline.yaml has %d clicks entries; >= 5 required "
+        "(a clicks-only scenario with fewer than 5 clicks cannot traverse "
+        "the six-segment spine)" % len(spine_clicks)
+    )
+    for ln, tok in spine_clicks:
+        assert not tok.endswith("_ClickTarget"), (
+            "clicks_only_storyline.yaml line %d: click token %r ends in "
+            "_ClickTarget. Anchors must target the control/unit body itself "
+            "(2026-08-29 90_decisions.md ruling)." % (ln, tok)
+        )
+
+    # ── map_facility_buttons_click.yaml ────────────────────────────────────
+    fac_path = PLAYTEST_DIR / "map_facility_buttons_click.yaml"
+    assert fac_path.is_file(), "map_facility_buttons_click.yaml missing"
+    fac_text = fac_path.read_text(encoding="utf-8")
+    fac_actions = _extract_action_tokens(fac_text)
+    bad_fac = [
+        (ln, tok) for ln, tok in fac_actions
+        if tok not in _FACILITY_COMPANION_ALLOWED_ACTIONS
+    ]
+    assert not bad_fac, (
+        "map_facility_buttons_click.yaml contains disallowed actions: %s. "
+        "Allowed tokens are %s. If you are legitimately adding a new "
+        "documented debug action, update this pin's allowlist in the same "
+        "change — do not delete the pin to go green." % (
+            bad_fac, sorted(_FACILITY_COMPANION_ALLOWED_ACTIONS))
+    )
+    fac_clicks = _extract_click_tokens(fac_text)
+    assert len(fac_clicks) >= 5, (
+        "map_facility_buttons_click.yaml has %d clicks entries; >= 5 "
+        "required" % len(fac_clicks)
+    )
+    for ln, tok in fac_clicks:
+        assert not tok.endswith("_ClickTarget"), (
+            "map_facility_buttons_click.yaml line %d: click token %r ends "
+            "in _ClickTarget (2026-08-29 ruling)." % (ln, tok)
+        )
+
+    # Facility leg: NO actions after the first FacilityEnterButton click.
+    first_enter_ln: int = -1
+    for ln, tok in fac_clicks:
+        if tok == "FacilityEnterButton":
+            first_enter_ln = ln
+            break
+    assert first_enter_ln > 0, (
+        "map_facility_buttons_click.yaml has no FacilityEnterButton click "
+        "(the facility leg must click it)"
+    )
+    post_facility_actions = [
+        (ln, tok) for ln, tok in fac_actions if ln > first_enter_ln
+    ]
+    assert not post_facility_actions, (
+        "map_facility_buttons_click.yaml has actions after the first "
+        "FacilityEnterButton click (line %d): %s. The facility leg must "
+        "contain NO actions — all interaction is clicks only. If you are "
+        "legitimately restructuring, update this pin in the same change." % (
+            first_enter_ln, post_facility_actions)
+    )
+
+
+def test_touch_reach_surface_contract() -> None:
+    """The 12 new touch-reach surface blocks + 5 pressed_connected vars +
+    GameManager.end_overlay_pressed_connected exist in _common.yaml.
+
+    This is a whitelist-existence gate: it exists so newly published
+    observables cannot be silently deleted. If you are renaming or
+    refactoring these observables, the correct fix is to update this pin
+    and the equivalent assertions in the same change — do not keep dead old
+    names to go green, and do not route around the rename.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+
+    _escape = (
+        " (whitelist-existence gate). This gate exists so newly published "
+        "observables cannot be silently deleted. If you are RENAMING or "
+        "REFACTORING these observables, the correct fix is to update THIS "
+        "PIN and the equivalent assertions in the same change — do not keep "
+        "dead old names to go green, and do not route around the rename."
+    )
+
+    # The 12 new blocks (each with visible, size, mouse_filter, text).
+    new_blocks: list[tuple[str, list[str]]] = [
+        ("ContinueButton", ["visible", "size", "mouse_filter", "text",
+                            "disabled", "focus_mode"]),
+        ("RetryButton", ["visible", "size", "mouse_filter", "text",
+                         "disabled", "focus_mode"]),
+        ("NextButton", ["visible", "size", "mouse_filter", "text"]),
+        ("SectButton0", ["visible", "size", "mouse_filter", "text"]),
+        ("CultOptionButton0", ["visible", "size", "mouse_filter", "text"]),
+        ("CultOptionButton2", ["visible", "size", "mouse_filter", "text"]),
+        ("TravelButton0", ["visible", "size", "mouse_filter", "text"]),
+        ("EventOptionButton0", ["visible", "size", "mouse_filter", "text"]),
+        ("RestartButton", ["visible", "size", "mouse_filter", "text"]),
+        ("FacilityEnterButton", ["visible", "size", "mouse_filter", "text"]),
+        ("FacilityUseButton", ["visible", "size", "mouse_filter", "text"]),
+        ("FacilityLeaveButton", ["visible", "size", "mouse_filter", "text"]),
+    ]
+    for block_name, required_vars in new_blocks:
+        assert block_name in blocks, (
+            "surface missing %s block" % block_name
+        ) + _escape
+        for var in required_vars:
+            assert var in blocks[block_name], (
+                "surface %s block missing %s" % (block_name, var)
+            ) + _escape
+
+    # The 5 pressed_connected additions to existing screen blocks.
+    for screen in ("TransitionScreen", "SectSelectScreen",
+                   "CultivationScreen", "MapScreen", "EndingScreen"):
+        assert screen in blocks, (
+            "surface missing %s block" % screen
+        ) + _escape
+        assert "pressed_connected" in blocks[screen], (
+            "surface %s block missing pressed_connected" % screen
+        ) + _escape
+
+    # GameManager.end_overlay_pressed_connected
+    assert "GameManager" in blocks, "surface missing GameManager block" + _escape
+    assert "end_overlay_pressed_connected" in blocks["GameManager"], (
+        "surface GameManager block missing end_overlay_pressed_connected"
+    ) + _escape

@@ -1,0 +1,539 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# CLICKS-ONLY SPINE — the RED-FIRST NAIL (2026-08-29).
+#
+# This scenario walks the full six-segment main storyline using ONLY clicks:
+# (real GUI hit-tests via Input.parse_input_event → Control.get_global_rect()
+# center). ZERO keyboard actions (no ui_accept, no move_*, no tutorial_next,
+# no end_turn, no skill_*, no use_facility). The single allowed non-click
+# timeline action is `debug_win_tutorial` — an unbound DEBUG action consumed in
+# _process (not a keyboard input). It is the same instrument spine_to_ending
+# uses at f20 to seed the battle outcome. The battle screen's clickability is
+# separately proven by four existing click scenarios (battle_end_turn_attack_
+# buttons, click_targeting_fixed, undo_button_retreat, click_portrait_body_
+# targets_enemy) plus one in-scenario real AttackButton click below.
+#
+# ADJUDICATION (design/90_decisions.md, 2026-08-29):
+# (a) debug_win_tutorial is the ONE sanctioned non-click action. A full
+#     click-fought battle cannot fit the frame cap, and splitting the spine
+#     would leave "overlay → … → ending reachable by taps" unproven in one
+#     run. The seed is documented here and in the report.
+# (b) The LOST/RetryButton click path is covered at unit level
+#     (tests/test_game_manager_fsm.gd asserts both buttons exist, are visible
+#     and wired in headless mode) plus the untouched keyboard scenario
+#     tutorial_loss_restarts_tutorial keeps LOST routing green. Not a second
+#     clicks-only scenario (marginal gate value, same code shape).
+# (c) The storyline does NOT detour into the facility (off the six-segment
+#     mainline; the facility buttons' click-reachability is proven by the
+#     companion scenario map_facility_buttons_click.yaml).
+#
+# RED-FIRST EVIDENCE (measured at first run on the unfixed tree):
+#   failing_frame: 180
+#   first_failing_assert: "ContinueButton.visible" (node not found — harness
+#                         push_error: unresolvable node name)
+#   exact_error: "push_error: clicks target 'ContinueButton' — node not found
+#                         in the current scene tree (the overlay is built in
+#                         code with CanvasLayer + ColorRect + Panel + Label
+#                         only; no Button nodes exist)"
+#   green_asserts_before_red: 5
+#   (frames 30/90/110 asserts pass; frame 180 block fails on the first
+#    ContinueButton liveness assert before the click at frame 190)
+name: clicks_only_storyline
+description: >-
+  The full six-segment main storyline driven by clicks only (zero keyboard
+  actions, one documented debug_win_tutorial seed). Menu → creation → tutorial
+  battle → tutorial end overlay → transition → sect select → cultivation (36
+  months, 做工/month) → map (4 travel legs, 3 events resolved) → ending →
+  restart. Anchors node NAMES only (never option texts); anchors the control
+  body itself (never *_ClickTarget). The single non-click action is
+  debug_win_tutorial (battle-outcome seed, adjudicated). First-red at the
+  tutorial-end overlay (ContinueButton does not exist pre-fix).
+timeline:
+# ── MENU → CREATION ────────────────────────────────────────────────────────
+- at: 10
+  actions: []
+  clicks:
+  - MenuEntry0
+- at: 30
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    CreationScreen.visible: visible == true
+- at: 35
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 50
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 65
+  actions: []
+  clicks:
+  - ConfirmButton
+# ── TUTORIAL BATTLE (intro pages + real click + seed) ──────────────────────
+- at: 90
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 95
+  actions: []
+  clicks:
+  - Next
+- at: 110
+  actions: []
+  clicks:
+  - Next
+- at: 125
+  actions: []
+  clicks:
+  - Next
+- at: 140
+  actions: []
+  clicks:
+  - AttackButton
+- at: 150
+  actions:
+  - debug_win_tutorial
+# ── TUTORIAL END OVERLAY (the nail — first-red frame) ─────────────────────
+- at: 180
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    GameManager.end_overlay_text: 'end_overlay_text.contains("胜利") and not end_overlay_text.contains("...") and not end_overlay_text.contains("…")'
+    ContinueButton.visible: visible == true
+    ContinueButton.size: size.x > 0 and size.y > 0
+    ContinueButton.mouse_filter: mouse_filter == 0
+    ContinueButton.focus_mode: focus_mode == 0
+- at: 190
+  actions: []
+  clicks:
+  - ContinueButton
+# ── TRANSITION (2 pages) ───────────────────────────────────────────────────
+- at: 220
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+    NextButton.visible: visible == true
+- at: 230
+  actions: []
+  clicks:
+  - NextButton
+- at: 250
+  actions: []
+  clicks:
+  - NextButton
+# ── SECT SELECT ────────────────────────────────────────────────────────────
+- at: 270
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+    SectButton0.visible: visible == true
+- at: 280
+  actions: []
+  clicks:
+  - SectButton0
+# ── CULTIVATION (36 months: CultOptionButton0 = card/year-augment/year-end,
+#     CultOptionButton2 = 做工/work → month advances) ───────────────────────
+- at: 310
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.year: year == 1
+    CultivationScreen.month: month == 1
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultOptionButton0.visible: visible == true
+# Year 1, months 1-11 (2 clicks each: card + work)
+- at: 320
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 325
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 330
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 335
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 340
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 345
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 350
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 355
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 360
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 365
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 370
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 375
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 380
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 385
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 390
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 395
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 400
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 405
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 410
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 415
+  actions: []
+  clicks:
+  - CultOptionButton2
+# Year 1, month 12 (card + work + year-end stay)
+- at: 420
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 425
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 430
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 435
+  actions: []
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+# Year 2, month 1 (year-augment + card + work)
+- at: 440
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 445
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 450
+  actions: []
+  clicks:
+  - CultOptionButton2
+# Year 2, months 2-11
+- at: 455
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 460
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 465
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 470
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 475
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 480
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 485
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 490
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 495
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 500
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 505
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 510
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 515
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 520
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 525
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 530
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 535
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 540
+  actions: []
+  clicks:
+  - CultOptionButton2
+# Year 2, month 12 (card + work + year-end stay)
+- at: 545
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 550
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 555
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 560
+  actions: []
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 1
+# Year 3, month 1 (year-augment + card + work)
+- at: 565
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 570
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 575
+  actions: []
+  clicks:
+  - CultOptionButton2
+# Year 3, months 2-12
+- at: 580
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 585
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 590
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 595
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 600
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 605
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 610
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 615
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 620
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 625
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 630
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 635
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 640
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 645
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 650
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 655
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 660
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 665
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 670
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 675
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 680
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 685
+  actions: []
+  clicks:
+  - CultOptionButton2
+# ── MAP (4 travel legs, 3 events resolved, endpoint routes to ENDING) ─────
+- at: 700
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.phase: phase == "TRAVEL"
+    TravelButton0.visible: visible == true
+# Leg 1: wuming_valley → luoyang (event: merchant)
+- at: 710
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 720
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 725
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 735
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+# Leg 2: luoyang → wudang (event: quanzhen_scripture)
+- at: 740
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 750
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "quanzhen_scripture"
+    MapScreen.current_node_id: current_node_id == "wudang"
+- at: 755
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 765
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 2
+# Leg 3: wudang → xiangyang (event: dragon_scrap)
+- at: 770
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 780
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "dragon_scrap"
+    MapScreen.current_node_id: current_node_id == "xiangyang"
+- at: 785
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 795
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 3
+# Leg 4: xiangyang → kunlun (endpoint → ENDING, no event)
+- at: 800
+  actions: []
+  clicks:
+  - TravelButton1
+# ── ENDING → RESTART ───────────────────────────────────────────────────────
+- at: 810
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    RestartButton.visible: visible == true
+- at: 820
+  actions: []
+  clicks:
+  - RestartButton
+- at: 840
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"

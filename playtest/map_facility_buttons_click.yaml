@@ -1,0 +1,254 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# FACILITY BUTTONS CLICK-REACHABILITY (2026-08-29).
+#
+# Companion to clicks_only_storyline: proves the three facility delegate
+# buttons (FacilityEnterButton / FacilityUseButton / FacilityLeaveButton)
+# are click-reachable end to end: enter → use → leave → re-enter → reuse.
+#
+# Structure:
+#   1. Seeding/debug prefix (keyboard + debug actions) mirrors
+#      facility_use_reusable.yaml's ACTUAL prefix tokens to reach MAP state.
+#      Allowed action tokens: ui_accept, move_right, debug_win_tutorial,
+#      debug_fast_forward, debug_grant_silver (verified from the file).
+#   2. Navigation to 少林 (shaolin) uses CLICKS on TravelButton{i} +
+#      EventOptionButton0 (pre-facility, still in the seeding phase).
+#   3. Facility leg (from the first FacilityEnterButton click onward):
+#      ZERO actions: entries. All interaction is clicks only.
+#
+# Two debug_grant_silver calls appear BEFORE the first FacilityEnterButton
+# click (funding for both facility uses). No actions appear after that point.
+name: map_facility_buttons_click
+description: >-
+  The three facility delegate buttons are click-reachable: enter (FACILITY
+  phase, facility_id set, use_count still 0) → use (use_count 1, silver and
+  attr_bone changed) → leave (TRAVEL restored) → travel away and back →
+  re-enter (FACILITY again) → reuse (use_count 2, attr_bone changed again)
+  → leave. The facility leg (from first FacilityEnterButton click onward)
+  contains zero actions — all interaction is clicks only.
+timeline:
+# ── Seeding prefix (mirrors facility_use_reusable.yaml) ──────────────────
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.visible: visible == true
+# ── Navigation to shaolin (clicks, pre-facility) ─────────────────────────
+# wuming_valley → luoyang (event: merchant)
+- at: 410
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 420
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 425
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 435
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+# luoyang → shaolin (event: night_rain)
+# luoyang neighbors: [wuming_valley, wudang, shaolin] → index 2
+- at: 440
+  actions: []
+  clicks:
+  - TravelButton2
+- at: 450
+  actions: []
+  assert:
+    MapScreen.phase: 'phase == "EVENT" and phase != "FACILITY"'
+    MapScreen.event_id: event_id == "night_rain"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+- at: 455
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 465
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 0
+# Fund for both facility uses (BEFORE the first FacilityEnterButton click)
+- at: 470
+  actions:
+  - debug_grant_silver
+- at: 475
+  actions:
+  - debug_grant_silver
+# ── FACILITY LEG (CLICKS ONLY from here — zero actions) ──────────────────
+# Enter facility
+- at: 480
+  actions: []
+  clicks:
+  - FacilityEnterButton
+- at: 490
+  actions: []
+  assert:
+    MapScreen.phase: phase == "FACILITY"
+    MapScreen.facility_id: facility_id == "shaolin_wooden_men"
+    MapScreen.facility_use_count: facility_use_count == 0
+# Use facility
+- at: 500
+  actions: []
+  clicks:
+  - FacilityUseButton
+- at: 510
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 1
+    MapScreen.silver: changed
+    MapScreen.attr_bone: changed
+# Leave facility
+- at: 520
+  actions: []
+  clicks:
+  - FacilityLeaveButton
+- at: 530
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 1
+# Travel away (shaolin → luoyang) and resolve event
+- at: 535
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 545
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 550
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 560
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+# Travel back (luoyang → shaolin) and resolve event
+- at: 565
+  actions: []
+  clicks:
+  - TravelButton2
+- at: 575
+  actions: []
+  assert:
+    MapScreen.phase: 'phase == "EVENT" and phase != "FACILITY"'
+    MapScreen.event_id: event_id == "night_rain"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+- at: 580
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 590
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_use_count: facility_use_count == 1
+# Re-enter facility
+- at: 595
+  actions: []
+  clicks:
+  - FacilityEnterButton
+- at: 605
+  actions: []
+  assert:
+    MapScreen.phase: phase == "FACILITY"
+    MapScreen.facility_id: facility_id == "shaolin_wooden_men"
+    MapScreen.facility_use_count: facility_use_count == 1
+# Reuse facility
+- at: 615
+  actions: []
+  clicks:
+  - FacilityUseButton
+- at: 625
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 2
+    MapScreen.attr_bone: changed
+# Leave facility (final)
+- at: 635
+  actions: []
+  clicks:
+  - FacilityLeaveButton
+- at: 645
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 2

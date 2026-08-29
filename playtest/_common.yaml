@@ -52,7 +52,10 @@
 # `clicks:` — REAL MOUSE EVENTS, and how to aim them (2026-08-25).
 # A `clicks:` entry is a spec string:  "<Node>[ +dx,dy][ left|right|middle]"
 #
-#   - Central_Divine_ClickTarget      左键点这个节点的屏幕中心
+#   - Central_Divine +0,0             左键点这个节点的屏幕中心
+#     (2026-08-29 90_decisions.md 裁定:点击锚一律锚在控件/单位本体上,
+#      不许挂 *_ClickTarget — 一个节点不能既是可命中的具名锚点、
+#      又是不许收到点击的控件)
 #   - Player +0,-64                   左键点玩家上方一格(TILE_SIZE = 64)
 #   - Player +64,0 right              右键点玩家右边一格
 #
@@ -201,6 +204,7 @@ surface:
   - end_overlay_text
   - creation_done
   - creation_entry
+  - end_overlay_pressed_connected
   Camera:
   - camera_position
   - camera_x_lo
@@ -702,6 +706,7 @@ surface:
   - done
   - visible
   - size
+  - pressed_connected
   CreationScreen:
   - phase
   - points_left
@@ -736,6 +741,7 @@ surface:
   - selected_sect_id
   - visible
   - size
+  - pressed_connected
   CultivationScreen:
   - year
   - month
@@ -758,6 +764,7 @@ surface:
   - gongfa_grades
   - gongfa_names
   - events_seen_count
+  - pressed_connected
   MapScreen:
   - current_node_id
   - focus_id
@@ -781,11 +788,13 @@ surface:
   - facility_use_count
   - last_facility_effect_types
   - facility_result_text
+  - pressed_connected
   EndingScreen:
   - tier
   - done
   - visible
   - size
+  - pressed_connected
   Backdrop:
   - visible
   - size
@@ -888,6 +897,90 @@ surface:
   HintLabel:
   - visible
   - text
+  # ── Touch-reach round (2026-08-29): new clickable control blocks ────────
+  # Each [visible, size, mouse_filter, text]; ContinueButton/RetryButton
+  # additionally get [disabled, focus_mode].
+  ContinueButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - disabled
+  - focus_mode
+  RetryButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - disabled
+  - focus_mode
+  NextButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  SectButton0:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  CultOptionButton0:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  CultOptionButton2:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  TravelButton0:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  TravelButton1:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  TravelButton2:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  EventOptionButton0:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  RestartButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  FacilityEnterButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  FacilityUseButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  FacilityLeaveButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  # Existing tutorial-overlay Next button (now used as a click target)
+  Next:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - focus_mode
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -958,3 +1051,5 @@ scenario_order:
 - language_zh_default
 - camera_transform_follows_unit
 - facility_use_reusable
+- clicks_only_storyline
+- map_facility_buttons_click
