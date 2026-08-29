@@ -305,7 +305,7 @@ the verifier step (the gates run after it). In short:
   `map.gd` (FACILITY phase, opt-in via `use_facility`, never in arrival
   dispatch, effects via `EventLogic`, surface observables via `_sync_surface`,
   runtime-error fix applied), `facility_use_reusable.yaml` (both halves of the
-  definitional property, red-then-green record 34/47 → 47/47), i18n (all 12 new
+  definitional property, red-then-green record 34/47 → 47/47), i18n (all 13 new
   strings in the EN dict), unit tests (`test_facility_data.gd` registered;
   `test_map_data.gd` per-node gap pins incl. the new wudang pin;
   `test_map_node_event.gd` facility phase negative assertions), the
