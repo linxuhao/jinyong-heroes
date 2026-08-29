@@ -1,0 +1,248 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: facility_use_reusable
+description: >-
+  The facility content type, end to end at 少林 (wuming_valley -> luoyang ->
+  shaolin, resolving the intermediate merchant events). The ARRIVAL half is the
+  DEFINITIONAL PROPERTY of the content type: event = fires on arrival, facility =
+  only an explicit choice enters it. Arriving at 少林 fires the night_rain EVENT
+  and does NOT enter a facility — phase stays EVENT (asserted `phase == "EVENT"
+  and phase != "FACILITY"`), facility_id stays "", and facility_use_count stays 0
+  both at the arrival frame and after the event resolves (resolving an event
+  cannot smuggle a facility use in). This negative half is NOT redundancy —
+  deleting it deletes what this round established, and the anti-deletion pin in
+  tests/test_playtest_contract_smoke.py depends on these two lines surviving.
+  The CHOICE half is the positive side: after funding with debug_grant_silver, the
+  player's explicit use_facility key enters FACILITY (facility_id ==
+  "shaolin_wooden_men", facility_use_count still 0 — entered, not yet used),
+  ui_accept uses it once (facility_use_count == 1, silver and attr_bone both
+  changed, last_facility_effect_types == ["silver","attr"]), move_down leaves, and
+  after travelling away and back the facility is used again (facility_use_count
+  == 2, attr_bone changed again) — reusable across visits, observable every use,
+  no new economy (silver cost via the shared EventLogic path).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.visible: visible == true
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 440
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 470
+  actions:
+  - move_right
+- at: 480
+  actions:
+  - move_right
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions: []
+  assert:
+    MapScreen.phase: 'phase == "EVENT" and phase != "FACILITY"'
+    MapScreen.event_id: event_id == "night_rain"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 510
+  actions:
+  - ui_accept
+- at: 530
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 540
+  actions:
+  - debug_grant_silver
+- at: 550
+  actions: []
+  assert:
+    MapScreen.silver: changed
+- at: 560
+  actions:
+  - use_facility
+- at: 570
+  actions: []
+  assert:
+    MapScreen.phase: phase == "FACILITY"
+    MapScreen.facility_id: facility_id == "shaolin_wooden_men"
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 580
+  actions:
+  - ui_accept
+- at: 600
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 1
+    MapScreen.silver: changed
+    MapScreen.attr_bone: changed
+    MapScreen.last_facility_effect_types: 'last_facility_effect_types == ["silver", "attr"]'
+- at: 610
+  actions:
+  - move_down
+- at: 620
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 1
+- at: 630
+  actions:
+  - move_right
+- at: 640
+  actions:
+  - ui_accept
+- at: 650
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 660
+  actions:
+  - ui_accept
+- at: 670
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+    MapScreen.facility_use_count: facility_use_count == 1
+- at: 680
+  actions:
+  - move_right
+- at: 690
+  actions:
+  - move_right
+- at: 700
+  actions:
+  - ui_accept
+- at: 710
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "night_rain"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+    MapScreen.facility_use_count: facility_use_count == 1
+- at: 720
+  actions:
+  - ui_accept
+- at: 730
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_use_count: facility_use_count == 1
+- at: 740
+  actions:
+  - debug_grant_silver
+- at: 750
+  actions:
+  - use_facility
+- at: 760
+  actions: []
+  assert:
+    MapScreen.phase: phase == "FACILITY"
+    MapScreen.facility_id: facility_id == "shaolin_wooden_men"
+    MapScreen.facility_use_count: facility_use_count == 1
+- at: 770
+  actions:
+  - ui_accept
+- at: 790
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 2
+    MapScreen.attr_bone: changed
+- at: 800
+  actions:
+  - move_down
+- at: 810
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 2

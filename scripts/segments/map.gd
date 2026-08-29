@@ -259,7 +259,10 @@ func _use_facility() -> void:
 		_render()
 		return
 	var opt = EventData.EventOption.new()
-	opt.effects = fdef.effects.duplicate(true)
+	# opt.effects is typed Array[Dictionary]; a plain Array duplicate() would fail
+	# the runtime type check ("Invalid assignment ... of type 'Array'"). assign()
+	# coerces element-by-element into the typed array.
+	opt.effects.assign(fdef.effects.duplicate(true))
 	EventLogic.apply_option_effects(SaveManager.profile, opt)
 	last_facility_effect_types = []
 	for eff in fdef.effects:
@@ -297,7 +300,9 @@ func _max_facility_silver_cost() -> int:
 ## Never a bare profile.silver assignment.
 func _debug_grant_silver() -> void:
 	var opt = EventData.EventOption.new()
-	opt.effects = [{"type": "silver", "value": DEBUG_SILVER_GRANT_MULT * _max_facility_silver_cost(), "target": ""}]
+	opt.effects.assign([
+		{"type": "silver", "value": DEBUG_SILVER_GRANT_MULT * _max_facility_silver_cost(), "target": ""},
+	])
 	EventLogic.apply_option_effects(SaveManager.profile, opt)
 	_sync_surface()
 	_render()

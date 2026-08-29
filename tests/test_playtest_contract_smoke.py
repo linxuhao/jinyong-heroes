@@ -64,6 +64,7 @@ ROUND_SCENARIOS: list[str] = [
     "portrait_grid_alignment",
     "language_zh_default",
     "camera_transform_follows_unit",
+    "facility_use_reusable",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -73,6 +74,15 @@ MAP_NODE_EVENT_SURFACE_VARS: tuple[str, ...] = (
     "silver", "attr_bone", "attr_inner", "attr_agility", "attr_wisdom",
     "attr_fortune", "last_effect_types", "events_resolved_count",
 )
+
+# The 3 observables the jinyong-facility round appends to the MapScreen surface
+# block (in playtest/_common.yaml), in the same order they are appended.
+FACILITY_SURFACE_VARS: tuple[str, ...] = (
+    "facility_id", "facility_use_count", "last_facility_effect_types",
+)
+
+# The 2 actions the jinyong-facility round appends to the actions list.
+FACILITY_ACTIONS: tuple[str, ...] = ("use_facility", "debug_grant_silver")
 
 
 def _items_under(text: str, header: str) -> list[str]:
@@ -858,6 +868,95 @@ def test_map_node_event_mainline_surface_contract() -> None:
             f"{name}.yaml missing a line ending `: changed` "
             f"(expected {expected_diff[name]})"
         )
+
+
+def test_facility_use_reusable_surface_contract() -> None:
+    """Static contract pin for the jinyong-facility round.
+
+    Pins ``facility_use_reusable`` against ``playtest/_common.yaml`` and
+    ``ROUND_SCENARIOS`` (two-place sync): the 3 new observables
+    (facility_id / facility_use_count / last_facility_effect_types) are
+    whitelisted on the MapScreen surface block, the 2 new actions
+    (use_facility / debug_grant_silver) are in the actions list, the scenario
+    is in scenario_order AND in ROUND_SCENARIOS, the file exists with ``name:``
+    equal to its basename, every timeline ``at:`` is a single integer, every
+    4-space dotted assert line carries a comparison operator or the differential
+    token changed/unchanged (the no-bare-scalar-silent-false rule), and the file
+    carries at least one ``: changed`` line.
+
+    HARD ANTI-DELETION PIN (the permanent negative assertion corridor): the
+    scenario file text must contain BOTH a ``phase != "FACILITY"`` line AND a
+    ``facility_use_count == 0`` line. These two lines are the arrival half of
+    the scenario — the standing proof that "arrival never enters a facility;
+    only an explicit choice does" (event = fires on arrival, facility = entered
+    by choice). They are the ONLY guard against a future round silently wiring
+    the facility into the arrival dispatch. Without this pin the permanent
+    negative assertion is itself silently deletable — the same failure shape as
+    the honesty pin in test_map_node_event_surface_contract (which requires the
+    shaolin gap line to reference both battle and facility).
+    """
+    name = "facility_use_reusable"
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "MapScreen" in blocks, "surface has no MapScreen block"
+    map_items = blocks["MapScreen"]
+    assert map_items, "MapScreen surface block parsed empty (vacuous pass guard)"
+
+    # The 3 new observables are whitelisted on the MapScreen surface block.
+    for var in FACILITY_SURFACE_VARS:
+        assert var in map_items, f"MapScreen.{var} not whitelisted on the surface"
+
+    # The 2 new actions are in the actions list.
+    actions = _items_under(text, "actions")
+    for action in FACILITY_ACTIONS:
+        assert action in actions, f"action {action} not in _common.yaml actions"
+
+    # Two-place sync: the scenario is in scenario_order AND in ROUND_SCENARIOS.
+    order = _items_under(text, "scenario_order")
+    assert name in order, f"{name} not in _common.yaml scenario_order (two-place sync)"
+    assert name in ROUND_SCENARIOS, (
+        f"{name} not in ROUND_SCENARIOS (two-place sync)"
+    )
+
+    # Scenario file static checks (same shape as test_map_node_event_surface_contract).
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    has_diff_line = False
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            has_op = any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            )
+            has_diff = "changed" in line or "unchanged" in line
+            assert has_op or has_diff, (
+                f"{name}.yaml line {lineno} assert missing "
+                f"comparison operator: {line.strip()}"
+            )
+            if line.rstrip().endswith(": changed"):
+                has_diff_line = True
+    assert has_diff_line, (
+        f"{name}.yaml missing a line ending `: changed` (relative-numeric rule)"
+    )
+
+    # HARD ANTI-DELETION PIN — the permanent negative assertion corridor.
+    # See the docstring: these two lines are the definitional property of the
+    # content type (arrival never enters a facility) made permanent.
+    assert re.search(
+        r'phase\s*!=\s*"FACILITY"', ftext
+    ), f"{name}.yaml must contain a `phase != \"FACILITY\"` line (anti-deletion)"
+    assert re.search(
+        r"facility_use_count\s*==\s*0", ftext
+    ), f"{name}.yaml must contain a `facility_use_count == 0` line (anti-deletion)"
 
 
 def _normalize_assert(s: str) -> str:

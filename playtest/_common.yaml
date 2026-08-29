@@ -172,6 +172,8 @@ actions:
 - debug_delete_save
 - debug_reset_settings
 - debug_spend_player_qi
+- use_facility
+- debug_grant_silver
 surface:
   CombatManager:
   - current_round
@@ -775,6 +777,9 @@ surface:
   - attr_fortune
   - last_effect_types
   - events_resolved_count
+  - facility_id
+  - facility_use_count
+  - last_facility_effect_types
   EndingScreen:
   - tier
   - done
@@ -951,3 +956,4 @@ scenario_order:
 - portrait_grid_alignment
 - language_zh_default
 - camera_transform_follows_unit
+- facility_use_reusable
