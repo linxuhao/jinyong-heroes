@@ -14,10 +14,10 @@
 #       zone where HealthBar's ProgressBar used to swallow the press:
 #       debug_right_input_events and debug_undo_events both change, eater "" at
 #       the feet, and the retreat happens (back to (7,5), budget 4).
-#   (c) left-click the enemy node Central_Divine (its Node2D origin is the SAME
-#       world point as the ClickTarget's center, but the harness aims Node2D
-#       anchors without a mouse_filter guard — the ClickTarget itself is now
-#       IGNORE, so it cannot be a Control aim): debug_click_events changes (the
+#   (c) left-click the enemy's authored ClickTarget Control
+#       (Central_Divine_ClickTarget, its rect centre == the enemy's feet). With
+#       mouse_filter = IGNORE this Control no longer fires gui_input, so the
+#       enemy _input relay is the click path: debug_click_events changes (the
 #       _input relay pre-handles own-tile presses) BUT
 #       Central_Divine.debug_click_target_fires == 0 — with mouse_filter = IGNORE
 #       the ClickTarget Control no longer receives GUI routing (MEASURED: with
@@ -41,9 +41,10 @@ description: >-
   and moves to (7,4); (b) a right-click on the player's own feet tile (the old
   Defect-A Bar dead zone) advances debug_right_input_events and
   debug_undo_events, keeps the eater empty, and retreats back to (7,5) with the
-  budget refunded; (c) a click on the enemy node Central_Divine (its Node2D
-  origin is the same world point as the now-IGNORE ClickTarget's center)
-  advances debug_click_events while Central_Divine.debug_click_target_fires stays
+  budget refunded; (c) a click on the enemy's authored ClickTarget Control
+  (Central_Divine_ClickTarget, its rect centre == the enemy's feet) advances
+  debug_click_events via the enemy _input relay while
+  Central_Divine.debug_click_target_fires stays
   0 — with mouse_filter = IGNORE the ClickTarget no longer gets GUI routing
   (MEASURED it DOES fire with STOP, counter == 1; IGNORE keeps it at 0) — and,
   being out of reach, is a silent no-op (acted false, grid unchanged). This is
@@ -105,7 +106,7 @@ timeline:
 - at: 145
   actions: []
   clicks:
-  - Central_Divine
+  - Central_Divine_ClickTarget
 - at: 200
   actions: []
   assert:

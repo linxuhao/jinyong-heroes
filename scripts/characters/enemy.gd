@@ -270,12 +270,15 @@ func _ready() -> void:
 		grid_pos = GridManager.world_to_grid(position)
 	position = GridManager.grid_to_world(grid_pos)
 
-	# Click hit-surface wiring. The external `clicks:` harness targets CONTROL
-	# nodes only (get_global_rect + mouse_filter), so a bare Node2D enemy is
-	# unclickable. Rename the authored ClickTarget child to
-	# "<EnemyNodeName>_ClickTarget" — the harness resolves targets by recursive
-	# bare-name search, so the name must be unique across the tree — and relay
-	# left-presses into the player's shared world-click handler.
+	# Click hit-surface wiring. The harness supports BOTH anchor kinds
+	# (playtest/_common.yaml: Control → get_global_rect() centre, Node2D →
+	# get_global_transform_with_canvas().origin), so unlike the old belief a bare
+	# Node2D enemy IS clickable. The authored ClickTarget child is kept anyway as
+	# a named, geometry-anchored aim point (the harness resolves it by recursive
+	# bare-name search, hence the unique "<EnemyNodeName>_ClickTarget" rename)
+	# AND as the instrument for the debug_click_target_fires routing counter.
+	# With mouse_filter = IGNORE the ClickTarget no longer fires gui_input — the
+	# enemy's actual click path is the _input relay below.
 	# NOTE: this MUST live here, not in setup(): setup() runs BEFORE battlefield
 	# names the node (the name is still "Enemy" at that point), so a setup()-time
 	# rename would give every enemy the same "Enemy_ClickTarget".
