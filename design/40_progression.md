@@ -358,14 +358,17 @@ implemented" —— 不实现它,推 36 个月和推 0 个月没有任何区别,
 |---|---|---|---|---|
 | `wuming_valley` | 无名谷 | `active` / `tomb_bed` | `declared` / `""` | `declared` / `""` |
 | `luoyang` | 洛阳 | `active` / `merchant` | `declared` / `""` | `declared` / `""` |
-| `wudang` | 武当 | `active` / `quanzhen_scripture` | `declared` / `""` | `declared` / `""` |
+| `wudang` | 武当 | `active` / `quanzhen_scripture` | `declared` / `""` | `active` / `wudang_meditation` |
 | `xiangyang` | 襄阳 | `active` / `dragon_scrap` | `declared` / `""` | `declared` / `""` |
 | `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
-| `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `declared` / `""` |
+| `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `active` / `shaolin_wooden_men` |
 
 (节点顺序 = `map_data.gd` 的 `NODES` 顺序;槽位值与 `design/20_content.md` §8
 的表同一事实源。少林是洛阳的支线、原本是没有理由去的死胡同,本轮以**既有**
-事件池行 `night_rain` 的确定性绑定作为去它的理由——见 `20_content.md` §8.2。)
+事件池行 `night_rain` 的确定性绑定作为去它的理由——见 `20_content.md` §8.2。
+2026-08-29 `jinyong-facility` 轮把少林 / 武当(两个门派)的 facility 槽转 `active`
+(木人巷 / 紫霄静修:银两换属性、可重复使用),定义与「到达永不入设施」不变量见
+`20_content.md` §10;其余节点仍诚实 `declared`。)
 
 **主线 5 节点的 event 槽:4/5 live,昆仑保持 `declared` 是终点保证。** 无名谷 /
 洛阳 / 武当 / 襄阳的 event 槽本轮以确定性绑定(字面 `event_id`,不抽池)转 `active`,

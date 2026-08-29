@@ -234,6 +234,20 @@ harness 侧读 Node2D 点击锚用 `get_global_transform_with_canvas().origin`(�
 > **回合制改造要点**:Space 从"暂停"改绑为"结束回合",暂停单独归 Escape。
 > 旧版 Space 同时绑了 `pause_game` 与 `ui_accept`,是已知缺陷。
 
+### 大地图(map 段)(2026-08-29 补记;`use_facility` 为 jinyong-facility 轮新增)
+
+地图段是**键盘驱动**(无鼠标点击目标),事件与设施面板共用 `ui_accept`:
+
+| 动作 | 键 | Godot action |
+|---|---|---|
+| 选择相邻节点 | 方向键(左右 / 上下) | move_left / move_right / move_up / move_down |
+| 启程去相邻节点 | Enter | ui_accept |
+| **进入门派设施** | **F** | `use_facility`(仅 facility 槽 `active` 的节点——现少林 / 武当;到达**永不**自动进入) |
+| 设施面板:使用一次 | Enter | ui_accept |
+| 设施面板:离开 | ↓ / ← | move_down / move_left |
+| 事件面板:选择 / 定夺 | 上下 / Enter | move_up / move_down / ui_accept |
+| 注入银两(调试) | —(debug-only) | `debug_grant_silver`(经 `EventLogic.apply_option_effects` 正常管线,不直改字段) |
+
 ### 战斗命中的 5 步优先级规则(2026-08-28,interaction-defects)
 
 左键点击世界点 `P` 在 `player.gd::handle_world_click` 内按以下顺序解算:

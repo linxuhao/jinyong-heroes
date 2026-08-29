@@ -670,3 +670,22 @@ luoyang / xiangyang / kunlun / huashan)仍诚实保持 `declared` / `""`(见 §8
   `final/delivery_notes_facility.md`。红转绿是一次性证据(转绿即消失),承载该性质向
   前的是上条的永久负向断言(见 `design/90_decisions.md` 裁定 (d))。
 
+**实测确认(2026-08-29,终局闸门):** 本节与 §8.1 / §8.3 均为设计期(doc-first)推演,
+终局实测后无需修订。本轮 `5_compile` 的 `playtest_summary.md` 实测 **69/69 场景全 PASS**
+(硬闸门过、零 runtime error、断言失败 0/69):`facility_use_reusable` **49/49**——官方
+全闸门计数比上条所记 **47/47** 多两条,差值即「用后必须看得见」的结果钉
+(`facility_result_text != ""`,加于 47 断言版之后:红值 **45/47** 先行记档、渲染修复
+(`facility_result_render`)落地后转绿,零断言放松,见 `final/delivery_notes_facility.md`);
+到达半场负向断言(`phase == "EVENT" and phase != "FACILITY"`、`facility_id == ""`、
+`facility_use_count == 0`)与选择半场(主动进入 → 用一次 `== 1` → 离开 → 再访再用
+`== 2`)在真实运行里逐帧成立。护线判据:`spine_to_ending` **42/42**(「设施从不接入
+到达分派」的构造性质实测成立,六段仍连着)、重基线后的 `map_node_event_shaolin`
+**32/32**(f560 收紧为 `has("battle") and not has("facility")` 实测成立,f460 洛阳对照
+原样保持)、`map_hint_single` **7/7**(设施面板自带提示后,旅行提示仍一屏一条)。既有
+回归网零红:`save_load_roundtrip` **14/14**、`event_travel_effects` **19/19**、
+`terminal_victory_8_12_rounds_hp_15_40` **6/6**、`qi_cost_blocks_cast_no_energy`
+**23/23**。编译 **87/87** 零错误。视觉闸门本轮 `passed: true` 但 blind
+(`judge_budget_exhausted`,judged_by human,69 场景 276 帧抽样)——与既往轮的
+`endpoint_unreachable` blind 不同源,同属「判官未裁决、人眼代判」立场,不作为上述
+数字断言的替代证据。
+
