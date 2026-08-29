@@ -43,6 +43,10 @@ const TESTS: Array[String] = [
 	"res://tests/test_trait_hover_preview.gd",
 	"res://tests/test_visibility_probe_canvas_layer.gd",
 	"res://tests/test_facility_data.gd",
+	# touch-reach 2026-08-29: the map screen's click-delegate buttons
+	# (TravelButton{i} / EventOptionButton{i} / the three facility delegates)
+	# and the FacilityEnterButton guard mirror, proven handler-side.
+	"res://tests/test_map_facility_buttons.gd",
 ]
 
 
