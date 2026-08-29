@@ -59,7 +59,9 @@ below the tiles they mark. This round inverts the ownership:
   bottom y − unit world y; both 0 = the portrait stands on its own tile). New
   `playtest/portrait_grid_alignment.yaml` asserts `abs(...) <= 1.0` for the
   player and all five enemies at f40 **and** re-asserts the same 12 lines on
-  the frame after walking the player to (9,1), a northernmost-legal tile. The
+  the frame after walking the player to (6,1) — a northernmost-legal row-1 tile, reached via a 2-round route
+  (round 1: (7,5)→(8,2); West Poison's knockback then moves the player to
+  (6,2); round 2: (6,2)→(6,1)). The
   threshold is the sub-pixel slack of an exact equality, not a tolerance, and
   the pin was authored while the clamp was still live so it demonstrably
   turns red (row-1 dy = 124, row-2 dy = 60) before turning green.
@@ -125,15 +127,19 @@ below the tiles they mark. This round inverts the ownership:
   can only be satisfied by altering what the engine should compute itself
   (offset/position/size/z-order) is a gate to delete, not a sprite to tune.
 
-Known gaps of this delivery (honest): `scenes/enemy.tscn`'s `ClickTarget`
-still reads `mouse_filter = 0` (the brief's preserved fix to `2`/IGNORE did
-not land, and `input_click_differential.yaml` still pins
-`debug_click_target_fires == 0`), and `scripts/ui/move_hint_label.gd` still
-lacks the `dock_failed: bool` observable — both are recorded in
-`final/verify_report.json`. Two stale Phase-1 comments ("the clamp is still
-live") survive in `portrait_grid_alignment.yaml` /
-`camera_transform_follows_unit.yaml`, and the two new scenarios are not yet
-in the smoke test's `ROUND_SCENARIOS` list.
+This delivery was re-looped after a reviewer found 3 of 68 playtest
+scenarios red; all three and the round's sweep items are now fixed at the
+code level (verified by direct read): `scenes/enemy.tscn`'s `ClickTarget` is
+`mouse_filter = 2` (IGNORE, node kept for name-based click parsing), the
+disproven "gui_input never fires under a Node2D ancestor" comments in
+`enemy.gd` now state the measured STOP-filter fact,
+`scripts/ui/move_hint_label.gd` declares the `dock_failed: bool` observable,
+the stale Phase-1 comments in `portrait_grid_alignment.yaml` /
+`camera_transform_follows_unit.yaml` are replaced with "history only"
+framing, and both new scenarios are synced into
+`tests/test_playtest_contract_smoke.py`'s `ROUND_SCENARIOS`. The remaining
+gap is runtime, not code: a fresh downstream gate re-run must confirm green
+(see Verification status).
 
 Previous rounds: interaction-defects (floating-bar STOP filter, feet-tile
 undo, real-input coverage, touch undo, nameplate/ground marker, 5-step click
@@ -305,12 +311,14 @@ the verifier step (the gates run after it). In short:
   `portrait_visibility.yaml`, the three backer pins cleared/re-derived,
   spawns restored, and the design-archive records (principles, decision
   entry, UX-01b rollback with evidence paths, UX-09/UX-10 backlog entries).
-- **Two goals verifiably unmet (recorded in `final/verify_report.json`)**:
-  the preserved `scenes/enemy.tscn` `ClickTarget mouse_filter = 2` fix (still
-  `0`, with the disproven "gui_input never fires" comments still in
-  `enemy.gd` and the `== 0` leg still pinned in `input_click_differential.yaml`),
-  and the preserved `move_hint_label.gd` `dock_failed: bool` observable
-  (absent). Both are small, self-contained fixes.
+- **The two previously-unmet goals are now landed at the code level** (this
+  re-loop): `scenes/enemy.tscn`'s `ClickTarget` is `mouse_filter = 2`
+  (IGNORE), the disproven "gui_input never fires" comments in `enemy.gd`
+  now state the measured STOP-filter fact, and the `== 0` leg in
+  `input_click_differential.yaml` is consistent with the IGNORE value;
+  `scripts/ui/move_hint_label.gd` declares the `dock_failed: bool`
+  observable. Their measured green is pending the downstream gate re-run,
+  not the code — see the pending items below.
 - **Pending the downstream gate run, not claimed**: the measured green of all
   68 scenarios — `portrait_grid_alignment` all-green including the row-1
   walk-leg frame, `camera_transform_follows_unit`, the rewritten
