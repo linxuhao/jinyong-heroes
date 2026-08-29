@@ -323,6 +323,23 @@ func _test_end_overlay_text(ok: bool) -> bool:
 	ok = _expect(ok, _gm.end_overlay_text.contains("胜利"), "WON end_overlay_text contains 胜利")
 	ok = _expect(ok, not _gm.end_overlay_text.contains("..."), 'WON end_overlay_text has no "..."')
 	ok = _expect(ok, not _gm.end_overlay_text.contains("…"), "WON end_overlay_text has no U+2026")
+	# ContinueButton visible & wired; RetryButton present but hidden & wired.
+	# Read via _gm._overlay_layer (always the live overlay) — a tree-name path
+	# would risk the previous overlay still queued for free.
+	var won_overlay: CanvasLayer = _gm._overlay_layer
+	var won_cont: Button = won_overlay.get_node_or_null("Panel/ContinueButton") if won_overlay != null else null
+	var won_retry: Button = won_overlay.get_node_or_null("Panel/RetryButton") if won_overlay != null else null
+	ok = _expect(ok, won_cont != null, "WON overlay has Panel/ContinueButton")
+	ok = _expect(ok, won_cont != null and won_cont.visible, "WON ContinueButton visible")
+	ok = _expect(ok, won_cont != null and won_cont.focus_mode == Control.FOCUS_NONE, "WON ContinueButton focus_mode NONE")
+	ok = _expect(ok, won_cont != null and won_cont.mouse_filter == Control.MOUSE_FILTER_STOP, "WON ContinueButton mouse_filter STOP (hittable)")
+	ok = _expect(ok, won_cont != null and won_cont.size.x >= 200 and won_cont.size.y >= 48, "WON ContinueButton size >= 200x48")
+	ok = _expect(ok, won_cont != null and won_cont.pressed.is_connected(_gm.request_continue), "WON ContinueButton wired to request_continue")
+	ok = _expect(ok, won_retry != null, "WON overlay has Panel/RetryButton")
+	ok = _expect(ok, won_retry != null and not won_retry.visible, "WON RetryButton hidden")
+	ok = _expect(ok, won_retry != null and won_retry.pressed.is_connected(_gm.request_retry), "WON RetryButton wired to request_retry")
+	ok = _expect(ok, _gm.end_overlay_pressed_connected.get("ContinueButton") == true, "WON end_overlay_pressed_connected ContinueButton true")
+	ok = _expect(ok, _gm.end_overlay_pressed_connected.get("RetryButton") == true, "WON end_overlay_pressed_connected RetryButton true")
 	_gm.clear_battle()
 
 	# LOST: end_battle(false) writes the 战败 overlay text.
@@ -333,6 +350,21 @@ func _test_end_overlay_text(ok: bool) -> bool:
 	ok = _expect(ok, _gm.end_overlay_text.contains("战败"), "LOST end_overlay_text contains 战败")
 	ok = _expect(ok, not _gm.end_overlay_text.contains("..."), 'LOST end_overlay_text has no "..."')
 	ok = _expect(ok, not _gm.end_overlay_text.contains("…"), "LOST end_overlay_text has no U+2026")
+	# Mirrored: RetryButton visible & wired; ContinueButton present but hidden & wired.
+	var lost_overlay: CanvasLayer = _gm._overlay_layer
+	var lost_cont: Button = lost_overlay.get_node_or_null("Panel/ContinueButton") if lost_overlay != null else null
+	var lost_retry: Button = lost_overlay.get_node_or_null("Panel/RetryButton") if lost_overlay != null else null
+	ok = _expect(ok, lost_retry != null, "LOST overlay has Panel/RetryButton")
+	ok = _expect(ok, lost_retry != null and lost_retry.visible, "LOST RetryButton visible")
+	ok = _expect(ok, lost_retry != null and lost_retry.focus_mode == Control.FOCUS_NONE, "LOST RetryButton focus_mode NONE")
+	ok = _expect(ok, lost_retry != null and lost_retry.mouse_filter == Control.MOUSE_FILTER_STOP, "LOST RetryButton mouse_filter STOP (hittable)")
+	ok = _expect(ok, lost_retry != null and lost_retry.size.x >= 200 and lost_retry.size.y >= 48, "LOST RetryButton size >= 200x48")
+	ok = _expect(ok, lost_retry != null and lost_retry.pressed.is_connected(_gm.request_retry), "LOST RetryButton wired to request_retry")
+	ok = _expect(ok, lost_cont != null, "LOST overlay has Panel/ContinueButton")
+	ok = _expect(ok, lost_cont != null and not lost_cont.visible, "LOST ContinueButton hidden")
+	ok = _expect(ok, lost_cont != null and lost_cont.pressed.is_connected(_gm.request_continue), "LOST ContinueButton wired to request_continue")
+	ok = _expect(ok, _gm.end_overlay_pressed_connected.get("ContinueButton") == true, "LOST end_overlay_pressed_connected ContinueButton true")
+	ok = _expect(ok, _gm.end_overlay_pressed_connected.get("RetryButton") == true, "LOST end_overlay_pressed_connected RetryButton true")
 	_gm.clear_battle()
 
 	# Restore the FSM to a non-WON/LOST state for _run()'s teardown.

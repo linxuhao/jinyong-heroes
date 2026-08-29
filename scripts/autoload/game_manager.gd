@@ -116,6 +116,15 @@ var battle_return_state: String = "TUTORIAL"
 ## asserted by test_game_manager_fsm and the playtest surface.
 var end_overlay_text: String = ""
 
+## Observable: whether the end-game overlay's ContinueButton/RetryButton have
+## their `pressed` signal wired to the matching handler. Written in BOTH the
+## construction and the re-show branches of _show_end_game_overlay(). Mirrors
+## CreationScreen.pressed_connected — the clicks-only spine can only click the
+## button its route happens to reach (ContinueButton on a WON run), so this
+## proves RetryButton (and every future button) is actually connected even when
+## no click path touches it. Shape: {"ContinueButton": bool, "RetryButton": bool}.
+var end_overlay_pressed_connected: Dictionary = {}
+
 # ---------------------------------------------------------------------------
 # Public API — State queries
 # ---------------------------------------------------------------------------
@@ -191,12 +200,12 @@ func end_battle(won: bool) -> void:
 		current_state = "WON"
 		game_won.emit()
 		state_changed.emit("WON")
-		_show_end_game_overlay("胜利！华山论剑的胜者！\n\n按回车继续")
+		_show_end_game_overlay("胜利！华山论剑的胜者！\n\n点击「继续」进入江湖")
 	else:
 		current_state = "LOST"
 		game_lost.emit()
 		state_changed.emit("LOST")
-		_show_end_game_overlay("战败于华山论剑\n\n按回车重试")
+		_show_end_game_overlay("战败于华山论剑\n\n点击「重试」再战")
 
 # ---------------------------------------------------------------------------
 # Public API — Battle context & WON/LOST routing (combat_cleanup)
@@ -454,12 +463,22 @@ func _show_end_game_overlay(text: String) -> void:
 	# guard) so the playtest surface reads it in every show path.
 	end_overlay_text = text
 	if _overlay_layer != null:
-		# Overlay already exists — just update the text.
-		# Safe: get_node_or_null re-resolves the path each call and returns
-		# null for freed nodes — no freed-object cast can occur.
+		# Overlay already exists — update text and re-sync both buttons (never
+		# leave a stale/hidden button over the next screen). Safe:
+		# get_node_or_null re-resolves each path and returns null for freed
+		# nodes — no freed-object cast can occur.
 		var existing_label: Label = _overlay_layer.get_node_or_null("Panel/Label")
 		if existing_label != null:
 			existing_label.text = text
+		var existing_continue: Button = _overlay_layer.get_node_or_null("Panel/ContinueButton")
+		if existing_continue != null:
+			existing_continue.text = tr("继续")
+			existing_continue.visible = (current_state == STATE_WON)
+		var existing_retry: Button = _overlay_layer.get_node_or_null("Panel/RetryButton")
+		if existing_retry != null:
+			existing_retry.text = tr("重试")
+			existing_retry.visible = (current_state == STATE_LOST)
+		_refresh_end_overlay_pressed_connected()
 		return
 
 	# Create CanvasLayer at a high layer (above HUD, below tutorial).
@@ -500,9 +519,63 @@ func _show_end_game_overlay(text: String) -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	label.offset_bottom = -80  # Upper band only (panel is 500x250; label ends ~170) so it never overlaps the buttons. Layout only — no theme/font change.
 	label.add_theme_color_override("font_color", Color.GOLD)
 	label.add_theme_font_size_override("font_size", 28)
 	panel.add_child(label)
+
+	# Clickable controls (this round: pointer reachability). Added AFTER the dim
+	# + panel + label, so GUI picking (topmost-first) hits them and the full-rect
+	# STOP Dim does not swallow the tap. Both share the lower band of the
+	# 500x250 panel; only one is visible per state. focus_mode = FOCUS_NONE means
+	# the button can never grab focus, so an injected ui_accept cannot activate
+	# it — keyboard dismissal stays in _unhandled_input (single-fire), while a
+	# finger/click reaches only the button. Each delegates to the SAME function
+	# the keyboard branch calls.
+	var continue_btn: Button = Button.new()
+	continue_btn.name = "ContinueButton"
+	continue_btn.text = tr("继续")
+	continue_btn.focus_mode = Control.FOCUS_NONE
+	continue_btn.custom_minimum_size = Vector2(200, 48)
+	continue_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	continue_btn.offset_left = 150
+	continue_btn.offset_top = 178
+	continue_btn.offset_right = 350
+	continue_btn.offset_bottom = 226
+	continue_btn.pressed.connect(request_continue)
+	continue_btn.visible = (current_state == STATE_WON)
+	panel.add_child(continue_btn)
+
+	var retry_btn: Button = Button.new()
+	retry_btn.name = "RetryButton"
+	retry_btn.text = tr("重试")
+	retry_btn.focus_mode = Control.FOCUS_NONE
+	retry_btn.custom_minimum_size = Vector2(200, 48)
+	retry_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	retry_btn.offset_left = 150
+	retry_btn.offset_top = 178
+	retry_btn.offset_right = 350
+	retry_btn.offset_bottom = 226
+	retry_btn.pressed.connect(request_retry)
+	retry_btn.visible = (current_state == STATE_LOST)
+	panel.add_child(retry_btn)
+
+	_refresh_end_overlay_pressed_connected()
+
+
+## Recompute the end_overlay_pressed_connected observable from the live overlay
+## buttons (used by BOTH the construction and the re-show branches so the
+## observable is never stale). False for a button that is absent/freed.
+func _refresh_end_overlay_pressed_connected() -> void:
+	if _overlay_layer == null:
+		end_overlay_pressed_connected = {"ContinueButton": false, "RetryButton": false}
+		return
+	var cont: Button = _overlay_layer.get_node_or_null("Panel/ContinueButton")
+	var ret: Button = _overlay_layer.get_node_or_null("Panel/RetryButton")
+	end_overlay_pressed_connected = {
+		"ContinueButton": cont != null and cont.pressed.is_connected(request_continue),
+		"RetryButton": ret != null and ret.pressed.is_connected(request_retry),
+	}
 
 # ---------------------------------------------------------------------------
 # Input — WON/LOST continue/retry + DEBUG hooks
@@ -510,8 +583,11 @@ func _show_end_game_overlay(text: String) -> void:
 
 ## WON/LOST keyboard routing: ui_accept / tutorial_next dismiss the overlay.
 ## Lives in _unhandled_input (NOT on the overlay) so headless playtest key
-## presses drive the routing: the overlay dim is a plain ColorRect with no
-## focusable controls, so keyboard events reach _unhandled_input untouched.
+## presses drive the routing. The overlay's ContinueButton/RetryButton are
+## focus_mode = FOCUS_NONE, so they can never grab focus and ui_accept cannot
+## activate them — keyboard events still reach _unhandled_input untouched and
+## exactly one dismissal fires per key press. request_continue/request_retry each
+## guard on current_state, so even a double delivery cannot advance two segments.
 func _unhandled_input(event: InputEvent) -> void:
 	if current_state == "WON":
 		if event.is_action_pressed("ui_accept") or event.is_action_pressed("tutorial_next"):

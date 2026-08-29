@@ -98,8 +98,19 @@ const EN: Dictionary = {
 	"左键点格移动 · 右键退回": "Left-click a tile to move · right-click to undo",
 
 	# --- Battle end overlays ---------------------------------------------
-	"胜利！华山论剑的胜者！\n\n按回车继续": "Victory! Champion of the Duel at Mount Hua!\n\nPress Enter to continue",
-	"战败于华山论剑\n\n按回车重试": "Defeated at the Duel at Mount Hua\n\nPress Enter to retry",
+	# Copy describes a real, tappable action (the on-screen Continue/Retry
+	# buttons) — the old "按回车…" prompt named an input a phone player has no
+	# way to satisfy. Keys are the exact game_manager.gd call-site literals.
+	"胜利！华山论剑的胜者！\n\n点击「继续」进入江湖": "Victory! Champion of the Duel at Mount Hua!\n\nTap Continue to enter the jianghu",
+	"战败于华山论剑\n\n点击「重试」再战": "Defeated at the Duel at Mount Hua\n\nTap Retry to fight again",
+
+	# --- Storyline button labels (pointer reachability) ------------------
+	# "继续" already exists above (reused here; the ContinueButton renders the
+	# same key). These are the labels of the new clickable controls.
+	"重试": "Retry",
+	"重新开始": "Restart",
+	"进入设施": "Enter facility",
+	"离开": "Leave",
 
 	# --- Tutorial ---------------------------------------------------------
 	"移动": "Move",
