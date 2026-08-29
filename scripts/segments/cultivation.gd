@@ -89,6 +89,13 @@ var _year_choice: int = 0
 var _switch_focus: int = 0
 var _delete_armed: bool = false
 
+## Surface: "CultOptionButton%d" -> pressed-signal wired (true iff the
+## button's pressed signal has a live connection). Re-snapshotted on every
+## OptionsBox rebuild, so the contract can assert the pool is WIRED, not just
+## present — a hittable button connected to nothing is the defect class the
+## click gate cannot see on a button it never clicks.
+var pressed_connected: Dictionary = {}
+
 
 func _ready() -> void:
 	# Refresh the surface whenever a load succeeds while this scene is already
@@ -479,6 +486,114 @@ func _on_delete() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Pointer path: the per-render option-button pool. A click sets the phase's
+# focus var and runs the EXISTING _on_accept() — one handler, two triggers,
+# zero forked logic (the keyboard branch above stays the single authority).
+# ---------------------------------------------------------------------------
+
+## Click delegate: focus := index, then _on_accept(). _on_accept's own guards
+## (_delete_armed reset, per-phase bounds/modulo) stay authoritative — no
+## phase logic is duplicated here.
+func _on_option_pressed(index: int) -> void:
+	match phase:
+		"YEAR_AUGMENT", "CARD_PICK":
+			_card_focus = index
+		"ACTION_PICK":
+			_action_focus = index
+		"GONGFA_PICK":
+			_gongfa_focus = index
+		"ATTR_PICK":
+			_attr_focus = index
+		"EVENT":
+			_event_focus = index
+		"YEAR_END":
+			_year_choice = index
+		"SECT_SWITCH":
+			_switch_focus = index
+		_:
+			return
+	_on_accept()
+
+
+## Rebuild the OptionsBox pool for the CURRENT phase. Children are freed
+## immediately (remove_child + free, never queue_free — renders are synchronous
+## and event-driven, so a queued free would leave stale buttons hittable inside
+## the same frame). One CultOptionButton{i} per option, in the SAME order with
+## the SAME labels as the BodyLabel rows (minus the ▶ marker). The box hides
+## when the phase offers nothing to pick (GONGFA_PICK with an empty unmastered
+## list — the keyboard path auto-returns to ACTION_PICK there; a defensive
+## EVENT with an unresolvable event id), and pressed_connected is re-snapshotted
+## after every rebuild (empty when the box is hidden) so the observable stays
+## truthful.
+func _rebuild_options_box() -> void:
+	var box: VBoxContainer = get_node_or_null("OptionsBox") as VBoxContainer
+	if box == null:
+		return
+	for child in box.get_children():
+		box.remove_child(child)
+		child.free()
+	var labels: Array[String] = []
+	match phase:
+		"YEAR_AUGMENT":
+			for c in _yearly_cards:
+				labels.append(_card_button_label(c))
+		"CARD_PICK":
+			for c in _monthly_cards:
+				labels.append(_card_button_label(c))
+		"ACTION_PICK":
+			var action_labels: Array[String] = ["练功", "修习", "做工", "游历", "存盘", "读档", "删档"]
+			for label in action_labels:
+				labels.append(tr(label))
+		"GONGFA_PICK":
+			var ids: Array[String] = _unmastered_ids()
+			for i in range(ids.size()):
+				var gid: String = ids[i]
+				var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
+				labels.append(tr("%s（%d/%d）") % [
+					tr(ProgressionGongfaData.display_name_of(gid)),
+					int(entry.get("practice", 0)),
+					int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(entry.get("grade", "D"), 4)),
+				])
+		"ATTR_PICK":
+			for i in range(PlayerProfile.ATTR_KEYS.size()):
+				var key: String = PlayerProfile.ATTR_KEYS[i]
+				labels.append(tr("%s %d") % [_attr_label(key), SaveManager.profile.get_attr(key)])
+		"EVENT":
+			var def = EventData.def(event_id)
+			if def != null:
+				labels.append(tr(str(def.option_a.label)))
+				labels.append(tr(str(def.option_b.label)))
+		"YEAR_END":
+			var year_labels: Array[String] = ["留在本门", "另投他派"]
+			for label in year_labels:
+				labels.append(tr(label))
+		"SECT_SWITCH":
+			for row in ProgressionGongfaData.SECTS:
+				labels.append(tr(str(row["display_name"])))
+	box.visible = not labels.is_empty()
+	pressed_connected = {}
+	for i in range(labels.size()):
+		var btn := Button.new()
+		btn.name = "CultOptionButton%d" % i
+		btn.text = labels[i]
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.custom_minimum_size = Vector2(240, 40)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed.connect(_on_option_pressed.bind(i))
+		box.add_child(btn)
+		pressed_connected["CultOptionButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
+
+
+## Button label for a drawn card: the same name + category the BodyLabel card
+## row shows, minus the ▶ marker.
+func _card_button_label(card: Dictionary) -> String:
+	return tr("%s（%s）") % [
+		tr(str(card.get("display_name", ""))),
+		_category_label(str(card.get("category", ""))),
+	]
+
+
+# ---------------------------------------------------------------------------
 # DEBUG fast-forward (unbound action; identical RNG draws to manual play)
 # ---------------------------------------------------------------------------
 
@@ -733,6 +848,7 @@ func _render() -> void:
 				text += "%s %s\n" % [marker, tr(str(row["display_name"]))]
 			text += tr("\n上下选择，回车拜入")
 	body.text = text
+	_rebuild_options_box()
 
 
 func _card_rows(cards: Array, focus: int) -> String:
