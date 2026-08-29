@@ -17,15 +17,16 @@
 ##
 ## Measured draw-order facts (do not re-derive):
 ##  * A per-unit _draw() on the character itself runs BEFORE that unit's child
-##    Sprite2D, so a feet marker drawn there is invisible for top-row units
-##    whose clamped art is pushed down over their own feet. Hence this overlay
-##    is mounted AFTER `Characters` in scenes/battlefield.tscn — the measured
-##    route where all six markers (incl. top-row Central_Divine / West_Poison)
-##    are visible.
-##  * Honest top-row caveat: for top-row units the marker draws ON TOP of their
-##    own robe ("ellipse on the robe") — the truthful statement "he stands
-##    here" while the art hangs elsewhere. Low alpha + thin outline is what
-##    keeps that presentable.
+##    Sprite2D, so a feet marker drawn there sits under the sprite. Hence this
+##    overlay is mounted AFTER `Characters` in scenes/battlefield.tscn — the
+##    measured route where all six markers (incl. top-row Central_Divine /
+##    West_Poison) are visible.
+##  * Clamp-independent keep-rationale: a 96 px portrait overhangs the 64 px
+##    tile horizontally even unclamped, so the ground ellipse still signals
+##    "clickable feet here" — the tile the unit occupies — regardless of
+##    upright art spilling over its neighbours. (Recorded as UX-10 in
+##    design/40_ux_backlog.md.) Low alpha + thin outline is what keeps it
+##    presentable.
 ##  * We deliberately do NOT use `sprite.show_behind_parent = true`: that field
 ##    is read by scripts/ui/visibility_probe.gd as part of its draw-order
 ##    comparison, and flipping it would re-baseline portrait_visibility.yaml.

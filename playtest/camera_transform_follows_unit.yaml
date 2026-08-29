@@ -40,13 +40,13 @@
 # deterministic player turn (no enemy interference), which is why the arrival is
 # asserted at f140 rather than across a round boundary.
 #
-# CLAMP-STATE-INDEPENDENT: BOTH halves are invariants that hold for ANY
-# sprite_top / nameplate flip and regardless of whether GridManager's
-# clamp_sprite_offset is still live (it is NOT deleted by this round's tasks).
-# The first half uses `position` (the unit's feet), which the clamp never
-# touches; the second is a screen-minus-world equality that holds for any
-# anchor/flip because camera motion is a pure translation. Nobody may re-derive
-# or re-derive-away these numbers when the clamp is deleted later.
+# RED-TO-GREEN HISTORY: the top-row sprite-offset clamp was removed 2026-08-28,
+# and this nail is GREEN now. BOTH halves are invariants that hold for ANY
+# sprite_top / nameplate flip and are independent of the now-deleted clamp.
+# The first half uses `position` (the unit's feet); the second is a
+# screen-minus-world equality that holds for any anchor/flip because camera
+# motion is a pure translation. Nobody may re-derive or re-derive-away these
+# numbers.
 #
 # BAR-HALF DECOMPOSITION (harness contract). The assert expression evaluator
 # binds ONLY the keyed block's own variables — it cannot reference a value from
@@ -90,8 +90,8 @@ description: >-
   camera term, so the first identity reads 0 != 92 and the bar reads 0 not > 1
   -> the nail turns RED. canvas ≡ correct, final ≡ bug. Both halves are
   camera-motion-pure-translation invariants, independent of any sprite_top /
-  nameplate flip and of the still-live sprite clamp, so nobody re-derives them
-  after the clamp deletion. ALSO asserts follow_target_is_active == true (the
+  nameplate flip and of the now-deleted clamp, so nobody re-derives them.
+  ALSO asserts follow_target_is_active == true (the
   camera follows the acting unit) and camera_position.y within
   [camera_y_lo, camera_y_hi] (a regression guard on clamping, not a
   re-derivation). ROW DEVIATION: row 1 is unreachable in one player turn and

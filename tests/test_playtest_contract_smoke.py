@@ -61,7 +61,9 @@ ROUND_SCENARIOS: list[str] = [
     "click_portrait_body_targets_enemy",
     "health_bar_above_portrait",
     "trait_hover_preview",
+    "portrait_grid_alignment",
     "language_zh_default",
+    "camera_transform_follows_unit",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1002,12 +1004,12 @@ def test_the_contract_boot_scene_is_recorded_against_the_games_own():
 # test_every_full_rect_host_is_click_through.
 # ---------------------------------------------------------------------------
 
-# Two-place sync for the language_zh_default scenario (fix_language_zh_pin):
-# "language_zh_default" must sit at the ROUND_SCENARIOS tail immediately after
-# "trait_hover_preview", and _common.yaml's scenario_order must list it last
-# (test_scenario_files_complete_and_ordered checks that pairing). The entry is
-# already present in both places — this comment documents the sync point; do
-# NOT add a duplicate.
+# Two-place sync for the four camera/visibility-round scenarios: the tail
+# "trait_hover_preview, portrait_grid_alignment, language_zh_default,
+# camera_transform_follows_unit" sits at ROUND_SCENARIOS and in _common.yaml's
+# scenario_order — mirrored in BOTH places (test_round_scenarios_present_on_disk_and_in_order
+# checks that pairing). The entries are already present in both places — this
+# comment documents the sync point; do NOT add a duplicate.
 
 # Block -> script mapping for the whitelist-existence guard. The card's
 # "Enemy" is NOT a surface block name; it means scripts/characters/enemy.gd,
