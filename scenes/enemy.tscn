@@ -11,7 +11,7 @@ texture_filter = 2
 mouse_filter = 2
 
 [node name="ClickTarget" type="Control" parent="."]
-mouse_filter = 0
+mouse_filter = 2
 offset_left = -32.0
 offset_top = -32.0
 offset_right = 32.0

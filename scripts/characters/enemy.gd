@@ -138,9 +138,12 @@ var health_bar_world_y: float = 0.0
 var ink_world_dx: float = 0.0
 var ink_world_dy: float = 0.0
 ## Measurement pin proving whether the authored ClickTarget Control's gui_input
-## ever fires (the brief demands measurement, not the comment's claim). Expected
-## measured value 0: Godot's GUI picker does not route events to a Control whose
-## ancestor is a Node2D, so ClickTarget is dead for routing and cannot eat events.
+## ever fires (the brief demands measurement, not the comment's claim). MEASURED:
+## with mouse_filter = 0 (STOP) the counter reads 1 — a Control whose ancestor is
+## a Node2D DOES get GUI routing and eats the press; with mouse_filter = 2
+## (IGNORE, the current authored value) it no longer fires and the counter stays 0.
+## It is the instrument for "does this Control receive routing at all", not "how
+## many left-presses it handled".
 ## Lifetime accumulator — never reset in _process/_ready/setup.
 var debug_click_target_fires: int = 0
 
@@ -344,14 +347,14 @@ func _process(_delta: float) -> void:
 
 
 ## Catch left-clicks on this enemy's tile directly from the input pipeline.
-## The external `clicks:` harness pushes real InputEventMouseButton events, but
-## Godot's GUI picker does NOT route them to a Control whose ancestor is a
-## Node2D (measured: the ClickTarget's gui_input never fires), so the authored
-## hit-surface alone leaves the enemy unclickable. `_input` runs on EVERY node
-## BEFORE the GUI system, so it is the reliable relay: it filters left-presses,
-## converts the event's own viewport coordinates to world space (identical
-## formula to player._handle_click_targeting), matches the clicked tile against
-## this enemy's grid_pos, and forwards into the player's shared, self-gated
+## MEASURED FACT: with mouse_filter = STOP the authored ClickTarget's gui_input
+## DOES fire (the counter reads 1) and eats the press; with
+## mouse_filter = IGNORE (the current authored value) it no longer fires, so the
+## _input relay below is the enemy's click path. `_input` runs on EVERY node
+## BEFORE the GUI system: it filters left-presses, converts the event's own
+## viewport coordinates to world space (identical formula to
+## player._handle_click_targeting), matches the clicked tile against this
+## enemy's grid_pos, and forwards into the player's shared, self-gated
 ## handle_world_click. The event is marked handled so the player's
 ## _unhandled_input mouse branch (the same handle_world_click) cannot
 ## double-process it — the `acted` gate in _try_attack_target is the backstop
@@ -385,8 +388,10 @@ func _input(event: InputEvent) -> void:
 ## Relay a left-press on this enemy's hit-surface into the player's shared
 ## world-click handler. gui_input's event.position is LOCAL to the control's
 ## rect — never use it for world math; the world point is the rect center in
-## global canvas coordinates (canvas coords == world coords under the identity
-## canvas transform, the same assumption _handle_click_targeting documents).
+## global canvas coordinates. A Control's get_global_rect() excludes the
+## viewport's canvas/camera transform, so it returns world coordinates exactly
+## what handle_world_click expects — still correct with the moving Camera2D
+## follower.
 func _on_click_target_gui_input(event: InputEvent) -> void:
 	# Count ANY gui_input delivery — placed BEFORE the mouse-button guard so the
 	# counter measures "does gui_input fire at all", not "how many left-presses".

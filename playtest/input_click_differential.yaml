@@ -14,20 +14,26 @@
 #       zone where HealthBar's ProgressBar used to swallow the press:
 #       debug_right_input_events and debug_undo_events both change, eater "" at
 #       the feet, and the retreat happens (back to (7,5), budget 4).
-#   (c) left-click Central_Divine_ClickTarget: debug_click_events changes (the
+#   (c) left-click the enemy node Central_Divine (its Node2D origin is the SAME
+#       world point as the ClickTarget's center, but the harness aims Node2D
+#       anchors without a mouse_filter guard — the ClickTarget itself is now
+#       IGNORE, so it cannot be a Control aim): debug_click_events changes (the
 #       _input relay pre-handles own-tile presses) BUT
-#       Central_Divine.debug_click_target_fires == 0 — the ClickTarget Control
-#       is measured DEAD for GUI routing (an ancestor Node2D makes Godot's picker
-#       skip it), the verdict this round records in design/30_presentation.md.
-#       Player is at (7,5), 4 tiles from Central_Divine at (7,1): out of reach,
-#       so this is a silent no-op — acted stays false, grid unchanged.
+#       Central_Divine.debug_click_target_fires == 0 — with mouse_filter = IGNORE
+#       the ClickTarget Control no longer receives GUI routing (MEASURED: with
+#       mouse_filter = STOP it DOES fire, counter == 1, and eats the press; the
+#       IGNORE fix drops it back to 0), the verdict this round records in
+#       design/30_presentation.md. Player is at (7,5), 4 tiles from Central_Divine
+#       at (7,1): out of reach, so this is a silent no-op — acted stays false,
+#       grid unchanged.
 #
 # NOTE (grades main.tscn, the contract default): the menu.tscn twin of the
 # real-input defect is covered by the landed static guard
 # (test_every_full_rect_host_is_click_through) and the windowed X11 input gate;
-# this headless scenario cannot see the GUI-phase swallow (clicks: injects via
-# Input.parse_input_event, which never reaches the GUI phase) — it pins the
-# post-engine chain instead.
+# this headless scenario pins the post-engine chain. MEASURED in this tree the
+# headless GUI picker DOES route to a Node2D-descendant Control: with
+# mouse_filter = STOP the counter reads 1 (the STOP Control eats the press); with
+# the IGNORE fix it stays 0. The assert below pins that second state.
 name: input_click_differential
 description: >-
   The P0 Layer-1 per-press differential net: (a) a left-click on an empty tile
@@ -35,11 +41,13 @@ description: >-
   and moves to (7,4); (b) a right-click on the player's own feet tile (the old
   Defect-A Bar dead zone) advances debug_right_input_events and
   debug_undo_events, keeps the eater empty, and retreats back to (7,5) with the
-  budget refunded; (c) a click on Central_Divine_ClickTarget advances
-  debug_click_events while Central_Divine.debug_click_target_fires stays 0 —
-  the ClickTarget is measured dead for GUI routing — and, being out of reach,
-  is a silent no-op (acted false, grid unchanged). This is the permanent
-  regression net for the Defect-A STOP-filter family.
+  budget refunded; (c) a click on the enemy node Central_Divine (its Node2D
+  origin is the same world point as the now-IGNORE ClickTarget's center)
+  advances debug_click_events while Central_Divine.debug_click_target_fires stays
+  0 — with mouse_filter = IGNORE the ClickTarget no longer gets GUI routing
+  (MEASURED it DOES fire with STOP, counter == 1; IGNORE keeps it at 0) — and,
+  being out of reach, is a silent no-op (acted false, grid unchanged). This is
+  the permanent regression net for the Defect-A STOP-filter family.
 timeline:
 - at: 3
   actions:
@@ -97,7 +105,7 @@ timeline:
 - at: 145
   actions: []
   clicks:
-  - Central_Divine_ClickTarget
+  - Central_Divine
 - at: 200
   actions: []
   assert:
