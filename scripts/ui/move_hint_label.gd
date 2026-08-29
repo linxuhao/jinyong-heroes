@@ -40,6 +40,13 @@ var in_viewport: bool = false
 ## A-class contract; stays false when the bar node cannot be resolved).
 var bar_overlap: bool = false
 
+## Distinguishes "this hint should be hidden anyway" from "all six dock
+## candidates collided with a nameplate and the hint was pressed out". False on
+## every normal hide path (no battle / no player / not player turn / moves_left
+## <= 0 / not tutorial) and on the visible path; TRUE only when every candidate
+## dock collided (the pick["hidden"] == true branch).
+var dock_failed: bool = false
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -154,8 +161,10 @@ func _process(_delta: float) -> void:
 	var pick: Dictionary = _pick_dock_center(world_pos, label_size, vp_rect, nameplates)
 	if bool(pick.get("hidden", false)):
 		_hide()
+		dock_failed = true
 		return
 	center = pick["center"]
+	dock_failed = false
 
 	global_position = center - size / 2.0
 
@@ -177,6 +186,7 @@ func _process(_delta: float) -> void:
 ## Hide the hint and reset the contract observables. Sole writer of
 ## visible = false; the only place state returns to "hidden".
 func _hide() -> void:
+	dock_failed = false
 	state = "hidden"
 	visible = false
 	text = ""

@@ -402,6 +402,7 @@ surface:
   - center
   - in_viewport
   - bar_overlap
+  - dock_failed
   TopStrip:
   - visible
   - size
