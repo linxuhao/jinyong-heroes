@@ -9,6 +9,10 @@ class_name MapData
 ## text source — see design/20_content.md §8). Preloaded directly; event_data.gd
 ## is pure data and does not reference map_data.gd, so this is a safe one-way edge.
 const EventData = preload("res://scripts/data/event_data.gd")
+## Sect-facility data pool (the single sanctioned text source for facility prose —
+## design/20_content.md §8). Preloaded directly; facility_data.gd is pure data and
+## does not reference map_data.gd, so this is a safe one-way edge (mirrors EventData).
+const FacilityData = preload("res://scripts/data/facility_data.gd")
 
 ## Per-node entry-content declaration slots (design/20_content.md §8.1).
 ## Status domain: "active" (implemented + live) | "declared" (declaration-only,
@@ -177,6 +181,25 @@ static func active_battle_id(id: String) -> String:
 	if typeof(bid) != TYPE_STRING or bid == "":
 		return ""
 	return bid as String
+
+
+## The facility_id iff the node's facility slot has status == "active" AND the id
+## resolves in the facility pool; "" otherwise. A typo'd / empty / unknown binding
+## reads as inert (fail-safe, never a crash), exactly like active_event_id — a
+## dangling facility id must not print empty prose at the player.
+static func active_facility_id(id: String) -> String:
+	var ec: Dictionary = entry_content(id)
+	var slot: Variant = ec.get("facility")
+	if typeof(slot) != TYPE_DICTIONARY:
+		return ""
+	if (slot as Dictionary).get("status", "") != "active":
+		return ""
+	var fid: Variant = (slot as Dictionary).get("facility_id", "")
+	if typeof(fid) != TYPE_STRING or fid == "":
+		return ""
+	if FacilityData.def(fid as String) == null:
+		return ""
+	return fid as String
 
 
 static func declared_gap_types(id: String) -> Array[String]:
