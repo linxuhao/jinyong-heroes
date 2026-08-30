@@ -4,6 +4,8 @@
 **Task:** touch_reach_design_docs
 **Sources:** `playtest/clicks_only_storyline.yaml` (the taps-only timeline) + the gate run; first-red measured values transcribed verbatim from `final/delivery_notes_touch_reach_red_first.md`.
 
+> Authoritative MEASURED first-red values are in `final/delivery_notes_touch_reach_red_first.md` (failing frame 265 / first assert `ContinueButton.visible` / exact error `aim: node not found: ContinueButton (spec: ContinueButton)` / green-before-red 8). The f180/5 figures in the table below are the structural prediction, kept as the prediction-vs-measurement record.
+
 ## What this note is
 
 The brief's first success criterion: a recorded walkthrough of the **full main storyline**

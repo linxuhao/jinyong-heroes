@@ -369,8 +369,9 @@ transcribed into the design archive (`design/00_roadmap.md`,
   `facility_use_reusable` **49/49**, `tutorial_win_routes_to_transition`
   **8/8**, `tutorial_loss_restarts_tutorial` **5/5**; compile **88/88**
   scripts, zero errors; vision gate **passed** (non-blind, 71 scenarios /
-  284 frames, all six questions `failed: false`; two bad Q6 frames are parked
-  as next-round review candidates and do not flip the gate); the pytest smoke
+  284 frames, all six questions `failed: false`; Q6 text-truncation question
+  measured good_answers 71 / bad_answers 0 — no Q6 bad answers that round,
+  nothing parked); the pytest smoke
   ran **31/32** in `5_review`'s pass — the single failure was a test-side
   false positive on a comment line, root-caused and fixed after that run
   (bullet below).
