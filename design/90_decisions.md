@@ -457,3 +457,5 @@ map.gd);反平凡下限按实测重基线(带日期注释,绝不 < 3);文案按�
 诱因的机制;检出从结构上移走这个诱因——map.gd 里的文案必须是且只能是 `tr()` 键 + i18n 条目,
 否则守卫红它。
 
+2026-08-30 `touch-single-surface`(5_design 证据步骤,如实记 open 项):新钉子 `clicks_only_gongfa_empty_exit` 的**修红实测四值**(失败帧 / 首个失败断言 / 确切错误串 / 红前绿数)在本轮收尾时**仍为结构预测**(f140 / `CultOptionButton0.visible` / 红前 8 绿),实测须按 2026-08-29 `record_measured_red_first_and_reconcile` 同款临时回退法(`TEMPORARY RED-FIRST REVERT` 标记的空出口分支注释块,直连边车 `godot_playtest_scenario`,跑红后逐字节还原)产生一次。**绿半边已实测**:本轮官方全量闸门 `clicks_only_gongfa_empty_exit` **16/16** / `gongfa_pick_empty_keyboard_return` **13/13**(`playtest_summary.md`),修后行为由闸门实测成立;欠的只是「修前红那一跑」的四个实测数字。预测不得当实测引用;实测值产生后回填场景头与 `final/delivery_notes_touch_single_surface.md`。
+
