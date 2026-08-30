@@ -69,6 +69,8 @@ ROUND_SCENARIOS: list[str] = [
     "facility_use_reusable",
     "clicks_only_storyline",
     "map_facility_buttons_click",
+    "clicks_only_gongfa_empty_exit",
+    "gongfa_pick_empty_keyboard_return",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1536,6 +1538,50 @@ def test_clicks_only_storyline_is_keyboard_free() -> None:
         "legitimately restructuring, update this pin in the same change." % (
             first_enter_ln, post_facility_actions)
     )
+
+
+def test_clicks_only_gongfa_empty_exit_is_keyboard_free() -> None:
+    """The GONGFA_PICK empty-exit nail must be clicks-only and click-real.
+
+    Self-explaining pin mirroring test_clicks_only_storyline_is_keyboard_free:
+    this scenario proves the touch-only exit out of the empty GONGFA_PICK
+    dead-end, so it must not smuggle in a KEYBOARD action (a keyboard return
+    would prove nothing about the finger path) and must land >= 3 real clicks
+    (card, 练功, 返回行动). Every click anchors the control body, never a
+    *_ClickTarget.
+
+    The ONE allowed action is `debug_seed_save` — the documented no-sect save
+    seed (the same sanctioned non-keyboard role `debug_win_tutorial` plays in
+    clicks_only_storyline: it seeds a fresh no-sect CULTIVATION save so a direct
+    cultivation boot is not required and decks are initialized). Any other
+    action, especially a keyboard one, reds.
+    """
+    path = PLAYTEST_DIR / "clicks_only_gongfa_empty_exit.yaml"
+    assert path.is_file(), "clicks_only_gongfa_empty_exit.yaml missing"
+    text = path.read_text(encoding="utf-8")
+    actions = _extract_action_tokens(text)
+    bad_actions = [
+        (ln, tok) for ln, tok in actions if tok != "debug_seed_save"
+    ]
+    assert not bad_actions, (
+        "clicks_only_gongfa_empty_exit.yaml contains keyboard/action tokens: %s. "
+        "The ONLY allowed action is `debug_seed_save` (the no-sect save seed). "
+        "This scenario must otherwise be clicks-only — it proves the finger-only "
+        "exit out of the empty GONGFA_PICK dead-end. If you are legitimately "
+        "changing the documented seed, update this pin's allowance in the same "
+        "change — do not delete the pin to go green." % (bad_actions,)
+    )
+    clicks = _extract_click_tokens(text)
+    assert len(clicks) >= 3, (
+        "clicks_only_gongfa_empty_exit.yaml has %d clicks entries; >= 3 required "
+        "(card, 练功, 返回行动)." % len(clicks)
+    )
+    for ln, tok in clicks:
+        assert not tok.endswith("_ClickTarget"), (
+            "clicks_only_gongfa_empty_exit.yaml line %d: click token %r ends in "
+            "_ClickTarget. Anchors must target the control/unit body itself "
+            "(2026-08-29 90_decisions.md ruling)." % (ln, tok)
+        )
 
 
 def test_touch_reach_surface_contract() -> None:

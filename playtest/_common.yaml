@@ -1074,3 +1074,5 @@ scenario_order:
 - facility_use_reusable
 - clicks_only_storyline
 - map_facility_buttons_click
+- clicks_only_gongfa_empty_exit
+- gongfa_pick_empty_keyboard_return

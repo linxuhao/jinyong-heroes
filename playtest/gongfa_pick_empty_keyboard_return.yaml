@@ -1,0 +1,89 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# GONGFA_PICK EMPTY KEYBOARD RETURN (2026-08-30).
+#
+# Keyboard twin of clicks_only_gongfa_empty_exit: it pins the KEYBOARD path out
+# of the empty GONGFA_PICK dead-end. With no unmastered art, the ONLY keyboard
+# exit is the `_on_accept()` empty branch (cultivation.gd:235-238) which sets
+# phase = "ACTION_PICK"; the on-screen button 返回行动 is the touch twin of that
+# same handler. This scenario drives the whole path by KEYBOARD (ui_accept) to
+# prove the desktop path still works after the single-surface change.
+#
+# Boot: a direct cultivation.tscn boot leaves GameManager.current_state !=
+# "CULTIVATION" (cultivation._unhandled_input gates on current_state ==
+# "CULTIVATION"), so keyboard cannot drive a direct segment boot. Instead we use
+# the menu_load_continues boot shape: debug_seed_save writes a FRESH no-sect
+# profile (year 1 month 1, sect_id "", zero arts — _grant_year_arts grants
+# nothing, so _unmastered_ids() is empty) through the real atomic pipeline,
+# then the menu's 读取存档 (entry 1, focused via move_down, activated via
+# ui_accept) routes DIRECTLY into CULTIVATION bypassing SEGMENT_PREDECESSORS
+# (menu_load_game, game_manager.gd:334) with the freshly hosted cultivation
+# scene. From CARD_PICK: ui_accept (card) -> ACTION_PICK, ui_accept (练功,
+# ACTION_PICK index 0) -> empty GONGFA_PICK (single 返回行动 button), assert the
+# empty state, ui_accept (the empty-branch return) -> ACTION_PICK.
+#
+# Frame timing follows the measured menu_load_continues boot (seed f40, load
+# land CULTIVATION f120) plus cultivation keyboard spacing.
+name: gongfa_pick_empty_keyboard_return
+description: >-
+  Keyboard twin of the GONGFA_PICK empty-exit nail. Boots menu.tscn, seeds a
+  fresh no-sect CULTIVATION save (debug_seed_save -> year 1 month 1, sect_id "",
+  zero arts), loads it by keyboard (move_down to entry 1, ui_accept). In
+  CULTIVATION: ui_accept (card) CARD_PICK -> ACTION_PICK, ui_accept (练功) ->
+  empty GONGFA_PICK, assert the single 返回行动 button + RELATIVE emptiness
+  (mastered_count == gongfa_count) + wired (pressed_connected truthy) + no ▶
+  (cursor_markers_visible false), then ui_accept returns GONGFA_PICK ->
+  ACTION_PICK (the empty branch at cultivation.gd:235-238). Proves the keyboard
+  exit path survives the single-surface change.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (no-sect fresh profile, month 1) ────────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 140
+  actions:
+  - ui_accept
+# ── CARD_PICK -> ACTION_PICK ────────────────────────────────────────────────
+- at: 150
+  actions:
+  - ui_accept
+# ── ACTION_PICK -> GONGFA_PICK (empty list, single 返回行动 button) ─────────
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultOptionButton0.visible: visible == true
+    CultOptionButton0.text: text == "返回行动"
+    CultivationScreen.mastered_count: mastered_count == gongfa_count
+    CultivationScreen.pressed_connected: pressed_connected["CultOptionButton0"] == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 180
+  actions:
+  - ui_accept
+# ── GONGFA_PICK -> ACTION_PICK (keyboard empty-branch return) ───────────────
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false

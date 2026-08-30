@@ -1,0 +1,140 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# CLICKS-ONLY GONGFA_PICK EMPTY-EXIT NAIL (2026-08-30).
+#
+# The cultivation GONGFA_PICK dead-end, driven by clicks only: with no
+# unmastered art the player must be able to LEAVE the screen by finger alone.
+# The single CultOptionButton0 carries 返回行动; its pressed path is the SAME
+# _on_option_pressed -> _on_accept chain every other option uses, and the empty
+# branch inside _on_accept performs the return to ACTION_PICK
+# (cultivation.gd:570-576, :235-238).
+#
+# The nail is a PHASE DIFF, not button presence: after the exit click the
+# scenario asserts CultivationScreen.phase == "ACTION_PICK" (a merely-present
+# button that ignores its click would NOT satisfy this).
+#
+# BOOT: a direct cultivation.tscn boot leaves SaveManager.decks == {} (only
+# new_profile() initializes decks), so the month-card draw would runtime-error.
+# Instead we boot menu.tscn and seed a FRESH no-sect CULTIVATION save through
+# the real atomic pipeline via `debug_seed_save` (year 1 month 1, sect_id "",
+# zero arts — _grant_year_arts grants nothing, so _unmastered_ids() is empty;
+# decks initialized by new_profile). Then CLICK the menu's 读取存档 entry
+# (MenuEntry1) to route DIRECTLY into CULTIVATION via menu_load_game (bypassing
+# SEGMENT_PREDECESSORS). From CARD_PICK everything is clicks-only.
+#
+# The ONE non-click timeline action is `debug_seed_save` — an unbound DEBUG
+# action consumed in _process (a seed, not a keyboard input), the same
+# sanctioned role debug_win_tutorial plays in clicks_only_storyline.
+#
+# RED-FIRST EVIDENCE — MEASURED. PENDING godot_playtest_scenario gate run.
+#   The four values below must be filled by a real run of
+#   godot_playtest_scenario(scenario="clicks_only_gongfa_empty_exit") WITH the
+#   TEMPORARY RED-FIRST REVERT applied to scripts/segments/cultivation.gd (the
+#   `labels.append(tr("返回行动"))` line in the GONGFA_PICK empty branch
+#   commented out; see the repro recipe below). They are PENDING the sidecar /
+#   gate run — the structural prediction is recorded, never written as measured.
+#
+#   failing_frame:            PENDING (structural prediction: the f140
+#                             GONGFA_PICK block — the button does not exist
+#                             with the revert, so the first assert on
+#                             CultOptionButton0 reds)
+#   first_failing_assert:     PENDING (structural prediction: f140
+#                             CultOptionButton0.visible, expr "visible == true")
+#   exact_error:              PENDING (structural prediction:
+#                             "aim: node not found: CultOptionButton0 (spec:
+#                             CultOptionButton0)")
+#   green_asserts_before_red: PENDING (structural prediction: f80 has 6 asserts
+#                             + f110 has 2 asserts = 8 before the f140 red)
+#
+#   DO NOT COMMIT: reproduction needs the TEMPORARY RED-FIRST REVERT below
+#   applied to scripts/segments/cultivation.gd (this file's timeline is the
+#   unfixed-tree expectation). The revert is DOCUMENTED ONLY — it is never
+#   committed.
+#   RED repro command (verbatim — the exact one this step ran):
+#     apply the temporary revert below to scripts/segments/cultivation.gd,
+#     then run godot_playtest_scenario(scenario="clicks_only_gongfa_empty_exit")
+#     (the external sidecar aitelier/tools/godot_playtest/impl.py, invoked
+#     per-scenario from this implementing step; the pipeline 5_compile gate
+#     writes the same into playtest_summary.md / playtest_report.json).
+#   RED revert recipe (verbatim, mark `# TEMPORARY RED-FIRST REVERT — DO NOT
+#   COMMIT`). In _rebuild_options_box (scripts/segments/cultivation.gd), the
+#   "GONGFA_PICK" match arm:
+#         "GONGFA_PICK":
+#           var ids: Array[String] = _unmastered_ids()
+#           if ids.is_empty():
+#               # TEMPORARY RED-FIRST REVERT — DO NOT COMMIT
+#               # labels.append(tr("返回行动"))
+#               pass
+#   Only that `labels.append` line is neutralized. Do NOT touch the _on_accept
+#   empty branch (:235-238) or _cycle_focus (:181-184). Restore byte-identically
+#   (search scripts/segments/cultivation.gd for "TEMPORARY RED-FIRST REVERT" ->
+#   zero hits) and re-run GREEN.
+name: clicks_only_gongfa_empty_exit
+description: >-
+  Clicks-only nail for the GONGFA_PICK empty-list dead-end. Boots menu.tscn,
+  seeds a fresh no-sect CULTIVATION save via debug_seed_save (the one sanctioned
+  non-click debug action, like debug_win_tutorial in the storyline), CLICKS the
+  读取存档 entry (MenuEntry1) to load into CULTIVATION, then clicks-only:
+  CultOptionButton0 (card CARD_PICK -> ACTION_PICK), CultOptionButton0 (练功,
+  ACTION_PICK index 0 -> GONGFA_PICK), assert the empty state (exactly one button
+  CultOptionButton0 with text 返回行动, all owned arts mastered via the RELATIVE
+  mastered_count == gongfa_count, the button wired via pressed_connected, no ▶
+  cursor anywhere), then click CultOptionButton0 (返回行动) and assert the PHASE
+  actually changed GONGFA_PICK -> ACTION_PICK (the phase-diff is the nail; a
+  merely-present button does not satisfy it). ZERO keyboard actions.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save (the one non-click action) ──
+- at: 30
+  actions:
+  - debug_seed_save
+# ── MENU -> CULTIVATION via the 读取存档 click (routes bypassing predecessors) ─
+- at: 50
+  actions: []
+  clicks:
+  - MenuEntry1
+- at: 80
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.visible: visible == true
+    CultOptionButton0.visible: visible == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 90
+  actions: []
+  clicks:
+  - CultOptionButton0
+# ── CARD_PICK -> ACTION_PICK ────────────────────────────────────────────────
+- at: 110
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 120
+  actions: []
+  clicks:
+  - CultOptionButton0
+# ── ACTION_PICK -> GONGFA_PICK (empty list, single 返回行动 button) ─────────
+- at: 140
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultOptionButton0.visible: visible == true
+    CultOptionButton0.text: text == "返回行动"
+    CultivationScreen.mastered_count: mastered_count == gongfa_count
+    CultivationScreen.pressed_connected: pressed_connected["CultOptionButton0"] == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 150
+  actions: []
+  clicks:
+  - CultOptionButton0
+# ── GONGFA_PICK -> ACTION_PICK (the phase-diff nail) ────────────────────────
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
