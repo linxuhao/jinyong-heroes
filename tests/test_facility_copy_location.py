@@ -12,21 +12,32 @@ This guard makes the rule mechanical. It scans the two map files for
 double-quoted GDScript string literals that are NOT inside a comment, counts the
 CJK ideographs in the raw slice, and reddens on any prose-length literal (>= 4
 CJK ideographs in the "一".."鿿" range — the same range
-test_i18n_coverage._has_cjk uses) that is not in the ALLOWED allowlist below.
-It is GREEN on day one: every literal that is legitimately in the two files
-today is named in ALLOWED, so it catches only NEWLY inlined copy.
+test_i18n_coverage._has_cjk uses) that is neither in the ALLOWED allowlist NOR
+a tr() call-site first argument (detected structurally by _tr_call_literals).
+
+The tr() call-site detection (2026-08-30, jinyong-touch_single_surface round):
+map chrome copy that is a tr() format key is legitimate by construction — it
+lives in i18n.gd's EN dictionary, is enforced by tests/test_i18n_coverage.py,
+and is structurally distinct from inlined prose. The previous per-key ALLOWED
+list (9 entries) is now empty: all 9 were tr() first args in map.gd, covered by
+detection. ALLOWED remains as an additive escape hatch (a future non-tr()
+literal with a legitimate reason can be added there), but the structural path
+removes the per-key upkeep incentive that made the guard a problem in the
+first place.
 
 Why prose-length (>= 4 CJK) rather than "zero CJK"? A stricter "no CJK at all in
 map_data.gd" variant needs exactly the same allowlist (the display_names and the
 short tr() templates are CJK), so the extra strictness buys nothing — every real
 violation is prose-length anyway. The < 4 CJK literals (此处 / 可前往 / 当前, the
-display_names at <= 3) are allowlisted defensively so a future threshold
-tightening does not move them; they are data identifiers and short chrome, not
-narrative.
+display_names at <= 3) are data identifiers and short chrome, not narrative;
+they are collected but do not trigger the prose-length threshold.
 
 facility_data.gd is the sanctioned data module and is deliberately NOT scanned
 by the first test; the second test cross-checks it the other way (no data-module
-prose may be duplicated into the map files).
+prose may be duplicated into the map files). The second test compares ALL
+>= 1-CJK literals of the map files against the data modules, INCLUDING tr()
+keys — detection lives only in the first test, so wrapping a data-module
+sentence in tr() does not evade the duplication check.
 
 Deliberately stdlib-only and Godot-free, like the other static guards under
 tests/, so it runs in the ordinary pytest pass with no Godot binary.
@@ -60,6 +71,35 @@ PROSE_MIN_CJK = 4
 # the \\. branch; the character class excludes \n so a match never spans source
 # lines (GDScript has no triple-quoted / continuation strings).
 _LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
+
+
+# A tr() call-site: captures the raw slice of the first-argument literal that
+# immediately follows tr( on the same source line. No re.DOTALL — GDScript has
+# no triple-quoted or continuation strings, so tr( and its string argument are
+# always on the same source line; the \s* absorbs optional whitespace between
+# ( and the opening quote, and the character class [^"\\\n]|\\. matches the
+# body without spanning lines (same discipline as _LITERAL).
+_TR_CALL = re.compile(r'tr\(\s*"((?:[^"\\\n]|\\.)*)"')
+
+
+def _tr_call_literals(path: Path) -> set[str]:
+    """Return the set of raw literal slices that are tr() first-argument keys
+    in ``path``.
+
+    For each comment-stripped line, find all matches of _TR_CALL and collect
+    group(1). Each line is processed independently; no cross-line state. A
+    literal appears here iff it is the first argument of a tr(...) call —
+    i.e., the i18n format key. This is the structural detection that replaces
+    the previous per-key ALLOWED list: any map-chrome copy that is a tr() key
+    is legitimate by construction (it lives in i18n.gd's EN dictionary and is
+    enforced by tests/test_i18n_coverage.py).
+    """
+    out: set[str] = set()
+    text = path.read_text(encoding="utf-8")
+    for raw in text.splitlines():
+        for m in _TR_CALL.finditer(_strip_comments(raw)):
+            out.add(m.group(1))
+    return out
 
 
 def _strip_comments(line: str) -> str:
@@ -141,47 +181,35 @@ def _cjk_literals(path: Path) -> list[tuple[int, str, int]]:
     return out
 
 
-# Every prose-length CJK literal that is legitimately in the two map files today,
-# written as Python RAW strings because each entry must equal the raw source
-# slice: GDScript's ``\n`` is backslash+n (two chars), and a normal Python
-# string would turn that into a real newline that never matches.
-ALLOWED: frozenset[str] = frozenset({
-    # --- scripts/segments/map.gd: the tr() render templates (map chrome, not
-    #     narrative — the single-hint invariant, the travel-board labels).
-    #     UI templates, not data rows: the 7 node display_names and the
-    #     ENDING_TIERS tier titles/texts are NOT allowlisted here — roadmap-
-    #     scope content, excluded by SYMBOL in _cjk_literals (2026-08-30) so a
-    #     wording edit to a node name or ending line never reddens this gate. ---
-    r"【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺",
-    r"【江湖行路】\n\n",
-    r"▶ %s（此处）\n",
-    r"  %s（可前往）\n",
-    r"\n当前：%s",
-    # --- sanctioned facility chrome (jinyong-facility 2026-08-29): the facility
-    #     travel-hint template and the FACILITY-phase panel prompt / refusal.
-    #     These are short directive/template strings (<= 12 CJK) that the §433
-    #     data-module rule does not cover — the panel chrome is UI, not anecdote.
-    #     Allowed so the guard stays green whichever order the sibling tasks
-    #     land in; a narrative sentence is NOT allowed and would stay red. ---
-    r"\n\n门派设施：%s（F 使用）",
-    r"回车使用 · 上下离开",
-    r"银两不足",
-    # The FACILITY result-line template (facility_result_render, 2026-08-29). UI
-    # chrome, not narrative: it is a format string composed from the def's own
-    # effects plus the session use count. It exists in no data module, so
-    # test_no_prose_duplicated_from_data_modules stays green alongside it.
-    r"修炼有得（第 %d 次）：%s",
-})
+# Additive escape hatch for non-tr() literals with a legitimate reason to live
+# inline in the map files. EMPTY as of 2026-08-30 (jinyong-touch_single_surface):
+# the previous 9 entries were all tr() first-argument format keys in map.gd
+# (render templates at :515/:532/:536/:538/:548/:555, the facility chrome at
+# :282/:304/:523), all covered by the structural _tr_call_literals detection.
+# ALLOWED remains in the bad-condition as an additive channel (a future non-tr()
+# literal with a documented reason can be added here), but the structural path
+# is the primary mechanism: copy in map.gd must be a tr() key with an i18n
+# entry, or the guard reds it.
+ALLOWED: frozenset[str] = frozenset()
 
 
 def test_no_inline_prose_in_map_files() -> None:
-    """No prose-length CJK literal outside ALLOWED may sit in the map files."""
+    """No prose-length CJK literal that is neither a tr() key nor in ALLOWED
+    may sit in the map files.
+
+    Detection is ADDITIVE to ALLOWED, never a replacement: a non-tr() >= 4-CJK
+    literal still reds unless explicitly allowlisted. The tr() detection
+    (structural, via _tr_call_literals) covers all map chrome format keys —
+    any copy wrapped in tr(...) is legitimate by construction because it must
+    have a matching entry in i18n.gd (enforced by test_i18n_coverage.py).
+    """
     bad: list[str] = []
     total = 0
     for p in FILES:
+        tr_lits = _tr_call_literals(p)
         for lineno, lit, cjk in _cjk_literals(p):
             total += 1
-            if cjk >= PROSE_MIN_CJK and lit not in ALLOWED:
+            if cjk >= PROSE_MIN_CJK and lit not in ALLOWED and lit not in tr_lits:
                 bad.append("%s:%d: %s" % (p.relative_to(ROOT), lineno, lit))
     # Extraction sanity — without this a broken extractor makes the assert below
     # trivially green by finding nothing (the test_i18n_coverage._en_keys()
@@ -191,8 +219,11 @@ def test_no_inline_prose_in_map_files() -> None:
     # Never set this floor below 3: a broken extractor must never look plausible.
     assert total >= 9, "extraction found only %d literals" % total
     assert not bad, (
-        "prose-length CJK literal in a map file outside the allowlist "
-        "(§433: prose lives only in its data module):\n  " + "\n  ".join(bad)
+        "prose-length CJK literal in a map file that is neither a tr() key "
+        "nor in ALLOWED (§433: prose lives only in its data module):\n  "
+        + "\n  ".join(bad)
+        + "\n\nFix: make it a tr() key with an i18n entry in "
+        "scripts/autoload/i18n.gd, or move the copy to its data module."
     )
 
 
