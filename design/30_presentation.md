@@ -903,6 +903,8 @@ cultivation / map / ending 五个段场景是 `Backdrop(Panel) + Label` 一张�
 全程 `clicks:` 真命中测试——先红于教程结算屏的实测记录 f265 见 `00_roadmap.md` /
 `90_decisions.md`,(b) 的观测结论由此有了正反两面的实测值)、`spine_to_ending` **42/42**
 (键盘路径未动仍全绿)、`map_facility_buttons_click` **38/38**;编译 **88/88** 零错误。视觉闸门
-非盲应答(`localqwen/qwen3`,`passed: true`,Q6 69 好 / 2 坏、不翻闸门,两帧候选见
-`40_ux_backlog.md` 记录行)。
+非盲应答(`localqwen/qwen3`,`passed: true`,六问全部 `failed: false`;Q6 **71 好 / 0 坏**——
+2026-08-30 证据复核勘误:盘上 `vision_report.json` 实测 `good_answers: 71 / bad_answers: 0`,
+早先转录的「69 好 / 2 坏 / 两帧候选」无法从盘上产物复现,按 `align_vision_gate_wording_v2`
+纪律删除,见 `40_ux_backlog.md` 记录行与 `99_changelog.md` reconcile_q6_counts_with_artifact 行)。
 
