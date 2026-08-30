@@ -573,7 +573,7 @@ func _rebuild_options_box() -> void:
 				# Empty unmastered list: the single tappable exit. Its pressed
 				# path is the same _on_option_pressed -> _on_accept chain every
 				# other option uses — no forked phase logic.
-								labels.append(tr("返回行动"))
+				labels.append(tr("返回行动"))
 			for i in range(ids.size()):
 				var gid: String = ids[i]
 				var entry: Dictionary = SaveManager.profile.get_gongfa(gid)

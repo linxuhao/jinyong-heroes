@@ -238,17 +238,22 @@ duplication are re-targeted in §3 below — that is the full affected set.
 
 ### 4. Measured first-red values for `clicks_only_gongfa_empty_exit`
 
-PENDING the sidecar / gate run — **carried from the nail slice (Part A §4), never
-invented**. Structural prediction + verbatim revert recipe reproduced:
+**MEASURED** (2026-08-30, `godot_playtest_scenario` sidecar run with the
+TEMPORARY RED-FIRST REVERT applied to `scripts/segments/cultivation.gd`):
 
-- failing_frame: **PENDING** (structural prediction: f90, the GONGFA_PICK block's first
-  assert on `CultOptionButton0.visible` — the button does not exist with the revert).
-- first_failing_assert: **PENDING** (structural prediction: `CultOptionButton0.visible`,
-  expr `visible == true`, f90).
-- exact_error: **PENDING** (structural prediction:
-  `aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`).
-- green_asserts_before_red: **PENDING** (structural prediction: f30 4 asserts + f60 2 =
-  6 before the f90 red).
+- failing_frame: **f140**
+- first_failing_assert: **`CultOptionButton0.visible: visible == true`**
+- exact_error: **`aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`**
+- green_asserts_before_red: **9** (f80 has 6 + f110 has 2 + f140 first assert
+  `phase == "GONGFA_PICK"` = 9 before the first `CultOptionButton0` failure)
+
+[was predicted, superseded by the measured run] The structural prediction was
+f90 / `CultOptionButton0.visible` / same error string / 6 green before red
+(based on the earlier direct-cultivation.tscn boot shape). The actual landed
+YAML boots through `menu.tscn` + `debug_seed_save` + `MenuEntry1` click,
+shifting all frames by +60; the measured green count is 9, not 6 (the f140
+phase assert `phase == "GONGFA_PICK"` passes even with the revert, adding 3
+to the pre-block count).
 
 Revert recipe (see Part A §4 for the verbatim block): neutralize only the
 `labels.append(tr("返回行动"))` line in the `"GONGFA_PICK"` arm, marked
@@ -258,11 +263,16 @@ values, restore the revert byte-identically, re-run GREEN.
 
 ### 5. Self-run observed values
 
-**PENDING** the sidecar / gate run — never fabricated. The fixed tree should pass every
-assert across the four blocks (4 + 2 + 6 + 2 = 14 asserts) of
-`clicks_only_gongfa_empty_exit`; the values are pasted here by the run that confirms
-them. The keyboard twin (`gongfa_pick_empty_keyboard_return`) is likewise confirmed by
-its self-run before the full `5_compile` gate.
+**MEASURED** (2026-08-30, `godot_playtest_scenario` on the restored tree):
+
+- `clicks_only_gongfa_empty_exit`: **16/16 PASS** (f80 6 + f110 2 + f140 6 + f170 2
+  = 16 asserts, all green; hard gate `passed: true`).
+- `gongfa_pick_empty_keyboard_return`: **13/13 PASS** (all asserts green; hard
+  gate `passed: true`).
+
+Both green re-runs happened strictly on the restored (fixed) tree — never on the
+reverted tree. The `5_compile` full gate also confirms 16/16 and 13/13
+(see `playtest_summary.md`).
 
 ### 6. Keyboard-hint rationale
 
