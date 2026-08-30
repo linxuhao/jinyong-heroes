@@ -470,6 +470,21 @@ const EN: Dictionary = {
 	"连环飞刀": "Chain Daggers",
 	"满天刀雨": "Blade Rain",
 	"绝招·一刀飞仙": "Finisher · Flying Immortal",
+
+	# --- Roster panel (scripts/ui/roster_panel.gd) -------------------------
+	"角色": "Character",
+	"关闭": "Close",
+	"人物": "Character",
+	"功法": "Gongfa",
+	"物品": "Items",
+	"银两": "Silver",
+	"先天特质": "Innate Traits",
+	"门派": "Sect",
+	"无门无派": "No Sect",
+	"（无）": "(none)",
+	"练度 %d": "Practice %d",
+	"练度 %d/%d": "Practice %d/%d",
+	"第 %d 年 %d 月": "Year %d, Month %d",
 }
 
 
