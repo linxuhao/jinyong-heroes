@@ -25,26 +25,33 @@ zh/EN i18n keys + the rewritten empty-list hint are present).
 
 ## 1. The clicks-only nail (`clicks_only_gongfa_empty_exit.yaml`)
 
-Direct hermetic no-sect boot (`scene: res://scenes/segments/cultivation.tscn`): a
-fresh profile has `sect_id == ""`, so `_grant_year_arts()` grants nothing and
-`_unmastered_ids()` is empty — the empty `GONGFA_PICK` needs zero setup.
+Boot: `scene: res://scenes/menu.tscn` — seeds a fresh no-sect CULTIVATION save via
+`debug_seed_save` (the one sanctioned non-click debug action, like
+`debug_win_tutorial` in `clicks_only_storyline`), then CLICKS the 读取存档 entry
+(`MenuEntry1`) to load directly into CULTIVATION via `menu_load_game` (bypassing
+SEGMENT_PREDECESSORS). A fresh profile has `sect_id == ""`, so
+`_grant_year_arts()` grants nothing and `_unmastered_ids()` is empty — the empty
+`GONGFA_PICK` needs zero setup.
 
-Timeline (frames re-based to the measured direct-segment-boot rhythm used by
-`creation_single_ui`, which asserts at f30 on a direct boot):
-- f30 — assert `phase == "CARD_PICK"`, `visible`, `CultOptionButton0.visible`,
+Timeline (16 asserts across 4 assert blocks):
+- f30 — `debug_seed_save` (the one non-click action).
+- f50 — click `MenuEntry1` (读取存档 → routes into CULTIVATION).
+- f80 — 6 asserts: `current_state == "CULTIVATION"`, `current_scene == "cultivation"`,
+  `phase == "CARD_PICK"`, `visible == true`, `CultOptionButton0.visible == true`,
   `cursor_markers_visible == false`.
-- f40 — click `CultOptionButton0` (card).
-- f60 — assert `phase == "ACTION_PICK"`, `cursor_markers_visible == false`.
-- f70 — click `CultOptionButton0` (练功 = ACTION_PICK index 0).
-- f90 — assert `phase == "GONGFA_PICK"`, `CultOptionButton0.visible == true`,
+- f90 — click `CultOptionButton0` (card).
+- f110 — 2 asserts: `phase == "ACTION_PICK"`, `cursor_markers_visible == false`.
+- f120 — click `CultOptionButton0` (练功 = ACTION_PICK index 0).
+- f140 — 6 asserts: `phase == "GONGFA_PICK"`, `CultOptionButton0.visible == true`,
   `CultOptionButton0.text == "返回行动"`, `mastered_count == gongfa_count`
   (RELATIVE — never an absolute count), `pressed_connected["CultOptionButton0"]
   == true`, `cursor_markers_visible == false`.
-- f100 — click `CultOptionButton0` (返回行动 = the exit).
-- f120 — assert `phase == "ACTION_PICK"` (the PHASE DIFF — the nail; a
-  merely-present button does not satisfy it) and `cursor_markers_visible == false`.
+- f150 — click `CultOptionButton0` (返回行动 = the exit).
+- f170 — 2 asserts: `phase == "ACTION_PICK"` (the PHASE DIFF — the nail; a
+  merely-present button does not satisfy it), `cursor_markers_visible == false`.
 
-Zero keyboard actions; every step is `clicks:` or an assert-only block.
+Zero keyboard actions; every step is `clicks:` or an assert-only block (the sole
+`actions:` entry is `debug_seed_save`, a debug seed, not a keyboard input).
 
 ## 2. The keyboard twin (`gongfa_pick_empty_keyboard_return.yaml`)
 
@@ -102,30 +109,39 @@ match arm:
 four measured values; restore the revert byte-identically (verify zero hits of
 `TEMPORARY RED-FIRST REVERT` in `cultivation.gd`), re-run GREEN.
 
-**MEASURED values (PENDING the sidecar/gate run — never predicted as measured):**
-- failing_frame: PENDING (structural prediction: the f90 GONGFA_PICK block's
-  first assert on `CultOptionButton0.visible` — the button does not exist with
-  the revert).
-- first_failing_assert: PENDING (structural prediction:
-  `CultOptionButton0.visible`, expr `visible == true`, f90).
-- exact_error: PENDING (structural prediction:
-  `aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`).
-- green_asserts_before_red: PENDING (structural prediction: f30 has 4 asserts +
-  f60 has 2 asserts = 6 before the f90 red).
+**MEASURED values (2026-08-30, `godot_playtest_scenario` sidecar run with the
+TEMPORARY RED-FIRST REVERT applied):**
+- failing_frame: **f140**
+- first_failing_assert: **`CultOptionButton0.visible: visible == true`**
+- exact_error: **`aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`**
+- green_asserts_before_red: **9** (f80 has 6 + f110 has 2 + f140 first assert
+  `phase == "GONGFA_PICK"` = 9 before the first `CultOptionButton0` failure)
 
-**GREEN values (PENDING the self-run):** the fixed tree should pass every assert
-(4 + 2 + 6 + 2 = 14 asserts across the four blocks) — to be confirmed by
-`godot_playtest_scenario(scenario="clicks_only_gongfa_empty_exit")` and pasted
-here.
+[was predicted, superseded by the measured run] The structural prediction was
+f90 / `CultOptionButton0.visible` / same error string / 6 green before red
+(based on the earlier direct-cultivation.tscn boot shape). The actual landed
+YAML boots through `menu.tscn` + `debug_seed_save` + `MenuEntry1` click,
+shifting all frames by +60; the measured green count is 9, not the predicted 6
+(the f140 phase assert `phase == "GONGFA_PICK"` passes even with the revert,
+adding 1 to the pre-block count of 8).
+
+**GREEN values (measured, 2026-08-30, `godot_playtest_scenario` on the restored
+tree):**
+- `clicks_only_gongfa_empty_exit`: **16/16 PASS** (f80 6 + f110 2 + f140 6 + f170 2
+  = 16 asserts, all green; hard gate `passed: true`).
+- `gongfa_pick_empty_keyboard_return`: **13/13 PASS** (all asserts green; hard
+  gate `passed: true`).
 
 ## 5. SELF-RUN requirement (implementer.md:23 hard condition)
 
-The implementer toolset has no shell, so the scenario files, two-place
-registration, smoke pin, verbatim revert recipe and the structural red prediction
-above are delivered. The four MEASURED red values and the GREEN observed values
-are filled by the `godot_playtest_scenario` sidecar / the `5_compile` gate run and
-pasted into the final copy of this note — never written as if measured before the
-run.
+**MET.** The `godot_playtest_scenario` sidecar was invoked (2026-08-30) with the
+TEMPORARY RED-FIRST REVERT applied (RED run: f140 first failure, 12/16, hard gate
+False), then the revert was restored byte-identically (zero `TEMPORARY RED-FIRST
+REVERT` hits confirmed by grep) and both scenarios re-run GREEN on the restored
+tree (16/16 and 13/13, hard gate True). The measured values above are from those
+real runs. Both green re-runs happened strictly on the restored (fixed) tree —
+never on the reverted tree. The `5_compile` full gate also confirms 16/16 and
+13/13 (see `playtest_summary.md`).
 
 ## 6. grep reconciliation (the keyboard-return twin)
 

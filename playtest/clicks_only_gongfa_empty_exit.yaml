@@ -28,25 +28,23 @@
 # action consumed in _process (a seed, not a keyboard input), the same
 # sanctioned role debug_win_tutorial plays in clicks_only_storyline.
 #
-# RED-FIRST EVIDENCE — MEASURED. PENDING godot_playtest_scenario gate run.
-#   The four values below must be filled by a real run of
-#   godot_playtest_scenario(scenario="clicks_only_gongfa_empty_exit") WITH the
-#   TEMPORARY RED-FIRST REVERT applied to scripts/segments/cultivation.gd (the
-#   `labels.append(tr("返回行动"))` line in the GONGFA_PICK empty branch
-#   commented out; see the repro recipe below). They are PENDING the sidecar /
-#   gate run — the structural prediction is recorded, never written as measured.
+# RED-FIRST EVIDENCE — MEASURED (2026-08-30, godot_playtest_scenario sidecar run
+#   WITH the TEMPORARY RED-FIRST REVERT applied to scripts/segments/cultivation.gd).
 #
-#   failing_frame:            PENDING (structural prediction: the f140
-#                             GONGFA_PICK block — the button does not exist
-#                             with the revert, so the first assert on
-#                             CultOptionButton0 reds)
-#   first_failing_assert:     PENDING (structural prediction: f140
-#                             CultOptionButton0.visible, expr "visible == true")
-#   exact_error:              PENDING (structural prediction:
-#                             "aim: node not found: CultOptionButton0 (spec:
-#                             CultOptionButton0)")
-#   green_asserts_before_red: PENDING (structural prediction: f80 has 6 asserts
-#                             + f110 has 2 asserts = 8 before the f140 red)
+#   failing_frame:            f140
+#   first_failing_assert:     CultOptionButton0.visible: visible == true
+#   exact_error:              aim: node not found: CultOptionButton0 (spec: CultOptionButton0)
+#   green_asserts_before_red: 9 (f80 has 6 + f110 has 2 + f140 first assert
+#                             phase=="GONGFA_PICK" = 9)
+#
+#   [was predicted, now superseded by the measured run above]
+#   structural prediction (pre-measurement): f140 / CultOptionButton0.visible /
+#     aim: node not found: CultOptionButton0 (spec: CultOptionButton0) /
+#     8 green before red (f80 6 + f110 2, NOT counting f140 assert 1 which
+#     passes even with the revert since the phase IS GONGFA_PICK).
+#     The measured green count is 9, not 8: the f140 phase assert
+#     (phase == "GONGFA_PICK") passes before the first CultOptionButton0
+#     failure, adding 1 to the predicted 8.
 #
 #   DO NOT COMMIT: reproduction needs the TEMPORARY RED-FIRST REVERT below
 #   applied to scripts/segments/cultivation.gd (this file's timeline is the
