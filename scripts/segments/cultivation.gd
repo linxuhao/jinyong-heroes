@@ -146,7 +146,14 @@ func _process(_delta: float) -> void:
 		_debug_grant_art()
 
 
+func _roster_open() -> bool:
+	var panel := get_node_or_null("RosterPanel")
+	return panel != null and panel.is_open
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _roster_open():
+		return
 	if GameManager.current_state != "CULTIVATION":
 		return
 	if event.is_action_pressed("ui_accept"):

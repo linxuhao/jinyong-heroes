@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/segments/cultivation.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/roster_panel.tscn" id="2"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_backdrop"]
 bg_color = Color(0.07, 0.07, 0.1, 1)
@@ -53,3 +54,5 @@ offset_top = 80.0
 offset_right = 950.0
 offset_bottom = 620.0
 mouse_filter = 2
+
+[node name="RosterPanel" parent="." instance=ExtResource("2")]

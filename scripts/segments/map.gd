@@ -109,7 +109,14 @@ func _ready() -> void:
 	_render()
 
 
+func _roster_open() -> bool:
+	var panel := get_node_or_null("RosterPanel")
+	return panel != null and panel.is_open
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _roster_open():
+		return
 	if ended:
 		return
 	if phase == "EVENT":
