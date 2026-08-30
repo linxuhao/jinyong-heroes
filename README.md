@@ -415,7 +415,8 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Verification status (honest)
 
-**touch-single-surface (this round, 2026-08-30) — split honestly:**
+**touch-single-surface (this round, 2026-08-30) — fully evidenced (red-first
+MEASURED post-review + official gate run):**
 
 - **Direct-read verified in the tree**: the single-surface renders (`▶` option
   rows deleted from the cultivation / map / sect_select bodies; selection on
@@ -431,27 +432,35 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   (30 (g) / 31 new / 40 / 90 / 99), and the tails corrections (README Q6
   measured 71/0; walkthrough pointer line with the f180/5 prediction
   preserved).
-- **NOT yet evidenced (must not be claimed)**: the four MEASURED first-red
-  values for `clicks_only_gongfa_empty_exit` are still PENDING in the scenario
-  header and `final/delivery_notes_touch_single_surface.md` — only a
-  structural prediction (f140 `CultOptionButton0.visible` red, 8 green asserts
-  before red) and the verbatim `TEMPORARY RED-FIRST REVERT` recipe are
-  recorded. The brief requires these values be measured, never predicted: a
-  real `godot_playtest_scenario` run with the revert applied, the four values
-  pasted into the scenario header + delivery note, then the byte-identical
-  restore and a green re-run remain outstanding; the GREEN observed values for
-  both new scenarios are likewise pending their self-run (the
-  `implementer.md:23` hard condition). Documentation staleness to refresh at
-  the same time: the delivery note's Part A slice still describes the earlier
-  direct-segment boot (f90 red / 14 asserts) while the landed YAML boots
-  through menu + `debug_seed_save` (f140 / 16 asserts) — the YAML is correct.
-- **Downstream gates** (`5_compile` compile + playtest, `5_vision`,
-  `5_test` unit suite + pytest) had not run for this round at the time of
-  writing — "all playtest scenarios green / 0 runtime errors / hard gate
-  `passed: true` / 0 compile errors / GDScript unit suite green /
-  `test_i18n_coverage.py` + `test_playtest_contract_smoke.py` +
-  `test_facility_copy_location.py` green" are NOT asserted here; this round's
-  numbers land with those artifacts and `5_review`.
+- **MEASURED first-red values landed (2026-08-30, after the review round)**:
+  the `godot_playtest_scenario` sidecar was invoked with the TEMPORARY
+  RED-FIRST REVERT applied to `scripts/segments/cultivation.gd` and the nail
+  went RED as the brief requires — failing frame **f140**, first failing
+  assert **`CultOptionButton0.visible: visible == true`**, exact error
+  **`aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`**,
+  **9** green asserts before red (f80 6 + f110 2 + the f140
+  `phase == "GONGFA_PICK"` assert, which passes even with the revert). The
+  earlier structural prediction (8 green before red) is preserved verbatim in
+  the scenario header, explicitly marked superseded by the measured run. The
+  revert was restored byte-identically (zero `TEMPORARY RED-FIRST REVERT`
+  hits in `scripts/`) and both new scenarios re-ran GREEN on the restored
+  tree: `clicks_only_gongfa_empty_exit` **16/16**,
+  `gongfa_pick_empty_keyboard_return` **13/13** (hard gate `passed: true`).
+  All values live in the scenario header's RED-FIRST EVIDENCE block and in
+  `final/delivery_notes_touch_single_surface.md` (Part A §4/§5 + Part B §4/§5) —
+  the `implementer.md:23` self-run hard condition is MET.
+- **Downstream gates measured (read by `5_review` from the gate artifacts)**:
+  compile **89/89** scripts, 0 errors; playtest **73/73** scenarios PASS, 0
+  runtime errors, hard gate `passed: true` (including
+  `clicks_only_gongfa_empty_exit` 16/16, `gongfa_pick_empty_keyboard_return`
+  13/13, `spine_to_ending` 42/42, `clicks_only_storyline` 47/47,
+  `facility_use_reusable` 49/49); vision gate **passed** (non-blind, 73
+  scenarios / 292 frames, all six questions `failed: false`, Q6 text
+  readability 73 good / 0 bad); GDScript unit suite **38/38** green
+  (including the traversal coverage gate `tests/test_touch_option_surface_gate.gd`
+  and the two re-targeted map unit tests); `tests/test_i18n_coverage.py` +
+  `tests/test_playtest_contract_smoke.py` + `tests/test_facility_copy_location.py`
+  green.
 
 The rest of this section describes the previous (touch-reach) round.
 
