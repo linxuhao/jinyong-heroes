@@ -47,6 +47,9 @@ const TESTS: Array[String] = [
 	# (TravelButton{i} / EventOptionButton{i} / the three facility delegates)
 	# and the FacilityEnterButton guard mirror, proven handler-side.
 	"res://tests/test_map_facility_buttons.gd",
+	# roster 2026-08-30: pure _compose_body / resolver / read-only pins
+	# for the read-only roster panel (scripts/ui/roster_panel.gd).
+	"res://tests/test_roster_panel.gd",
 ]
 
 

@@ -75,6 +75,8 @@ static func _test_empty_states(ok: bool) -> bool:
 		if not body.contains(section):
 			push_error("roster: empty body missing section %s; body=%s" % [section, body])
 			return false
+	# Three-section pin: the panel has exactly 人物/功法/物品 sections; if a
+	# future section is added this count must be updated together.
 	if body.count("（无）") < 3:
 		push_error("roster: empty profile did not render three （无） rows; body=%s" % body)
 		return false

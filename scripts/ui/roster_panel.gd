@@ -111,7 +111,7 @@ func _compose_character(p: PlayerProfile) -> String:
 	var attr_parts: PackedStringArray = []
 	for key in PlayerProfile.ATTR_KEYS:
 		attr_parts.append("%s %d" % [tr(_ATTR_LABELS.get(key, key)), p.get_attr(key)])
-	lines.append("  ".join(attr_parts))
+	lines.append(" ".join(attr_parts))
 	lines.append("%s %d" % [tr("银两"), p.silver])
 	lines.append("%s %s" % [tr("先天特质"), _traits_text(p)])
 	var year: int = int(p.cultivation.get("year", 1))
