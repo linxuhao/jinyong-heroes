@@ -77,6 +77,13 @@ static func def(id: String) -> CardDef:
 	return null
 
 
+## Display name for an inventory id; "" when unknown (caller degrades to the
+## raw id — mirrors ProgressionGongfaData.display_name_of's "" contract).
+static func display_name_of(id: String) -> String:
+	var d := def(id)
+	return "" if d == null else d.display_name
+
+
 ## Fresh CardDef per unique TABLE row of a category (no multiplicity expansion).
 static func defs_in_category(cat: String) -> Array[CardDef]:
 	var out: Array[CardDef] = []
