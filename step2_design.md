@@ -269,13 +269,88 @@ timeline:
   2. NEW `test_roster_panel_surface_contract()` — mirrors the facility pin shape: the seven RosterPanel vars + RosterLabel/RosterHint blocks are whitelisted; `toggle_roster` is in the actions list; the scenario is in `scenario_order` AND `ROUND_SCENARIOS`; the file exists with `name:` equal to its basename; the file text contains a `toggle_roster` timeline entry (the panel must be opened by the real key action, not a handler call); **correspondence anti-deletion pin:** the file text must contain a line matching `items_text.contains("青锋剑")`, and the assert's FAILURE TEXT (not docstring-only, per the 2026-08-29 form-gate ruling) carries the escape clause: *"this is a form gate — if you legally renamed the observable or re-expressed the pin, update THIS pin together with the equivalent assert in the same change; never bypass a rename by weakening this pin, and never keep a dead old scenario line to stay green."*
   3. **Facility pin failure-text upgrade (brief item, exact):** in `test_facility_use_reusable_surface_contract()` (line 925+), the two verbatim requirements (`phase != "FACILITY"` and `facility_use_count == 0` present in the file text) get failure messages that carry the form-gate explanation: these are form gates; a future legal rename/rewrite of the observables must update this pin together with the equivalent assertions in the same change — red is right in that case; the fix is never to bypass the rename. Docstring stays as supporting prose; the escape clause must live in the assert messages.
 
-### C8 — `_bad_timeline_at_values` parser hole: `tests/test_playtest_contract_smoke.py` (EDIT)
+### C8 — `_bad_timeline_at_values` → parse-based type gate: `tests/test_playtest_contract_smoke.py` (EDIT)
 
-- **Verified current shape (read this step, lines 407–485):** the helper reads every `playtest/*.yaml` file, comment-strips each line via `line.split("#", 1)[0]`, then applies `\bat\s*:\s*([^,}\s]*)` + `isdigit()`. Two regression pins constrain any change: a real non-integer `at:` still reds, and a backtick-`` `at:` `` inside a pure `#` comment stays inert.
-- **The hole (SOTA finding, accepted):** a line whose real content carries an `at:` **after** an inline `#` (e.g. `- {label: "a#b", at: 3}`) is silently truncated at the `#`, matches nothing, and that entry's `at:` is never checked. Measured this research round: 1620 `at:` lines across `playtest/*.yaml`, **0** with a `#` before the `at:` — a zero-instance potential hole today.
-- **Fix (the "make the parser still check such lines" exit):** keep the comment-strip as the primary path; when the stripped line yields **no** `at:` match but is non-blank **and** the raw line does match, append a failure `"<name>.yaml line N: 'at:' key shadowed by an inline '#' — unverifiable at static check; restructure the line"`. The non-blank condition keeps pure-comment lines inert, so both existing regression pins stay green byte-identically.
-- Add one regression: `test_timeline_at_shadowed_by_comment_is_reported()` — `_bad_timeline_at_values` on a probe text containing a content line whose only `at:` sits after a `#` returns exactly one entry mentioning the shadowing; and the pure-comment probe stays `[]`.
-- **Explicitly REJECTED (record in 90_decisions):** "aligning" the parser to the `f265/8 → 97.6%` prose in `final/delivery_notes_touch_reach_red_first.md` — that file is delivery-note prose, not the playtest contract; `_bad_timeline_at_values` never reads it and must not. The brief's tail-(c) wording rests on that false premise; the true, measurable defect is the shadowed-`at:` hole above, and this fix closes it without touching either existing pin.
+- **The property is structural, so the checker must parse, not regex.** The gate asserts "every timeline entry's `at` is an integer". Timeline entries are YAML structures, not text shapes; a line-level rule asserts a text shape. (Feedback round 1 replaced the previously designed line-level "shadowed-`at:`" rule; its rejection is recorded below so nobody re-derives it.)
+- **Why ANY line-level rule is rejected:** a rule keyed on "`#` appears before `at:` on the line" cannot distinguish these two inputs — they are character-level identical to a line regex:
+
+  | line | after `#`-strip | the rule says |
+  |---|---|---|
+  | `- {label: "a#b", at: 3}` (real hole: `#` inside quotes) | `- {label: "a` | red ✔ correct |
+  | `  actions: [move_right]   # travel at: full speed` (legal trailing comment) | `  actions: [move_right]` | **red ✘ false red** |
+
+  It swaps a silent miss for a false red on legal prose — a form gate that stays green only while nobody happens to write such a comment. Measured on today's tree: **2** lines in `playtest/*.yaml` carry an inline `#`; the rule would false-red **0** of them today — that is "hasn't collided yet", not "can distinguish". The 2026-08-29 form-gate rule (`design/30_presentation.md`: a gate a legal edit can red must self-explain or assert by property) forbids exactly this shape.
+- **Measured feasibility (reviewer-verified 2026-08-30; adopted as given — do NOT re-verify):** pyyaml **6.0.3** is present in the container the gate runs in; all **72** `playtest/*.yaml` parse independently with `yaml.safe_load` (**0** failures, no `_common.yaml` merge needed); **1617** timeline entries, every `at` an int — the parse-based gate is green today. (The earlier line-grep counted 1620 `at:`-bearing lines vs 1617 real entries: line-level counting over-matches, which is precisely why the gate must walk the structure.)
+- **Verified current shape (read this step):** `_bad_timeline_at_values(text: str, name: str) -> list[str]` at `tests/test_playtest_contract_smoke.py:407` — pure helper (no file I/O, no globals), docstring :408–430, body comment-strips each line (`line.split("#", 1)[0]`) then applies `\bat\s*:\s*([^,}\s]*)` + `isdigit()`. Sole caller: `test_timeline_at_values_are_integers` (:456–460) loops `ROUND_SCENARIOS`, `bad.extend(_bad_timeline_at_values(text, name))`, `assert not bad`. Two existing regressions: `test_timeline_at_real_non_integer_still_red` (probe `"- at: abc\n"` → len 1, message contains `probe.yaml line 1` and `'abc'`) and `test_timeline_at_comment_backtick_at_is_ignored` (probe `"#   ... and every `at:`\n- at: 3\n"` → `[]`; pins the exact historical false-red bug `clicks_only_storyline.yaml:99`, cf. `final/delivery_notes_fix_at_gate_strip_comments.md`). Six OTHER smoke checks re-implement the same line-regex+`isdigit()` walk per scenario (:537/:586/:638/:746/:806/:900/:982) — **out of scope this round**: the verdict targets the shared helper; migrating six more sites is a possible follow-up, not a requirement (their per-scenario line diagnostics stay untouched, so no diagnostic capability regresses).
+- **New implementation — helper body + docstring replaced; signature, position, and the caller loop untouched:**
+
+  ```python
+  import yaml  # pyyaml 6.0.3 — present in the gate container (measured 2026-08-30)
+
+  def _bad_timeline_at_values(text: str, name: str) -> list[str]:
+      """Type gate: every timeline entry's 'at' must be an integer frame number.
+
+      Parse-based (replaces the line-regex/comment-strip walker): comments
+      vanish at parse, a '#' inside a quoted scalar is handled by the parser,
+      and a file that fails to parse is REPORTED instead of silently
+      unverifiable. Two rules, walked recursively over the whole document:
+        A. every mapping that carries an 'at' key must carry an int
+           (bool excluded) — also covers bare top-level entry lists and
+           click/other frame entries;
+        B. every element of any 'timeline' list must be a mapping with 'at'.
+      """
+      try:
+          doc = yaml.safe_load(text)
+      except yaml.YAMLError as exc:
+          return [f"{name}.yaml: unparseable YAML — timeline 'at' values "
+                  f"cannot be verified; parser said: {exc}"]
+      bad: list[str] = []
+
+      def _at_check(node: dict, path: str) -> None:
+          v = node["at"]
+          if isinstance(v, bool) or not isinstance(v, int):
+              bad.append(f"{name}.yaml: 'at' value {v!r} at {path} must be an "
+                         f"integer frame number (got {type(v).__name__})")
+
+      def _walk(node: object, path: str) -> None:
+          if isinstance(node, dict):
+              if "at" in node:
+                  _at_check(node, path)
+              entries = node.get("timeline")
+              if isinstance(entries, list):
+                  for i, entry in enumerate(entries):
+                      epath = f"{path}.timeline[{i}]"
+                      if not isinstance(entry, dict):
+                          bad.append(f"{name}.yaml: timeline entry {i} at "
+                                     f"{epath} is not a mapping")
+                      elif "at" not in entry:
+                          bad.append(f"{name}.yaml: timeline entry {i} at "
+                                     f"{epath} has no 'at'")
+              for k, child in node.items():
+                  _walk(child, f"{path}.{k}")
+          elif isinstance(node, list):
+              for i, child in enumerate(node):
+                  _walk(child, f"{path}[{i}]")
+
+      _walk(doc, "$")
+      return bad
+  ```
+
+  Implementation notes the implementer must honor:
+  - `yaml.safe_load` ONLY (never the unsafe `yaml.load`); per-file parse, no `_common.yaml` merge — matching the measured protocol. Add `import yaml` to the module import block (currently `Path`/`json`/`re` only).
+  - **Bool exclusion is mandatory:** pyyaml loads `at: true` as Python `True`, and `isinstance(True, int)` is True — without the `not isinstance(v, bool)` guard the gate would accept a boolean frame number.
+  - **This is a TYPE gate: `at: 0` is legal.** Positivity / upper-bound claims live in their own checks; do not add them here.
+  - Failure strings must keep the two fragments the regressions pin: the file name (`{name}.yaml`) and the offending value's `repr` (`'abc'`). Line numbers are gone (the parse view has no lines) — the sibling per-scenario walkers keep theirs.
+  - If the module header carries a stdlib-only remark, amend that one comment line: the single sanctioned third-party import is `yaml` (recorded in 90_decisions ruling (d)).
+- **The two existing regressions are PRESERVED with their exact probe texts, re-expressed to the parse message shape (the sanctioned re-expression):**
+  1. `test_timeline_at_real_non_integer_still_red` — probe `"- at: abc\n"` unchanged; assertions become `len(bad) == 1`, `"probe.yaml" in bad[0]`, `"'abc'" in bad[0]`. The `line 1` fragment is dropped (no line numbers in the parse view); the probe now lands via rule A on the bare top-level entry list.
+  2. `test_timeline_at_comment_backtick_at_is_ignored` — probe and the `== []` assertion unchanged byte-for-byte; under the parser it is trivially true (comments vanish at parse) and is kept as the recorded history of the strip-comments bug.
+- **New regressions (no loosening — pinned):**
+  3. `test_timeline_at_type_rejections` — `at: '3'` (str), `at: 3.0` (float), `at: 3..15` (str), bare `at:` (None), `at: true` (bool) each yield exactly one failure; `at: 0` and `at: 30` each yield `[]`. (The old docstring already promised the first four fail — the parse gate keeps that promise by TYPE, more accurately than `isdigit()`, which also false-reds legal YAML ints like `at: +30` and mis-reads multi-line scalars.)
+  4. `test_timeline_entry_without_at_is_reported` — a `timeline:` element without an `at` key reds (rule B: "every entry's `at` is an integer" fails when there is no `at`).
+  5. `test_unparseable_yaml_is_reported` — a truncated doc (e.g. `timeline: [ {at: 3`) reds with the filename and a fragment of the parser's message — the previously silent skip becomes a red.
+  6. Real-tree sweep unchanged: `test_timeline_at_values_are_integers` keeps looping `ROUND_SCENARIOS` and must stay green (72 files / 1617 entries per the measurement above).
+- **Explicitly REJECTED (record in 90_decisions (d)):** (i) "aligning" the parser to the `f265/8 → 97.6%` prose in `final/delivery_notes_touch_reach_red_first.md` — that file is delivery-note prose, not the playtest contract; `_bad_timeline_at_values` never reads it and must not (the brief's tail-(c) literal wording rests on a false premise). (ii) the line-level shadow rule — see the table above. The brief's other exit (declare not-worth-fixing, keep status quo) is not taken: the parse path is measured feasible and green today.
 
 ### C9 — `tests/test_facility_copy_location.py`: literal allowlist → symbol exclusion (EDIT)
 
@@ -305,7 +380,7 @@ timeline:
   - 记录 row: 2026-08-30 `jinyong-roster`(记录;不改任何既有 OPEN/CLOSED 状态;两条为 brief 点名的已查实欠账,实现各需自己的一轮,按规矩 2 关闭)。
 - `design/90_decisions.md` — the round's rulings (§11 below, verbatim substance).
 - `design/99_changelog.md` — one append-only row:
-  `| jinyong-roster | 2026-08-30 | 新增只读角色页(人物/功法/物品三段,`toggle_roster` 键 C,养成与大地图可达,开合不耗回合不写存档);新增 `CardData.display_name_of` 惰性解析器;新场景 `roster_panel_shows_granted_item` 钉「事件给予的青锋剑出现在面板」;`facility_copy_location` 闸门改按符号排除(ENDING_TIERS 块与 NODES[*].display_name),删 7 个永不命中的节点名;`_bad_timeline_at_values` 补「at: 被 # 遮蔽」检测(实测 1620/0);README Q6 勘误为实测 0;walkthrough 顶部加权威首红指针;UX-13/14 两条欠账入册。 | 玩家三年养成、抽卡、触发事件之后,第一次能看见自己是谁、会什么、有什么;装备死路(inventory 只写不读)由面板首次接通为可见——「data-only this round」的欠账本轮还掉显示的那一半。 |`
+  `| jinyong-roster | 2026-08-30 | 新增只读角色页(人物/功法/物品三段,`toggle_roster` 键 C,养成与大地图可达,开合不耗回合不写存档);新增 `CardData.display_name_of` 惰性解析器;新场景 `roster_panel_shows_granted_item` 钉「事件给予的青锋剑出现在面板」;`facility_copy_location` 闸门改按符号排除(ENDING_TIERS 块与 NODES[*].display_name),删 7 个永不命中的节点名;`_bad_timeline_at_values` 改为 YAML 解析式类型闸门(timeline 条目 `at` 必须为整数;'3'/3.0/空值/布尔均红;解析失败即红,不再静默跳过);README Q6 勘误为实测 0;walkthrough 顶部加权威首红指针;UX-13/14 两条欠账入册。 | 玩家三年养成、抽卡、触发事件之后,第一次能看见自己是谁、会什么、有什么;装备死路(inventory 只写不读)由面板首次接通为可见——「data-only this round」的欠账本轮还掉显示的那一半。 |`
 
 ### C12 — Unit test: `tests/test_roster_panel.gd` (NEW) + registry (EDIT `tests/unit_test_runner.gd`)
 
@@ -386,6 +461,7 @@ Binding order constraints: T2 ≤ T3 (panel uses the resolver); T3 < T1 (whiteli
 - **Deleting `test_facility_copy_location.py`:** allowed by the brief as a fallback, but the symbol-exclusion fix is small and keeps the guard's property; deletion recorded only as the fallback if the block parser proves brittle during implementation (record either way in `90_decisions.md`).
 - **A second playtest scenario for the gongfa rows:** no existing deterministic grant path reaches a fresh profile's gongfa array outside the full spine (boot-flow scenario = frame-budget rewrite of frozen territory); the row template is unit-pinned (C12) instead, and the empty-section placeholder is pinned in the main scenario — rejected as a scenario, delivered as a unit pin.
 - **Aligning `_bad_timeline_at_values` to the `f265/8 →` delivery-note prose:** rejected (C8) — the parser reads the playtest contract, not prose notes.
+- **A line-level "shadowed-`at:`" rule in `_bad_timeline_at_values` (stripped line yields no `at:` match + raw line matches ⇒ red):** rejected (feedback round 1) — "`#` inside quotes" (the real hole it aimed at) and "a legal trailing comment containing `at:`" are character-level identical to a line regex, so the rule swaps a silent miss for a false red on prose: a form gate by the 2026-08-29 rule. Superseded by C8's parse-based type gate.
 
 ---
 
@@ -394,7 +470,7 @@ Binding order constraints: T2 ≤ T3 (panel uses the resolver); T3 < T1 (whiteli
 - **(a) Toggle key = physical C, action `toggle_roster`.** Collision audit against `project.godot [input]` (all used physical keys enumerated); C is mnemonic (人物/Character); harness debug actions have empty event lists so no scenario can mis-fire it.
 - **(b) MAP open only from TRAVEL (refuse EVENT/FACILITY/ended); CULTIVATION any phase.** The map's modal phases own their key grammar (`map.gd:109-133`); a panel open inside them would either fight the grammar or force per-phase swallow tables. Cultivation phases are plain flow and the panel is read-only.
 - **(c) Panel owns the toggle; hosts get a 2-line defensive early-return; zero save writes.** Scoping note: the guard inserts before all branches in `map.gd`/`cultivation.gd`; facility/EVENT handler bodies stay byte-identical (the "don't touch just-landed facility files" constraint is honored in spirit and letter — no facility logic line changes).
-- **(d) Tail-(c) resolution: shadowed-`at:` detection adopted; the `f265/8 →` prose alignment rejected; measured 1620/0 recorded.** The parser reads the playtest contract; the true hole is inline-`#` shadowing; both existing regression pins preserved byte-identically.
+- **(d) Tail-(c) resolution: the gate goes parse-based; BOTH the `f265/8 →` prose alignment AND the line-level shadow detection are rejected.** The gate's property is structural — "every timeline entry's `at` is an integer" — so `_bad_timeline_at_values(text, name)` (signature, position, caller loop and both regression probes preserved; failure-message shape re-expressed) now `yaml.safe_load`s each file and type-checks recursively: every mapping carrying an `at` must carry an int (bools excluded), every `timeline` element must be a mapping with an `at`; `'3'` / `3.0` / `3..15` / null stay red; an entry without `at` reds; an unparseable file reds with filename + parser message (previously a silent skip). Feasibility measured and adopted as given: pyyaml 6.0.3 in the gate container, 72/72 `playtest/*.yaml` parse clean, 1617 entries all-int → green today; this one `import yaml` supersedes the module's stdlib-only habit. Rejected (i): aligning the parser to the `f265/8 → 97.6%` prose in `final/delivery_notes_touch_reach_red_first.md` — delivery-note prose is not the playtest contract and the helper never reads it. Rejected (ii): the line-level "shadowed-`at:`" rule — `- {label: "a#b", at: 3}` (real hole: `#` inside quotes) and `actions: [move_right]   # travel at: full speed` (legal trailing comment) are character-level identical to a line regex, so the rule trades a silent miss for a false red on prose; measured: 2 inline-`#` lines in `playtest/*.yaml`, 0 false reds today — fragility, not correctness, and the 2026-08-29 form-gate rule forbids it. The brief's other exit (not-worth-fixing + keep status quo) not taken: the parse path is measured feasible. The six per-scenario line-regex walkers elsewhere in the smoke test (:537/:586/:638/:746/:806/:900/:982) are out of scope this round.
 - **(e) Key hint lives in a new `RosterHint` node in both host scenes.** `HintLabel.text` is pinned verbatim (`map_node_event_mainline_return` f30) and `map_hint_single` pins the one-hint invariant; the hint must not ride either.
 - **(f) `facility_copy_location` gate: symbol exclusion ADOPTED (not deleted).** The guard keeps asserting its property (no new inline prose positions) without pinning roadmap-scope content forms; the 7 node names are dropped (sub-threshold dead weight). If implementation proves the block parser brittle, the documented fallback is guard deletion with this same ruling noting §433 as an unguarded documentation rule.
 
