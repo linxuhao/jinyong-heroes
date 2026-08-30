@@ -162,21 +162,33 @@ All three are added to `playtest/_common.yaml`'s `CultivationScreen` surface blo
 
 ### 3.2 `scripts/segments/map.gd`
 
-**(a) EVENT panel** `:508-516`: remove the two `▶ option` rows. Implementation
-constraint (see §7 — `test_facility_copy_location.py` is frozen): keep the composite
-`tr("【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺")` key **byte-identical** and pass `""` for
-the two removed slots (`% [tr(def.title), tr(def.text), "", ""]`). Zero new literals,
-zero allowlist edits, guard stays green; the i18n EN value of that key keeps its
-option-slot placeholders (harmless — they render empty).
-**(b) FACILITY panel** `:517-531`: remove the `"▶ " + tr(fdef.action_label)` argument
-(pass `""` for that slot of the unchanged composite key). The cost/effect summary
-(descriptive) and the hint 「回车使用 · 上下离开」 stay; `FacilityUseButton` carries the verb.
+**(a) EVENT panel** `:508-516`: remove the two `▶ option` rows by SHORTENING the
+composite key itself: `tr("【%s】\n\n%s\n\n上下选择，回车定夺")` with args
+`% [tr(def.title), tr(def.text)]`. The two option slots are **deleted from the key,
+never fed `""`** — feeding empty strings renders 4 consecutive blank lines between
+the event prose and the hint, which is exactly the dirt this round exists to remove.
+The i18n EN entry is rewritten to the same 2-slot shape in the same commit (§8); the
+guard maintenance that makes the key change legal is §7 (`tr()` call-site detection —
+no allowlist entry is added for it).
+**(b) FACILITY panel** `:517-531`: delete the `"▶ " + tr(fdef.action_label)` slot from
+the composite key: `tr("【%s】\n\n%s\n\n%s\n\n%s")` with args
+`% [tr(fdef.title), tr(fdef.text), summary, tr("回车使用 · 上下离开")]` — title, prose,
+cost/effect summary (descriptive, stays) and the hint, one blank line between blocks,
+matching the EVENT panel's rhythm. `FacilityUseButton` carries the verb. Same rule as
+(a): slots are deleted, not blanked. The key is a 0-CJK format key today with no EN
+entry and the coverage suite is green on that shape; the shortened key keeps exactly
+that shape.
 **(c) TRAVEL panel** `:532-556`: the node list is the **map overview — kept** (it lists
 non-adjacent nodes too; it is descriptive, not an option list). Removed: the `▶`
 glyph and the focus marker `（可前往）` (focus now lives only on the highlighted
-`TravelButton{i}`). Current-node row switches to the new sub-4-CJK key
-`tr("  %s（此处）\n")` (「此处」 = 2 CJK chars — under the frozen §433 guard's ≥ 4 threshold;
-EN entry added to `i18n.gd`). The old keys stay in the EN dict (unused keys are legal).
+`TravelButton{i}`; the overview list itself stays put, and the `elif focus_id`
+branch collapses into the plain `  %s\n` row). Current-node row becomes
+`tr("  %s（当前所在）\n") % name` — wording chosen for what it tells the player (you are
+standing on this node, same register as the 「当前：%s」 line below the list), with the
+2-space indent kept so node names stay column-aligned with the plain rows. Under §7
+path 2 there is no length threshold to consider and none is considered. New EN entry
+`  %s (current location)\n` (§8); the superseded keys' EN entries are deleted in the
+same commit as their last call sites (§8's dead-copy rule).
 **(d) Selection on the button.** In `_sync_click_buttons()`, set each visible
 `TravelButton{i}`'s `modulate` bright when `nbrs[i] == focus_id`, dim otherwise; same
 for `EventOptionButton{i}` (`event_focus`) and the two FACILITY buttons
@@ -338,19 +350,64 @@ project-wide parse check and blinds every behavioral gate.
 
 ---
 
-## 7. The frozen-guard constraint that shapes `map.gd` edits
+## 7. The copy-location guard — maintained, not dodged (round-owner-granted scope, 2026-08-30)
 
-`tests/test_facility_copy_location.py` (FROZEN — do not edit) reds any **new**
-≥ 4-CJK double-quoted literal in `map.gd` / `map_data.gd` not in its allowlist.
-Therefore the map.gd editing strategy (§3.2) introduces **zero** new ≥ 4-CJK literals:
-- composite keys reused byte-identically with `""` slotted for removed rows (EVENT,
-  FACILITY);
-- the one genuinely new literal `  %s（此处）\n` contains 2 CJK chars (sub-threshold);
-- its EN entry is added to `scripts/autoload/i18n.gd` (not frozen; `tests/
-  test_i18n_coverage.py` requires every `tr()` call site to have a dict entry).
-The implementer MUST read the allowlist before touching `map.gd` and must not move
-copy into `map.gd`; if an edit seems to need a new ≥ 4-CJK literal, stop and compose
-from empty slots / sub-threshold literals / existing keys — never edit the guard.
+`tests/test_facility_copy_location.py` reds any ≥ 4-CJK double-quoted literal in
+`map.gd` / `map_data.gd` that is not exempt. The previous draft treated the guard as
+frozen and dodged it: composite keys kept byte-identical with `""` fed into the
+removed option slots (4 blank lines on the EVENT panel, 2 on FACILITY) and copy
+word-picked to stay under the threshold. That served the gate at the player's
+expense. The round owner has explicitly unfrozen the guard for exactly two kinds of
+maintenance (2026-08-30): (1) updating its exemptions for copy this round legitimately
+shortens/deletes, or (2) implementing the file's own documented next step —
+symbolizing the map.gd chrome via `tr()` call-site detection. **This design picks
+path 2**, and explicitly forbids the behavior that made the guard a problem in the
+first place: choosing words for their CJK count. Specification:
+
+- **Detection, not whitelist, for map chrome.** `_cjk_literals()` keeps collecting
+  every ≥ 1-CJK non-comment literal unchanged (the extraction-sanity floor logic
+  stays intact). A new `_tr_call_literals(path)` helper collects the raw slices of
+  literals appearing immediately after `tr(` on the same comment-stripped line
+  (`tr\(\s*"((?:[^"\\\n]|\\.)*)"` — same per-line discipline as `_strip_comments`).
+  In `test_no_inline_prose_in_map_files` the bad condition becomes
+  `cjk >= PROSE_MIN_CJK and lit not in ALLOWED and lit not in tr_literals_of_that_file`
+  — detection is ADDITIVE to ALLOWED, never a replacement: a non-tr ≥ 4-CJK literal
+  still reds.
+- **ALLOWED shrinks.** All nine chrome entries currently in ALLOWED are `tr()` first
+  args in map.gd (verified 2026-08-30: the render templates at :515/:523/:532-555,
+  `银两不足` :282, `修炼有得（第 %d 次）：%s` :304). Delete every entry that detection now
+  covers; if any entry proves NOT to be a `tr()` first arg, it stays in ALLOWED and
+  the delivery note says so. The module docstring's 此处/可前往 references and the
+  per-entry comments are updated in the same edit.
+- **The two symbol exclusions stay byte-identical.** The `ENDING_TIERS` block-skip and
+  the `"display_name":` field-skip are the jinyong-panels acceptance this permission
+  was meant to protect — untouched.
+- **The anti-triviality floor is re-based, not weakened.** After the map.gd edits the
+  collected literal set shrinks (two `▶`/`（可前往）` call sites deleted, one
+  `（当前所在）` key added), so the `total >= 9` floor stops matching reality.
+  Re-measure the extractor's count on the POST-EDIT tree and re-base the floor to
+  that measured value with a dated comment (same discipline as the existing
+  "measured 2026-08-30" comment), never below 3 — the floor exists to catch a broken
+  extractor returning zero, and a measured re-base keeps it doing that job.
+- **`test_no_prose_duplicated_from_data_modules` gains NO exemption.** It must keep
+  comparing ALL ≥ 1-CJK literals of the map files against the data modules,
+  INCLUDING `tr()` keys — otherwise a data-module sentence copied into map.gd and
+  wrapped in `tr(...)` would evade both tests. Detection lives only in the first
+  test. This is the no-weakening line of the whole maintenance.
+- **Copy discipline unchanged (§433).** No prose moves into `map.gd` / `map_data.gd`;
+  event/facility content copy still lives in `EventData.TABLE` /
+  `FacilityData.TABLE`. Copy in map.gd must be a `tr()` key with an i18n entry —
+  enforced from now on by structure (detection + `tests/test_i18n_coverage.py`), not
+  by per-key whitelist upkeep.
+- **No threshold word-picking.** Copy is chosen for what it tells the player
+  (§3.2(c) 「当前所在」), never for its CJK count. The guard's failure message keeps its
+  self-explaining escape hatch and now names the two legal fixes: make it a `tr()`
+  key with an i18n entry, or move the copy to its data module.
+- **Order of operations for the implementer:** land the guard change first and run
+  `pytest tests/test_facility_copy_location.py` green on the PRE-edit tree (detection
+  covers today's chrome, ALLOWED emptied, floor still satisfied), then edit `map.gd`,
+  then re-run green on the POST-edit tree with the re-based floor. Any red in either
+  run is investigated and reported, never absorbed.
 
 ### 7.1 Assertion-update policy (measured, not the brief's ~15 prediction)
 
@@ -369,6 +426,13 @@ and reports the measured table in the delivery notes (before / after / equivalen
 reason per line actually changed — possibly none), explicitly reconciling the brief's
 ~15 estimate against the measured set.
 
+The §3.2 composite-key shortening rides on this same reconciliation: the shortened
+EVENT key keeps the 「上下选择，回车定夺」 substring, so `map_hint_single.yaml:43`'s
+`BodyLabel.text` contains-assert stays true; the footer pins read `HintLabel`, which
+no body-key change touches. No playtest assert pins the deleted option rows or a
+full-equality `BodyLabel.text` on a map panel — the grep above is the proof duty,
+re-run after the key edits land.
+
 **Unit tests that DO pin the duplication (must be re-targeted):**
 - `tests/test_map_node_event.gd` `:388-408` — pins the `▶` marker in map EVENT body
   text → re-target to `EventOptionButton0/1` texts + `cursor_markers_visible == false`.
@@ -379,18 +443,31 @@ Each re-target is listed before / after / equivalence-reason in the delivery not
 
 ---
 
-## 8. i18n additions (`scripts/autoload/i18n.gd` EN dict — only additions)
+## 8. i18n changes (`scripts/autoload/i18n.gd` EN dict — slot counts always match)
+
+**Added:**
 
 | zh key (call-site literal) | EN value |
 |---|---|
 | `返回行动` | `Back to Actions` |
 | `暂无未大成武功。点击「返回行动」回到本月行动。` | `No unmastered arts to train. Tap "Back to Actions" to return to this month's actions.` |
-| `  %s（此处）\n` | `  %s (here)\n` |
+| `  %s（当前所在）\n` | `  %s (current location)\n` |
 
-Keep the superseded keys (「暂无未大成武功，改选修习吧。」, `▶ %s（此处）\n`,
-`  %s（可前往）\n`) in the dict — unused dict entries are legal and
-`tests/test_i18n_coverage.py` must stay green. Composed strings keep the `tr()`
-format-key convention.
+**Rewritten in place (shortened key, EN value rewritten to the matching slot count in
+the same commit — never a key whose EN value kept the old slot count):**
+
+| key | before | after |
+|---|---|---|
+| EVENT composite | `【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺` (4 slots), EN `[%s]\n\n%s\n\n%s\n%s\n\nUp/down to choose, Enter to decide` | `【%s】\n\n%s\n\n上下选择，回车定夺` (2 slots), EN `[%s]\n\n%s\n\nUp/down to choose, Enter to decide` |
+| FACILITY composite | `【%s】\n\n%s\n\n%s\n%s\n\n%s` (5 slots, 0 CJK, no EN entry today) | `【%s】\n\n%s\n\n%s\n\n%s` (4 slots — keeps the 0-CJK / no-EN-entry shape) |
+
+**Deleted (in the same commit as the call sites that used them):** the old 4-slot
+EVENT entry, the old 5-slot FACILITY entry if present, `▶ %s（此处）\n`,
+`  %s（可前往）\n`, 「暂无未大成武功，改选修习吧。」. Dead translations are where
+slot-count mismatches hide; grep the call sites before deleting each entry.
+Composed strings keep the `tr()` format-key convention and `tests/test_i18n_coverage.py`
+stays green — every surviving call site keeps an entry, and removing an entry whose
+last call site is gone cannot red a call-site→entry check.
 
 ---
 
@@ -450,7 +527,18 @@ format-key convention.
   (d) map TRAVEL node list kept as descriptive overview, focus markers removed;
   (e) selection highlight = modulate dim/bright (creation precedent; theme
   variations / ButtonGroup / GUI focus rejected per Step 1 §2);
-  (f) coverage-gate exclusion rule + traversal scope.
+  (f) coverage-gate exclusion rule + traversal scope;
+  (g) the copy-location guard (`tests/test_facility_copy_location.py`) was MAINTAINED,
+  not dodged: round-owner feedback (2026-08-30) unfroze it after the previous draft
+  kept a 4-slot composite key alive with `""` slots — 4/2 consecutive blank lines
+  rendered to the player so a whitelist could stay untouched. Path chosen: the file's
+  own documented next step, `tr()` call-site detection for the map chrome (§7). The
+  two symbol exclusions (`ENDING_TIERS`, `NODES[*].display_name`) stay byte-identical,
+  no prose moves inline into map.gd (§433 unchanged), and no wording is picked to
+  duck under the ≥ 4-CJK threshold. Rationale to record: per-key whitelist upkeep is
+  what created the incentive to leave holes on the player's screen; detection removes
+  the incentive structurally — copy in map.gd must be a `tr()` key with an i18n
+  entry, or the guard reds it.
 - **`design/99_changelog.md`:** one append row (run name e.g. `touch_single_surface`,
   date 2026-08-30).
 
@@ -469,7 +557,7 @@ new/changed scenario (hard condition), keyboard-hint rationale, and the
 | playtest | ALL scenarios green, incl. unchanged `clicks_only_storyline` (47/47 shape), `spine_to_ending`, `map_hint_single`, `map_facility_buttons_click`, `facility_use_reusable`, `creation_single_ui`; 2 new scenarios green; hard gate `passed: true`, 0 runtime errors |
 | red-first | new nail's measured red values recorded before the fix (frame / assert / exact error / green count) |
 | unit suite | GDScript suite green incl. re-targeted `test_map_node_event.gd` / `test_map_facility_buttons.gd` + new `test_touch_option_surface_gate.gd` (independent parse check run first) |
-| pytest | `test_i18n_coverage.py`, `test_playtest_contract_smoke.py` (incl. new smoke pin + two-place sync), `test_facility_copy_location.py` all green, none edited |
+| pytest | `test_i18n_coverage.py` and `test_playtest_contract_smoke.py` (incl. new smoke pin + two-place sync) all green and unedited; `test_facility_copy_location.py` green after its granted-scope maintenance only (§7: `tr()` call-site detection + floor re-base; symbol exclusions and the data-module duplication test untouched) |
 | archive | `design/31_touch_coverage.md` (file:line rows) + 30/90/99 updates + backlog refresh |
 | tails | README Q6 71/0 + walkthrough pointer line landed |
 | i18n | new keys in EN dict; coverage test green |
@@ -492,8 +580,10 @@ the unfixed exit); 7 last. Every task carries its own delivery-notes slice.
 
 ## 14. Risks / known warts (accepted, documented)
 
-- Empty-slot composition leaves blank lines in map EVENT/FACILITY panels where option
-  rows used to be — cosmetic, zero new literals; survey records it.
+- Map copy now rides on i18n: a shortened zh key and its slot-matched EN value must
+  land in the same commit (a stale-slot translation renders broken text) — enforced
+  by review plus `tests/test_i18n_coverage.py`; the survey records the before/after
+  copy per panel.
 - `modulate` is the least "themed" highlight (no border/fill change) — accepted; the
   theme holds fonts only and authoring styleboxes is out of scope (Step 1 §2.1/§2.3).
 - The new observables (`option_focus` etc.) are mirrors of internal focus vars —
