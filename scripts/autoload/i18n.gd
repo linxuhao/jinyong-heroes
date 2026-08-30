@@ -358,7 +358,7 @@ const EN: Dictionary = {
 	# --- Sect selection ---------------------------------------------------
 	"上下选择 · 回车拜入": "Up/down to choose · Enter to join",
 	"【拜入门派】\n\n": "[Choose a Sect]\n\n",
-	"%s %s —— 内功 %s（%s） · 外功 %s（%s）\n": "%s %s — Internal: %s (%s) · External: %s (%s)\n",
+			"%s —— 内功 %s（%s） · 外功 %s（%s）\n": "%s — Internal: %s (%s) · External: %s (%s)\n",
 
 	# --- Map travel -------------------------------------------------------
 	"左右/上下选择相邻去处，回车启程": "Arrow keys to pick an adjacent stop, Enter to set out",

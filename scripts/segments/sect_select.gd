@@ -13,6 +13,10 @@ var selected_sect_id: String = ""
 ## Surface: button name -> pressed-signal wired.
 var pressed_connected: Dictionary = {}
 
+## Surface: true iff the rendered body text still contains a '▶' cursor glyph
+## (false means the duplicated keyboard-cursor option list is gone).
+var cursor_markers_visible: bool = false
+
 
 func _ready() -> void:
 	_wire_sect_buttons()
@@ -67,9 +71,8 @@ func _render() -> void:
 	var rows: Array = ProgressionGongfaData.SECTS
 	for i in range(rows.size()):
 		var row: Dictionary = rows[i]
-		var marker: String = "▶" if i == focus_index else " "
-		text += tr("%s %s —— 内功 %s（%s） · 外功 %s（%s）\n") % [
-			marker, tr(str(row["display_name"])), tr(str(row["internal_base"])), tr(str(row["internal_attribute"])),
+		text += tr("%s —— 内功 %s（%s） · 外功 %s（%s）\n") % [
+			tr(str(row["display_name"])), tr(str(row["internal_base"])), tr(str(row["internal_attribute"])),
 			tr(str(row["external_base"])), tr(str(row["external_attribute"])),
 		]
 	text += tr("\n上下选择，回车拜入")
@@ -78,3 +81,5 @@ func _render() -> void:
 		var btn: Button = get_node_or_null("SectButton%d" % i) as Button
 		if btn != null:
 			btn.text = tr(str(rows[i]["display_name"]))
+			btn.modulate = Color(1, 1, 1, 1) if i == focus_index else Color(0.72, 0.72, 0.72, 1)
+	cursor_markers_visible = body.text.contains("▶")

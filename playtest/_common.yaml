@@ -742,6 +742,7 @@ surface:
   - visible
   - size
   - pressed_connected
+  - cursor_markers_visible
   CultivationScreen:
   - year
   - month
