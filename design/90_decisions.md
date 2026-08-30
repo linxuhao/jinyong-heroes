@@ -363,6 +363,12 @@ Button,只委托到既有设施的具名 handler:`FacilityEnterButton` 镜像 F 
 **停手**,把「委托做不到」的原因写进报告与本文件,回退到「无设施按钮」(设施面板回记 UX-12
 为已测量欠账)。两种结论都接受;沉默不接受。
 
+**结果(2026-08-30 官方闸门实测收口):落到第一种结论** —— 委托做成、设施逻辑零改动:
+`playtest/facility_use_reusable.yaml` 逐字节未动且官方全量闸门实测 **49/49** 全绿,配套
+`map_facility_buttons_click` **38/38** 全绿(硬闸门 `passed: true`、71/71 场景全 PASS、编译
+**88/88** 零错误,见 `99_changelog.md` record_official_gate_run_green)。「无设施按钮」回退
+未触发;设施面板不再记「面板缺可点控件」欠账,UX-12 只余文案行号。
+
 (e) **点击锚挂控件/单位本体,重申 `*_ClickTarget` 禁令。** 沿用本条上方 2026-08-29「点击锚不再
 挂在 *_ClickTarget 上」的裁定;本轮所有新锚点(overlay / 五段场景按钮、旅行 / 事件 / 设施按钮)
 都是 Button 本体,绝不挂 `*_ClickTarget`。
@@ -387,4 +393,11 @@ error **`aim: node not found: ContinueButton (spec: ContinueButton)`** / green a
 `at:` 帧重基线到屏就绪时序、教程开场腿 Next 点击数 3→7、加 `scene: res://scenes/menu.tscn`)后实测为
 **265**,同一屏同一首断断言。该红**不以 5_compile 闸门为来源** — 本轮闸门运行仍解析失败 / 0 帧,实测
 来自对同一外部边车的直连每场景调用。档案自此持有实测数字,不再以预测充数。
+
+**官方闸门收口(2026-08-30):** 上文所指那次解析失败的 `5_compile` 运行之后,本轮的**官方
+全量闸门重跑解析干净**:编译 **88/88** 零错误、`spec_used: true`、**71/71** 场景全 PASS
+(`clicks_only_storyline` 47/47、`spine_to_ending` 42/42、`map_facility_buttons_click` 38/38、
+`facility_use_reusable` 49/49),零 runtime error。本节立的规矩(新增 `tests/*.gd` 后先独立
+解析检查)不因此作废——它防的正是那次盲跑;本行只把「本轮最终闸门证据」与「盲跑教训」
+分界,防止下一轮把二者混读。
 

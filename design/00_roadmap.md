@@ -14,7 +14,7 @@
 5. 数值精调      —— 放到最后
 ```
 
-**当前位置(2026-08-28 校准):第 2 阶段收尾 / 第 3 阶段进行中。** 两者是**并行**的,
+**当前位置(2026-08-30 校准):第 2 阶段结构性缺口已清——主线六段触屏可达由 touch-reach 轮落地并经官方全量闸门实测(clicks-only 钉子 `clicks_only_storyline` 47/47 全绿),仅余 UX-11 / UX-12 两条测量欠账(不设闸门);第 3 阶段进行中。** 两者是**并行**的,
 不是顺序推进——上面那张表没说清这一点,记在这里。
 
 - **第 1 阶段(逻辑)** 完成:六段骨架接通(教程→养成→遭遇→江湖→结局),结局可达。
@@ -122,8 +122,17 @@ Button)。本轮给全部六段加上可见、可点的控件,向既有 handler 
 
 **Phase 2 剩余只含两条测量欠账(不设闸门):** UX-11(主线可点控件在 960×704 下的真实触控
 目标尺寸,measure-only,禁止 `size >= 48` 引擎级形态断言)与 UX-12(残留仅讲键盘操作、
-屏上已有控件但文案没说可点的提示行号)。两条都按 `40_ux_backlog.md` 规则保持 OPEN,由
-5_design 证据步骤按本轮闸门实测单关闭。
+屏上已有控件但文案没说可点的提示行号)。两条都按 `40_ux_backlog.md` 规则保持 OPEN。
+
+**官方全量闸门实测(2026-08-30,本轮 `5_compile` 产物)**:71/71 场景全 PASS(硬闸门
+`passed: true`、`spec_used: true`、零 runtime error)——`clicks_only_storyline` **47/47**
+(零键盘动作)、`map_facility_buttons_click` **38/38**、键盘路径证明 `spine_to_ending`
+**42/42**(未动仍全绿)、`facility_use_reusable` **49/49**、`tutorial_win_routes_to_transition`
+**8/8**、`tutorial_loss_restarts_tutorial` **5/5**;编译 **88/88** 零错误;视觉闸门本轮**非盲**
+(`localqwen/qwen3` 应答,284 帧,`passed: true`,六问全部 `failed: false`)。本轮早先那次
+解析失败运行(见 `99_changelog.md` record_parse_lesson_and_reconcile)由此行收口:官方全量
+运行解析干净、全部断言真实执行。两条测量欠账**不因闸门转绿而关闭**——关闭需各自动作
+(UX-11 待一次专门测量运行转录 rect 值;UX-12 待后续文案对齐轮)。
 
 **「先红后绿」的红由实测确认,不再只是结构预测(2026-08-29,record_measured_red_first_and_reconcile):**
 上文 `clicks_only_storyline` 的「先红」已由一次解析干净的实测运行坐实 — 轮 `red_first_evidence_measured`

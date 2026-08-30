@@ -307,6 +307,14 @@ fallback-model limitation) remains PENDING. No code change to health_bar.gd (EMP
 expand margin 8.0, EmptyCap rect all unchanged). The next 5_vision gate run (with the retry fix
 applied on the gate side) will produce the real verdict.
 
+> **2026-08-30 收口(touch-reach 轮官方闸门).** The follow-up 5_vision run has since
+> executed **non-blind** (judge `localqwen/qwen3`, 71 scenarios / 284 frames, `passed: true`):
+> Q5 answered **39 good / 0 bad** over all judged battle frames (32 not-applicable) — the
+> gate-level「bars recognisable」concern did not reproduce. The finer full-HP flattening
+> classification remains an eyes-on observation only (the gate flagged no injured frame;
+> zero code change to health_bar.gd, EMPTY_CAP_PX 14.0 / expand margin 8.0 / EmptyCap rect
+> all still unchanged).
+
 > **2026-08-26 wording alignment (docs only, `align_vision_gate_wording_v2`).** The repo's
 > recorded Q5 description (`final/verify_report.json`, `README.md`) now reports the gate state
 > honestly: the gate **did not judge** (4/47 scenarios, all full-HP, zero injured) — not "Q5
@@ -889,4 +897,12 @@ cultivation / map / ending 五个段场景是 `Backdrop(Panel) + Label` 一张�
 (d) **点击锚挂控件/单位本体,绝不挂 `*_ClickTarget`。** 重申 `90_decisions.md` 2026-08-29
 条(「点击锚不再挂在 *_ClickTarget 上」):一个节点不能既是可命中的锚、又是不该收到点击的
 控件。本轮所有新锚点都是 Button / 单位本体。
+
+(e) **官方闸门实测收口(2026-08-30)。** 本节性质由本轮官方全量闸门实测证实:71/71 场景全 PASS
+(硬闸门 `passed: true`、零 runtime error),其中 `clicks_only_storyline` **47/47**(零键盘动作、
+全程 `clicks:` 真命中测试——先红于教程结算屏的实测记录 f265 见 `00_roadmap.md` /
+`90_decisions.md`,(b) 的观测结论由此有了正反两面的实测值)、`spine_to_ending` **42/42**
+(键盘路径未动仍全绿)、`map_facility_buttons_click` **38/38**;编译 **88/88** 零错误。视觉闸门
+非盲应答(`localqwen/qwen3`,`passed: true`,Q6 69 好 / 2 坏、不翻闸门,两帧候选见
+`40_ux_backlog.md` 记录行)。
 
