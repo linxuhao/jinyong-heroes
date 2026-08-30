@@ -19,16 +19,23 @@
 # by prose. Open/close consume no turn/action and write no save
 # (events_resolved_count stays 1, ended == false).
 #
-# RED-FIRST EVIDENCE — TEMPORARY PLACEHOLDER (do not treat as measured).
-# The follow-up measurement task measures the four values via the TEMPORARY
-# RED-FIRST REVERT method (comment out roster_panel.gd open() to a no-op,
-# run godot_playtest_scenario(scenario="roster_panel_item_nail") directly,
-# record, restore byte-identical) and OVERWRITES this block. Predictions are
-# never quoted as observations.
-#   fail frame:       <filled by measurement>
-#   first assertion:  <filled by measurement>
-#   exact error:      <filled by measurement>
-#   red-before-green: <filled by measurement>
+# RED-FIRST EVIDENCE — MEASURED (2026-08-30), never predicted.
+# Method (TEMPORARY RED-FIRST REVERT + direct sidecar): comment out
+# roster_panel.gd open() body to a no-op (RosterOpenButton still exists, its
+# pressed still delivers), run godot_playtest_scenario(scenario=
+# "roster_panel_item_nail") directly, record the four values VERBATIM, restore
+# byte-identical. Measured, not predicted.
+#   fail frame:       f70
+#   first assertion:  RosterPanel.is_open: is_open == true
+#   exact error:      FAIL f70 RosterPanel.is_open: is_open == true
+#                     observed=false
+#   red-before-green: 8  (f30 x4 + f50 x4; strictly before the first failing
+#                         assert — the f70 block's first assert is the failure)
+# Note: the f110 `MapScreen.silver: changed` failure observed on the restored
+# (un-reverted) tree is a SEPARATE defect: fresh boot silver = 0 and merchant
+# option_a = silver -20 clamps to 0, so silver never changes (see
+# final/delivery_notes_roster.md). It sits after this red-first pin, so it does
+# not affect the measured red-before-green of 8.
 name: roster_panel_item_nail
 description: >-
   Correspondence nail: the REAL merchant event path through
