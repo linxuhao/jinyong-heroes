@@ -1002,6 +1002,29 @@ surface:
   - mouse_filter
   - text
   - focus_mode
+  RosterPanel:
+  - visible
+  - is_open
+  - body_text
+  - cursor_markers_visible
+  - pressed_connected
+  - item_count
+  - gongfa_count
+  RosterOpenButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - focus_mode
+  RosterCloseButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - focus_mode
+  RosterBodyLabel:
+  - visible
+  - text
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -1076,3 +1099,5 @@ scenario_order:
 - map_facility_buttons_click
 - clicks_only_gongfa_empty_exit
 - gongfa_pick_empty_keyboard_return
+- roster_panel_item_nail
+- roster_panel_cultivation_open_close

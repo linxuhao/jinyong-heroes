@@ -1,0 +1,100 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# CULTIVATION entry reachability for the roster panel. Direct-boots
+# cultivation.tscn (a STABLE_STATES segment — design/40_progression §8).
+# Fresh boot sits at month 1 / CARD_PICK. Click opens the panel, the three
+# sections render, open/close consume no month or action (phase stays
+# CARD_PICK, month stays 1), one real month advance makes month: changed,
+# reopen then close proves the panel re-syncs with the changed state
+# underneath. All open/close interaction is clicks only — no keyboard
+# required (mobile-first surface).
+#
+# gongfa_count is a relational non-negative bound: a FRESH direct boot grants
+# no sect arts (sect_id is unset, so _grant_year_arts early-outs), so
+# gongfa_count starts at 0. Content presence is carried by the section-header
+# assertion (人物/功法/物品). If the measurement task observes a start grant
+# on the real build it should tighten this to > 0.
+#
+# debug_step_month NOTE: the token is registered in _common.yaml actions and
+# consumed by cultivation.gd::_process, but gated on
+# GameManager.current_state == "CULTIVATION". A direct scene boot does not run
+# the normal state transition, so IF direct boot leaves current_state unset,
+# debug_step_month will NOT advance a month and `month: changed` goes RED —
+# that is the documented signal to fall back to "one real month played by
+# clicks" (a CultOptionButton card pick + a non-travel action; those buttons
+# are NOT state-gated, only phase-gated), keeping the `month: changed` line.
+#
+# RED-FIRST EVIDENCE — TEMPORARY PLACEHOLDER (do not treat as measured).
+# The follow-up measurement task fills real measured values here via the
+# TEMPORARY RED-FIRST REVERT method and OVERWRITES this block.
+#   fail frame:       <filled by measurement>
+#   first assertion:  <filled by measurement>
+#   exact error:      <filled by measurement>
+#   red-before-green: <filled by measurement>
+name: roster_panel_cultivation_open_close
+description: >-
+  Entry reachability + content presence + no-consumption + re-sync in
+  CULTIVATION. Direct-boot cultivation.tscn at CARD_PICK month 1; click opens
+  the roster panel (three sections render, cursor_markers_visible false on
+  panel and segment), click closes (phase still CARD_PICK, month still 1 — no
+  month/action consumed); one real month advance makes month: changed; reopen
+  then close proves the panel re-syncs with the changed state underneath.
+scene: res://scenes/segments/cultivation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CultivationScreen.visible: visible == true
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+    RosterOpenButton.visible: visible == true
+- at: 40
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 50
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品")'
+    RosterPanel.gongfa_count: gongfa_count >= 0
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 60
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 70
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+# One real month advance (structural differential — no absolute month literal).
+- at: 80
+  actions:
+  - debug_step_month
+- at: 110
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: changed
+# Re-sync: reopen after the state changed underneath.
+- at: 120
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 130
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+- at: 140
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 150
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false

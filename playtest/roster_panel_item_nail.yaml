@@ -1,0 +1,128 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# THE ROUND'S CORRESPONDENCE NAIL (jinyong-roster). A REAL event/card path —
+# map.gd::_resolve_node_event → EventLogic.apply_option_effects, merchant
+# option_a — grants eq_sword_3 (青锋剑) into profile.inventory, then `click:`
+# (true hit test) opens the roster panel and asserts the item's Chinese name
+# (青锋剑) appears in RosterBodyLabel.text. This is NOT "the panel opened":
+# it pins object provenance — the very item the merchant granted is the item
+# the panel renders. Text-name pins (青锋剑 / 人物 / 功法 / 物品) are the
+# sanctioned exception to the no-absolute-numbers rule.
+#
+# RULING (b) PIN — the panel opens OVER the unresolved merchant modal. While
+# open, the modal is untouched (phase == "EVENT", event_id == "merchant",
+# events_resolved_count == 0); on close the SAME EventOptionButton0 click
+# resolves normally. "While the panel owns input the modal grammar is inert;
+# on close it resumes byte-identical" is carried by this walked segment, not
+# by prose. Open/close consume no turn/action and write no save
+# (events_resolved_count stays 1, ended == false).
+#
+# RED-FIRST EVIDENCE — TEMPORARY PLACEHOLDER (do not treat as measured).
+# The follow-up measurement task measures the four values via the TEMPORARY
+# RED-FIRST REVERT method (comment out roster_panel.gd open() to a no-op,
+# run godot_playtest_scenario(scenario="roster_panel_item_nail") directly,
+# record, restore byte-identical) and OVERWRITES this block. Predictions are
+# never quoted as observations.
+#   fail frame:       <filled by measurement>
+#   first assertion:  <filled by measurement>
+#   exact error:      <filled by measurement>
+#   red-before-green: <filled by measurement>
+name: roster_panel_item_nail
+description: >-
+  Correspondence nail: the REAL merchant event path through
+  EventLogic.apply_option_effects grants eq_sword_3 (青锋剑); `click:` opens
+  the roster panel and asserts the item's Chinese name appears in the body.
+  Ruling (b) pin: opening over the unresolved modal consumes nothing
+  (phase/event_id/events_resolved_count unchanged while open), and the SAME
+  EventOptionButton0 click after close resolves normally. Open/close consume
+  no turn/action and write no save (events_resolved_count stays 1,
+  ended == false).
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.visible: visible == true
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+    RosterOpenButton.visible: visible == true
+# wuming_valley → luoyang via the tappable travel button (merchant event auto-fires on arrival).
+- at: 40
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 50
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+    MapScreen.events_resolved_count: events_resolved_count == 0
+# RULING (b) PIN — open the panel OVER the unresolved modal (click = true hit test).
+- at: 60
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 70
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.events_resolved_count: events_resolved_count == 0
+    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品")'
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+    MapScreen.cursor_markers_visible: cursor_markers_visible == false
+    RosterCloseButton.visible: visible == true
+- at: 80
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 90
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+# Resolve the SAME option normally: the modal grammar resumed byte-identical.
+- at: 100
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 110
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.events_resolved_count: events_resolved_count == 1
+    MapScreen.silver: changed
+# Open the panel again — now AFTER the grant — and assert the item's Chinese name.
+- at: 120
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 130
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterBodyLabel.text: 'text.contains("青锋剑") and text.contains("物品")'
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+    MapScreen.cursor_markers_visible: cursor_markers_visible == false
+    MapScreen.phase: phase == "TRAVEL"
+    RosterCloseButton.visible: visible == true
+    RosterPanel.pressed_connected: pressed_connected.size() >= 2
+- at: 140
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 150
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+    MapScreen.ended: ended == false
+    RosterOpenButton.visible: visible == true

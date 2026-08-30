@@ -71,6 +71,8 @@ ROUND_SCENARIOS: list[str] = [
     "map_facility_buttons_click",
     "clicks_only_gongfa_empty_exit",
     "gongfa_pick_empty_keyboard_return",
+    "roster_panel_item_nail",
+    "roster_panel_cultivation_open_close",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1072,7 +1074,16 @@ def test_facility_use_reusable_surface_contract() -> None:
         "RENAMING or REWRITING the assertion, update THIS PIN in the same "
         "change to match the equivalent new assertion — do not keep a dead "
         "old-text line in the scenario just to turn it green, and do not "
-        "bypass a legitimate rename."
+        "bypass a legitimate rename. "
+        "This is a FORM gate: it requires two literal assertion lines "
+        "(phase != \"FACILITY\" and facility_use_count == 0) to appear "
+        "verbatim in the scenario file — they are the machine-readable "
+        "evidence of the definitional property 'arrival never enters a "
+        "facility'. A red here is CORRECT when the observables or their "
+        "expression legitimately change; the fix is to update this pin "
+        "together with the equivalent new assertion in the same change — "
+        "not to rename around it and not to keep a dead old-text line just "
+        "to stay green."
     )
     assert re.search(
         r'phase\s*!=\s*"FACILITY"', ftext
