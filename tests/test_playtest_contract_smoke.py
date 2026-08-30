@@ -404,36 +404,85 @@ def test_creation_rework_and_bar_surface_contract() -> None:
         assert var in creation_items, "CreationScreen.%s not whitelisted on the surface" % (var,)
 
 
+def _bad_timeline_at_values(text: str, name: str) -> list[str]:
+    """Scan `text` for malformed timeline ``at:`` values; return the failures.
+
+    Pure helper (no file I/O, no globals): feed it the full text of a scenario
+    file plus its basename, and it returns one message per offending line (empty
+    list == every real ``at:`` is a positive integer and every comment is inert).
+
+    Rule (playtest_summary.md, 2026-08-25): timeline frames are single integers.
+    A range (``- {at: 3..15, ...}``), a list (``- at: 20/25/30``), a quoted
+    string (``- at: '3'``), a float (``- at: 3.0``) and an empty value are all
+    invalid spec; the loader rejects them and the whole run HARD-fails, so this
+    helper catches malformed entries at static-check time instead.
+
+    Each line is comment-stripped before matching: ``line.split("#", 1)[0]``
+    drops everything from the first ``#`` to end of line, so prose in a ``#``
+    comment (including a backtick-wrapped `` `at:` `` token, whose trailing
+    backtick would otherwise be captured by the value class and fail
+    ``isdigit()``) never produces a spurious entry. Real ``at:`` values are
+    integers and never contain ``#``, so no true value is dropped, and an inline
+    trailing comment retains its value. The ``\\bat\\s*:`` regex then matches
+    only real content lines; the captured value class ``[^,}\\s]*`` stops at
+    ``,`` / ``}`` / whitespace, so an inline dict captures only the number, and
+    every captured value must pass ``isdigit()`` or it is reported.
+    """
+    bad: list[str] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        line = line.split("#", 1)[0]  # strip comment (incl. `` `at:` `` in prose)
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is None:
+            continue  # line carries no timeline `at:` key
+        val = m.group(1)
+        if not val.isdigit():
+            bad.append(
+                f"{name}.yaml line {lineno}: non-integer timeline 'at' "
+                f"value {val!r}"
+            )
+    return bad
+
+
 def test_timeline_at_values_are_integers() -> None:
     """Every timeline ``at:`` in every ROUND_SCENARIOS file is a single integer.
 
-    Harness rule (playtest_summary.md, 2026-08-25): frames are single integers —
-    a range (``- {at: 3..15, ...}``) or a list (``- at: 20/25/30``) is NOT valid
-    spec syntax; the loader rejects such an entry and the whole run HARD-fails.
-    A timeline entry takes exactly two shapes: the inline dict
-    (``- {at: 3, actions: [ui_accept]}``) or the multiline dict (``- at: 3``).
-    ``\\bat\\s*:`` is word-boundary-guarded, so ``at`` inside identifiers
-    (``grid_pos``, ``format``) or prose never matches; the captured value class
-    ``[^,}\\s]*`` stops at ``,`` / ``}`` / whitespace, so an inline dict captures
-    only the number. Every captured value must pass ``isdigit()`` — a range
-    (``3..15``), a list (``20/25/30``), a quoted string (``'3'``), a float
-    (``3.0``) or an empty value all fail, catching malformed timeline entries at
-    static-check time instead of at runtime.
+    Comments are stripped from each line before matching (``line.split("#", 1)[0]``);
+    the ``\\bat\\s*:`` regex then matches ``at:`` keys on real content lines only,
+    and the captured value must pass ``isdigit()``. A range (``3..15``), a list
+    (``20/25/30``), a quoted string (``'3'``), a float (``3.0``) and an empty
+    value all fail; comment lines (including prose that mentions a backtick-
+    wrapped `` `at:` ``) never match and never produce a spurious entry.
     """
     bad: list[str] = []
     for name in ROUND_SCENARIOS:
         text = (PLAYTEST_DIR / (name + ".yaml")).read_text(encoding="utf-8")
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
-            if m is None:
-                continue  # line carries no timeline `at:` key
-            val = m.group(1)
-            if not val.isdigit():
-                bad.append(
-                    f"{name}.yaml line {lineno}: non-integer timeline 'at' "
-                    f"value {val!r}"
-                )
+        bad.extend(_bad_timeline_at_values(text, name))
     assert not bad, "malformed timeline `at` values:\n" + "\n".join(bad)
+
+
+def test_timeline_at_real_non_integer_still_red() -> None:
+    """Regression: a real non-integer ``at:`` value still fails the gate.
+
+    The comment-stripping fix only removes comment lines from consideration; it
+    must not let an actual malformed timeline entry (``- at: abc``) slip through.
+    """
+    bad = _bad_timeline_at_values("- at: abc\n", "probe")
+    assert len(bad) == 1
+    assert "probe.yaml line 1" in bad[0]
+    assert "'abc'" in bad[0]  # captured value is echoed in the failure message
+
+
+def test_timeline_at_comment_backtick_at_is_ignored() -> None:
+    """Regression: a backtick-wrapped `` `at:` `` inside a ``#`` comment is inert.
+
+    Pins the exact bug fixed 2026-08-30: clicks_only_storyline.yaml:99 is a
+    ``#`` comment whose prose contains `` `at:` ``; before comment-stripping the
+    ``\\b`` boundary fired on a ``#``/backtick-adjacent ``a``, the regex captured
+    the closing backtick, and ``isdigit()`` failed — a false red on a legal
+    scenario comment. With the strip, line 1 contributes no entry and the real
+    ``- at: 3`` on line 2 still passes.
+    """
+    assert _bad_timeline_at_values("#   ... and every `at:`\n- at: 3\n", "probe") == []
 
 
 def test_event_content_surface_contract() -> None:
