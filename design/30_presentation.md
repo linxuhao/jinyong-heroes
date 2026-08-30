@@ -908,3 +908,28 @@ cultivation / map / ending 五个段场景是 `Backdrop(Panel) + Label` 一张�
 早先转录的「69 好 / 2 坏 / 两帧候选」无法从盘上产物复现,按 `align_vision_gate_wording_v2`
 纪律删除,见 `40_ux_backlog.md` 记录行与 `99_changelog.md` reconcile_q6_counts_with_artifact 行)。
 
+(f) **按钮是选项的唯一呈现(单面规矩,2026-08-30)。** 每个需要玩家选择的屏幕上,同一份
+选项**只出现一次**,且它的唯一呈现是**可点按钮**——不再有一段 `▶` 光标文字行 + 一排
+一模一样按钮的平行 UI。被删的只是「和按钮逐字重复的那份选项行」;描述性文字(卡面描述、
+属性说明、结局正文、HP 数值、门派内外功信息、节点名一览等)不是选项列表,**不删**。
+键盘仍照常用:它是作用在这份按钮表面之上的一层**快捷键**,`_unhandled_input` + 焦点变量
+仍是唯一输入权威;选中状态**表达在按钮本身上**(`modulate` 亮/暗,`creation.gd`
+先例)——键盘上下键移动的就是按钮高亮,不再移动正文里的 `▶` 光标。每一段暴露一个
+机器可查的观测量 `cursor_markers_visible`(正文仍含 `▶` 为真)作为「重复列表已消失」的
+运行时证据。四个 `▶` 重复点本轮消除:cultivation / map / sect_select(正文行删除,选中
+改按钮 `modulate`),creation 本就单面(先例)。
+
+(g) **每个需要玩家选择的状态都必须有可点出口(规矩,2026-08-30)。** 玩家能停留、且需要他
+做出选择才能推进的任何状态,其可点控件构造(`_rebuild_options_box` / `_sync_click_buttons`
+/ `_wire_sect_buttons` 之属)**必须产出 ≥ 1 个可见、已接线(`pressed_connected` 非空)的
+控件**。唯一的例外是「没有任何输入能改变它」的纯展示 / 自动推进状态,须在闸门里写明排除
+依据。本规矩由 `tests/test_touch_option_surface_gate.gd` 作为**性质断言**钉住——它以**遍历
+phase 机器**(`match phase:` 分派臂即邻接表)的方式发现并检查每个到达的玩家选择相位,不是一份
+phase 名字面量清单(那样加一个 phase 就会漏)。`GONGFA_PICK` 空列表死角(零按钮、键盘独占出口)
+由此类推向不可能:**空未大成列表仍产出一个「返回行动」按钮**,pressed 走与其它选项**同一条**
+`_on_option_pressed → _on_accept` 链(`_on_accept` 的空分支 `cultivation.gd:237-238` 执行
+返回 ACTION_PICK),无任何分叉相位逻辑。唯一留存的零按钮构造是「不可解析事件定义」的防御分支
+(阶段机不可达),记录于 `design/31_touch_coverage.md`。**「钉子钉的是点得出去,不是有按钮」**:
+新增 `playtest/clicks_only_gongfa_empty_exit.yaml` 断的是一记 `click:` 之后 `phase` 真从
+`GONGFA_PICK` 变 `ACTION_PICK`(相位差),不是「按钮存在」。
+
