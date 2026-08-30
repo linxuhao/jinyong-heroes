@@ -101,11 +101,38 @@ def _cjk_count(s: str) -> int:
 def _cjk_literals(path: Path) -> list[tuple[int, str, int]]:
     """All non-comment literals in ``path`` with >= 1 CJK ideograph.
 
+    Two symbol-based skips (jinyong-roster 2026-08-30) remove roadmap-scope
+    content forms so the guard asserts "no NEW inline prose position" without
+    pinning their wording:
+      * field-symbol: a line whose comment-stripped text contains
+        ``"display_name":`` contributes no literals (covers NODES[*].display_name
+        in map_data.gd; any future display_name field is covered by the same
+        symbol, so a wording edit to a node name never reddens this gate).
+      * block-symbol: a line matching ``ENDING_TIERS ... =`` opens a block
+        whose literals are skipped until the first subsequent line whose
+        lstripped content starts with ``]`` or ``}`` (the ENDING_TIERS tier
+        titles/texts are roadmap-scope content — same stability rationale).
+
     Returns ``(1-based line number, raw slice, cjk count)`` triples.
     """
     out: list[tuple[int, str, int]] = []
     text = path.read_text(encoding="utf-8")
+    in_ending_block = False
     for lineno, raw in enumerate(text.splitlines(), start=1):
+        stripped = raw.lstrip()
+        # block-symbol: inside the ENDING_TIERS block — skip until closing ]/}
+        if in_ending_block:
+            if stripped.startswith("]") or stripped.startswith("}"):
+                in_ending_block = False
+            else:
+                continue
+        # block-symbol: entering the ENDING_TIERS block
+        if re.search(r"ENDING_TIERS\b.*=", _strip_comments(raw)):
+            in_ending_block = True
+            continue
+        # field-symbol: display_name field lines contribute no literals
+        if re.search(r'"display_name"\s*:', _strip_comments(raw)):
+            continue
         for m in _LITERAL.finditer(_strip_comments(raw)):
             lit = m.group(1)
             c = _cjk_count(lit)
@@ -119,29 +146,12 @@ def _cjk_literals(path: Path) -> list[tuple[int, str, int]]:
 # slice: GDScript's ``\n`` is backslash+n (two chars), and a normal Python
 # string would turn that into a real newline that never matches.
 ALLOWED: frozenset[str] = frozenset({
-    # --- scripts/data/map_data.gd: the 7 node display_names (data identifiers,
-    #     <= 3 CJK — below the prose threshold; allowlisted defensively so a
-    #     tighter threshold never moves them) ---
-    "无名谷",
-    "洛阳",
-    "武当",
-    "襄阳",
-    "昆仑",
-    "少林",
-    "华山",
-    # --- scripts/data/map_data.gd: ENDING_TIERS tier titles (4 CJK each) ---
-    "一代宗师",
-    "武林名宿",
-    "隐于市井",
-    # --- scripts/data/map_data.gd: ENDING_TIERS multi-line tier texts. These are
-    #     prose-length data rows that legitimately live in map_data.gd; the
-    #     line-210 style comment pitfall does not apply, and they must never be
-    #     duplicated into map.gd (that is what the second test catches). ---
-    r"武林为之震动。\n你的名号传遍江湖，各派掌门纷纷登门请教。\n此世武学之巅，自此有了你的名字。",
-    r"江湖中人都认得你的名号。\n行至何处，皆有豪杰相迎。\n虽未登峰造极，亦是一方武林名宿。",
-    r"你收起兵刃，隐入市井。\n江湖纷争从此与你无关。\n唯有炊烟与酒香，伴你终老。",
     # --- scripts/segments/map.gd: the tr() render templates (map chrome, not
-    #     narrative — the single-hint invariant, the travel-board labels) ---
+    #     narrative — the single-hint invariant, the travel-board labels).
+    #     UI templates, not data rows: the 7 node display_names and the
+    #     ENDING_TIERS tier titles/texts are NOT allowlisted here — roadmap-
+    #     scope content, excluded by SYMBOL in _cjk_literals (2026-08-30) so a
+    #     wording edit to a node name or ending line never reddens this gate. ---
     r"【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺",
     r"【江湖行路】\n\n",
     r"▶ %s（此处）\n",
@@ -175,9 +185,11 @@ def test_no_inline_prose_in_map_files() -> None:
                 bad.append("%s:%d: %s" % (p.relative_to(ROOT), lineno, lit))
     # Extraction sanity — without this a broken extractor makes the assert below
     # trivially green by finding nothing (the test_i18n_coverage._en_keys()
-    # `len(keys) > 100` guard pattern). The two map files today yield ~18
-    # >= 1-CJK literals, well clear of the floor.
-    assert total >= 6, "extraction found only %d literals" % total
+    # `len(keys) > 100` guard pattern). After symbol-exclusion (display_name
+    # fields + ENDING_TIERS block skipped in map_data.gd), the two map files
+    # yield 9 >= 1-CJK literals — all in map.gd chrome — measured 2026-08-30.
+    # Never set this floor below 3: a broken extractor must never look plausible.
+    assert total >= 9, "extraction found only %d literals" % total
     assert not bad, (
         "prose-length CJK literal in a map file outside the allowlist "
         "(§433: prose lives only in its data module):\n  " + "\n  ".join(bad)

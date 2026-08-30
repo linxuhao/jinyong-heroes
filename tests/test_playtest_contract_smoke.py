@@ -20,14 +20,16 @@ Scope (deliberately narrow):
     to a whitelisted surface block — offset specs parsed by first whitespace
     token, trailing ``_ClickTarget`` stripped)
 
-It uses ONLY the Python standard library (pathlib, re) — no PyYAML, no
-requests, no subprocess, no network, no Godot process — so it runs in
-milliseconds offline and can never hit the gate's per-test time wall.
+It uses the Python standard library plus one sanctioned third-party import
+(yaml, for the timeline 'at' type gate) — no requests, no subprocess, no
+network, no Godot process — so it runs in milliseconds offline and can never
+hit the gate's per-test time wall.
 """
 
 from pathlib import Path
 import json
 import re
+import yaml
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[1]
 COMMON: Path = REPO_ROOT / "playtest" / "_common.yaml"
@@ -405,53 +407,64 @@ def test_creation_rework_and_bar_surface_contract() -> None:
 
 
 def _bad_timeline_at_values(text: str, name: str) -> list[str]:
-    """Scan `text` for malformed timeline ``at:`` values; return the failures.
+    """Type gate: every timeline entry's 'at' must be an integer frame number.
 
-    Pure helper (no file I/O, no globals): feed it the full text of a scenario
-    file plus its basename, and it returns one message per offending line (empty
-    list == every real ``at:`` is a positive integer and every comment is inert).
-
-    Rule (playtest_summary.md, 2026-08-25): timeline frames are single integers.
-    A range (``- {at: 3..15, ...}``), a list (``- at: 20/25/30``), a quoted
-    string (``- at: '3'``), a float (``- at: 3.0``) and an empty value are all
-    invalid spec; the loader rejects them and the whole run HARD-fails, so this
-    helper catches malformed entries at static-check time instead.
-
-    Each line is comment-stripped before matching: ``line.split("#", 1)[0]``
-    drops everything from the first ``#`` to end of line, so prose in a ``#``
-    comment (including a backtick-wrapped `` `at:` `` token, whose trailing
-    backtick would otherwise be captured by the value class and fail
-    ``isdigit()``) never produces a spurious entry. Real ``at:`` values are
-    integers and never contain ``#``, so no true value is dropped, and an inline
-    trailing comment retains its value. The ``\\bat\\s*:`` regex then matches
-    only real content lines; the captured value class ``[^,}\\s]*`` stops at
-    ``,`` / ``}`` / whitespace, so an inline dict captures only the number, and
-    every captured value must pass ``isdigit()`` or it is reported.
+    Parse-based (replaces the line-regex/comment-strip walker): comments
+    vanish at parse, a '#' inside a quoted scalar is handled by the parser,
+    and a file that fails to parse is REPORTED instead of silently
+    unverifiable. Two rules, walked recursively over the whole document:
+      A. every mapping that carries an 'at' key must carry an int
+         (bool excluded) - also covers bare top-level entry lists and
+         click/other frame entries;
+      B. every element of any 'timeline' list must be a mapping with 'at'.
     """
+    try:
+        doc = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        return [f"{name}.yaml: unparseable YAML - timeline 'at' values "
+                f"cannot be verified; parser said: {exc}"]
     bad: list[str] = []
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        line = line.split("#", 1)[0]  # strip comment (incl. `` `at:` `` in prose)
-        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
-        if m is None:
-            continue  # line carries no timeline `at:` key
-        val = m.group(1)
-        if not val.isdigit():
-            bad.append(
-                f"{name}.yaml line {lineno}: non-integer timeline 'at' "
-                f"value {val!r}"
-            )
+
+    def _at_check(node: dict, path: str) -> None:
+        v = node["at"]
+        if isinstance(v, bool) or not isinstance(v, int):
+            bad.append(f"{name}.yaml: 'at' value {v!r} at {path} must be an "
+                       f"integer frame number (got {type(v).__name__})")
+
+    def _walk(node: object, path: str) -> None:
+        if isinstance(node, dict):
+            if "at" in node:
+                _at_check(node, path)
+            entries = node.get("timeline")
+            if isinstance(entries, list):
+                for i, entry in enumerate(entries):
+                    epath = f"{path}.timeline[{i}]"
+                    if not isinstance(entry, dict):
+                        bad.append(f"{name}.yaml: timeline entry {i} at "
+                                   f"{epath} is not a mapping")
+                    elif "at" not in entry:
+                        bad.append(f"{name}.yaml: timeline entry {i} at "
+                                   f"{epath} has no 'at'")
+            for k, child in node.items():
+                _walk(child, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, child in enumerate(node):
+                _walk(child, f"{path}[{i}]")
+
+    _walk(doc, "$")
     return bad
 
 
 def test_timeline_at_values_are_integers() -> None:
     """Every timeline ``at:`` in every ROUND_SCENARIOS file is a single integer.
 
-    Comments are stripped from each line before matching (``line.split("#", 1)[0]``);
-    the ``\\bat\\s*:`` regex then matches ``at:`` keys on real content lines only,
-    and the captured value must pass ``isdigit()``. A range (``3..15``), a list
-    (``20/25/30``), a quoted string (``'3'``), a float (``3.0``) and an empty
-    value all fail; comment lines (including prose that mentions a backtick-
-    wrapped `` `at:` ``) never match and never produce a spurious entry.
+    Kept as the real-tree sweep: loops ROUND_SCENARIOS and feeds each file's
+    text to ``_bad_timeline_at_values``, which now parses the YAML and
+    type-checks recursively (every mapping carrying an ``at`` holds an int,
+    bools excluded; every ``timeline`` element is a mapping with ``at``; an
+    unparseable file is reported). A range (``3..15``), a list (``20/25/30``),
+    a quoted string (``'3'``), a float (``3.0``), an empty value and a bool
+    all fail.
     """
     bad: list[str] = []
     for name in ROUND_SCENARIOS:
@@ -463,13 +476,61 @@ def test_timeline_at_values_are_integers() -> None:
 def test_timeline_at_real_non_integer_still_red() -> None:
     """Regression: a real non-integer ``at:`` value still fails the gate.
 
-    The comment-stripping fix only removes comment lines from consideration; it
-    must not let an actual malformed timeline entry (``- at: abc``) slip through.
+    The parse-based type gate (replaces the old line-regex/comment-strip
+    walker) must not let an actual malformed timeline entry (``- at: abc``)
+    slip through. Line numbers are gone in the parse view, so the failure
+    message carries the filename plus the offending value's repr instead.
     """
     bad = _bad_timeline_at_values("- at: abc\n", "probe")
     assert len(bad) == 1
-    assert "probe.yaml line 1" in bad[0]
+    assert "probe.yaml" in bad[0]
     assert "'abc'" in bad[0]  # captured value is echoed in the failure message
+
+
+def test_timeline_at_type_rejections() -> None:
+    """Regression: the parse gate rejects non-int 'at' values by TYPE.
+
+    A str, a float, a str-range, an empty (None) value and a bool each yield
+    exactly one failure (bools are excluded because ``isinstance(True, int)``
+    is True). Legal ints (0, 30) pass.
+    """
+    cases = [
+        ("- at: '3'\n", "'3'"),
+        ("- at: 3.0\n", "3.0"),
+        ("- at: 3..15\n", "'3..15'"),
+        ("- at:\n", "None"),
+        ("- at: true\n", "True"),
+    ]
+    for probe, expected_repr in cases:
+        bad = _bad_timeline_at_values(probe, "probe")
+        assert len(bad) == 1, (
+            f"expected exactly 1 failure for {probe!r}, got {len(bad)}: {bad}"
+        )
+        assert "probe.yaml" in bad[0]
+        # For `3..15` assert the repr WITH quotes: the bare `3..15` substring
+        # could appear in a path and false-positive via a bare `in`.
+        assert expected_repr in bad[0], f"expected {expected_repr!r} in {bad[0]!r}"
+    # Legal ints pass (type gate: `at: 0` is legal, no positivity check).
+    assert _bad_timeline_at_values("- at: 0\n", "probe") == []
+    assert _bad_timeline_at_values("- at: 30\n", "probe") == []
+
+
+def test_timeline_entry_without_at_is_reported() -> None:
+    """Regression: a timeline element missing the 'at' key is reported (rule B)."""
+    probe = "timeline:\n  - actions: [move_right]\n"
+    bad = _bad_timeline_at_values(probe, "probe")
+    assert len(bad) == 1
+    assert "probe.yaml" in bad[0]
+    assert "has no 'at'" in bad[0]
+
+
+def test_unparseable_yaml_is_reported() -> None:
+    """Regression: an unparseable doc reds (previously a silent skip)."""
+    probe = "timeline: [ {at: 3"
+    bad = _bad_timeline_at_values(probe, "probe")
+    assert len(bad) == 1
+    assert "probe.yaml" in bad[0]
+    assert "unparseable" in bad[0]
 
 
 def test_timeline_at_comment_backtick_at_is_ignored() -> None:
