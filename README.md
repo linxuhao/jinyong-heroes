@@ -17,7 +17,82 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: touch-reach — the whole storyline is playable with taps only
+## Latest round: touch-single-surface — buttons are the option list, every state has a tappable exit
+
+The touch-reach round gave every screen a button; player feedback (2026-08-30)
+then showed the screens were *doubled*: the same option list rendered twice (a
+`▶` cursor text row in `BodyLabel` **and** an identical row of buttons), and
+one state had a button count of zero — `GONGFA_PICK` with no unmastered art
+hid its whole button box, leaving Enter (`_on_accept`'s empty branch) as the
+only exit. On a phone there is no Enter.
+
+**What landed (keyboard branches byte-identical; clicks delegate to the same
+handlers; no art assets; `focus_mode = FOCUS_NONE` kept):**
+
+- **One surface, one rendering** — `cultivation.gd` / `map.gd` /
+  `sect_select.gd` no longer print option rows (or the `▶` cursor) into
+  `BodyLabel`; the button pool is the only option list. Descriptive text
+  (event title/prose, facility cost summary, the map overview node list, stats
+  header, sect info lines) is untouched. Selection lives **on the button**: the
+  focused row is full-bright `modulate`, the rest dimmed (the creation.gd
+  precedent) — arrow keys still move the focus var and the highlight follows
+  (`map.gd:483/:494/:505/:510`, `sect_select.gd:84`, `cultivation.gd`
+  `_rebuild_options_box`). `creation.gd` was already single-surface (parity
+  check only). The transition screen's 「继续 ▶」 glyph stays: it lives inside
+  the button's own text — one surface, no duplication (recorded in
+  `design/90_decisions.md`).
+- **GONGFA_PICK empty-list exit** — with no unmastered art the box builds one
+  「返回行动」 button (`cultivation.gd:572-576`) whose press walks the SAME
+  `_on_option_pressed → _on_accept` chain every other option uses (the existing
+  empty branch `:235-238` returns to `ACTION_PICK`; no forked phase logic).
+  The on-screen hint states the way out (「暂无未大成武功。点击「返回行动」
+  回到本月行动。」), and the self-justifying comment at the old
+  `cultivation.gd:529` is rewritten to describe the actual guarantee: every
+  player-choice phase leaves the box with ≥ 1 visible, wired button.
+- **New observables** (`playtest/_common.yaml` surface, only-add):
+  `cursor_markers_visible` (false ⇒ no `▶` anywhere in the rendered body) on
+  cultivation / map / sect_select, plus `option_focus` /
+  `focused_option_text` on cultivation.
+- **The clicks-only nail** — `playtest/clicks_only_gongfa_empty_exit.yaml`
+  seeds a fresh no-sect save (the one sanctioned debug seed), loads it by
+  CLICKING the menu's 读取存档 entry, then clicks-only through card → 练功 →
+  the empty `GONGFA_PICK` (exactly one 返回行动 button, wired, no `▶`),
+  clicks it, and asserts `CultivationScreen.phase == "ACTION_PICK"` — the
+  phase really changed; a merely-present button would not satisfy it.
+  Registered two places (`_common.yaml::scenario_order` tail +
+  `ROUND_SCENARIOS` tail) with a new keyboard-free smoke pin; keyboard twin
+  `gongfa_pick_empty_keyboard_return.yaml` pins the Enter path of the same fix.
+- **Property-based coverage gate** — `tests/test_touch_option_surface_gate.gd`
+  (SceneTree script; auto-discovered by `run_tests.sh`'s sidecar scan) drives
+  the cultivation / map / sect_select phase machines through their OWN handlers
+  and asserts every reached player-choice phase produced ≥ 1 visible, wired
+  control and no `▶` marker — not a literal phase-name list. A future phase
+  with zero buttons reds the gate with a self-explaining message; the EXEMPT
+  table (no-input states only, with its rule text) lives inside the gate.
+- **Copy guard maintained, not dodged** (round-owner-granted scope):
+  `tests/test_facility_copy_location.py` now detects `tr()` call-site keys
+  structurally (`_tr_call_literals`), the map-chrome ALLOWED entries are
+  emptied, and the shortened map copy keys land in the same commit as their
+  slot-matched `i18n.gd` EN values. No wording was chosen for its CJK count.
+- **Design archive**: new `design/31_touch_coverage.md` (every segment × phase
+  with file:line — every touch-only exit Y; defensive unreachable zero-button
+  branches recorded, not treated as dead-ends); rule (g) in
+  `design/30_presentation.md`; the round's rulings in
+  `design/90_decisions.md`; the `design/99_changelog.md` row; the
+  `design/40_ux_backlog.md` record (UX-11 / UX-12 stay OPEN, nothing newly
+  deferred).
+- **Tails corrections** (carried over card): the Q6 clause below now carries
+  the measured values (good_answers 71 / bad_answers 0 — nothing parked), and
+  `final/delivery_notes_touch_reach_walkthrough.md` points at
+  `final/delivery_notes_touch_reach_red_first.md` for the authoritative
+  measured first-red values while keeping the f180/5 prediction as the
+  prediction-vs-measurement record.
+
+**The visibly-fixed dead end:** enter 养成 → tap 练功 with no trainable art →
+【练功】 shows one 返回行动 button → tap it once → back at 本月行动 → keep
+playing. Zero keyboard.
+
+## Round: touch-reach — the whole storyline is playable with taps only (previous round)
 
 A real player (2026-08-29) hit a wall at the end of the tutorial: 「玩完需要回车继续，
 但是我在手机上没有回车」. Investigation showed it was not one missing button — the
@@ -223,14 +298,26 @@ unverified, which is the intended behavior.
 
 ```bash
 GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
-python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard, keyboard-free pin, touch-reach surface contract)
+python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard with tr() call-site detection, keyboard-free pins incl. the gongfa empty-exit nail, touch surface contracts)
 godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (24 files)
+godot --headless --path . -s res://tests/test_touch_option_surface_gate.gd  # property-based touch-coverage gate (traverses the cultivation/map/sect_select phase machines)
 godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-style suites
 ```
 
 ## Key interfaces
 
-- **Touch-reach controls & observables** (this round): overlay
+- **Touch-single-surface controls & observables** (2026-08-30 round): buttons
+  are the sole option surface in cultivation / map / sect_select — selection is
+  the button's own `modulate` (bright focused / dim rest), arrow keys move the
+  focus var the highlight follows; `GONGFA_PICK` with an empty unmastered list
+  offers the single `CultOptionButton0` 「返回行动」 → the same
+  `_on_accept` empty branch → `ACTION_PICK`; observables
+  `cursor_markers_visible` (cultivation / map / sect_select), `option_focus` /
+  `focused_option_text` (cultivation); scenarios
+  `clicks_only_gongfa_empty_exit.yaml` (clicks-only, phase-diff nail) +
+  `gongfa_pick_empty_keyboard_return.yaml` (keyboard twin); coverage gate
+  `tests/test_touch_option_surface_gate.gd` (traverses the phase machines).
+- **Touch-reach controls & observables** (touch-reach round): overlay
   `Panel/ContinueButton` / `Panel/RetryButton` in
   `GameManager._show_end_game_overlay` (delegates to `request_continue` /
   `request_retry`; keyboard branch byte-identical) with the
@@ -328,12 +415,52 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Verification status (honest)
 
+**touch-single-surface (this round, 2026-08-30) — split honestly:**
+
+- **Direct-read verified in the tree**: the single-surface renders (`▶` option
+  rows deleted from the cultivation / map / sect_select bodies; selection on
+  the button via `modulate`; keyboard focus vars and `_unhandled_input`
+  branches byte-identical), the `GONGFA_PICK` empty-exit button + rewritten
+  hint + rewritten comment (`cultivation.gd:542-550`), the new observables in
+  the `_common.yaml` surface (only-add), the two new scenarios + two-place
+  registration + the keyboard-free smoke pin, the traversal-based coverage
+  gate (SceneTree script; `run_tests.sh` discovers every `extends SceneTree`
+  script by property — no list edit needed), the maintained copy-location
+  guard (`_tr_call_literals` detection, ALLOWED emptied, anti-triviality floor
+  re-based, the two symbol exclusions untouched), the design-archive rows
+  (30 (g) / 31 new / 40 / 90 / 99), and the tails corrections (README Q6
+  measured 71/0; walkthrough pointer line with the f180/5 prediction
+  preserved).
+- **NOT yet evidenced (must not be claimed)**: the four MEASURED first-red
+  values for `clicks_only_gongfa_empty_exit` are still PENDING in the scenario
+  header and `final/delivery_notes_touch_single_surface.md` — only a
+  structural prediction (f140 `CultOptionButton0.visible` red, 8 green asserts
+  before red) and the verbatim `TEMPORARY RED-FIRST REVERT` recipe are
+  recorded. The brief requires these values be measured, never predicted: a
+  real `godot_playtest_scenario` run with the revert applied, the four values
+  pasted into the scenario header + delivery note, then the byte-identical
+  restore and a green re-run remain outstanding; the GREEN observed values for
+  both new scenarios are likewise pending their self-run (the
+  `implementer.md:23` hard condition). Documentation staleness to refresh at
+  the same time: the delivery note's Part A slice still describes the earlier
+  direct-segment boot (f90 red / 14 asserts) while the landed YAML boots
+  through menu + `debug_seed_save` (f140 / 16 asserts) — the YAML is correct.
+- **Downstream gates** (`5_compile` compile + playtest, `5_vision`,
+  `5_test` unit suite + pytest) had not run for this round at the time of
+  writing — "all playtest scenarios green / 0 runtime errors / hard gate
+  `passed: true` / 0 compile errors / GDScript unit suite green /
+  `test_i18n_coverage.py` + `test_playtest_contract_smoke.py` +
+  `test_facility_copy_location.py` green" are NOT asserted here; this round's
+  numbers land with those artifacts and `5_review`.
+
+The rest of this section describes the previous (touch-reach) round.
+
 The only authoritative gate evidence is the pipeline step products —
 `5_compile`'s `compile_report.json` / `playtest_report.json` /
 `playtest_summary.md`, `5_vision`'s `vision_report.json`, `5_test`'s
-`test_report.json` — pipeline artifacts, not repo files. This round's
-official full-suite run has executed (2026-08-30); its measured results are
-transcribed into the design archive (`design/00_roadmap.md`,
+`test_report.json` — pipeline artifacts, not repo files. The touch-reach
+round's official full-suite run has executed (2026-08-30); its measured
+results are transcribed into the design archive (`design/00_roadmap.md`,
 `design/40_ux_backlog.md`, `design/30_presentation.md`) and were relayed by
 `5_review`. In short:
 
