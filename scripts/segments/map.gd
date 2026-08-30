@@ -80,6 +80,12 @@ var facility_result_text: String = ""
 ## playtest/_common.yaml's MapScreen surface block.
 var pressed_connected: Dictionary = {}
 
+## Surface: true iff the rendered BodyLabel text still contains the ▶ glyph.
+## Recomputed at the end of every _render() arm — the machine-checkable proof
+## that the duplicated option list is gone (same pattern as creation.gd /
+## cultivation.gd / sect_select.gd).
+var cursor_markers_visible: bool = false
+
 ## State-only (NOT a surface var, NOT a render source since 2026-08-29): true when
 ## the last use was refused for lack of silver. The refusal is displayed through
 ## facility_result_text alone, so the panel can never print it twice.
