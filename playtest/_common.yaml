@@ -765,6 +765,9 @@ surface:
   - gongfa_names
   - events_seen_count
   - pressed_connected
+  - cursor_markers_visible
+  - option_focus
+  - focused_option_text
   MapScreen:
   - current_node_id
   - focus_id

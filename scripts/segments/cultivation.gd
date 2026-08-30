@@ -96,6 +96,20 @@ var _delete_armed: bool = false
 ## click gate cannot see on a button it never clicks.
 var pressed_connected: Dictionary = {}
 
+## Surface: true iff the composed BodyLabel still contains a ▶ cursor marker —
+## the runtime probe that the keyboard cursor text list is gone (creation.gd
+## precedent: cursor_markers_visible). Recomputed on every _render.
+var cursor_markers_visible: bool = false
+
+## Surface: the active phase's focus index — the option row whose button is
+## highlighted (mirror of the internal focus var; playtest asserts game-level
+## focus without reading underscore vars). Recomputed on every _render.
+var option_focus: int = 0
+
+## Surface: the text of the button at option_focus ("" when none). Recomputed
+## on every _render.
+var focused_option_text: String = ""
+
 
 func _ready() -> void:
 	# Refresh the surface whenever a load succeeds while this scene is already
@@ -524,13 +538,16 @@ func _on_option_pressed(index: int) -> void:
 ## which the keyboard path never reached). remove_child already detaches every
 ## old button so it cannot be hit again this frame; queue_free only defers the
 ## memory reclaim to end-of-frame (next click is frames later), which is safe
-## and lets the emission complete. One CultOptionButton{i} per option, in the
-## SAME order with the SAME labels as the BodyLabel rows (minus the ▶ marker).
-## The box hides when the phase offers nothing to pick (GONGFA_PICK with an
-## empty unmastered list — the keyboard path auto-returns to ACTION_PICK there;
-## a defensive EVENT with an unresolvable event id), and pressed_connected is
-## re-snapshotted after every rebuild (empty when the box is hidden) so the
-## observable stays truthful.
+## and lets the emission complete. The buttons are the ONLY rendering of the
+## option list — the ▶ cursor text rows are gone (cursor_markers_visible is
+## the runtime probe that stays false). Every player-choice phase leaves this
+## box with at least one visible, wired button: GONGFA_PICK with an empty
+## unmastered list appends a single 返回行动 button whose pressed path is the
+## same _on_option_pressed -> _on_accept chain every other option uses (the
+## empty branch inside _on_accept performs the return to ACTION_PICK). The
+## only zero-button state left is a defensive EVENT with an unresolvable event
+## id, which the phase machine cannot reach; in that case the box hides and
+## pressed_connected re-snapshots empty so the observable stays truthful.
 func _rebuild_options_box() -> void:
 	var box: VBoxContainer = get_node_or_null("OptionsBox") as VBoxContainer
 	if box == null:
@@ -552,6 +569,11 @@ func _rebuild_options_box() -> void:
 				labels.append(tr(label))
 		"GONGFA_PICK":
 			var ids: Array[String] = _unmastered_ids()
+			if ids.is_empty():
+				# Empty unmastered list: the single tappable exit. Its pressed
+				# path is the same _on_option_pressed -> _on_accept chain every
+				# other option uses — no forked phase logic.
+				labels.append(tr("返回行动"))
 			for i in range(ids.size()):
 				var gid: String = ids[i]
 				var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
@@ -583,6 +605,9 @@ func _rebuild_options_box() -> void:
 		btn.name = "CultOptionButton%d" % i
 		btn.text = labels[i]
 		btn.focus_mode = Control.FOCUS_NONE
+		# Keyboard focus is expressed ON the button (creation.gd precedent):
+		# the focused row full-brightness, the rest dimmed.
+		btn.modulate = Color(1, 1, 1, 1) if i == _focused_index_for_phase() else Color(0.72, 0.72, 0.72, 1)
 		btn.custom_minimum_size = Vector2(240, 40)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_option_pressed.bind(i))
@@ -590,8 +615,8 @@ func _rebuild_options_box() -> void:
 		pressed_connected["CultOptionButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
 
 
-## Button label for a drawn card: the same name + category the BodyLabel card
-## row shows, minus the ▶ marker.
+## Button label for a drawn card: name + category — the button is the only
+## rendering of the option (the BodyLabel card rows are gone).
 func _card_button_label(card: Dictionary) -> String:
 	return tr("%s（%s）") % [
 		tr(str(card.get("display_name", ""))),
@@ -794,76 +819,82 @@ func _render() -> void:
 	match phase:
 		"YEAR_AUGMENT":
 			text += tr("【开年际遇】\n")
-			text += _card_rows(_yearly_cards, _card_focus)
 			text += tr("\n左右选择，回车收取")
 		"CARD_PICK":
 			text += tr("【每月机缘】\n")
-			text += _card_rows(_monthly_cards, _card_focus)
 			text += tr("\n左右选择，回车收取")
 		"ACTION_PICK":
 			text += tr("【本月行动】\n")
-			var labels: Array[String] = ["练功", "修习", "做工", "游历", "存盘", "读档", "删档"]
-			for i in range(labels.size()):
-				var marker: String = "▶" if i == _action_focus else " "
-				text += "%s %s   " % [marker, tr(labels[i])]
 			if _action_focus == 6 and _delete_armed:
 				text += tr("\n\n⚠ 再按一次确认删除存档")
 			text += tr("\n\n上下选择，回车执行")
 		"GONGFA_PICK":
 			text += tr("【练功】\n")
-			var ids: Array[String] = _unmastered_ids()
-			if ids.is_empty():
-				text += tr("暂无未大成武功，改选修习吧。")
-			else:
-				for i in range(ids.size()):
-					var gid: String = ids[i]
-					var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
-					var marker: String = "▶" if i == _gongfa_focus % ids.size() else " "
-					text += tr("%s %s  （%d/%d）\n") % [marker, tr(ProgressionGongfaData.display_name_of(gid)), int(entry.get("practice", 0)), int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(entry.get("grade", "D"), 4))]
-				text += tr("\n上下选择，回车苦练")
+			if _unmastered_ids().is_empty():
+				text += tr("暂无未大成武功。点击「返回行动」回到本月行动。")
+			# The keyboard hint shows even when the list is empty: the
+			# 返回行动 button is the tappable exit, and the hint names the
+			# confirm key for desktop players.
+			text += tr("\n上下选择，回车苦练")
 		"ATTR_PICK":
 			text += tr("【修习】\n")
-			for i in range(PlayerProfile.ATTR_KEYS.size()):
-				var key: String = PlayerProfile.ATTR_KEYS[i]
-				var marker: String = "▶" if i == _attr_focus else " "
-				text += "%s %s %d\n" % [marker, _attr_label(key), SaveManager.profile.get_attr(key)]
 			text += tr("\n上下选择，回车修习（+1~+3）")
 		"EVENT":
 			text += tr("【游历 · 遇事】\n")
 			var def = EventData.def(event_id)
 			if def != null:
 				text += tr(def.title) + "\n" + tr(def.text) + "\n\n"
-				var sel: String = "▶" if _event_focus == 0 else " "
-				text += "%s %s\n" % [sel, tr(def.option_a.label)]
-				var sel2: String = "▶" if _event_focus == 1 else " "
-				text += "%s %s\n" % [sel2, tr(def.option_b.label)]
 			text += tr("\n上下选择，回车定夺")
 		"YEAR_END":
 			text += tr("【年关将至】\n")
-			var labels2: Array[String] = ["留在本门", "另投他派"]
-			for i in range(labels2.size()):
-				var marker: String = "▶" if i == _year_choice else " "
-				text += "%s %s\n" % [marker, tr(labels2[i])]
 			text += tr("\n上下选择，回车决定")
 		"SECT_SWITCH":
 			text += tr("【另投他派】\n")
-			var rows: Array = ProgressionGongfaData.SECTS
-			for i in range(rows.size()):
-				var row: Dictionary = rows[i]
-				var marker: String = "▶" if i == _switch_focus else " "
-				text += "%s %s\n" % [marker, tr(str(row["display_name"]))]
 			text += tr("\n上下选择，回车拜入")
 	body.text = text
 	_rebuild_options_box()
+	# Observables recomputed on every render. cursor_markers_visible is the
+	# runtime proof the ▶ cursor text list is gone (creation.gd precedent).
+	cursor_markers_visible = body.text.contains("▶")
+	option_focus = _focused_index_for_phase()
+	focused_option_text = _focused_option_text()
 
 
-func _card_rows(cards: Array, focus: int) -> String:
-	var out: String = ""
-	for i in range(cards.size()):
-		var c: Dictionary = cards[i]
-		var marker: String = "▶" if i == focus else " "
-		out += tr("%s %s（%s）\n") % [marker, tr(str(c.get("display_name", ""))), _category_label(c.get("category", ""))]
-	return out
+## The active phase's focus index — the button row that is highlighted. A pure
+## switch over the internal focus vars (no state mutation); the same value the
+## modulate highlight in _rebuild_options_box uses.
+func _focused_index_for_phase() -> int:
+	match phase:
+		"YEAR_AUGMENT", "CARD_PICK":
+			return _card_focus
+		"ACTION_PICK":
+			return _action_focus
+		"GONGFA_PICK":
+			return _gongfa_focus
+		"ATTR_PICK":
+			return _attr_focus
+		"EVENT":
+			return _event_focus
+		"YEAR_END":
+			return _year_choice
+		"SECT_SWITCH":
+			return _switch_focus
+		_:
+			return 0
+
+
+## The text of the button at option_focus ("" when the box holds no button at
+## that index — defensive; the constructor guarantees >= 1 for every reachable
+## choice phase).
+func _focused_option_text() -> String:
+	var box: VBoxContainer = get_node_or_null("OptionsBox") as VBoxContainer
+	if box == null:
+		return ""
+	var idx: int = option_focus
+	if idx < 0 or idx >= box.get_child_count():
+		return ""
+	var btn: Button = box.get_child(idx) as Button
+	return btn.text if btn != null else ""
 
 
 func _category_label(cat: String) -> String:
