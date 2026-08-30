@@ -427,14 +427,9 @@ static func _test_facility_use_and_leave(ok: bool) -> bool:
 			"(g) the enter door is hidden while inside (no double-entry)")
 	ok = _expect(ok, use.text != "",
 			"(g) the use button carries a runtime label of its own")
-	# Relational (no CJK retyped here): the click must offer EXACTLY the verb the
-	# FACILITY panel advertises with its ▶ marker, so a button that delegated to
-	# a different action than the one on screen cannot pass.
-	var body_g: Label = map.get_node_or_null("BodyLabel") as Label
-	ok = _expect(ok, body_g != null, "(g) BodyLabel resolvable for the advertised-verb probe")
-	if body_g != null:
-		ok = _expect(ok, String(body_g.text).contains("▶ " + use.text),
-				"(g) the use button carries exactly the verb the FACILITY panel advertises (button '%s')" % use.text)
+	# The button IS the surface: no ▶ remains in the body text.
+	ok = _expect(ok, map.cursor_markers_visible == false,
+			"(g) no ▶ glyph remains in the FACILITY body (button is the sole surface)")
 
 	var uses_before: int = int(map.facility_use_count)
 	var silver_before: int = int(map.silver)

@@ -25,7 +25,7 @@ var phase: String = "TRAVEL"
 ## Surface: id of the active node-entry event ("" when none is up).
 var event_id: String = ""
 
-## Surface: which event option the ▶ marks (0 = option_a, 1 = option_b).
+## Surface: which event option is highlighted on the button (0 = option_a, 1 = option_b).
 var event_focus: int = 0
 
 ## Surface: battle_id of the node-entry battle this arrival started ("" when the
@@ -480,6 +480,7 @@ func _sync_click_buttons() -> void:
 		b.visible = show
 		if show:
 			b.text = tr(str(MapData.node_def(nbrs[i]).get("display_name", nbrs[i])))
+			b.modulate = Color(1, 1, 1, 1) if nbrs[i] == focus_id else Color(0.72, 0.72, 0.72, 1)
 	for i in range(2):
 		var b: Button = get_node_or_null("EventBox/EventOptionButton%d" % i) as Button
 		if b == null:
@@ -490,6 +491,7 @@ func _sync_click_buttons() -> void:
 			if edef != null:
 				var opt = edef.option_a if i == 0 else edef.option_b
 				b.text = tr(opt.label)
+			b.modulate = Color(1, 1, 1, 1) if i == event_focus else Color(0.72, 0.72, 0.72, 1)
 	var enter_btn: Button = get_node_or_null("FacilityEnterButton") as Button
 	if enter_btn != null:
 		enter_btn.visible = phase == "TRAVEL" and MapData.active_facility_id(current_node_id) != ""
@@ -500,9 +502,12 @@ func _sync_click_buttons() -> void:
 			var fdef = FacilityData.def(facility_id)
 			if fdef != null:
 				use_btn.text = tr(fdef.action_label)
+			use_btn.modulate = Color(1, 1, 1, 1)
 	var leave_btn: Button = get_node_or_null("FacilityLeaveButton") as Button
 	if leave_btn != null:
 		leave_btn.visible = phase == "FACILITY"
+		if leave_btn.visible:
+			leave_btn.modulate = Color(0.72, 0.72, 0.72, 1)
 
 
 func _render() -> void:
@@ -515,42 +520,35 @@ func _render() -> void:
 		var def = EventData.def(event_id)
 		if def == null:
 			body.text = ""
+			cursor_markers_visible = false
 			return
-		var ea = "▶ %s" % tr(def.option_a.label) if event_focus == 0 else "  %s" % tr(def.option_a.label)
-		var eb = "▶ %s" % tr(def.option_b.label) if event_focus == 1 else "  %s" % tr(def.option_b.label)
-		body.text = tr("【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺") % [tr(def.title), tr(def.text), ea, eb]
+		body.text = tr("【%s】\n\n%s\n\n上下选择，回车定夺") % [tr(def.title), tr(def.text)]
+		cursor_markers_visible = "▶" in body.text
 		return
 	if phase == "FACILITY":
 		var fdef = FacilityData.def(facility_id)
 		if fdef == null:
 			body.text = ""
+			cursor_markers_visible = false
 			return
 		var summary: String = _facility_effect_summary(fdef)
-		body.text = tr("【%s】\n\n%s\n\n%s\n%s\n\n%s") % [tr(fdef.title), tr(fdef.text), summary, "▶ " + tr(fdef.action_label), tr("回车使用 · 上下离开")]
+		body.text = tr("【%s】\n\n%s\n\n%s\n\n%s") % [tr(fdef.title), tr(fdef.text), summary, tr("回车使用 · 上下离开")]
 		# The result line and the refusal line BOTH come from the single var
 		# facility_result_text — the same string the surface publishes, so the
-		# player-visible change and the observable cannot diverge. (The old
-		# `if _facility_refused: body.text += tr("银两不足")` block printed the
-		# refusal a second time while the observable held it once.)
+		# player-visible change and the observable cannot diverge.
 		if facility_result_text != "":
 			body.text += "\n" + facility_result_text
+		cursor_markers_visible = "▶" in body.text
 		return
 	var text: String = tr("【江湖行路】\n\n")
 	for node in MapData.node_ids():
 		var name: String = tr(str(MapData.node_def(node).get("display_name", node)))
 		if node == current_node_id:
-			text += tr("▶ %s（此处）\n") % name
-		elif node == focus_id:
-			text += tr("  %s（可前往）\n") % name
+			text += tr("  %s（当前所在）\n") % name
 		else:
 			text += "  %s\n" % name
 	# The operation hint lives in ONE place: the footer HintLabel, whose
-	# visibility _apply_hint_visibility() already drives per phase. It used to be
-	# printed here as well, so the TRAVEL screen showed the identical sentence
-	# twice — the panel line and the footer, both reading
-	# 「左右/上下选择相邻去处，回车启程」. Unifying the two texts (2026-08-27) made
-	# them byte-identical and turned a near-duplicate into an exact one; the
-	# single-hint invariant this file documents above wants one, not two.
+	# visibility _apply_hint_visibility() already drives per phase.
 	text += tr("\n当前：%s") % tr(str(MapData.node_def(current_node_id).get("display_name", current_node_id)))
 	# Facility hint: let the player SEE the node has a usable facility and which key
 	# enters it. The prose itself lives only in facility_data.gd (the §433 rule).
@@ -560,6 +558,7 @@ func _render() -> void:
 		if fdef != null:
 			text += tr("\n\n门派设施：%s（F 使用）") % tr(fdef.title)
 	body.text = text
+	cursor_markers_visible = "▶" in body.text
 
 
 ## Compose the cost/effect summary line for a facility from its effects (e.g.

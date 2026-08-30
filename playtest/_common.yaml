@@ -793,6 +793,7 @@ surface:
   - last_facility_effect_types
   - facility_result_text
   - pressed_connected
+  - cursor_markers_visible
   EndingScreen:
   - tier
   - done

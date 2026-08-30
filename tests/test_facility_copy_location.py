@@ -215,9 +215,11 @@ def test_no_inline_prose_in_map_files() -> None:
     # trivially green by finding nothing (the test_i18n_coverage._en_keys()
     # `len(keys) > 100` guard pattern). After symbol-exclusion (display_name
     # fields + ENDING_TIERS block skipped in map_data.gd), the two map files
-    # yield 9 >= 1-CJK literals — all in map.gd chrome — measured 2026-08-30.
+    # yield 8 >= 1-CJK literals — all in map.gd chrome — measured 2026-08-30
+    # (post-map_single_surface: two marker keys deleted, one current-location
+    # key added — net -1).
     # Never set this floor below 3: a broken extractor must never look plausible.
-    assert total >= 9, "extraction found only %d literals" % total
+    assert total >= 8, "extraction found only %d literals" % total
     assert not bad, (
         "prose-length CJK literal in a map file that is neither a tr() key "
         "nor in ALLOWED (§433: prose lives only in its data module):\n  "

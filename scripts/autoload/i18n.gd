@@ -363,10 +363,9 @@ const EN: Dictionary = {
 	# --- Map travel -------------------------------------------------------
 	"左右/上下选择相邻去处，回车启程": "Arrow keys to pick an adjacent stop, Enter to set out",
 	"【江湖行路】\n\n": "[Traveling the Realm]\n\n",
-	"▶ %s（此处）\n": "▶ %s (here)\n",
-	"  %s（可前往）\n": "  %s (reachable)\n",
+	"  %s（当前所在）\n": "  %s (current location)\n",
 	"\n当前：%s": "\nCurrent: %s",
-	"【%s】\n\n%s\n\n%s\n%s\n\n上下选择，回车定夺": "[%s]\n\n%s\n\n%s\n%s\n\nUp/down to choose, Enter to decide",
+	"【%s】\n\n%s\n\n上下选择，回车定夺": "[%s]\n\n%s\n\nUp/down to choose, Enter to decide",
 
 	# --- Sect facilities (scripts/data/facility_data.gd + map.gd FACILITY) ---
 	"木人巷": "Wooden Men Alley",

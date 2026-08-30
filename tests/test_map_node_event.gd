@@ -385,29 +385,28 @@ static func _test_map_event_phase(ok: bool) -> bool:
 	map.event_focus = 0
 	ok = _expect(ok, map.event_focus == 0, "focus cycles back to option A")
 
-	# --- the ▶ marker follows the focus in the rendered body text ---
+	# --- the option buttons carry the option labels; no ▶ remains in the body ---
 	var opt_a_label: String = String(night.option_a.label)
 	var opt_b_label: String = String(night.option_b.label)
 	ok = _expect(ok, opt_a_label != "" and opt_b_label != "" and opt_a_label != opt_b_label,
 			"the bound row carries two distinct option labels")
-	var body_label: Label = map.get_node_or_null("BodyLabel") as Label
-	ok = _expect(ok, body_label != null, "MapScreen has a direct BodyLabel child (marker probe target)")
-	if body_label != null:
+	var btn0: Button = map.get_node_or_null("EventBox/EventOptionButton0") as Button
+	var btn1: Button = map.get_node_or_null("EventBox/EventOptionButton1") as Button
+	ok = _expect(ok, btn0 != null and btn1 != null, "EventOptionButton0/1 exist")
+	if btn0 != null and btn1 != null:
 		map._render()
-		var text_a: String = String(body_label.text)
-		ok = _expect(ok, text_a.find("▶ " + opt_a_label) != -1,
-				"focus 0 renders the marker on option A")
-		ok = _expect(ok, text_a.find("▶ " + opt_b_label) == -1,
-				"focus 0 does not mark option B")
-		map.event_focus = 1
-		map._render()
-		var text_b: String = String(body_label.text)
-		ok = _expect(ok, text_b.find("▶ " + opt_b_label) != -1,
-				"focus 1 renders the marker on option B")
-		ok = _expect(ok, text_b.find("▶ " + opt_a_label) == -1,
-				"focus 1 does not mark option A")
-		ok = _expect(ok, text_b.find(String(night.title)) != -1 and text_b.find(String(night.text)) != -1,
-				"the event title and body text are shown (pool text, not invented)")
+		ok = _expect(ok, String(btn0.text) == opt_a_label,
+				"EventOptionButton0 carries option A label")
+		ok = _expect(ok, String(btn1.text) == opt_b_label,
+				"EventOptionButton1 carries option B label")
+		ok = _expect(ok, map.cursor_markers_visible == false,
+				"no ▶ glyph in the rendered body")
+		# Title and body text are still in the body (descriptive, not options)
+		var body_label: Label = map.get_node_or_null("BodyLabel") as Label
+		if body_label != null:
+			var text: String = String(body_label.text)
+			ok = _expect(ok, text.find(String(night.title)) != -1 and text.find(String(night.text)) != -1,
+					"the event title and body text are shown (pool text, not invented)")
 		map.event_focus = 0
 
 	# --- resolving option A applies its effects and returns to TRAVEL ---
