@@ -51,5 +51,9 @@ Recorded defensively, deliberately **not** rows in the table: `cultivation.gd` `
 No **new** state is deferred: every row above is Y. Two **measure-only** OPEN backlog items
 carry over unchanged (measured, not in scope to fix): **UX-12** (residual keyboard-only hint
 copy on screens that already have tappable controls) and **UX-11** (touch-target size,
-measure-only, no size gate). Both stay OPEN (gate evidence pending); see
-`design/40_ux_backlog.md` record line 2026-08-30.
+measure-only, no size gate). Both stay OPEN — **not** for lack of gate evidence (this round's
+gates are green, 73/73 scenarios PASS) but because closing each needs its own action: UX-11's
+touch-target measurement run has not yet been transcribed into the backlog table, and UX-12's
+residual keyboard-first copy was explicitly left unfixed this round (`90_decisions.md`
+2026-08-30 touch-single-surface (a)). See `design/40_ux_backlog.md` record lines of
+2026-08-30 (post-gate 收尾 + 修红实测收口).

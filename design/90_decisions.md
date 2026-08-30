@@ -459,3 +459,18 @@ map.gd);反平凡下限按实测重基线(带日期注释,绝不 < 3);文案按�
 
 2026-08-30 `touch-single-surface`(5_design 证据步骤,如实记 open 项):新钉子 `clicks_only_gongfa_empty_exit` 的**修红实测四值**(失败帧 / 首个失败断言 / 确切错误串 / 红前绿数)在本轮收尾时**仍为结构预测**(f140 / `CultOptionButton0.visible` / 红前 8 绿),实测须按 2026-08-29 `record_measured_red_first_and_reconcile` 同款临时回退法(`TEMPORARY RED-FIRST REVERT` 标记的空出口分支注释块,直连边车 `godot_playtest_scenario`,跑红后逐字节还原)产生一次。**绿半边已实测**:本轮官方全量闸门 `clicks_only_gongfa_empty_exit` **16/16** / `gongfa_pick_empty_keyboard_return` **13/13**(`playtest_summary.md`),修后行为由闸门实测成立;欠的只是「修前红那一跑」的四个实测数字。预测不得当实测引用;实测值产生后回填场景头与 `final/delivery_notes_touch_single_surface.md`。
 
+**修红实测收口(2026-08-30,5_design 证据步骤;上行 open 项关闭):** 上行所等的「修前红那一跑」
+四个实测数字**已抵达**——按上行所记的同一临时回退法(`scripts/segments/cultivation.gd` 空出口
+分支注释块标 `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`,直连边车
+`godot_playtest_scenario` 跑红后逐字节还原,`scripts/` 零回退标记残留)实测:失败帧 **f140** /
+首个失败断言 **`CultOptionButton0.visible: visible == true`** / 确切错误
+**`aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`** / 红前绿 **9** 条
+(f80 6 + f110 2 + f140 的 `phase == "GONGFA_PICK"` 断言——该断言在回退下也过,因为空列表相位
+本身可到达,缺的只是按钮)。与结构预测(f140 / 红前 8 绿)相比**同帧、同首断,唯绿数 8→9**
+(预测没算上 f140 那条回退下仍过的相位断言);预测值按档案纪律逐字保留在场景头 RED-FIRST
+EVIDENCE 块并标注被本实测取代,实测值落 `final/delivery_notes_touch_single_surface.md`
+(Part A §4/§5 + Part B §4/§5)。还原后的树上两条新场景复跑全绿:
+`clicks_only_gongfa_empty_exit` **16/16**、`gongfa_pick_empty_keyboard_return` **13/13**
+(硬闸门 `passed: true`)——上行「绿半边已实测」与本行「红半边已实测」合起来,该钉子
+「先红后绿」的档案记录链完整。本文件自此无因本轮新增的待决问题。
+
