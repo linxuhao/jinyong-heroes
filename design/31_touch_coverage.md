@@ -38,6 +38,7 @@ reach is keyboard-only anymore.
 | creation | `CONFIRM` | `ConfirmButton` + `BackButton` (`creation.gd:246-248`, wired `:426`) | Y | — | already single-surface |
 | menu | main menu (4 entries) | `MenuEntry0..3` (`ENTRY_COUNT=4` `menu_panel.gd:26`), wired `pressed`→`_activate_entry` `:58-59` | Y | — | already clickable (button-first panel); not touched |
 | settings | settings (5 rows) | `Button0..4` (`ROW_COUNT=5` `settings_panel.gd:28`), wired `pressed`→`_activate_row` `:54-59` | Y | — | already clickable (button-first panel); not touched |
+| roster overlay | `OPEN` (over cultivation / map) | `RosterCloseButton` visible+wired (`pressed_connected` 非空, `scripts/ui/roster_panel.gd` ) + tap-outside dim layer; entry `RosterOpenButton` covered in every cultivation/map phase (incl. modal EVENT/FACILITY) | Y | — | NEW this round (2026-08-30): panel open state has ≥1 visible wired control, touch-only exit; entry button visible+wired in every cultivation/map phase when not already open |
 | tutorial | steps 1..7 | overlay `Next` + `SkipTutorial` (`tutorial_manager.gd:264-270`), `tutorial_next`/`ui_accept` `:375` | Y | — | already clickable; not touched |
 | transition | page 1 / page 2 | `NextButton` (`transition.gd:28-33`, `:63-66`) — **「继续 ▶」 glyph kept**: it is inside the button's own text, one surface, no duplication (see `90_decisions.md`) | Y | — | already clickable; glyph kept (decision); not touched |
 | ending | ending (tier 1..3) | `RestartButton` (`ending.gd:25-30`, `:59-62`) | Y | — | already clickable; not touched |

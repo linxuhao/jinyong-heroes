@@ -474,3 +474,31 @@ EVIDENCE 块并标注被本实测取代,实测值落 `final/delivery_notes_touch
 (硬闸门 `passed: true`)——上行「绿半边已实测」与本行「红半边已实测」合起来,该钉子
 「先红后绿」的档案记录链完整。本文件自此无因本轮新增的待决问题。
 
+## jinyong-roster — 角色面板七裁定 (2026-08-30)
+
+- **(a) 面板是纯展示 overlay,不是 phase。** 无 `match phase:` 分支、无新状态串,不开存档。
+  单一操作面**空集真**满足(面板内部零内可选控件)+ **主动**满足(`cursor_markers_visible == false`
+  发布并被新场景断言;dim 层 STOP = 打开期间唯一操作面,`▶` 无处出现)。
+- **(b) 养成 / 大地图任意相位——含 map EVENT/FACILITY 模态与 cultivation 选择相位——都可打开,
+  宿主 `_unhandled_input` 以 `is_open` 为闸第一行进 return。** 选 (ii)(不隐藏入口)而非 (i)(模态期
+  藏入口):「我是谁 / 背上有什么」是与相位无关的信息,而玩家最可能想确认的恰是**刚落定某个事件
+  选项之前**(花这笔银两?取这把剑?)。代价是两个「面板打开期间模态键语法惰性、关闭即刻恢复」的
+  主张必须被**钉**而不是靠散文:由 `playtest/roster_panel_item_nail.yaml` 的中段(f35–f60)实现——
+  面板打开在未解算的 merchant 模态之上,断言 `phase == "EVENT"` / `event_id == "merchant"` /
+  `events_resolved_count == 0` 未动,关闭后**同一个** `EventOptionButton0` click 正常解算
+  (`events_resolved_count == 1`、`silver: changed`)。`spine_to_ending` 永不打开面板 → 时序天然未动。
+- **(c) 关闭 = 关闭按钮 和 点面板外区域。** 关闭按钮被真实 click 钉住(纯 tap-outside 层无法被
+  harness 有意义地命中测试);dim 层的 STOP filter 让面板成为打开期间的唯一操作面。
+- **(d) 本轮不加新键盘动作。** 开 / 关纯 click-only,无 `project.godot` input-map 变更、无新动作
+  token、零语法冲突面;键盘快捷层留待后续,**可见可点控件是唯一机制**(无键盘、无按钮 = 不合格)。
+- **(e) 只读硬保证。** `open()/close()` 从不 `SaveManager.autosave()`(反例:`map.gd::_resolve_node_event`
+  会存档——那是事件路径,不是面板)、不写 profile/flags、不消耗月份/行动、不改 phase。
+  `save_load_roundtrip` 保持绿;`spine_to_ending` 逐字节未动。
+- **(f) 降级,绝不发明。** 物品名走冻结的 `CardData.display_name_of`,功法走
+  `ProgressionGongfaData.display_name_of`,特质走 `TraitData.get_def()`,门派走 `SECTS`;
+  每个 resolver miss 惰性降级为原始 id 或诚实「（无）」行。无新数据字段、无新系统、无装备语义——
+  面板只**显示** `PlayerProfile` 已存的一切。
+- **(g) 自足 instanced 场景。** 一个 `roster_panel.tscn` 承载入口 + 面板overlay,宿主只加
+  一个节点 + 一行 `_unhandled_input` 闸;按钮位置实现者可调(画布内、不压既有命中区)——`clicks:`
+  真命中测试即证明。
+

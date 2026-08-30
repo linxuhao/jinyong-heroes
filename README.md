@@ -399,7 +399,7 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   or changed/unchanged token on every assert line). `clicks:` entries are
   `<Node>[ +dx,dy][ left|right|middle]` — a **true GUI hit test** (aim at the
   control/unit body, never a `*_ClickTarget`); `hovers:` are motion-only.
-  71 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
+  75 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
   clicks-only storyline spine `clicks_only_storyline.yaml` and the facility
   click companion `map_facility_buttons_click.yaml`.
 - **Unit tests**: GDScript files with a top-level `static func run() -> bool`
@@ -551,7 +551,7 @@ results are transcribed into the design archive (`design/00_roadmap.md`,
 - `scenes/` — Godot scenes: `ui/` (hud, health_bar), `segments/`
   (creation, map, transition, sect_select, cultivation, ending),
   `battlefield.tscn`, `main.tscn` / `menu.tscn`
-- `playtest/` — 71 headless playtest scenarios + the `_common.yaml` contract
+- `playtest/` — 75 headless playtest scenarios + the `_common.yaml` contract
   (72 yaml files); incl. the clicks-only storyline spine and the facility
   click companion; frozen yamls are append-only (authorized edits stay
   machine-pinned by the superset fixture)

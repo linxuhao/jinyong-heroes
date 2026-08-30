@@ -933,3 +933,51 @@ phase 名字面量清单(那样加一个 phase 就会漏)。`GONGFA_PICK` 空列
 新增 `playtest/clicks_only_gongfa_empty_exit.yaml` 断的是一记 `click:` 之后 `phase` 真从
 `GONGFA_PICK` 变 `ACTION_PICK`(相位差),不是「按钮存在」。
 
+## 角色面板 (roster panel, 2026-08-30)
+
+玩家把数据早已存进 `PlayerProfile`(五属性 / 银两 / traits / gongfa / inventory / cultivation,
+`design/30_presentation.md` 上文),却有一条完全死掉的路:**12 张装备卡把 id 写进
+`profile.inventory`(`scripts/data/card_data.gd` / `scripts/data/event_logic.gd` item 效果),
+而全仓没有任何一处把 inventory 读出来给玩家看**。本轮新增一个**只读、可点开 / 点关**的角色页,
+把这三块「玩家已经拥有却永远看不见」的信息显示出来。它是**纯展示 overlay,不是 phase**——
+无 `match phase:` 分支、无新状态串、不写存档、不消耗回合 / 行动。
+
+### 三块内容与惰性降级
+
+- **人物** — 五属性(根骨 / 内力 / 身法 / 悟性 / 福缘)取自 `p.attrs`,银两 `p.silver`,
+  先天特质 = `traits` 逐条经 `TraitData.get_def(id).display_name` 解析(缺行 → 原始 id),
+  当前年月 = `p.cultivation.year/month`,`门派` = `ProgressionGongfaData.SECTS` 匹配
+  (miss → 原始 id,`""` → 「无门无派」)。traits 空列表 → 「（无）」。
+- **功法** — `p.gongfa` 逐条 `{id, grade, practice, mastered}`:名称经
+  `ProgressionGongfaData.display_name_of(id)`(未知 id → 原始 id),品级 = grade 字母,
+  练度 `练度 %d/%d`(上限 `PRACTICE_TO_MASTER.get(grade, -1)`;grade `""`/未知 → 只显示练度不显示上限),
+  `mastered == true` → 大成标记。hostile 行一律 `.get()` 带默认值,绝不崩。空列表 → 「（无）」。
+- **物品** — `p.inventory` 每个 id 经**冻结的** `CardData.display_name_of(id)` 解析为中文名
+  (`card_data.gd:82-84`,未知 id 返回 `""`),未知 id **惰性降级为原始 id**(显示出来),
+  不崩、不 `push_error`。空列表 → 「（无）」。「看见」本轮还账,「装上」欠着(见
+  `design/40_ux_backlog.md` UX-13 / UX-14)。
+
+### 入口
+
+`RosterOpenButton`(`scenes/ui/roster_panel.tscn` 实例进 `cultivation.tscn` / `map.tscn`,
+两个宿主里节点名同为 `RosterPanel`),面板打开时隐藏、关闭时恢复可见。入口在两个可存档段落
+(`design/40_progression.md §8` STABLE_STATES = CULTIVATION / MAP)都够得着。
+
+### 关闭
+
+`RosterCloseButton` 按钮 **和** 点面板外区域(dim 层)——两者都存在,按钮是场景钉住的关闭
+控件,叠加层只吸收面板外的点击。
+
+### 单一操作面 conformity
+
+面板内部**零内可选控件**(纯展示行 + 两个控制),`cursor_markers_visible == false`(`"▶" in body_text`)
+由新场景断言;面板打开时 dim 层的 `mouse_filter = STOP` 使它成为**唯一操作面**(宿主的所有
+选项按钮在 STOP 之下点不到),宿主 `_unhandled_input` 以 `is_open` 为闸第一行进 return——
+面板打开时键盘语法惰性。不回归并行 `▶` UI:四个既有段落的同名观测量保持 `false`。
+
+### 只读硬保证
+
+打开 / 关闭**从不**调用 `SaveManager.autosave()`(反例:`map.gd::_resolve_node_event` 会存档——
+那是事件路径,不是面板),不写 `profile` / flags、不消耗月份 / 行动、不改 phase。
+`save_load_roundtrip` 保持绿;`spine_to_ending` 永不打开面板 → 其时序逐字节未动。
+

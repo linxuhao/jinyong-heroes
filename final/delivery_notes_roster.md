@@ -122,3 +122,55 @@ task's** job, not this card's. The measured evidence this task contributes is: t
 red-first four values above, and the observed (non-green) baseline counts above — the
 final README scenario total must be reconciled by the docs task once the contract-task
 scenario defects (Section 2) are resolved and the official gate reports a green count.
+
+## 6. Visually-verifiable walkthrough (docs task addition, 2026-08-30)
+
+The following walks exactly the nail path pinned by `playtest/roster_panel_item_nail.yaml`
+(a real event/card grant, then a click-through of the panel):
+
+1. Boot the game into the **MAP** segment (`map.tscn`), standing at 无名谷.
+2. Tap the **角色** button (top-right of the canvas) — the roster panel opens as a centered
+   box. 人物 section shows the five attributes (根骨 / 内力 / 身法 / 悟性 / 福缘), 银两,
+   先天特质, the current year/month and 门派; 功法 lists every learned gongfa one by one
+   with grade, 练度 and a 大成 marker; 物品 resolves each inventory id via
+   `CardData.display_name_of` to a readable Chinese name.
+3. Close the panel (tap **关闭** or outside it) — back to the same MAP state, nothing consumed.
+4. Travel to 洛阳, resolve the merchant `EVENT` with **option A** (a real
+   `EventLogic.apply_option_effects` grant → `eq_sword_3` **青锋剑**, silver −20).
+5. Tap **角色** again — the 物品 section now shows **青锋剑** (the drawn item's Chinese name
+   is finally visible instead of a dead id).
+6. Tap **关闭** and continue playing; phase / year-month / counts are unchanged and no
+   keyboard was used at any point.
+
+This is the exact correspondence-nail path the playtest asserts (`RosterBodyLabel.text`
+contains `青锋剑` after the grant, `cursor_markers_visible == false` on the panel and on the
+host, and the open/close never consumes a turn/action or autosaves).
+
+## 7. `design/99_changelog.md` row :126 verification (docs task conclusion)
+
+**Verified, not rewritten.** Row :126 (`touch_single_surface(修红实测收口)`, 2026-08-30)
+already holds the four measured values **verbatim**: failing frame **f140** / first failing
+assert **`CultOptionButton0.visible: visible == true`** / exact error
+**`aim: node not found: CultOptionButton0 (spec: CultOptionButton0)`** / red-before-green
+**9**. Per the append-only archive rule (old rows stay verbatim; corrections are new rows),
+and because this correction row already exists, **no third `touch_single_surface` correction
+row was appended** — the brief's 「改成实测值」 for that historical predicted row is
+overridden by the already-landed correction. The only changelog addition this round is the
+single new `roster_panel` row for jinyong-roster's own design change, referencing the
+measured red-first values in §1 above.
+
+## 8. README scenario-count correction (docs task; measured, not hardcoded)
+
+**Counting method:** the number of list items under `scenario_order:` in
+`playtest/_common.yaml` — a registry count (counted 2026-08-30, not gated). Counted value:
+**75** entries (73 prior + 2 roster scenarios: `roster_panel_item_nail`,
+`roster_panel_cultivation_open_close`), matching the lines 1029–1103 list. This measured
+value, **75**, was written into README at **exactly two** present-tense structural lines:
+- `README.md:402` — "75 scenarios, including the keyboard spine …"
+- `README.md:554` — "`playtest/` — 75 headless playtest scenarios …"
+
+No other occurrence of "71" was touched: the historical PASS counts (`:501` / `:507` / `:520`
+"71/71 scenarios PASS") and the unrelated `good_answers 71` counts (`:85` / `:433` / `:509`)
+and the "(72 yaml files)" parenthetical at `:554` remain byte-identical. This is the
+anti-global-replace rule applied — only the two current, structural scenario-count lines
+changed (plain prose, not under the append-only archive rule).
