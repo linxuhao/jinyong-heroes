@@ -205,6 +205,10 @@ description: >-
   EventLogic.apply_option_effects, merchant option_a) grants eq_sword_3 (青锋剑),
   then clicks open the roster panel and assert the item's Chinese name appears;
   close restores the same state (phase / node / session counters unchanged).
+  Ruling (b) pin: the panel also opens OVER the unresolved merchant modal —
+  phase / event_id / events_resolved_count untouched while open — and after
+  closing, the SAME EventOptionButton0 click resolves the event normally:
+  the modal grammar resumes because the panel owned input while open.
 # RED-FIRST EVIDENCE block pasted here from the measured run (§6).
 timeline:
 - at: 10   # boot
@@ -220,15 +224,36 @@ timeline:
     MapScreen.phase: phase == "EVENT"
     MapScreen.event_id: event_id == "merchant"
     MapScreen.current_node_id: current_node_id == "luoyang"
-- at: 40   # resolve option_a: silver -20 + item eq_sword_3 (EventLogic.apply_option_effects)
+    MapScreen.events_resolved_count: events_resolved_count == 0   # baseline for the mid-modal pin
+- at: 35   # ruling (b) pin: OPEN the panel OVER the unresolved modal (true hit test)
+  clicks: [RosterOpenButton]
+- at: 40   # panel owns input; the modal underneath is untouched
+  assert:
+    RosterPanel.is_open: is_open == true
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.events_resolved_count: events_resolved_count == 0   # opening resolved/consumed nothing
+    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品")'   # three sections render even with an empty inventory
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+    MapScreen.cursor_markers_visible: cursor_markers_visible == false
+    RosterCloseButton.visible: visible == true
+- at: 45   # close back into the SAME unresolved modal
+  clicks: [RosterCloseButton]
+- at: 50   # modal intact — its grammar is about to be PROVEN by walking it, not asserted as prose
+  assert:
+    RosterPanel.is_open: is_open == false
+    RosterPanel.visible: visible == false
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+- at: 55   # the SAME option click resolves normally -> grammar resumed byte-identical
   clicks: [EventOptionButton0]
-- at: 50
+- at: 60
   assert:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.event_id: event_id == ""
     MapScreen.events_resolved_count: events_resolved_count == 1
     MapScreen.silver: changed          # grant landed (differential; no absolute silver)
-- at: 60   # OPEN the panel (true hit test proves the button is really tappable)
+- at: 65   # OPEN the panel again, now after the grant (true hit test proves tappable)
   clicks: [RosterOpenButton]
 - at: 70
   assert:
@@ -239,9 +264,9 @@ timeline:
     MapScreen.phase: phase == "TRAVEL"
     RosterCloseButton.visible: visible == true
     RosterPanel.pressed_connected: pressed_connected.size() >= 2
-- at: 80   # CLOSE
+- at: 75   # CLOSE
   clicks: [RosterCloseButton]
-- at: 90
+- at: 80
   assert:
     RosterPanel.is_open: is_open == false
     RosterPanel.visible: visible == false
@@ -383,12 +408,25 @@ Predictions are never quoted as observations; the brief's example (f140 / 9-gree
   selectables) and *actively* (`cursor_markers_visible == false` published and asserted;
   no `▶` anywhere).
 - **(b) Openable in ANY phase of CULTIVATION/MAP — including map EVENT/FACILITY modals and
-  cultivation's choice phases — with host `_unhandled_input` gated by `is_open`.** Rationale:
-  "who am I / what do I carry" is phase-independent information; refusing mid-modal would
-  manufacture a touch dead-end (resolve-the-event-first is exactly the keyboard-era gate
-  this project removes). The clash with modal keyboard grammar is dissolved by ownership:
-  while open, the modal keys are inert; on close the grammar resumes byte-identical.
-  `spine_to_ending` never opens the panel → its timing is untouched by construction.
+  cultivation's choice phases — with host `_unhandled_input` gated by `is_open`; both
+  ownership claims below are pinned by assertions, not carried by prose (review round 1:
+  option (ii) chosen over (i), reason below).** Rationale: **convenience** — "who am I /
+  what do I carry" is phase-independent information, and the moment a player most wants
+  it is right before committing an event choice (spend the silver? take the sword?).
+  Option (i) — hiding the entry button during map EVENT/FACILITY — was defensible: the
+  modals have their own tappable exits (`EventOptionButton0/1`, `FacilityUseButton` /
+  `FacilityLeaveButton`), so a modal-gated entry costs only a few deferred clicks, never
+  a trap. (ii) is chosen because the convenience is real exactly at that moment, and
+  because it keeps the panel phase-blind — the scene stays self-contained (one node +
+  one input-gate line per host, no visibility-sync coupling to the host's phase
+  machine). Its price is that the two ownership claims must be measured, and they are:
+  S1's inserted segment (f35–f60) opens the panel over the unresolved `merchant` modal,
+  asserts the modal untouched while open (`phase == "EVENT"`, `event_id == "merchant"`,
+  `events_resolved_count == 0`), closes, then the SAME `EventOptionButton0` click
+  resolves normally (`events_resolved_count == 1`, `silver: changed`) — "while open, the
+  modal keys are inert; on close the grammar resumes byte-identical" is carried by that
+  walked segment. `spine_to_ending` never opens the panel → its timing is untouched by
+  construction.
 - **(c) Close = close button AND tap-outside.** The button is pinned by a real click (the
   tap-outside layer alone cannot be hit-tested by the harness meaningfully); the dim layer's
   STOP filter is what makes the panel the sole operation surface while open (host option
