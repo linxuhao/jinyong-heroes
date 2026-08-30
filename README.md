@@ -17,7 +17,66 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: touch-single-surface — buttons are the option list, every state has a tappable exit
+## Latest round: jinyong-roster — the roster panel: what you own, finally visible (taps only)
+
+Everything the profile already stored but nothing ever rendered — five
+attributes, silver, innate traits, current year/month and sect, every learned
+gongfa (grade / practice / mastered), and every inventory item resolved to its
+Chinese name — is now one tap away.
+
+**What landed:**
+
+- **`RosterOpenButton`「角色」** (top-right, `focus_mode = 0`) in BOTH stable
+  segments — `scenes/segments/cultivation.tscn` and `scenes/segments/map.tscn`
+  each instance `scenes/ui/roster_panel.tscn` as a node named `RosterPanel`.
+  `scripts/ui/roster_panel.gd` reads `SaveManager.profile` and writes nothing:
+  open/close never autosave, never consume a month or action, never touch a
+  phase (each host's `_unhandled_input` gates on `RosterPanel.is_open`).
+- **The panel** is a centered read-only box over a tap-outside dim layer:
+  「人物」 (根骨/内力/身法/悟性/福缘, 银两, 先天特质, 第 N 年 N 月, 门派),
+  「功法」 (per art: name, grade, 练度 practice/cap from
+  `ProgressionGongfaData.PRACTICE_TO_MASTER`, 大成 marker), and 「物品」 (each
+  `profile.inventory` id through the frozen `CardData.display_name_of`; an
+  unknown id degrades lazily to the raw id — never a crash, never a
+  `push_error`; empty sections render 「（无）」). Close via the 「关闭」
+  button or by tapping outside. The panel has zero internal selectables, so it
+  publishes `cursor_markers_visible == false` exactly like every segment.
+- **Contract (append-only)**: four `Roster*` surface blocks in
+  `playtest/_common.yaml`; two new scenarios at the `scenario_order` tail
+  (73 → **75**) mirrored in `tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS`;
+  GDScript unit pins in `tests/test_roster_panel.gd` (compose purity, item
+  name resolution, unknown-id degradation, honest empty states, read-only
+  `to_dict()` invariance); every new string in the `scripts/autoload/i18n.gd`
+  EN dictionary.
+- **The correspondence nail, MEASURED red-first** (TEMPORARY RED-FIRST REVERT
+  applied to `roster_panel.gd open()`, direct sidecar run, restored
+  byte-identical): failing frame **f70**, first failing assert
+  **`RosterPanel.is_open: is_open == true`**, exact error
+  **`FAIL f70 RosterPanel.is_open: is_open == true` / `observed=false`**,
+  **8** green asserts before red. The nail drives the REAL grant path (map
+  `merchant` event → `EventLogic.apply_option_effects` → `eq_sword_3`
+  青锋剑) and then clicks the panel open and asserts 「青锋剑」 inside
+  `RosterBodyLabel.text`.
+- **Design record**: `design/30_presentation.md` (roster panel section),
+  `design/90_decisions.md` (seven rulings a–g), `design/40_ux_backlog.md`
+  (UX-13 no-`equipped` field / UX-14 §9 loadout promise vs auto-equip — both
+  OPEN, record-only), and the `design/99_changelog.md` `roster_panel` row.
+
+**Honest status: the two new scenarios are NOT yet green on this tree**
+(measured sidecar runs, 2026-08-30 — see "Verification status (honest)"
+below): `roster_panel_item_nail` **35/36** (red at f110
+`MapScreen.silver: changed` — a fresh boot has silver 0 and the merchant's
+option_a is silver −20, clamped to 0, so silver never changes; the 青锋剑 pin
+itself measured green) and `roster_panel_cultivation_open_close` **15/16**
+plus **6 runtime errors** (red at f110 `CultivationScreen.month: changed` —
+`debug_step_month` is gated on `GameManager.current_state`, which a direct
+scene boot does not set, and the documented clicks-only fallback was not
+implemented; the runtime errors are `Invalid access … 'economy' /
+'equipment' / 'growth'` at `save_manager.gd:365/:382`). No official
+75-scenario gate run exists yet; the 75 in the counts below is the
+`scenario_order` registry count, not a gate-measured green count.
+
+## Round: touch-single-surface — buttons are the option list, every state has a tappable exit (previous round)
 
 The touch-reach round gave every screen a button; player feedback (2026-08-30)
 then showed the screens were *doubled*: the same option list rendered twice (a
@@ -415,7 +474,58 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Verification status (honest)
 
-**touch-single-surface (this round, 2026-08-30) — fully evidenced (red-first
+**jinyong-roster (this round, 2026-08-30) — delivery verified by direct read;
+both new scenarios measured NOT green, downstream gates pending:**
+
+- **Landed and verified in the tree**: `scripts/ui/roster_panel.gd` +
+  `scenes/ui/roster_panel.tscn` instanced as `RosterPanel` into BOTH segment
+  scenes; host input gates (`cultivation.gd:149-150`, `map.gd:112-119`); the
+  four `Roster*` surface blocks; `scenario_order` 73→75 + `ROUND_SCENARIOS`
+  two-place sync; the i18n roster block (`i18n.gd:474-487`);
+  `tests/test_roster_panel.gd` registered in the unit-suite registry; the
+  facility anti-delete pin's FORM-gate failure message
+  (`test_playtest_contract_smoke.py:1078-1086`, additive only); the five
+  design-doc updates (30 / 40_ux_backlog UX-13+UX-14 / 90 / 99). MEASURED nail
+  red-first: f70 / `RosterPanel.is_open: is_open == true` /
+  `FAIL f70 RosterPanel.is_open: is_open == true` + `observed=false` /
+  red-before-green **8** (scenario header RED-FIRST EVIDENCE block +
+  `final/delivery_notes_roster.md` §1). `design/99_changelog.md` row :126
+  re-verified to hold the measured touch_single_surface values verbatim
+  (f140 / `CultOptionButton0.visible: visible == true` /
+  `aim: node not found: CultOptionButton0 (spec: CultOptionButton0)` /
+  red-before-green 9) — no third correction row (append-only archive
+  honored).
+- **NOT green (measured sidecar runs, 2026-08-30; root causes still in the
+  tree)**: `roster_panel_item_nail` **35/36** — f110
+  `MapScreen.silver: changed` red (fresh boot `profile.silver = 0`
+  (`player_profile.gd:21`); merchant `option_a` is silver −20
+  (`event_data.gd:35`); `apply_option_effects` clamps `maxi(0−20, 0) = 0`
+  (`event_logic.gd:42`); the 青锋剑 pin at f130 measured green).
+  `roster_panel_cultivation_open_close` **15/16** — f110
+  `CultivationScreen.month: changed` red (`debug_step_month` early-returns
+  unless `GameManager.current_state == "CULTIVATION"`,
+  `cultivation.gd:695-696`; autoload default is `STATE_TUTORIAL`; the
+  documented clicks-only fallback was never implemented) **plus 6 runtime
+  errors** (`Invalid access to property or key 'economy' / 'equipment' /
+  'growth'` at `save_manager.gd:365/:382` — deck table not initialized on the
+  direct-boot path). Fix direction: fund silver via the sanctioned
+  `debug_grant_silver` pipeline action (or a travel-path silver source)
+  before the merchant grant; play one real month by clicks instead of the
+  gated debug token; root-cause the deck-initialization errors (0 runtime
+  errors is an acceptance criterion). `roster_panel_cultivation_open_close.yaml`
+  still carries a TEMPORARY PLACEHOLDER RED-FIRST block — that scenario's
+  red-first was never measured.
+- **Pending downstream evidence (not producible at verification time — not
+  guessed, counted as unmet)**: compile 0 errors; GDScript unit suite green;
+  `tests/test_i18n_coverage.py` / `tests/test_playtest_contract_smoke.py` /
+  `tests/test_facility_copy_location.py` green; the vision gate;
+  `spine_to_ending` timing. Their reports (`compile_report.json`,
+  `vision_report.json`, `test_report.json`) are pipeline artifacts produced
+  after this step. No official 75-scenario playtest gate run exists yet — the
+  registry count (75) is not a gate-measured green count; the most recent
+  gate-measured count below (73/73) is the previous round's.
+
+**touch-single-surface (previous round, 2026-08-30) — fully evidenced (red-first
 MEASURED post-review + official gate run):**
 
 - **Direct-read verified in the tree**: the single-surface renders (`▶` option
