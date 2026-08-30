@@ -331,8 +331,11 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 The only authoritative gate evidence is the pipeline step products —
 `5_compile`'s `compile_report.json` / `playtest_report.json` /
 `playtest_summary.md`, `5_vision`'s `vision_report.json`, `5_test`'s
-`test_report.json` — pipeline artifacts, not repo files; none is on disk at
-the verifier step (the gates run after it). In short:
+`test_report.json` — pipeline artifacts, not repo files. This round's
+official full-suite run has executed (2026-08-30); its measured results are
+transcribed into the design archive (`design/00_roadmap.md`,
+`design/40_ux_backlog.md`, `design/30_presentation.md`) and were relayed by
+`5_review`. In short:
 
 - **Direct-read verified this round (touch-reach)**: the overlay buttons +
   re-show branch + `end_overlay_pressed_connected` in `game_manager.gd`; the
@@ -356,26 +359,42 @@ the verifier step (the gates run after it). In short:
   `map_facility_buttons_click` 38/38, `facility_use_reusable` 49/49, plus four
   cultivation/sect scenarios). The earlier f180/5 numbers were the structural
   prediction (superseded).
-- **Pending the downstream gate run, not claimed**: the measured green of all
-  71 playtest scenarios (incl. `clicks_only_storyline`,
-  `map_facility_buttons_click` and `spine_to_ending` still fully green — the
-  keyboard-path proof), 0 runtime errors, hard gates `passed: true`, compile
-  zero errors, the 23-file unit suite, the pytest smoke (incl. the two new
-  pins), the i18n coverage test, and the vision gate's check that the new
-  controls render legibly at the design resolution (no new geometry, but the
-  verdict is not pre-declared).
+- **Official full-suite gate run (2026-08-30) — MEASURED**, transcribed into
+  `design/00_roadmap.md` / `design/40_ux_backlog.md` /
+  `design/30_presentation.md` (e) and relayed by `5_review`: playtest
+  **71/71 scenarios PASS** (hard gate `passed: true`, `spec_used: true`,
+  **0 runtime errors**) — incl. `clicks_only_storyline` **47/47** (zero
+  keyboard actions), `map_facility_buttons_click` **38/38**, the keyboard-path
+  proof `spine_to_ending` **42/42** (byte-untouched, still fully green),
+  `facility_use_reusable` **49/49**, `tutorial_win_routes_to_transition`
+  **8/8**, `tutorial_loss_restarts_tutorial` **5/5**; compile **88/88**
+  scripts, zero errors; vision gate **passed** (non-blind, 71 scenarios /
+  284 frames, all six questions `failed: false`; two bad Q6 frames are parked
+  as next-round review candidates and do not flip the gate); the pytest smoke
+  ran **31/32** in `5_review`'s pass — the single failure was a test-side
+  false positive on a comment line, root-caused and fixed after that run
+  (bullet below).
 - **Gate runs for this round**: `design/99_changelog.md`'s
   `record_parse_lesson_and_reconcile` row records that the round's `5_compile`
   run measured `Parse failed — play-test skipped` (`spec_used: false`,
   `frames: 0`): a parse error in a new `tests/*.gd` file reds Godot's
   project-wide parse check, the playtest is skipped entirely, and the hard gate
-  still reads `passed: true` with zero frames. Since then **parse-clean
-  measured runs did happen via direct per-scenario sidecar invocation** (see
-  the red-first bullet above) — the nail and its regression probes have real
-  numbers — but the **official full-suite gate run** (all 71 scenarios +
-  compile 0 errors + the unit suite + the pytest smoke) remains the downstream
-  `5_compile` / `5_test` product and is still pending; none of those numbers
-  is claimed here.
+  still reads `passed: true` with zero frames. That lesson is closed by the
+  official parse-clean full run above (`spec_used: true`, 71/71 PASS).
+- **Smoke-gate hardening (post-gate fix, 2026-08-30,
+  `final/delivery_notes_fix_at_gate_strip_comments.md`)**:
+  `tests/test_playtest_contract_smoke.py::test_timeline_at_values_are_integers`
+  false-reded on a `#` comment — `clicks_only_storyline.yaml:99` carries a
+  backtick-wrapped `` `at:` `` in prose and the old regex matched comments
+  too, capturing the backtick and failing `isdigit()`. Root cause fixed in
+  the TEST (the scenario file stays byte-identical): a pure
+  `_bad_timeline_at_values()` helper now strips each line's `#` comment
+  before applying the original regex + `isdigit()` check, the docstring's
+  false "word-boundary-guarded, so `at` inside prose never matches" claim was
+  deleted, and two regression pins were added — a real non-integer `at:`
+  value still reds, and the exact backtick-in-comment case is inert. Net
+  effect: two tests added, the gate property preserved (only comments are
+  excluded from matching), no scenario or threshold touched.
 - If the downstream playtest gate reddens any scenario, that is reported with
   its cause, never papered over: no assertion is removed or relaxed, no
   frozen yaml is edited to route around a defect, and thresholds are never
