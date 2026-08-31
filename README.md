@@ -17,7 +17,72 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-roster — the roster panel: what you own, finally visible (taps only)
+## Latest round: wuxia-shrimp-portraits — every character is now a shrimp (武虾, 2026-08-31)
+
+The 2026-08-28 world ruling (`design/90_decisions.md`) — **all characters are
+shrimp** — is now visible on screen: the six 96×128 character portraits were
+swapped from human ink-wash martial artists to non-human shrimp bodies
+(cartoon head + semi-realistic body). The PNGs are round INPUTS (never
+generated, drawn, or rewritten by the pipeline); this round aligned every
+record with them and re-measured the pinned portrait geometry.
+
+**What landed:**
+
+- **Roster complete** (`assets/characters/roster.json`): the four
+  「待定虾种」 filled by owner ruling — east_heretic 樱花虾(正樱虾) /
+  south_emperor 罗氏沼虾 / central_divine 玻璃虾 / yang_guo 枪虾 (one giant
+  claw, the other side empty — 独臂) — and all six `art_status` flipped to
+  `completed`. west_poison (皮皮虾) / north_beggar (龙虾) were already set and
+  untouched; `yang_guo`'s title/note untouched (de-naming is a separate
+  round → UX-15).
+- **Two-layer seed manifest** (`assets/seed_manifest.json`): flat table →
+  `subjects` (6 locked identities: id/name/species/appearance — **no seeds: a
+  seed identifies an image, not a person**) + `images` (6 derived:
+  subject + scene + path) + the 9 non-character asset records preserved.
+  `style_block` is the split-register sentence that produced these six
+  images (head fully cartoon / body semi-realistic).
+- **Geometry re-measured, all green on the new art** (observed values in
+  `final/delivery_notes_wuxia.md` §3; raw runs in
+  `final/portrait_geometry_remeasure_notes.md` and
+  `final/portrait_alpha_bbox_notes.md`): `portrait_grid_alignment` **30/30**
+  — all 24 ink lines `ink_world_dx/dy = 0.0` at f40 and f820; six-unit
+  eight-layer visibility `portrait_visible = true`, `portrait_fail_layer = ""`,
+  `portrait_covered_frac = 0.0`; `camera_transform_follows_unit` **9/9**;
+  `spine_to_ending` **42/42, 0 runtime errors**. Frozen scenarios run
+  unmodified; no threshold loosened; no yaml/script/PNG edit.
+- **Pixel-true footing check**, independent of the texture-rect pin: alpha
+  bbox of all six PNGs — `bottom_gap = 0` (ink touches the bottom row;
+  the transparent-bottom-padding blind spot does not exist in this set),
+  h_center_offset 0 / −0.5, `east_heretic` top = 3 recorded as a deviation,
+  not "fixed".
+- **Texture-rect blind-spot finding**: `portrait_ink_rect` / `ink_world_dx/dy`
+  derive from the 96×128 texture rect + the constant foot anchor
+  `(0, −tex.y/2)`, not from alpha pixels — all-green proves foot-anchoring,
+  not ink footing; this round's alpha-bbox check covers the gap. (Full record
+  → `design/30_presentation.md`, landed by the 5_design step.)
+- **Recipe archived**: how these six images were made — species table, exact
+  style sentence, contamination words that pull shrimp into humanoid form,
+  age/gender expression, asymmetry-as-positive, composition→post-process
+  (bottom-align + horizontal-centre), remove_bg + border flood-fill hole
+  repair — all in `final/delivery_notes_wuxia.md` §1, the verbatim archive of
+  the transitional `WUXIA_ART_HANDOFF.md` (whose deletion is documented there:
+  blocked by a step required-output guard; safe to delete by a step with
+  authority).
+
+**Status (honest, 2026-08-31): measured this round, verdict pending
+downstream gates.** The geometry numbers above are real harness self-run
+values, but the OFFICIAL evidence is produced after verification:
+`5_compile`/`5_test` (compile 0 errors, all scenarios green, hard gate
+passed, GDScript unit suite, pytest guards incl.
+`tests/test_shrimp_roster.py`), `5_vision` (frame support for the
+per-portrait descriptions — the delivery notes mark them
+unverified-this-round), and `5_design` (the design-doc updates:
+30_presentation style sync + art-direction record + 重画流程→已执行,
+90_decisions species rulings, 40_ux_backlog UX-15, 99_changelog row,
+roadmap item 5 ❌→✅, and the `WUXIA_ART_HANDOFF.md` deletion). Do not treat
+this round as GREEN until those land.
+
+## Round: jinyong-roster — the roster panel: what you own, finally visible (taps only) (previous round)
 
 Everything the profile already stored but nothing ever rendered — five
 attributes, silver, innate traits, current year/month and sect, every learned
