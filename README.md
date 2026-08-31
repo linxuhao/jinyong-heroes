@@ -63,19 +63,34 @@ byte-identical (machine-pinned verbatim by the test mirrors).
   `design/99_changelog.md` row, `design/40_ux_backlog.md` UX-17 (OPEN,
   record-only).
 
-**Verification status (honest):** the pool (36 unique ids, frozen 16
-verbatim), both gates' code, the seeder, the i18n entries and all five
-design-doc updates are verified in the tree by direct read. The playtest
-scenario's red-first four values were **measured** via the temporary-rollback
-protocol (fail frame **f140** / `events_seen_count == 35` / observed 16 on the
-16-row pool / **2** green asserts before red —
-`final/delivery_notes_event_pool_playtest.md`). The unit gate's red-first
-values are structurally derived, not sidecar-measured (the unit-suite leg was
-unreachable at implementation time — `final/delivery_notes_event_pool.md`).
-The official compile / 78-scenario playtest / pytest / unit-suite runs are
-produced by the downstream gate steps (`compile_report.json` /
-`playtest_report.json` / `test_report.json`), so those criteria stay pending
-that evidence — see `final/verify_report.json`.
+**Verification status (honest, updated 2026-08-31 after the review round):**
+the pool (36 unique ids, frozen 16 verbatim), both gates' code, the seeder,
+the i18n entries and all five design-doc updates are verified in the tree by
+direct read. The playtest scenario's red-first four values were **measured**
+via the temporary-rollback protocol (fail frame **f140** /
+`events_seen_count == 35` / observed 16 on the 16-row pool / **2** green
+asserts before red — `final/delivery_notes_event_pool_playtest.md`), and the
+unit gate's red-first values are structurally derived, not sidecar-measured
+(the unit-suite leg was unreachable at implementation time —
+`final/delivery_notes_event_pool.md`). The first official gate run then
+measured the new scenario **13/15** (f200 `event_title` / `event_body`
+observed empty — the two new render surfaces; draw / select / resolve and the
+35→36 ladder were green; recorded as **UX-18 OPEN** in
+`design/40_ux_backlog.md`). The review blocker was root-caused and **fixed in
+the tree**: `_on_accept` ACTION_PICK case 3 published the drawn id without
+re-syncing the surfaces, so `cultivation.gd:256` now calls `_sync_surface()`
+the moment the roam draw lands, the publication (raw zh, matching the zh
+playtest pins) carries a defensive `push_warning` for unknown ids
+(:862-866), a unit pin `_test_event_title_body_surface`
+(`tests/test_cultivation.gd:314`) guards the publish/clear pair, and the
+stale file headers in `event_data.gd` now read 36 rows. **No post-fix
+official re-run exists yet** (the sidecar was unreachable at the fix task;
+`final/delivery_notes_event_pool_playtest.md` §Measured re-run), so the
+**15/15** confirmation, the 78/78 no-regression count, zero compile errors,
+the pytest / GDScript unit-suite runs and the vision gate are produced by the
+downstream gate steps (`compile_report.json` / `playtest_report.json` /
+`test_report.json` / `vision_report.json`) and stay pending that evidence —
+see `final/verify_report.json`.
 
 ## Round: jinyong-equipment-battle — gear you drew can now be equipped, and it fights (previous round)
 
