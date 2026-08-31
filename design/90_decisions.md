@@ -577,4 +577,20 @@ portrait_covered_frac=0.0`、`camera_transform_follows_unit` **9/9**、`spine_to
   装备进真实遭遇战的 `changed` 差分官方闸门证据待重排后重测。两条新钉子的修红实测四值
   (临时回退直连边车法)仍欠一次实测——`final/delivery_notes_equipment.md` 里为结构
   预测,按档案纪律不得当实测引用。
+- **Open question 收口(2026-08-31 post-fix 官方闸门,5_design 证据步骤补写):** 上问已答
+  ——根因不是帧布局而是路由:MAP(华山)战斗复用教程战场(`battle_return_state !=
+  "CULTIVATION"` 分支),从不调 `build_character(SaveManager.profile)`,任何帧重排都到
+  不了差分;修法 = 场景重写为真实养成遭遇战路径(`debug_enter_encounter` →
+  `battlefield.gd:651` → `derive_stats` → `EquipmentData.sum_bonuses`;物品经白名单
+  `debug_grant_equip` → `EventLogic.apply_option_effects`;每腿断
+  `CombatManager.tutorial_battle == false`)。本轮官方闸门 `playtest_summary.md` 复测
+  `equipment_in_battle_diff` **47/47**、硬闸门 `passed: true`、零 runtime error——装备进
+  真实遭遇战的 `changed` 差分证据到手,`40_ux_backlog.md` UX-16 据此
+  CLOSED(jinyong-equipment-battle)。修红实测四值同批抵达(临时回退法直连边车,逐字节
+  还原,`scripts/` 零回退标记):失败帧 **f560** / 首断
+  **`Player.gear_attack_bonus: gear_attack_bonus > 0`** / 确切错误
+  **`FAIL f560 Player.gear_attack_bonus: gear_attack_bonus > 0 (observed=0)`** / 红前绿
+  **46**(`roster_equip_free_action` f110 四值同批,见
+  `final/delivery_notes_equipment.md`)——上句「结构预测不得当实测引用」由此实测取代。
+  pytest 与 GDScript 单元套件的 post-fix 复跑报告(5_test 产物)不在本步上下文,不冒充实测。
 

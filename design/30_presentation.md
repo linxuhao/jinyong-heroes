@@ -1063,6 +1063,9 @@ phase 名字面量清单(那样加一个 phase 就会漏)。`GONGFA_PICK` 空列
 `cursor_markers_visible == false` 保持。面板新观测量:`equipped_weapon / equipped_armor /
 equipped_boots`(三槽镜像)、`equip_button_count`、`equip_pressed_connected`;战斗侧镜像
 `Player.gear_attack/health/initiative/move_bonus` 让「换把剑,这场战斗数值不一样」可被
-差分断言(`equipment_in_battle_diff`;该场景本轮官方运行 16/32 红——帧布局把面板点击排在
-返回 MAP 之前,如实记 `40_ux_backlog.md` UX-16,零断言放松)。
+差分断言(`equipment_in_battle_diff`;首轮官方运行 16/32 红——根因不是帧布局而是路由:
+MAP(华山)战斗复用教程战场、从不调 `build_character(profile)`,差分经该路由不可达;
+场景重写为真实养成遭遇战路径后,post-fix 官方复跑 **47/47**、硬闸门 `passed: true`、
+零 runtime error,`40_ux_backlog.md` UX-16 据此 CLOSED(jinyong-equipment-battle),
+零断言放松、零阈值放宽)。
 
