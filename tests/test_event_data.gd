@@ -5,6 +5,7 @@
 const EventData = preload("res://scripts/data/event_data.gd")
 const EventLogic = preload("res://scripts/data/event_logic.gd")
 const PlayerProfileScript = preload("res://scripts/data/player_profile.gd")
+const I18nScript = preload("res://scripts/autoload/i18n.gd")
 
 ## Expected row data, verbatim from step2_design §8.6.
 const ROW_EFFECTS := {
@@ -72,6 +73,86 @@ const ROW_EFFECTS := {
 		"A": [{"type": "attr", "value": 2, "target": "fortune"}],
 		"B": [{"type": "silver", "value": 20, "target": ""}],
 	},
+	"riverside_duel": {
+		"A": [{"type": "practice", "value": 2, "target": ""}],
+		"B": [{"type": "silver", "value": 15, "target": ""}],
+	},
+	"ancient_bell": {
+		"A": [{"type": "attr", "value": 2, "target": "inner"}],
+		"B": [{"type": "silver", "value": 12, "target": ""}],
+	},
+	"poisoned_well": {
+		"A": [{"type": "silver", "value": -10, "target": ""}, {"type": "attr", "value": 2, "target": "fortune"}],
+		"B": [{"type": "attr", "value": 2, "target": "wisdom"}],
+	},
+	"tiger_pass": {
+		"A": [{"type": "silver", "value": -8, "target": ""}, {"type": "attr", "value": 1, "target": "wisdom"}],
+		"B": [{"type": "attr", "value": 2, "target": "agility"}],
+	},
+	"lantern_festival": {
+		"A": [{"type": "attr", "value": 2, "target": "wisdom"}],
+		"B": [{"type": "silver", "value": 5, "target": ""}, {"type": "attr", "value": 1, "target": "fortune"}],
+	},
+	"pawnshop": {
+		"A": [{"type": "silver", "value": 16, "target": ""}],
+		"B": [{"type": "silver", "value": -14, "target": ""}, {"type": "attr", "value": 2, "target": "fortune"}],
+	},
+	"storyteller": {
+		"A": [{"type": "silver", "value": -5, "target": ""}, {"type": "practice", "value": 1, "target": ""}],
+		"B": [{"type": "attr", "value": 1, "target": "wisdom"}],
+	},
+	"chess_stall": {
+		"A": [{"type": "attr", "value": 2, "target": "wisdom"}],
+		"B": [{"type": "silver", "value": -8, "target": ""}, {"type": "practice", "value": 2, "target": ""}],
+	},
+	"smithy": {
+		"A": [{"type": "silver", "value": -18, "target": ""}, {"type": "item", "value": 0, "target": "eq_sword_3"}],
+		"B": [{"type": "attr", "value": 1, "target": "wisdom"}],
+	},
+	"cliff_herbs": {
+		"A": [{"type": "silver", "value": 12, "target": ""}, {"type": "attr", "value": 1, "target": "agility"}],
+		"B": [{"type": "silver", "value": -18, "target": ""}, {"type": "attr", "value": 2, "target": "inner"}],
+	},
+	"wedding_train": {
+		"A": [{"type": "silver", "value": -8, "target": ""}, {"type": "attr", "value": 2, "target": "fortune"}],
+		"B": [{"type": "attr", "value": 1, "target": "agility"}],
+	},
+	"sword_mound": {
+		"A": [{"type": "practice", "value": 3, "target": ""}],
+		"B": [{"type": "silver", "value": 17, "target": ""}],
+	},
+	"night_inn": {
+		"A": [{"type": "silver", "value": 9, "target": ""}, {"type": "attr", "value": 1, "target": "wisdom"}],
+		"B": [{"type": "silver", "value": -10, "target": ""}, {"type": "attr", "value": 1, "target": "bone"}],
+	},
+	"wild_goose_letter": {
+		"A": [{"type": "attr", "value": 1, "target": "agility"}, {"type": "silver", "value": 6, "target": ""}],
+		"B": [{"type": "attr", "value": 2, "target": "wisdom"}],
+	},
+	"snow_pass": {
+		"A": [{"type": "silver", "value": -12, "target": ""}, {"type": "attr", "value": 1, "target": "wisdom"}],
+		"B": [{"type": "attr", "value": 2, "target": "agility"}],
+	},
+	"drunken_fist": {
+		"A": [{"type": "silver", "value": -9, "target": ""}, {"type": "practice", "value": 2, "target": ""}],
+		"B": [{"type": "attr", "value": 1, "target": "bone"}],
+	},
+	"river_god": {
+		"A": [{"type": "attr", "value": 2, "target": "wisdom"}],
+		"B": [{"type": "silver", "value": 15, "target": ""}],
+	},
+	"plague_village": {
+		"A": [{"type": "silver", "value": -12, "target": ""}, {"type": "attr", "value": 2, "target": "fortune"}],
+		"B": [{"type": "attr", "value": 1, "target": "wisdom"}],
+	},
+	"young_disciple": {
+		"A": [{"type": "practice", "value": 1, "target": ""}, {"type": "attr", "value": 1, "target": "wisdom"}],
+		"B": [{"type": "silver", "value": 10, "target": ""}],
+	},
+	"fallen_rider": {
+		"A": [{"type": "silver", "value": 14, "target": ""}],
+		"B": [{"type": "item", "value": 0, "target": "eq_boots_1"}],
+	},
 }
 
 const ROW_TITLES := {
@@ -80,6 +161,93 @@ const ROW_TITLES := {
 	"snake_bile": "蛇胆奇效", "dragon_scrap": "降龙残谱", "flood_ferry": "渡口风波",
 	"escort_job": "镖行招募", "dali_market": "大理市集", "night_rain": "破庙夜雨",
 	"gambling_den": "赌坊喧嚣", "quanzhen_scripture": "全真抄经", "lost_purse": "遗落的褡裢",
+	"riverside_duel": "河滩论剑", "ancient_bell": "荒寺晚钟", "poisoned_well": "荒村毒井",
+	"tiger_pass": "虎啸危崖", "lantern_festival": "上元灯会", "pawnshop": "当铺旧刀",
+	"storyteller": "茶馆说书", "chess_stall": "街角残局", "smithy": "铸剑回炉",
+	"cliff_herbs": "崖上采药", "wedding_train": "山道花轿", "sword_mound": "荒冢埋剑",
+	"night_inn": "客栈夜账", "wild_goose_letter": "雁足传书", "snow_pass": "风雪隘口",
+	"drunken_fist": "醉汉传拳", "river_god": "河伯娶亲", "plague_village": "疫村施药",
+	"young_disciple": "登门求教", "fallen_rider": "坠马客商",
+}
+
+## Verbatim body text for all 36 rows (pins the text field byte-for-byte).
+const ROW_TEXTS := {
+	"bandits": "行至山道，一伙劫匪拦住去路。\n为首之人手提钢刀，索要买路财。",
+	"merchant": "一位行商赶着马车路过，\n车上满载刀剑兵刃，正愁销路。",
+	"ruins": "荒野深处露出一角残碑，\n碑文似与古墓武学有关。",
+	"beggar": "巷口一名老丐伸手乞食，\n目光却在你身上暗暗打量。",
+	"tomb_bed": "荒山之中藏着一座古墓，\n石室中央横着一张寒玉床。",
+	"wounded_eagle": "一只巨雕伏在崖边，\n翅上箭伤未愈，目光如炬。",
+	"peach_maze": "海岛风送来桃花香，\n花影错落，隐成阵势。",
+	"snake_bile": "白驼山弟子叫卖蛇胆，\n称其大补真元，价钱不菲。",
+	"dragon_scrap": "书摊上一册残破掌谱，\n隐见「降龙」二字，纸色发黄。",
+	"flood_ferry": "河水暴涨，渡口只余一舟，\n艄公索价甚高，爱搭不理。",
+	"escort_job": "镖头缺人手，见你身手，\n便邀你押一趟去南边的镖。",
+	"dali_market": "市集上皮甲快靴俱全，\n掌柜的拍着胸脯称分量十足。",
+	"night_rain": "夜雨滂沱，破庙漏得厉害，\n老僧独坐，就着灯火补屋檐。",
+	"gambling_den": "镇上赌坊彻夜喧闹，\n有人一夜输光了全部盘缠。",
+	"quanzhen_scripture": "全真宫外老道伏案抄经，\n见你驻足，递来一卷道德经。",
+	"lost_purse": "路旁褡裢里散着银两，\n四下无人，只有风声掠过草叶。",
+	"riverside_duel": "河滩上两派剑客各立一端，\n口舌已僵，都请你执剑裁断。",
+	"ancient_bell": "荒寺暮色里铜钟自鸣，\n钟腹内壁隐有呼吸般的铭文。",
+	"poisoned_well": "荒村井水一夜发苦，\n药翁提药箱来，开口要价。",
+	"tiger_pass": "崖下虎啸阵阵，\n商队头目兜售过路符。",
+	"lantern_festival": "上元灯会人声鼎沸，\n灯摊谜面未解，猴子却已逃了。",
+	"pawnshop": "当铺柜台压着一柄断票旧刀，\n刀主落魄，已无力赎当。",
+	"storyteller": "茶馆说书人正讲一段旧年剑侠，\n满堂喝彩，茶碗都忘了喝。",
+	"chess_stall": "街角棋盘摆着一局残局，\n据说十年无人解出。",
+	"smithy": "铁匠铺炉火正旺，\n老铁匠说你的旧剑可以回炉重铸。",
+	"cliff_herbs": "崖上采药人正招人攀崖，\n崖顶灵芝长势极好，亦可买去。",
+	"wedding_train": "山道上一顶花轿拦住去路，\n按老例须随礼方能通行。",
+	"sword_mound": "荒冢之旁堆着断剑残刃，\n剑意未散，隐隐有鸣。",
+	"night_inn": "客栈掌柜伏在账本前揉眼，\n见你驻足，邀你帮算账或温酒暖身。",
+	"wild_goose_letter": "一只大雁落在脚边，\n足上系着帛书，村舍就在山下。",
+	"snow_pass": "风雪封了隘口，\n向导蹲在火边，开口报了价。",
+	"drunken_fist": "醉汉在酒肆口手舞足蹈，\n看似胡闹，拳理却暗合章法。",
+	"river_god": "河伯娶亲的鼓号从村头响起，\n巫师索价，村民面有难色，求你定夺。",
+	"plague_village": "疫村炊烟稀薄，\n村中郎中望着药柜叹气，缺药无力。",
+	"young_disciple": "一名少年在门外徘徊良久，\n终于鼓足勇气，开口求你指点。",
+	"fallen_rider": "客商坠马，货物散落一地，\n他揉着腰，四下张望寻人搭手。",
+}
+
+## Verbatim option labels for all 36 rows: [label_a, label_b].
+const ROW_LABELS := {
+	"bandits": ["破财消灾", "出手退敌"],
+	"merchant": ["买下长剑", "婉拒"],
+	"ruins": ["入内参悟", "谨慎绕行"],
+	"beggar": ["施舍", "切磋武学"],
+	"tomb_bed": ["卧床练气", "床畔拾剑"],
+	"wounded_eagle": ["施药疗伤", "静观其变"],
+	"peach_maze": ["循隙闯阵", "阵外观潮"],
+	"snake_bile": ["重金购之", "掉头就走"],
+	"dragon_scrap": ["强记于心", "卖与书贾"],
+	"flood_ferry": ["付钱渡河", "泅水而过"],
+	"escort_job": ["接下镖单", "婉拒独行"],
+	"dali_market": ["购皮甲", "购快靴"],
+	"night_rain": ["帮工换宿", "檐下练剑"],
+	"gambling_den": ["入局三把", "袖手旁观"],
+	"quanzhen_scripture": ["随他抄经", "求教剑理"],
+	"lost_purse": ["送还失主", "收起走人"],
+	"riverside_duel": ["出招定胜负", "劝散取彩"],
+	"ancient_bell": ["抚钟入息", "敲钟卖铜"],
+	"poisoned_well": ["出银请药", "自学辨毒"],
+	"tiger_pass": ["买符通过", "攀崖绕行"],
+	"lantern_festival": ["破灯猜谜", "追猴拾遗"],
+	"pawnshop": ["断票贱收", "代赎还主"],
+	"storyteller": ["买茶续听", "默记剑理"],
+	"chess_stall": ["静思破局", "出银买谱"],
+	"smithy": ["出银回炉", "旁观剑理"],
+	"cliff_herbs": ["帮攀崖顶", "重金购芝"],
+	"wedding_train": ["随礼放行", "攀坡绕行"],
+	"sword_mound": ["拾剑参悟", "断剑熔银"],
+	"night_inn": ["帮算夜账", "温酒暖身"],
+	"wild_goose_letter": ["拾书送村", "拆书细读"],
+	"snow_pass": ["出银雇导", "踏雪先行"],
+	"drunken_fist": ["买酒请教", "以拳换教"],
+	"river_god": ["破局辨伪", "受金平事"],
+	"plague_village": ["出银买药", "自学方剂"],
+	"young_disciple": ["耐心点拨", "收礼了事"],
+	"fallen_rider": ["帮拣银赏", "捡靴自用"],
 }
 
 
@@ -92,6 +260,8 @@ static func run() -> bool:
 	ok = _test_unknown(ok)
 	ok = _test_fresh_instances(ok)
 	ok = _test_no_repeat_full_journey(ok)
+	ok = _test_option_labels(ok)
+	ok = _test_i18n_entries(ok)
 	if ok:
 		print("PASS test_event_data")
 	else:
@@ -195,6 +365,7 @@ static func _test_texts(ok: bool) -> bool:
 		var def = EventData.def(id)
 		ok = _expect(ok, (def.text as String) != "", "text non-empty " + id)
 		ok = _expect(ok, (def.text as String).length() > 10, "text body 2-3 lines " + id)
+		ok = _expect(ok, def.text == ROW_TEXTS[id], "text verbatim pin " + id)
 	return ok
 
 
@@ -276,6 +447,35 @@ static func _test_no_repeat_full_journey(ok: bool) -> bool:
 	# Size floor asserted LAST so the first red on the 16-pool lands on the
 	# no-repeat violation at draw 17, not here.
 	ok = _expect(ok, all.size() >= 36, "TABLE has >= 36 rows (got %d)" % all.size())
+	return ok
+
+
+## Verbatim option-label pin: every row's both labels must match ROW_LABELS.
+static func _test_option_labels(ok: bool) -> bool:
+	for id in ROW_TITLES.keys():
+		var def = EventData.def(id)
+		ok = _expect(ok, def != null, "def exists for labels " + id)
+		if def == null:
+			continue
+		ok = _expect(ok, def.option_a.label == ROW_LABELS[id][0], "option_a label " + id)
+		ok = _expect(ok, def.option_b.label == ROW_LABELS[id][1], "option_b label " + id)
+	return ok
+
+
+## EN-dictionary membership gate: every event string (title, text, both labels)
+## must exist as a key in the i18n EN dictionary. test_i18n_coverage.py does NOT
+## scan event_data.gd literals; this gate closes that blind spot.
+static func _test_i18n_entries(ok: bool) -> bool:
+	var en: Dictionary = I18nScript.EN
+	for id in ROW_TITLES.keys():
+		var def = EventData.def(id)
+		ok = _expect(ok, def != null, "def exists for i18n " + id)
+		if def == null:
+			continue
+		ok = _expect(ok, en.has(def.title), "EN has title " + id)
+		ok = _expect(ok, en.has(def.text), "EN has text " + id)
+		ok = _expect(ok, en.has(def.option_a.label), "EN has option_a label " + id)
+		ok = _expect(ok, en.has(def.option_b.label), "EN has option_b label " + id)
 	return ok
 
 
