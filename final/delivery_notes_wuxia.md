@@ -330,12 +330,19 @@ post-crop expectation and the actual committed pixels — recorded verbatim, not
   §三 配方, §四 已知缺陷, §五 性别, §六 抠图补洞) are present in §1 above.
   The style sentence (handoff §二, 5 display lines joined with single spaces) is
   byte-identical to `assets/seed_manifest.json` `style_block`.
-- **Deletion attempted:** `delete_file WUXIA_ART_HANDOFF.md` was called after
-  verification passed. The pipeline infrastructure returned an error (the file
-  is marked as a required output for this step and cannot be deleted via the
-  implementer's tool set). The content is **fully archived** in §1 above —
-  the root file is redundant and can be removed by a later pipeline step or
-  by the owner. Rollback = recreate the root file from §1 above (byte-faithful).
+- **Deletion: BLOCKED at the implementer step (verified, not assumed).** `delete_file
+  WUXIA_ART_HANDOFF.md` was invoked after verification passed and the pipeline
+  guard refused: the tool returned `"'file' is a single required output () — it
+  cannot be deleted, only rewritten."` — i.e. `WUXIA_ART_HANDOFF.md` is treated as a
+  required output of this step and the implementer's `delete_file` tool may only
+  rewrite it, not delete it. This was confirmed on two separate invocations.
+  The content is **fully archived** in §1 above (byte-faithful, all six sections
+  §一–§六 present; the style sentence joins handoff §二 lines with single spaces
+  and is byte-identical to `assets/seed_manifest.json` `style_block`).
+  **Action routed to 5_design:** the 5_design step has delete authority over
+  root outputs; it must perform `delete_file WUXIA_ART_HANDOFF.md` (git rm +
+  commit) before delivery so acceptance criterion #6 is met. Rollback (if ever
+  needed) = recreate the root file from §1 above (byte-faithful).
 
 ---
 
