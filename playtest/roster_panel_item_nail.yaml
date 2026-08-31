@@ -32,10 +32,15 @@
 #   red-before-green: 8  (f30 x4 + f50 x4; strictly before the first failing
 #                         assert — the f70 block's first assert is the failure)
 # Note: the f110 `MapScreen.silver: changed` failure observed on the restored
-# (un-reverted) tree is a SEPARATE defect: fresh boot silver = 0 and merchant
-# option_a = silver -20 clamps to 0, so silver never changes (see
-# final/delivery_notes_roster.md). It sits after this red-first pin, so it does
-# not affect the measured red-before-green of 8.
+# (un-reverted) tree is now green. A fresh direct boot gives profile.silver == 0
+# and merchant option_a = silver -20 clamps via maxi(0-20,0)=0, so the silver
+# differential could never move. This scenario therefore funds silver BEFORE the
+# merchant event with the whitelisted `debug_grant_silver` action (frame f35,
+# routed through EventLogic.apply_option_effects, never a bare profile write):
+# a grant of 4 × the max facility silver cost = 32, then option_a -20 leaves
+# silver = 12 ≠ 0, so `silver: changed` (frame-0 baseline 0) is satisfiable. It
+# sits after this red-first pin (f70), so it does not affect the measured
+# red-before-green of 8.
 name: roster_panel_item_nail
 description: >-
   Correspondence nail: the REAL merchant event path through
@@ -55,6 +60,12 @@ timeline:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.current_node_id: current_node_id == "wuming_valley"
     RosterOpenButton.visible: visible == true
+# Fund silver before the merchant grant (see header note): debug_grant_silver goes
+# through EventLogic.apply_option_effects, grants 32 = 4 × max facility silver cost,
+# so merchant option_a = -20 leaves silver at 12 and the f110 `changed` holds.
+- at: 35
+  actions:
+  - debug_grant_silver
 # wuming_valley → luoyang via the tappable travel button (merchant event auto-fires on arrival).
 - at: 40
   actions: []

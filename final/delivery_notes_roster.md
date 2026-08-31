@@ -86,6 +86,19 @@ target).
   (contract task's job, requires a timeline/flow change this task must not make): give the
   player positive silver before the merchant grant (e.g. a `debug_grant_silver` action or a
   travel-path silver source) so `silver: changed` is meaningful.
+**Fix landing (task `fix_roster_item_nail_silver`, 2026-08-31):** `roster_panel_item_nail`
+was re-run **36/36 PASS** on the restored tree via `godot_playtest_scenario` sidecar (the
+authoritative self-run for this scenario's fix). The f110 `MapScreen.silver: changed` red
+is resolved by funding silver before the merchant event: one `at: 35` frame `actions:
+[debug_grant_silver]` (whitelisted action, consumed in `map.gd::_process` → `_debug_grant_silver()`
+→ `EventLogic.apply_option_effects`, never a bare profile write) grants **32** = 4 × the max
+facility silver cost; merchant `option_a` then applies −20 and `maxi(32−20,0) = 12 ≠ 0`,
+so the frame-0 baseline `0` → `12` satisfies `changed`. All blocks from f40 onward are
+byte-identical; the RED-FIRST EVIDENCE block (f70 / `RosterPanel.is_open: is_open == true`
+/ exact two lines / red-before-green **8**) and the §1 measured four values are untouched
+(no re-measure — this scenario's red-first was already done). Note: under the historical
+revert condition (open() a no-op) f110 would now be green regardless, but the stored 8
+counts only asserts strictly before the f70 failure, so §1's block stays accurate.
 - `roster_panel_cultivation_open_close`: **15/16** — failure at **f110**
   `CultivationScreen.month: month changed since frame 0` PLUS 6 runtime errors
   `Invalid access to property or key 'economy' / 'equipment' / 'growth' on a base object of
