@@ -196,3 +196,80 @@ deleted or relaxed to hide it).
   frame/panel mechanics should now clear the node-not-found cascade, but the two
   gear-diff-into-battle asserts are expected to remain red through the MAP route
   until the CULTIVATION-encounter re-route lands (see ROOT CAUSE above).
+
+---
+
+## Addendum — CULTIVATION-encounter re-route (2026-08-31, final fix)
+
+### Root-cause review confirmed the MAP route is a dead end
+
+The frame re-projection above is mechanically sound but **could not** make the
+gear-diff-into-battle asserts green: `battlefield.gd:69` enters
+`_setup_encounter_battle()` — the ONLY path that calls
+`BattleSetup.build_character(SaveManager.profile)` (:651) — solely when
+`battle_return_state == "CULTIVATION"`, and `start_map_battle()` (game_manager.gd:186)
+set it to `"MAP"`, so the huashan battle fell through to the tutorial battlefield
+(Yang Guo, gear mirrors always 0). The legal-predecessors table
+(`"MAP": [CULTIVATION]`) and the one-way `debug_fast_forward` (CULTIVATION → MAP)
+mean a scenario that reaches MAP can never return to CULTIVATION.
+
+### What changed to fix it
+
+`equipment_in_battle_diff.yaml` was **rewritten** to route all three encounter legs
+through the **CULTIVATION encounter** path (`debug_enter_encounter` →
+`start_encounter` → battlefield.gd:69 `_setup_encounter_battle` →
+`BattleSetup.build_character(SaveManager.profile)` → `derive_stats` →
+`EquipmentData.sum_bonuses`). This is the real code path the brief requires.
+
+- **New real-path debug grant** `debug_grant_equip` in `scripts/segments/cultivation.gd`
+  (bound in `_process`, input action added to `project.godot` and the
+  `_common.yaml` actions list). It grants 青锋剑 `eq_sword_3` through
+  `EventLogic.apply_option_effects` — the **same item-grant handler** every
+  event/card item effect takes (merchant option_a included), never a bare profile
+  write. Idempotent (no-op if already owned); no-op outside CULTIVATION.
+- **Boot** reuses the proven menu → creation → tutorial → cultivation sequence
+  (`cultivation_changes_combat.yaml` f3–f200), landing in CULTIVATION state so
+  `debug_enter_encounter` (hard-gated on `current_state == "CULTIVATION"`) fires.
+- **Three real legs**, each an encounter battle asserted with
+  `CombatManager.tutorial_battle == false` (proves the Encounter vehicle):
+  Leg 1 unequipped (`gear_*_bonus` all 0, `max_health > 0`) → panel-click equip →
+  Leg 2 (`gear_attack_bonus` `changed` AND `> 0`) → win → panel-click unequip →
+  Leg 3 (`gear_attack_bonus == 0`, back to baseline).
+- **Free-action pins on the write path** in CULTIVATION: `CultivationScreen.phase`
+  stays `CARD_PICK` and `month` stays 1 across every open/equip/close (ruling (c)).
+
+### `changed` differential caveat — Leg-3 reversal is proven by value, not `changed`
+
+The harness differential baseline is the **frame-0 snapshot**
+(`test_playtest_contract_smoke.py:1102`) and `Player.gear_attack_bonus` is `0` at
+frame 0, so `gear_attack_bonus: changed` at Leg 3 (0 → 0) is **inexpressible**. The
+reversibility is instead proven by the value sequence across consecutive real
+battles: Leg 2 `gear_attack_bonus > 0` (equipped) then Leg 3
+`gear_attack_bonus == 0` (unequipped) — the same reversal style
+`roster_equip_free_action` uses for its unequip (`equipped_weapon == ""`, not
+`changed`). `changed` is asserted where it is satisfiable (Leg 2: 0 → +6).
+
+### Frame layout is a PROJECTION, not a measurement (honest, unchanged discipline)
+
+The implementer protocol requires self-running the changed scenario via
+`godot_playtest_scenario`; the in-call probe returned `"No project.godot at /app"`
+(the pipeline limitation documented at delivery_notes_fix_clicktarget_ignore.md:58).
+The frame deltas are therefore **derived from the MEASURED
+`cultivation_changes_combat.yaml` deltas** and generously buffered, NOT freshly
+measured this run: `debug_enter_encounter` → BATTLE measured ~40 (here 50);
+`debug_win_tutorial` → WON measured ~20 (here 35); `ui_accept` → CULTIVATION
+measured ~30 (here 45). Exact per-frame confirmation remains pending the 5_compile
+gate, marked as pending — never held as a measured value.
+
+### Code additions (this task, fix_equipment_battle_diff_frame_timing)
+
+| File | Change |
+|---|---|
+| `playtest/equipment_in_battle_diff.yaml` | rewritten: CULTIVATION-encounter route, `debug_grant_equip` grant, 3 real legs, free-action pins |
+| `scripts/segments/cultivation.gd` | `_DEBUG_EQUIP_ID` const + `_debug_grant_equip()` (EventLogic-routed) + `_process` binding |
+| `project.godot` | `debug_grant_equip` input action (empty event list, harness-only) |
+| `playtest/_common.yaml` | `debug_grant_equip` appended to the `actions:` list (append-only) |
+| `final/delivery_notes_equipment.md` | this addendum |
+
+Existing assertions in `roster_equip_free_action.yaml` / `spine_to_ending.yaml` /
+`map_node_event_shaolin.yaml` and the `_common.yaml` surface whitelist are untouched.

@@ -163,6 +163,10 @@ debug_grant_art={
 "deadzone": 0.5,
 "events": []
 }
+debug_grant_equip={
+"deadzone": 0.5,
+"events": []
+}
 debug_enter_encounter={
 "deadzone": 0.5,
 "events": []

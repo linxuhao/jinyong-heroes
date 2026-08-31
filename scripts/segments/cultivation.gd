@@ -28,6 +28,12 @@ const _A_ID_BY_SCHOOL := {
 	"dart": "a_dart",
 }
 
+## Debug- grant fixed equipment id (青锋剑 eq_sword_3). Routed through
+## EventLogic.apply_option_effects (the same item grant pipeline every
+## event/card item effect takes — merchant option_a included), never a bare
+## profile.inventory append. See _debug_grant_equip.
+const _DEBUG_EQUIP_ID: String = "eq_sword_3"
+
 ## Surface: cultivation year (1..3).
 var year: int = 1
 
@@ -144,6 +150,8 @@ func _process(_delta: float) -> void:
 		_debug_step_month()
 	if Input.is_action_just_pressed("debug_grant_art"):
 		_debug_grant_art()
+	if Input.is_action_just_pressed("debug_grant_equip"):
+		_debug_grant_equip()
 
 
 func _roster_open() -> bool:
@@ -770,6 +778,23 @@ func _debug_grant_art() -> void:
 	if id == "" or SaveManager.profile.has_gongfa(id):
 		return
 	SaveManager.profile.add_gongfa(id, "A")
+	_sync_surface()
+
+
+## DEBUG: grant a fixed equipment card (青锋剑 eq_sword_3) into the inventory
+## through the REAL item grant pipeline — EventLogic.apply_option_effects, the
+## same handler every event/card item effect takes (merchant option_a included).
+## Never a bare profile.inventory append (roadmap rule 2: injection must not
+## bypass the code the player actually exercises). Idempotent (no-op when the id
+## is already owned); no-op outside CULTIVATION.
+func _debug_grant_equip() -> void:
+	if GameManager.current_state != "CULTIVATION":
+		return
+	if SaveManager.profile.inventory.has(_DEBUG_EQUIP_ID):
+		return
+	var opt = EventData.EventOption.new()
+	opt.effects.assign([{"type": "item", "value": 0, "target": _DEBUG_EQUIP_ID}])
+	EventLogic.apply_option_effects(SaveManager.profile, opt)
 	_sync_surface()
 
 

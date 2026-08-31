@@ -1,73 +1,72 @@
-# Real grant → click equip → real encounter → changed → unequip → baseline.
+# Real grant -> click equip -> real CULTIVATION encounter -> changed -> unequip -> baseline.
 #
 # THE ROUND'S CORE DIFFERENTIAL NAIL (jinyong-equipment-battle). Three legs
-# through a REAL encounter (battlefield.gd:651 → BattleSetup.build_character
-# → derive_stats with EquipmentData.sum_bonuses):
+# through a REAL ENCOUNTER battle on the REAL code path:
+#   GameManager.start_encounter -> battlefield._setup_encounter_battle
+#   -> BattleSetup.build_character(SaveManager.profile) -> derive_stats
+#   -> EquipmentData.sum_bonuses -> CharacterData.gear_* -> Player mirrors.
 #
-#   Leg 1: UNEQUIPPED battle — assert gear_attack_bonus == 0 (and the other
-#          three gear mirrors == 0), max_health > 0 (registers observation
-#          for `changed`).
-#   Leg 2: EQUIPPED battle — after clicking EquipButton0 through the panel,
-#          re-travel to huashan; assert gear_attack_bonus changed AND > 0
-#          (0 → +6 from eq_sword_3 tier 3 × ATTACK_PER_TIER 2).
-#   Leg 3: UNEQUIPPED again — after clicking EquipButton0 to unequip,
-#          re-travel; assert gear_attack_bonus == 0 AND changed (reversed).
+#   Leg 1: UNEQUIPPED battle — assert all four gear_*_bonus == 0, max_health > 0.
+#   Leg 2: EQUIPPED battle — after a click on EquipButton0 (equip eq_sword_3,
+#          tier 3 sword = ATTACK_PER_TIER 2 * 3 = +6), assert gear_attack_bonus
+#          changed AND > 0 in the live battle.
+#   Leg 3: UNEQUIPPED again — after a click to unequip, assert gear_attack_bonus
+#          == 0 (back to baseline — reversibility through the real battle path).
 #
-# REAL CODE PATH: eq_sword_3 enters inventory via the merchant event
-# (EventLogic.apply_option_effects, the same path as roster_panel_item_nail).
-# The player equips it via a click on EquipButton0 (true hit test on the
-# real control, never *_ClickTarget). The battle reads equipped gear through
-# BattleSetup.build_character → derive_stats → EquipmentData.sum_bonuses.
+# ROUTE = CULTIVATION ENCOUNTER, NOT the MAP/tutorial battlefield. That distinction
+# is the whole fix for the prior frame-timing failure: the MAP (huashan) battle
+# reuses the TUTORIAL battlefield — battlefield._ready branches to the tutorial
+# path for any battle_return_state != "CULTIVATION" (battlefield.gd:69-71),
+# instantiating Yang Guo (cd.max_health = 1000), NEVER the profile. Equipped gear
+# flows into derived stats ONLY through the CULTIVATION encounter branch
+# (battlefield.gd:69 -> _setup_encounter_battle -> :651 build_character). So the
+# MAP-route scenario could not satisfy `gear_attack_bonus > 0` by ANY frame layout;
+# this scenario routes through the only green-capable vehicle.
 #
-# ROUTE: full boot (menu → creation → tutorial → cultivation → map) reusing
-# the proven map_battle_node_huashan frame sequence. The map topology:
-#   wuming_valley → luoyang → shaolin → huashan
-# After each battle win (debug_win_tutorial → WON → ui_accept → MAP), the
-# player is at huashan (current_node_id persists). Re-travel requires going
-# to shaolin first (huashan's only neighbor), then back to huashan.
+# REAL CODE PATH for the item: eq_sword_3 enters inventory via the
+# `debug_grant_equip` cultivation action, which routes through
+# EventLogic.apply_option_effects (the SAME item-grant handler every event/card
+# item effect takes — merchant option_a included), never a bare profile write.
+# The player equips it via a click on EquipButton0 (true hit test on the real
+# control, never *_ClickTarget). The battle reads equipped gear through
+# BattleSetup.build_character -> derive_stats -> EquipmentData.sum_bonuses.
 #
-# MEASURED ROUTE NOTE (2026-08-31): the post-battle return node after
-# debug_win_tutorial → WON → ui_accept is the MAP segment at huashan
-# (battle_return_state == "MAP" set by start_map_battle, game_manager.gd:186).
-# Shaolin fires its night_rain event on every arrival (events_resolved_count
-# increments each pass). The re-travel steps are derived from the adjacency
-# table: huashan: [shaolin], shaolin: [luoyang, huashan].
+# BOOT = the proven menu -> creation -> tutorial -> cultivation sequence
+# (cultivation_changes_combat.yaml f3-f200, templated on the huashan boot).
+# Lands in CULTIVATION state (needed by debug_enter_encounter, which is
+# hard-gated on GameManager.current_state == "CULTIVATION").
 #
-# FRAME RE-PROJECTION (2026-08-31, fix_equipment_battle_diff_frame_timing):
-# the win→MAP legs are re-projected with WIDE parse/transition windows (spread
-# ui_accept + an in-window `current_state == "WON" or current_state == "MAP"`
-# diagnostic) and the re-travel legs carry focus_id/phase diagnostics before
-# every travel accept. This layout is a PROJECTION (derivation + wide buffer),
-# NOT a measured value: the battle→WON→MAP duration could not be measured from
-# this step's working dir (godot_playtest_scenario: "No project.godot at /app").
-# The exact transition duration and re-travel landing are pending confirmation
-# by the 5_compile gate's per-frame report.
+# FRAME DELTAS are derived from the MEASURED cultivation_changes_combat deltas,
+# generously buffered, NOT freshly measured this run (implementer probe could not
+# boot the project from its working dir): debug_enter_encounter -> BATTLE measured
+# ~40 frames (here 50); debug_win_tutorial -> WON measured ~20 (here 35);
+# ui_accept -> CULTIVATION measured ~30 (here 45). Each assertion lands several
+# frames inside a wide buffer; nothing guesses a node id or event.
 #
-# KNOWN CODE-LEVEL BLOCKER (must not be hidden by timing): the MAP (huashan)
-# battle reuses the TUTORIAL battlefield — battlefield._ready branches to the
-# tutorial path for any battle_return_state != "CULTIVATION" (battlefield.gd
-# :69-71), instantiating Yang Guo (:80, cd.max_health = 1000) with the tutorial
-# overlay. Equipped gear flows into the player ONLY via the CULTIVATION
-# encounter (battlefield.gd:651 BattleSetup.build_character(SaveManager.profile)
-# in _setup_encounter_battle). Therefore `Player.gear_attack_bonus` is 0 in the
-# MAP battle regardless of what the profile carries, so the Leg-2 `> 0` and the
-# Leg-3 `changed` asserts CANNOT be satisfied through this route by any frame
-# layout. This scenario pins the frame/step mechanics and the panel equip; the
-# gear-diff-into-battle proof requires routing through a CULTIVATION encounter
-# (debug_enter_encounter) — reported in final/delivery_notes_equipment.md.
+# `changed` DIFF CAVEAT: the harness differential baseline is the FRAME-0 snapshot
+# (test_playtest_contract_smoke.py: "the harness's differential baseline is the
+# frame-0 snapshot"). Player.gear_attack_bonus is 0 at frame 0, so `changed` at
+# Leg 3 (0 -> 0) is INEXPRESSIBLE — reversibility is instead proven by the value
+# sequence across consecutive real battles: Leg 2 `> 0` (equipped) then Leg 3
+# `== 0` (unequipped). This is the same reversal style roster_equip_free_action
+# uses for its unequip (proven by `equipped_weapon == ""`, not `changed`).
 #
 # NO absolute tuned values: all gear diffs are `changed` or relational
-# (`> 0`, `== 0`). The `== 0` baseline is the same shape as
-# facility_id == "" (zero-baseline relation, sanctioned).
+# (`> 0`, `== 0`). The `== 0` baselines are the zero-baseline relation
+# (facility_id == "" shape, sanctioned). Every battle asserts
+# CombatManager.tutorial_battle == false (proves the Encounter path, not the
+# tutorial path, is the vehicle).
 name: equipment_in_battle_diff
 description: >-
-  Equipment in battle differential: real merchant grant of eq_sword_3,
-  click-to-equip through the roster panel, three encounter legs showing
-  gear_attack_bonus 0 → >0 (changed) → 0 (changed, reversed). All through
-  the real code path (EventLogic → profile.inventory → profile.equipped →
-  BattleSetup.build_character → derive_stats).
+  Equipment into battle differential, proven through the REAL CULTIVATION
+  encounter path (BattleSetup.build_character at battlefield.gd:651 ->
+  derive_stats -> EquipmentData.sum_bonuses). eq_sword_3 is granted through
+  EventLogic.apply_option_effects (the real item pipeline), equipped by clicking
+  EquipButton0, then three real encounters show gear_attack_bonus 0 -> >0 (changed)
+  -> 0 (reversed). CombatManager.tutorial_battle == false throughout proves the
+  Encounter (not tutorial) path is the vehicle.
 timeline:
-# ── Leg 0: Boot to MAP (proven huashan route) ──────────────────────────
+# ── Boot: menu -> creation -> tutorial -> cultivation (proven huashan boot, f3-f200) ──
 - at: 3
   actions:
   - ui_accept
@@ -103,331 +102,177 @@ timeline:
   - ui_accept
 - at: 120
   actions:
-  - move_right
+  - ui_accept
 - at: 130
   actions:
   - move_right
 - at: 140
   actions:
-  - move_right
-- at: 150
-  actions:
-  - move_right
+  - ui_accept
 - at: 160
   actions:
-  - move_right
+  - move_down
 - at: 170
   actions:
   - ui_accept
-- at: 180
-  actions:
-  - move_right
-- at: 190
-  actions:
-  - ui_accept
-- at: 220
-  actions:
-  - ui_accept
-- at: 280
-  actions:
-  - debug_fast_forward
-- at: 400
+- at: 200
   actions: []
   assert:
-    GameManager.current_state: current_state == "MAP"
-# ── Travel to luoyang (merchant event fires on arrival) ────────────────
-- at: 420
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.sect_id: sect_id == "wudang"
+    CultivationScreen.month: month == 1
+    RosterOpenButton.visible: visible == true
+# ── Grant the equipment card through the REAL item pipeline (in CULTIVATION) ──
+- at: 215
   actions:
-  - move_right
-- at: 430
-  actions:
-  - ui_accept
-- at: 440
-  actions: []
-  assert:
-    MapScreen.phase: phase == "EVENT"
-    MapScreen.event_id: event_id == "merchant"
-# Resolve merchant: option_a grants eq_sword_3 (real EventLogic path).
-- at: 450
+  - debug_grant_equip
+# Open the roster once to prove eq_sword_3 is in inventory (equip_button_count
+# >= 1) and the weapon slot is still empty (Leg 1 runs unequipped).
+- at: 240
   actions: []
   clicks:
-  - EventOptionButton0
-- at: 460
+  - RosterOpenButton
+- at: 250
   actions: []
   assert:
-    MapScreen.phase: phase == "TRAVEL"
-    MapScreen.events_resolved_count: events_resolved_count == 1
-# ── Travel to shaolin (luoyang → wudang focus → shaolin focus) ─────────
-- at: 470
-  actions:
-  - move_right
-- at: 480
-  actions:
-  - move_right
-- at: 490
-  actions:
-  - ui_accept
-# Shaolin fires night_rain on arrival — resolve it before continuing.
-- at: 510
-  actions:
-  - ui_accept
-- at: 520
+    RosterPanel.is_open: is_open == true
+    RosterPanel.equip_button_count: equip_button_count >= 1
+    RosterPanel.equipped_weapon: equipped_weapon == ""
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 260
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 270
   actions: []
   assert:
-    MapScreen.phase: phase == "TRAVEL"
-# ── Travel to huashan (shaolin → luoyang focus → huashan focus) ────────
-- at: 530
+    RosterPanel.is_open: is_open == false
+    CultivationScreen.phase: phase == "CARD_PICK"   # free action: phase unchanged
+# ── Leg 1: real CULTIVATION encounter, UNEQUIPPED ─────────────────────────
+- at: 280
   actions:
-  - move_right
-- at: 540
-  actions:
-  - move_right
-- at: 550
-  actions:
-  - ui_accept
-# ── Leg 1: BATTLE UNEQUIPPED ───────────────────────────────────────────
-# The MAP (huashan) battle reuses the TUTORIAL battlefield: battlefield._ready
-# branches to the tutorial path for any battle_return_state != "CULTIVATION"
-# (battlefield.gd:69-71, :80 — Yang Guo, not the profile), and
-# CombatManager.debug_wipe_enemies no-ops while phase == IDLE (combat_manager.gd
-# :454-460), so the tutorial overlay must be advanced (spread ui_accept) before
-# the wipe can land. The parse/transition windows below are WIDE with spread
-# ui_accept + an in-window diagnostic because the exact battle→WON→MAP duration
-# was NOT measurable from this step's working dir (godot_playtest_scenario:
-# "No project.godot at /app") — this layout is a projection (derivation + wide
-# buffer), pending 5_compile gate confirmation.
-- at: 580
+  - debug_enter_encounter
+- at: 330
   actions: []
   assert:
     GameManager.current_state: current_state == "BATTLE"
-    SceneManager.current_scene: current_scene == "battlefield"
+    CombatManager.tutorial_battle: tutorial_battle == false
     Player.gear_attack_bonus: gear_attack_bonus == 0
     Player.gear_health_bonus: gear_health_bonus == 0
     Player.gear_initiative_bonus: gear_initiative_bonus == 0
     Player.gear_move_bonus: gear_move_bonus == 0
     Player.max_health: max_health > 0
-# Advance the tutorial overlay toward a playable phase before the wipe.
-- at: 590
-  actions:
-  - ui_accept
-- at: 610
-  actions:
-  - ui_accept
-- at: 630
-  actions:
-  - ui_accept
-- at: 650
-  actions:
-  - ui_accept
-- at: 670
-  actions:
-  - ui_accept
-# Win battle 1 (wipe through the real pipeline → WON).
-- at: 690
+- at: 345
   actions:
   - debug_win_tutorial
-# Wide parse + transition window: spread ui_accept so the first that lands on
-# the WON overlay advances WON→MAP (request_continue); the rest are no-ops.
-- at: 720
-  actions:
-  - ui_accept
-- at: 750
-  actions:
-  - ui_accept
-- at: 780
-  actions:
-  - ui_accept
-- at: 810
-  actions:
-  - ui_accept
-- at: 840
+- at: 380
   actions: []
   assert:
-    GameManager.current_state: current_state == "WON" or current_state == "MAP"
-# Definite MAP landing with a buffer after the wide window.
-- at: 880
+    GameManager.current_state: current_state == "WON"
+- at: 395
+  actions:
+  - ui_accept
+- at: 440
   actions: []
   assert:
-    GameManager.current_state: current_state == "MAP"
-# ── Equip sword through the panel (Leg 2 prep) ─────────────────────────
-- at: 890
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+# ── Equip eq_sword_3 through the panel (Leg 2 prep) — click-only ──────────
+- at: 450
   actions: []
   clicks:
   - RosterOpenButton
-- at: 900
+- at: 460
   actions: []
   assert:
     RosterPanel.is_open: is_open == true
     RosterPanel.equipped_weapon: equipped_weapon == ""
     RosterPanel.equip_button_count: equip_button_count >= 1
-    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
-- at: 910
+- at: 470
   actions: []
   clicks:
   - EquipButton0
-- at: 920
+- at: 480
   actions: []
   assert:
     RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3"
     RosterPanel.equipped_weapon: changed
-    MapScreen.phase: phase == "TRAVEL"
-- at: 930
+    CultivationScreen.phase: phase == "CARD_PICK"   # free action: phase unchanged
+- at: 490
   actions: []
   clicks:
   - RosterCloseButton
-- at: 940
+- at: 500
   actions: []
   assert:
     RosterPanel.is_open: is_open == false
-# ── Re-travel to huashan (Leg 2: equipped) ─────────────────────────────
-# After the WON return the map reloads at huashan (current_node_id persists).
-# huashan's only neighbor is shaolin; shaolin fires night_rain on arrival
-# (resolve before continuing). From shaolin, neighbors are [luoyang, huashan]:
-# the proven recipe is move_right×2 → focus huashan → accept. focus_id/phase
-# are asserted BEFORE each travel accept (measured-steps precedent): a wrong
-# focus names the node instead of failing later with a mystery.
-- at: 950
-  actions: []
-  assert:
-    MapScreen.phase: phase == "TRAVEL"
-    MapScreen.current_node_id: current_node_id == "huashan"
-- at: 960
+    CultivationScreen.phase: phase == "CARD_PICK"
+# ── Leg 2: real CULTIVATION encounter, EQUIPPED ───────────────────────────
+- at: 510
   actions:
-  - move_right
-- at: 970
-  actions:
-  - ui_accept
-# Resolve shaolin's night_rain entry event on arrival.
-- at: 990
-  actions:
-  - ui_accept
-- at: 1010
-  actions: []
-  assert:
-    MapScreen.phase: phase == "TRAVEL"
-- at: 1020
-  actions:
-  - move_right
-- at: 1030
-  actions:
-  - move_right
-- at: 1040
-  actions: []
-  assert:
-    MapScreen.focus_id: focus_id == "huashan"
-- at: 1050
-  actions:
-  - ui_accept
-# ── Leg 2: BATTLE EQUIPPED ─────────────────────────────────────────────
-- at: 1080
+  - debug_enter_encounter
+- at: 560
   actions: []
   assert:
     GameManager.current_state: current_state == "BATTLE"
+    CombatManager.tutorial_battle: tutorial_battle == false
     Player.gear_attack_bonus: changed
     Player.gear_attack_bonus: gear_attack_bonus > 0
     Player.max_health: max_health > 0
-# Advance the tutorial overlay, then win battle 2 → return to MAP.
-- at: 1090
-  actions:
-  - ui_accept
-- at: 1110
-  actions:
-  - ui_accept
-- at: 1130
-  actions:
-  - ui_accept
-- at: 1150
-  actions:
-  - ui_accept
-- at: 1170
-  actions:
-  - ui_accept
-- at: 1190
+- at: 575
   actions:
   - debug_win_tutorial
-- at: 1220
-  actions:
-  - ui_accept
-- at: 1250
-  actions:
-  - ui_accept
-- at: 1280
-  actions:
-  - ui_accept
-- at: 1310
-  actions:
-  - ui_accept
-- at: 1340
+- at: 610
   actions: []
   assert:
-    GameManager.current_state: current_state == "WON" or current_state == "MAP"
-- at: 1380
+    GameManager.current_state: current_state == "WON"
+- at: 625
+  actions:
+  - ui_accept
+- at: 670
   actions: []
   assert:
-    GameManager.current_state: current_state == "MAP"
-# ── Unequip sword through the panel (Leg 3 prep) ───────────────────────
-- at: 1390
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+# ── Unequip through the panel (Leg 3 prep) — click-only ───────────────────
+- at: 680
   actions: []
   clicks:
   - RosterOpenButton
-- at: 1400
+- at: 690
   actions: []
   assert:
     RosterPanel.is_open: is_open == true
     RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3"
-- at: 1410
+- at: 700
   actions: []
   clicks:
   - EquipButton0
-- at: 1420
+- at: 710
   actions: []
   assert:
     RosterPanel.equipped_weapon: equipped_weapon == ""
-    MapScreen.phase: phase == "TRAVEL"
-- at: 1430
+    CultivationScreen.phase: phase == "CARD_PICK"
+- at: 720
   actions: []
   clicks:
   - RosterCloseButton
-- at: 1440
+- at: 730
   actions: []
   assert:
     RosterPanel.is_open: is_open == false
-# ── Re-travel to huashan (Leg 3: unequipped again) ─────────────────────
-- at: 1450
-  actions: []
-  assert:
-    MapScreen.phase: phase == "TRAVEL"
-    MapScreen.current_node_id: current_node_id == "huashan"
-- at: 1460
+    CultivationScreen.phase: phase == "CARD_PICK"
+# ── Leg 3: real CULTIVATION encounter, UNEQUIPPED again (reversibility) ───
+- at: 740
   actions:
-  - move_right
-- at: 1470
-  actions:
-  - ui_accept
-- at: 1490
-  actions:
-  - ui_accept
-- at: 1510
-  actions: []
-  assert:
-    MapScreen.phase: phase == "TRAVEL"
-- at: 1520
-  actions:
-  - move_right
-- at: 1530
-  actions:
-  - move_right
-- at: 1540
-  actions: []
-  assert:
-    MapScreen.focus_id: focus_id == "huashan"
-- at: 1550
-  actions:
-  - ui_accept
-# ── Leg 3: BATTLE UNEQUIPPED AGAIN (reversibility) ─────────────────────
-- at: 1580
+  - debug_enter_encounter
+- at: 790
   actions: []
   assert:
     GameManager.current_state: current_state == "BATTLE"
+    CombatManager.tutorial_battle: tutorial_battle == false
     Player.gear_attack_bonus: gear_attack_bonus == 0
-    Player.gear_attack_bonus: changed
+    Player.max_health: max_health > 0

@@ -162,6 +162,7 @@ actions:
 - debug_lose_tutorial
 - debug_step_month
 - debug_grant_art
+- debug_grant_equip
 - debug_enter_encounter
 - debug_poison_player
 - debug_damage_player
