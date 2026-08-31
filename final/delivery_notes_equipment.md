@@ -114,3 +114,85 @@ jinyong-touch-ui precedent (predicted 8, measured 9) is the named caution.
 - [x] Frame budget: Scenario A = 150, Scenario B = 960 (both < 2999)
 - [x] `test_equipment_surface_contract` added (5+4 observables, two-place sync, `: changed` presence, no `*_ClickTarget`)
 - [x] `tests/test_roster_equipment_guards.py` added (no-autosave, surface appends, focus_mode=0)
+
+---
+
+## Addendum — fix_equipment_battle_diff_frame_timing (2026-08-31)
+
+**Task:** `fix_equipment_battle_diff_frame_timing` — re-project `equipment_in_battle_diff`
+frames after the 5_compile hard-gate failure (16/32, 6 runtime errors: `aim: node not
+found: RosterOpenButton/EquipButton0/RosterCloseButton` ×2 each).
+
+### What changed in the scenario (frame/step re-projection ONLY)
+
+- `f3–f550` boot segment kept **verbatim** (proven menu → creation → tutorial →
+  cultivation → map → luoyang merchant → shaolin → huashan).
+- Every win→MAP leg re-projected with a **wide parse window** (spread `ui_accept` +
+  an in-window diagnostic `current_state == "WON" or current_state == "MAP"`) and a
+  **wide transition window** before the definite `current_state == "MAP"` assert.
+- Because the MAP (huashan) battle reuses the tutorial battlefield
+  (`battlefield._ready` branches to the tutorial path for `battle_return_state !=
+  "CULTIVATION"`), each battle's tutorial overlay is advanced with spread
+  `ui_accept` before `debug_win_tutorial` (which no-ops while `phase == "IDLE"`,
+  combat_manager.gd:454-460).
+- Both re-travel legs re-projected with `MapScreen.phase` / `current_node_id` /
+  `focus_id` diagnostics asserted before every travel accept (measured-steps
+  precedent), following the huashan: [shaolin], shaolin: [luoyang, huashan]
+  adjacency and the proven move_right×2 → focus huashan → accept recipe.
+- Last `at:` frame = **1580** (< 2999 hard cap).
+- **No existing assertion line deleted or weakened.** All 16 previously-failing
+  assertion lines are preserved verbatim in content (frames re-based). The only
+  ADDED asserts are diagnostic lines of existing kinds (relational / equality on
+  ids), per the reviewer clarification on "assertion kind".
+- `spine_to_ending.yaml`, `map_node_event_shaolin.yaml`, `roster_equip_free_action.yaml`,
+  and `_common.yaml` surface whitelist are untouched.
+
+### Frame layout is a PROJECTION, not a measurement (honest disclosure)
+
+The implementer protocol (implementer.md:23) requires self-running each new/changed
+scenario via `godot_playtest_scenario` and pasting observed values. **This could not
+be done from this step's working directory**: the in-call probe returned
+`"No project.godot at /app"` (the same pipeline limitation documented in
+`final/delivery_notes_fix_clicktarget_ignore.md:58`). Therefore:
+
+- The re-projected frame numbers are a **derivation + wide buffer** projection, not
+  measured transition durations.
+- The exact battle→WON→MAP duration and the re-travel landing points are marked
+  **pending 5_compile gate per-frame confirmation**, per the repo discipline of
+  never holding a prediction as a measured value.
+
+### ROOT CAUSE — the deeper blocker this task surfaced (code-level, not timing)
+
+Frame re-projection fixes the win→MAP cascade and the panel-equip mechanics, but it
+**cannot** make the gear-diff-into-battle asserts green through the MAP route, for a
+reason the original frame-timing diagnosis did not account for:
+
+1. The MAP (huashan) battle reuses the **tutorial battlefield**: `battlefield._ready`
+   branches to the tutorial path for any `battle_return_state != "CULTIVATION"`
+   (battlefield.gd:69-71), instantiating **Yang Guo** (:80, `cd.max_health = 1000`,
+   tutorial overlay), NOT the player profile.
+2. Equipped gear flows into the player **only** through the CULTIVATION encounter
+   (`_setup_encounter_battle`, battlefield.gd:651
+   `BattleSetup.build_character(SaveManager.profile)`).
+3. Therefore `Player.gear_attack_bonus` is **always 0** in the MAP battle no matter
+   what the profile's `equipped` carries. The Leg-2 `gear_attack_bonus > 0` and the
+   Leg-3 `gear_attack_bonus: changed` asserts are **unreachable through this route**
+   by any frame layout — this is a code/contract defect, not a timing bug.
+
+**Recommended correct fix (for the round's success criteria, which require the diff
+"in a real encounter through the real code path"):** route the gear-diff proof
+through a **CULTIVATION encounter** (`debug_enter_encounter`), which is the real code
+path (battlefield.gd:651), instead of the MAP huashan battle. The MAP-route scenario
+as re-projected here pins the frame/step mechanics and the panel equip path but must
+not be taken as proof of the gear→battle differential; the CULTIVATION-route is the
+only green-capable vehicle. This is reported, not worked around (no assertion was
+deleted or relaxed to hide it).
+
+### Status
+
+- `roster_equip_free_action.yaml` — untouched this task (its 36/36 run at 5_compile
+  is green).
+- `equipment_in_battle_diff.yaml` — re-projected (frames only + diagnostics); the
+  frame/panel mechanics should now clear the node-not-found cascade, but the two
+  gear-diff-into-battle asserts are expected to remain red through the MAP route
+  until the CULTIVATION-encounter re-route lands (see ROOT CAUSE above).
