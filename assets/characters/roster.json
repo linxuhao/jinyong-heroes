@@ -22,32 +22,32 @@
     "west_poison": {
       "title": "西毒",
       "species": "皮皮虾(雀尾螳螂虾) — 螯击约 23 m/s,单位体重出拳最狠的动物",
-      "art_status": "pending"
+      "art_status": "completed"
     },
     "north_beggar": {
       "title": "北丐",
       "species": "龙虾 — 降龙十八掌由一只龙虾使出",
-      "art_status": "pending"
+      "art_status": "completed"
     },
     "east_heretic": {
       "title": "东邪",
-      "species": "待定虾种",
-      "art_status": "pending"
+      "species": "樱花虾(正樱虾) — 深海群游、绯红半透,聚散如落英,对桃花岛",
+      "art_status": "completed"
     },
     "south_emperor": {
       "title": "南帝",
-      "species": "待定虾种",
-      "art_status": "pending"
+      "species": "罗氏沼虾 — 南方淡水巨虾,一对细长蓝螯,对大理段皇爷",
+      "art_status": "completed"
     },
     "central_divine": {
       "title": "中神通",
-      "species": "待定虾种",
-      "art_status": "pending"
+      "species": "玻璃虾 — 通体透明、内里一览无余,对先天功",
+      "art_status": "completed"
     },
     "yang_guo": {
       "title": "待定称号(去名化)",
-      "species": "待定虾种",
-      "art_status": "pending",
+      "species": "枪虾 — 一只螯极大而另一侧空缺(独臂),与虾虎鱼结伴共生(神雕)",
+      "art_status": "completed",
       "note": "唯一带人名的资源。替换时一并改称号,人名不进公开构建。"
     }
   }
