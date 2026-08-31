@@ -17,14 +17,17 @@
 # assertion (人物/功法/物品). If the measurement task observes a start grant
 # on the real build it should tighten this to > 0.
 #
-# debug_step_month NOTE: the token is registered in _common.yaml actions and
-# consumed by cultivation.gd::_process, but gated on
-# GameManager.current_state == "CULTIVATION". A direct scene boot does not run
-# the normal state transition, so IF direct boot leaves current_state unset,
-# debug_step_month will NOT advance a month and `month: changed` goes RED —
-# that is the documented signal to fall back to "one real month played by
-# clicks" (a CultOptionButton card pick + a non-travel action; those buttons
-# are NOT state-gated, only phase-gated), keeping the `month: changed` line.
+# MONTH ADVANCE (2026-08-31): the month advance is driven by CLICKS, NOT
+# debug_step_month. That token is registered in _common.yaml actions and
+# consumed by cultivation.gd::_process but gated on
+# GameManager.current_state == "CULTIVATION"; a direct scene boot does not run
+# the normal state transition, so debug_step_month never advances a month under
+# this scenario's boot (measured: month stayed 1, `month: changed` red). The
+# confirmed fallback implemented here is one real month played by clicks: a
+# CultOptionButton0 card pick (CARD_PICK -> ACTION_PICK) then a CultOptionButton2
+# 做工/work action (ACTION_PICK option index 2 -> _after_action advances the
+# calendar back to CARD_PICK). Those buttons are NOT state-gated, only
+# phase-gated, so they advance a month under a direct scene boot.
 #
 # RED-FIRST EVIDENCE — TEMPORARY PLACEHOLDER (do not treat as measured).
 # The follow-up measurement task fills real measured values here via the
@@ -72,29 +75,38 @@ timeline:
     RosterPanel.is_open: is_open == false
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 1
-# One real month advance (structural differential — no absolute month literal).
+# One real month advance via clicks (no state-machine dependency): a CARD_PICK
+# option click picks the card (CultOptionButton0) -> ACTION_PICK, then an
+# ACTION_PICK option click does 做工/work (CultOptionButton2, index 2 of
+# [练功,修习,做工,游历,存盘,读档,删档]) -> _after_action() advances the
+# calendar. Structural differential — no absolute month literal.
 - at: 80
-  actions:
-  - debug_step_month
-- at: 110
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 90
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 100
   actions: []
   assert:
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: changed
 # Re-sync: reopen after the state changed underneath.
-- at: 120
+- at: 110
   actions: []
   clicks:
   - RosterOpenButton
-- at: 130
+- at: 120
   actions: []
   assert:
     RosterPanel.is_open: is_open == true
-- at: 140
+- at: 130
   actions: []
   clicks:
   - RosterCloseButton
-- at: 150
+- at: 140
   actions: []
   assert:
     RosterPanel.is_open: is_open == false

@@ -187,3 +187,31 @@ No other occurrence of "71" was touched: the historical PASS counts (`:501` / `:
 and the "(72 yaml files)" parenthetical at `:554` remain byte-identical. This is the
 anti-global-replace rule applied — only the two current, structural scenario-count lines
 changed (plain prose, not under the append-only archive rule).
+
+## 9. `roster_panel_cultivation_open_close` month-progression fix (2026-08-31)
+
+**Task:** `fix_roster_cultivation_month_progression` — replace the `debug_step_month`
+frame with a clicks-only month advance, fixing the f110 `CultivationScreen.month: changed`
+red (measured 15/16) and re-baselining frames. The `save_manager.gd` deck-boot runtime
+errors (6, lines `:365`/`:382`) were already handled by `fix_save_manager_deck_boot_guard`
+(this task runs after it).
+
+- **Root cause (measured, not predicted):** `debug_step_month` is consumed in
+  `cultivation.gd::_process` but early-returns unless `GameManager.current_state ==
+  "CULTIVATION"`; a direct scene boot of `cultivation.tscn` leaves `GameManager.current_state`
+  at the autoload default (STATE_TUTORIAL), so the token never advanced a month — observed
+  `month: changed` actual `{'baseline': 1, 'current': 1}` at f110. The scenario's own
+  documented clicks-only fallback was never implemented.
+- **Fix:** replaced the f80 `actions: [debug_step_month]` frame with the real month path
+  driven by clicks (phase-gated, not state-gated — works under a direct boot): f80 clicks
+  `CultOptionButton0` (card pick, CARD_PICK → ACTION_PICK), f90 clicks `CultOptionButton2`
+  (做工/work, ACTION_PICK index 2 → `_after_action` advances month 1→2 back to CARD_PICK).
+  The post-advance assert (f100: `phase == "CARD_PICK"` + `month: changed`) is kept; the
+  re-open/close block shifted f110→f140. All other assertions (three section headers,
+  `cursor_markers_visible == false`, gongfa_count, is_open, boot `month == 1`) and the
+  RED-FIRST EVIDENCE placeholder block were kept verbatim.
+- **Observed self-run (authoritative, `godot_playtest_scenario` sidecar on the staged tree):
+  `roster_panel_cultivation_open_close` **16/16 PASS**, hard gate `passed: True`,
+  **ZERO runtime errors**.**
+- Not modified: `playtest/spine_to_ending.yaml`, frozen artifacts,
+  `playtest/_common.yaml`, `ROUND_SCENARIOS`, other scenarios.
