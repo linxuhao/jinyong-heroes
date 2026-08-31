@@ -60,40 +60,60 @@ slot is populated by this scenario; the armor and boots slots remain empty
 (`gear_attack_bonus` 0 → 6), satisfying the requirement. No armor or boots
 differential is forced (the seed does not grant them).
 
-## Red-first four values
+## Red-first four values — MEASURED (2026-08-31)
 
 Per the `record_measured_red_first_and_reconcile` discipline, the red-first
-four values for each new pin must be MEASURED from a real run (temporary
-revert + direct sidecar), never predicted.
+four values for each new pin are MEASURED from a real run (temporary
+revert + direct sidecar), never predicted. All values below were read from
+the `godot_playtest_scenario` report on 2026-08-31.
 
-### Scenario A red-first (pending)
+### Scenario A: `roster_equip_free_action` — MEASURED
 
-**Revert point:** Comment out the body of `_on_equip_pressed` in
-`scripts/ui/roster_panel.gd:316-324` (mark `# TEMPORARY RED-FIRST REVERT —
-DO NOT COMMIT`). Run `godot_playtest_scenario(scenario="roster_equip_free_action")`.
+**Revert applied:** `_on_equip_pressed` body in
+`scripts/ui/roster_panel.gd` replaced with `pass` (marked
+`# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`).
 
-**Expected failure mode (to be measured, NOT predicted):**
-- First failing assert at f110: `RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3"`
-  (the equip write never happens, so the value stays `""`)
-- Green-before-red: f30 (4) + f50 (4) + f70 (3) + f90 (9) = 20
+**Measured four values:**
+| value | measured |
+|---|---|
+| failing_frame | f110 |
+| first_failing_assert | `RosterPanel.equipped_weapon: equipped_weapon changed since frame 0` |
+| exact_error | `equipped_weapon changed since frame 0` |
+| green_asserts_before_red | **35** |
 
-### Scenario B red-first (pending)
+**Post-restore green re-run:** 36/36 (2026-08-31).
 
-**Revert point:** Comment out the `EquipmentData.sum_bonuses` call in
-`scripts/data/battle_setup.gd` `derive_stats` (line 40) and replace with
-`var gear: Dictionary = {}` (mark `# TEMPORARY RED-FIRST REVERT — DO NOT
-COMMIT`). Run `godot_playtest_scenario(scenario="equipment_in_battle_diff")`.
+> [superseded by measured run] Original structural prediction:
+> f110 / `equipped_weapon == "eq_sword_3"` / value still `""` / green-before-red 20
+> (f30×4 + f50×4 + f70×3 + f90×9). The measured green-before-red is 35,
+> not 20 — the prediction undercounted frames between f90 and f110.
 
-**Expected failure mode (to be measured, NOT predicted):**
-- First failing assert at f760: `Player.gear_attack_bonus: changed`
-  (the bonus never enters derive_stats, so gear_attack_bonus stays 0 in both
-  Leg 1 and Leg 2, and `changed` sees no delta)
-- Green-before-red: f400 (1) + f440 (2) + f460 (2) + f500 (1) + f560 (6) +
-  f610 (1) + f630 (4) + f650 (4) + f670 (1) + f700 (1) = 23
+### Scenario B: `equipment_in_battle_diff` — MEASURED
 
-**NOTE:** These green-before-red counts are structural predictions from the
-timeline layout. The ACTUAL measured values must come from a real run. The
-jinyong-touch-ui precedent (predicted 8, measured 9) is the named caution.
+**Revert applied:** Both `EquipmentData.sum_bonuses(...)` call sites in
+`scripts/data/battle_setup.gd` (derive_stats :40 AND build_character :73)
+replaced with `var gear: Dictionary = {}` (each marked
+`# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`).
+
+**Measured four values:**
+| value | measured |
+|---|---|
+| failing_frame | f560 |
+| first_failing_assert | `Player.gear_attack_bonus: gear_attack_bonus > 0` |
+| exact_error | `gear_attack_bonus > 0` (observed=0) |
+| green_asserts_before_red | **46** |
+
+**Post-restore green re-run:** 47/47 (2026-08-31).
+
+> [superseded by measured run; STALE — scenario rewritten to CULTIVATION route]
+> Original structural prediction: f760 / `Player.gear_attack_bonus: changed` /
+> no delta / green-before-red 23. This prediction was based on the pre-rewrite
+> MAP-route timeline. The scenario was rewritten to the CULTIVATION route
+> (fix_equipment_battle_diff_frame_timing); the measured first gear differential
+> is f560 (Leg 2 battle assert), not f760.
+
+**Residue check:** `search scripts/**/*.gd` for "TEMPORARY RED-FIRST REVERT"
+→ **0 hits** (confirmed 2026-08-31 after both restores).
 
 ## Contract compliance checklist
 
