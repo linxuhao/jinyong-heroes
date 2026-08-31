@@ -39,7 +39,8 @@ one tier formula, and feeds equipped gear into real encounters.
   bonuses are category-keyed constants only — weapon → attack `+2×tier`,
   armor → health `+5×tier`, boots → initiative `+2×tier` plus `+1` move at
   tier ≥ 3. Never 12 hand-written per-item literals. The full derivation is
-  tracked for the design archive (see verification status below).
+  archived in `design/40_progression.md` §9 (directions, per-tier steps,
+  attribute-equivalent anchors, movement threshold, phase-5 re-tune surface).
 - **Gear enters battle** (`scripts/data/battle_setup.gd`): `derive_stats`
   adds the equipment bonuses (empty-equipped output is bit-identical to the
   base formulas — the reversibility baseline), `build_character` mirrors
@@ -65,17 +66,41 @@ one tier formula, and feeds equipped gear into real encounters.
   round-trip/hostile/validation, battle-setup legacy equality + per-slot
   direction + reversibility), i18n entries 「装上/卸下」.
 
-**Verification status (honest):** implementation, unit-test registration,
-contract appends, and i18n are verified in the tree (see
-`final/verify_report.json`). The gate artifacts (`compile_report.json`,
-`playtest_summary.md`, `vision_report.json`, `test_report.json`) are produced
-by the steps after the verifier and were **not available at verification
-time** — compile/playtest/vision/pytest green status is therefore pending
-those artifacts. Two debts are recorded, not hidden: the two new scenarios'
-self-run observed values and the red-first four-value measurements are
-pending a real sidecar run, and the design-archive updates
-(`40_progression.md` §8/§9, `90_decisions.md` ruling, `99_changelog.md` row,
-`30_presentation.md`) are not yet in the repo.
+**Verification status (honest, updated 2026-08-31 after the review round):**
+implementation, unit-test registration, contract appends, i18n, AND the
+design-archive updates are all verified in the tree by direct read
+(`40_progression.md` §8 equipped row + §9 formula/derivation;
+`90_decisions.md` 2026-08-31 ruling explicitly superseding the 2026-08-30
+jinyong-roster ruling (e) with the old text preserved; `99_changelog.md`
+append-only row; `30_presentation.md` equipment section). Both review
+blockers are resolved in the tree:
+
+- The `tests/test_roster_equipment_guards.py` no-autosave guard now strips
+  `#`-comment lines before scanning (the `roster_panel.gd:8` doc-comment
+  legitimately names the method; two regression pins cover both directions —
+  comment-only lines are inert, a real non-comment call still reds).
+- `equipment_in_battle_diff.yaml` was root-caused and REWRITTEN: the MAP
+  (huashan) battle reuses the tutorial battlefield (`battle_return_state !=
+  "CULTIVATION"` never calls `BattleSetup.build_character(profile)`), so the
+  gear diff was unreachable there by ANY frame layout. All three encounter
+  legs now run the REAL cultivation-encounter path (`debug_enter_encounter` →
+  `battlefield.gd:651`); the item is granted via `debug_grant_equip` →
+  `EventLogic.apply_option_effects` (never a bare profile write). Red-first
+  four values MEASURED: fail frame **f560** / first failing assert
+  **`Player.gear_attack_bonus: gear_attack_bonus > 0`** / exact error
+  **`FAIL f560 Player.gear_attack_bonus: gear_attack_bonus > 0 (observed=0)`**
+  / **46** green before red; post-restore green **47/47** (2026-08-31 sidecar;
+  scenario header RED-FIRST EVIDENCE block +
+  `final/delivery_notes_equipment.md`). `roster_equip_free_action` measured
+  **36/36** with its own measured red-first (f110 / `equipped_weapon changed
+  since frame 0` / exact error in the delivery notes / 35 green before red).
+
+The official gate artifacts (`compile_report.json`, `playtest_summary.md`,
+`vision_report.json`, `test_report.json`) are produced by the steps after the
+verifier; the POST-FIX official re-run has not landed yet, so
+compile/playtest/vision/pytest green status stays pending those artifacts
+(UX-16 records the same honest state: fix landed, post-fix gate evidence
+pending).
 
 ## Round: wuxia-shrimp-portraits — every character is now a shrimp (武虾, 2026-08-31)
 
@@ -492,7 +517,7 @@ unverified, which is the intended behavior.
 ```bash
 GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
 python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard with tr() call-site detection, keyboard-free pins incl. the gongfa empty-exit nail, touch surface contracts)
-godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (24 files)
+godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (28 files)
 godot --headless --path . -s res://tests/test_touch_option_surface_gate.gd  # property-based touch-coverage gate (traverses the cultivation/map/sect_select phase machines)
 godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-style suites
 ```
@@ -599,19 +624,20 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   `tests/test_i18n_coverage.py` keeps lookups honest.
 - **Playtest contract** (the project's test "API"): `playtest/_common.yaml`
   declares the scene, the allowed actions (incl. debug injections and
-  `use_facility` / `debug_grant_silver`), the observable-surface whitelist
+  `use_facility` / `debug_grant_silver` / `debug_grant_equip`), the
+  observable-surface whitelist
   (incl. the twelve new touch-reach button blocks and the six
   `pressed_connected` vars) and `scenario_order`; each `playtest/*.yaml` is
   one scenario (name == basename, single-integer `at:`, a comparison operator
   or changed/unchanged token on every assert line). `clicks:` entries are
   `<Node>[ +dx,dy][ left|right|middle]` — a **true GUI hit test** (aim at the
   control/unit body, never a `*_ClickTarget`); `hovers:` are motion-only.
-  75 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
+  77 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
   clicks-only storyline spine `clicks_only_storyline.yaml` and the facility
   click companion `map_facility_buttons_click.yaml`.
 - **Unit tests**: GDScript files with a top-level `static func run() -> bool`
   are collected by `tests/unit_test_runner.gd`'s explicit append-only `TESTS`
-  registry (24 files), run headless. SceneTree-extending integration suites
+  registry (28 files), run headless. SceneTree-extending integration suites
   (`test_game_manager_fsm.gd` — extended this round with the overlay-button
   wiring pins — and friends) are driven with their own `-s` invocation. The
   pytest smoke (`tests/test_playtest_contract_smoke.py`) statically pins the
@@ -815,11 +841,11 @@ results are transcribed into the design archive (`design/00_roadmap.md`,
 - `scenes/` — Godot scenes: `ui/` (hud, health_bar), `segments/`
   (creation, map, transition, sect_select, cultivation, ending),
   `battlefield.tscn`, `main.tscn` / `menu.tscn`
-- `playtest/` — 75 headless playtest scenarios + the `_common.yaml` contract
-  (72 yaml files); incl. the clicks-only storyline spine and the facility
+- `playtest/` — 77 headless playtest scenarios + the `_common.yaml` contract
+  (78 yaml files); incl. the clicks-only storyline spine and the facility
   click companion; frozen yamls are append-only (authorized edits stay
   machine-pinned by the superset fixture)
-- `tests/` — GDScript unit suites (24 files in the TESTS registry),
+- `tests/` — GDScript unit suites (28 files in the TESTS registry),
   SceneTree-style integration suites (incl. `test_game_manager_fsm.gd` with
   the overlay-button pins), `test_playtest_contract_smoke.py` (incl. the
   keyboard-free pin + touch-reach surface contract),
