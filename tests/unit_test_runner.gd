@@ -58,6 +58,9 @@ const TESTS: Array[String] = [
 	# bonuses (legacy equality, direction matrix, reversibility, build_character
 	# mirrors, tutorial-shape CharacterData defaults).
 	"res://tests/test_battle_setup_equipment.gd",
+	# map battle 2026-08-31: the huashan_duel roster module (MapBattleData) —
+	# exact five-greats roster, unknown-id fail-safe, position invariants.
+	"res://tests/test_map_battle_data.gd",
 ]
 
 

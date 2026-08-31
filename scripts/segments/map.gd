@@ -104,6 +104,10 @@ func _ready() -> void:
 		current_node_id = MapData.start_node()
 		SaveManager.profile.map_node = current_node_id
 	focus_id = current_node_id
+	# The MapScreen is rebuilt on return from a map battle, so its own counter
+	# would reset to 0; seed it from the GameManager session mirror to carry the
+	# events_resolved_count across the battle swap.
+	events_resolved_count = GameManager.map_events_resolved_count
 	_wire_buttons()
 	_sync_surface()
 	_render()
@@ -237,9 +241,14 @@ func _maybe_start_entry_battle() -> void:
 	var bid: String = MapData.active_battle_id(current_node_id)
 	if bid == "":
 		return
+	# An unresolvable binding is inert, mirroring active_event_id's fail-safe:
+	# a typo'd / unknown battle id leaves the map playable (no battle, no crash).
+	if MapBattleData.roster_ids(bid).is_empty():
+		push_warning("MapBattleData: no roster for battle_id '%s'" % bid)
+		return
 	entry_battle_id = bid
 	_sync_surface()
-	GameManager.start_map_battle()
+	GameManager.start_map_battle(bid)
 
 
 ## Resolve the modal node-event: pick the option by event_focus, apply its effects
@@ -258,6 +267,9 @@ func _resolve_node_event() -> void:
 		last_effect_types.append(eff.get("type", "none") as String)
 	EventLogic.apply_option_effects(SaveManager.profile, opt)
 	events_resolved_count += 1
+	# Write through to the GameManager session mirror so the count survives the
+	# MapScreen rebuild on return from a map battle.
+	GameManager.map_events_resolved_count = events_resolved_count
 	event_id = ""
 	phase = "TRAVEL"
 	SaveManager.autosave()

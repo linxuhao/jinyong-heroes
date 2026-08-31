@@ -109,6 +109,27 @@ var _overlay_layer: CanvasLayer = null
 ## not terminal states.
 var battle_return_state: String = "TUTORIAL"
 
+## Build-source signal for a node-entry (map) battle, decoupled from the return
+## target: battle_return_state decides ONLY where WON/LOST routes, while
+## map_battle_id decides who builds the player character. Non-empty means a MAP
+## battle that must profile-build via BattleSetup.build_character(SaveManager.
+## profile) and resolve its opponent roster from the id (huashan_duel). Empty
+## means the tutorial / encounter fallthrough (tutorial Yang Guo) stays intact.
+## Lifecycle = write-at-entry (start_map_battle writes the id; start_encounter /
+## start_battle / restart_game write "") + clear-at-route (request_continue /
+## request_retry write ""). clear_battle() deliberately never touches it (it runs
+## mid-swap on every scene change; a mid-swap clear sits exactly between the
+## entry write and the new battlefield's _ready() read and re-creates the defect).
+var map_battle_id: String = ""
+
+## Session mirror of MapScreen.events_resolved_count. The MapScreen is rebuilt on
+## return from a map battle (SceneManager._do_swap frees it), so its own counter
+## would reset to 0; this mirror carries the count across the swap. Seeded in
+## map._ready() and written through on every resolve; reset to 0 when a run
+## begins (SaveManager.profile_created) or a save is loaded (SaveManager.loaded).
+## Session-scoped only — never persisted.
+var map_events_resolved_count: int = 0
+
 ## Observable: the end-game overlay's rendered text, written unconditionally
 ## inside _show_end_game_overlay() whenever the overlay shows (WON -> text
 ## containing 胜利, LOST -> text containing 战败). Never contains the ellipsis
@@ -144,6 +165,7 @@ func start_battle() -> void:
 		return
 
 	current_state = "BATTLE"
+	map_battle_id = ""
 	battle_started.emit()
 	state_changed.emit("BATTLE")
 
@@ -157,6 +179,7 @@ func start_encounter() -> void:
 	if current_state != STATE_CULTIVATION:
 		return
 	battle_return_state = STATE_CULTIVATION
+	map_battle_id = ""
 	current_state = STATE_BATTLE
 	battle_started.emit()
 	state_changed.emit(STATE_BATTLE)
@@ -180,10 +203,16 @@ func start_encounter() -> void:
 ## start_encounter() (hard-gated to CULTIVATION): each entry point states the one
 ## state it may be reached from, so a stray call cannot smuggle the player into a
 ## battle from somewhere the design never sanctioned. No-op outside MAP.
-func start_map_battle() -> void:
+## The battle id is written BEFORE battle_started.emit() / state_changed.emit()
+## (write-before-emit is the ordering guarantee: state_changed synchronously
+## drives the SceneManager swap, and the mid-swap teardown runs after the write
+## is already on record). The default parameter keeps historical no-arg call
+## sites source-compatible.
+func start_map_battle(battle_id: String = "") -> void:
 	if current_state != STATE_MAP:
 		return
 	battle_return_state = STATE_MAP
+	map_battle_id = battle_id
 	current_state = STATE_BATTLE
 	battle_started.emit()
 	state_changed.emit(STATE_BATTLE)
@@ -221,6 +250,37 @@ func get_battle_return_state() -> String:
 	return battle_return_state
 
 
+## Set the current map-battle build-source id (see map_battle_id).
+func set_map_battle_id(v: String) -> void:
+	map_battle_id = v
+
+
+## The current map-battle build-source id (see map_battle_id).
+func get_map_battle_id() -> String:
+	return map_battle_id
+
+
+## Autoload init. Deferred because the SaveManager autoload must already be in
+## the tree before we connect its signals — a deferred flush runs after every
+## autoload's _ready(), so autoload registration order can never bite here.
+func _ready() -> void:
+	_connect_save_signals.call_deferred()
+
+
+## Connect the run-boundary signals that reset the events-resolved mirror. Both
+## SaveManager.loaded (passes slot: int) and SaveManager.profile_created (no
+## args) are routed to the same zeroing handler; the handler's optional Variant
+## parameter absorbs either shape.
+func _connect_save_signals() -> void:
+	SaveManager.loaded.connect(_reset_map_events_resolved_count)
+	SaveManager.profile_created.connect(_reset_map_events_resolved_count)
+
+
+## Zero the events-resolved mirror when a run begins or a save is loaded.
+func _reset_map_events_resolved_count(_a: Variant = null) -> void:
+	map_events_resolved_count = 0
+
+
 ## Drop every per-battle reference owned by this autoload so a scene swap never
 ## touches freed nodes: clears the enemy registry, releases the player slot
 ## (set_player is first-call-wins — a stale _player would silently swallow the
@@ -244,6 +304,7 @@ func clear_battle() -> void:
 func request_continue() -> void:
 	if current_state != STATE_WON:
 		return
+	map_battle_id = ""
 	var target: String = battle_return_state if SEGMENT_STATES.has(battle_return_state) else STATE_TRANSITION
 	if SEGMENT_STATES.has(battle_return_state):
 		clear_battle()
@@ -259,6 +320,7 @@ func request_continue() -> void:
 func request_retry() -> void:
 	if current_state != "LOST":
 		return
+	map_battle_id = ""
 	clear_battle()
 	var target: String = battle_return_state if SEGMENT_STATES.has(battle_return_state) else STATE_TUTORIAL
 	current_state = target
@@ -374,6 +436,7 @@ func finish_creation() -> void:
 ## routes the scene first, then reloads a fresh battlefield.
 func restart_game() -> void:
 	clear_battle()
+	map_battle_id = ""
 	SaveManager.new_profile({}, [])
 	SaveManager.profile.flags["tutorial_done"] = false
 	creation_entry = "TRANSITION"

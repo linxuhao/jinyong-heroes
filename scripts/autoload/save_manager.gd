@@ -29,6 +29,10 @@ const STABLE_STATES: Array[String] = ["CULTIVATION", "MAP"]
 ## lands on the already-hosted scene.
 signal loaded(slot: int)
 
+## Emitted at the end of new_profile(): a run has begun with a fresh profile, so
+## run-boundary session state (GameManager.map_events_resolved_count) resets.
+signal profile_created
+
 # ---------------------------------------------------------------------------
 # State (surface vars have safe defaults so arbitrary-frame assertions never
 # see null: seed/last_error/slot/has_save and the six *_left counts).
@@ -114,6 +118,7 @@ func new_profile(attrs: Dictionary, traits: Array[String]) -> void:
     last_error = ""
     slot = 0
     has_save = false
+    profile_created.emit()
 
 
 ## Draw one card per category (MONTHLY or YEARLY array order — never
