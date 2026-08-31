@@ -170,11 +170,21 @@
 | 先天功·全真 | 内功 | 阳 |
 | 全真剑法 | 剑 | 阳 |
 
-## 4. 游历事件池 (16 条)
+## 4. 游历事件池 (36 条)
 
-游历途中的 16 条纯数据事件,每条两条真实取舍的选项,只用到
-`silver` / `attr` / `item` / `practice` / `none` 五种效果类型。权威源
-`scripts/data/event_data.gd` 的 `EventData.TABLE`(本文只记取舍形状,不抄数据)。
+游历途中的 **36 条**纯数据事件(冻结的既有 16 条 + 2026-08-31 `jinyong-event-pool-36`
+轮追加的 20 条),每条两条真实取舍的选项,只用到 `silver` / `attr` / `item` /
+`practice` / `none` 五种效果类型。权威源 `scripts/data/event_data.gd` 的
+`EventData.TABLE`(本文只记取舍形状,不抄数据)。
+
+**为什么是 36 条(算术注)。** 一次完整旅程 = 3 年 × 12 月 = **36 个月**;玩家每月
+游历一次便抽一次事件。此前的 16 条撑不满——`EventLogic.draw_unseen_id` 的无重复袋抽到
+第 **17** 次必然清空 `events_seen` 整池重来,于是第 17 个月起开始重复。扩到 36 条后,
+36 个月旅程内**永不触发清空**;**清空分支原样保留**,留作第 37 抽的安全网(旅程内走
+不到),抽取逻辑与 `events_seen` 语义一律不动。不重复的性质由两道闸门实测证明:
+单元闸门 `_test_no_repeat_full_journey`(`tests/test_event_data.gd`,跑真实
+`draw_unseen_id` 36 次、断言 36 个互异 id 且 seen 阶梯 0→36 无中途清空)与 playtest
+场景 `event_pool_new_event_resolved`(屏上抽到、渲染、选中、结算一条新事件)。
 
 **银钱换物 (item-with-cost)。** `merchant` 行商路过——花钱买物,一物一价;
 `dali_market` 大理市集——二选一,花不同的钱买皮甲或快靴。
@@ -202,6 +212,50 @@
 涨福缘,还是收起走人得银两;`gambling_den` 赌坊喧嚣——入局三把搏一把银两,还是袖手旁观涨福缘。
 
 **施舍 (charity)。** `beggar` 老丐乞食——施舍银两,得福缘回报。
+
+**(本轮追加 20 条;2026-08-31 `jinyong-event-pool-36`,同一取舍词汇,格式照冷冻
+16 条——只记取舍形状,不抄数值。新文案按既有 16 条的写法不指明物种,与
+2026-08-28「一切角色都是虾」裁定并存,见 `40_ux_backlog.md` UX-17。) **
+
+**练功 vs 金钱 (growth-vs-money)。** `riverside_duel` 河滩论剑——两派剑客请你执剑
+裁断,出招斗一场换练功,还是劝散收彩得银两;`sword_mound` 荒冢埋剑——断剑堆里拾剑
+参悟换练功,还是熔剑换银两。
+
+**道理 vs 银两 (truth-vs-money)。** `ancient_bell` 荒寺晚钟——抚钟入息养内力,还是
+敲钟卖铜得银两;`river_god` 河伯娶亲——当众破局辨伪换悟性,还是受金平事拿银两。
+
+**巧思 vs 机缘 (study-vs-serendipity)。** `lantern_festival` 上元灯会——静心破灯猜谜
+换悟性,还是追逃逸的猴儿拾遗得一点银两又涨福缘;`wild_goose_letter` 雁足传书——
+拾雁足帛书送还山下村舍换身法又贴银两,还是拆书细读换悟性。
+
+**出钱行善 vs 费力自助 (paid-charity vs effort)。** `poisoned_well` 荒村毒井——出银
+请药翁治井换福缘,还是自学辨毒换悟性;`plague_village` 疫村施药——出银买药周济得
+福缘,还是自学方剂换悟性。
+
+**花钱过路 vs 自力 (pay-vs-effort)。** `tiger_pass` 虎啸危崖——买符通过换一点悟性,
+还是攀崖绕行换身法;`snow_pass` 风雪隘口——出银雇向导换悟性,还是踏雪先行换身法;
+`wedding_train` 山道花轿——按老例随礼放行换福缘,还是攀坡绕行换身法。
+
+**即时银两 vs 道德·后福 (money-now vs moral-luck)。** `pawnshop` 当铺旧刀——断票
+贱收可得银两,还是替落魄刀主代赎还主换福缘;`young_disciple` 登门求教——耐性点拨
+少年换练功又悟性,还是收礼了事得银两。
+
+**动脑 vs 花钱 (time-vs-money)。** `storyteller` 茶馆说书——买茶续听一段剑侠旧事换
+练功,还是默记剑理换悟性;`chess_stall` 街角残局——静思破局换悟性,还是出银买谱换
+练功。
+
+**出炉换器 vs 旁观知理 (paid-item vs free-knowledge)。** `smithy` 铸剑回炉——出银把
+旧剑回炉重铸得一把好剑,还是旁观剑理换悟性;`fallen_rider` 坠马客商——帮坠马客商
+拣拾货物得银两,还是捡起散落的快靴自用。
+
+**卖力得酬 vs 出资养体 (earn-by-effort vs pay-for-medicine)。** `cliff_herbs` 崖上采药
+——帮采药人攀崖顶得银两又练身法,还是重金买下崖顶灵芝养内力。
+
+**劳力 vs 养身 (labor vs paid-rest)。** `night_inn` 客栈夜账——帮掌柜算夜账得银两又
+涨悟性,还是温酒暖身贴银两换根骨。
+
+**喝酒求艺 vs 以实招换 (paid-practice vs toughness)。** `drunken_fist` 醉汉传拳——
+买酒向醉汉请教拳理换练功,还是以拳换教、硬挨一顿换根骨。
 
 ## 5. 内力消耗缺口(2026-08-26,jinyong-hud 轮记录)
 

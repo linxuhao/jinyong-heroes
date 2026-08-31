@@ -594,3 +594,39 @@ portrait_covered_frac=0.0`、`camera_transform_follows_unit` **9/9**、`spine_to
   `final/delivery_notes_equipment.md`)——上句「结构预测不得当实测引用」由此实测取代。
   pytest 与 GDScript 单元套件的 post-fix 复跑报告(5_test 产物)不在本步上下文,不冒充实测。
 
+## jinyong-event-pool-36 — 事件池扩至 36 条与两道不重复闸门(2026-08-31)
+
+本条记 `jinyong-event-pool-36` 轮五项裁定。数据行见 `20_content.md` §4;本轮把游历
+事件池从 16 条扩到 **36 条**,配两道证明「一次完整旅程不重复」的可执行闸门,
+全部动因是路线图完整度第 3 条(16 条撑不过 36 个月,第 17 个月起必重复)❌→✅。
+
+**(a) 池 = 恰好 36、append-only、冻结 16 条逐字不动。** `EventData.TABLE` 只追加 20 行
+到 36 行;既有 16 行的 id / title / text / 选项 / 效果**逐字冻结**,游戏机制(五种效果
+类型、抽取逻辑、`events_seen` 语义、`battle_id` stub、大地图节点事件通道)一律不动。
+「冻结 16 条未变」由 `tests/test_event_data.gd` 的镜像(标题 / 效果 / 正文 / 选项标签
+逐条 pin)机器化,任何一行被改都会当场变红。36 = 旅程长度(3 年 × 12 月),是「不重复」
+的精确最小值;清空分支原样保留,留作第 37 抽的安全网。
+
+**(b) 不重复闸门 = `_test_no_repeat_full_journey`,在 `tests/test_event_data.gd`,
+跑真实 `EventLogic.draw_unseen_id`。** 闸门构造一颗带显式种子的 `RandomNumberGenerator`、
+一个干净 profile,循环调真实抽函数 36 次,每次按 `cultivation.gd` 同形的 append-if-absent
+标记 seen,断言 seen **单调阶梯 0→36、无中途清空**(任何一次重置都会让阶梯回落而红),
+36 个 id 全互异。这是「一次完整旅程不重复」的**实测**依据,不是推理。
+
+**(c) 调试注入纪律:all-but-one seeder 经同一标记分支写入,绝不裸覆盖 flags。**
+屏上证明用的调试动作 `debug_seed_events_seen` 把除 showcase id 外的全部事件 id
+append-if-absent 进 `profile.flags["events_seen"]`——与 `cultivation.gd` 标记分支同形、
+同 `debug_grant_silver`「走正常管线」的纪律,从不直接覆写 `flags` 数组,游戏代码零
+fixture 数据。
+
+**(d) playtest id 钉对未来追加按构造免疫。** 屏上场景
+`event_pool_new_event_resolved` 断言 `event_id == "cliff_herbs"` 而非写死 35 个 id 的
+夹具:seeder 永远只留下 showcase 一个不可见 id,无论未来池子扩多大,该钉子都指向同一
+条新事件——追加不改此钉。
+
+**(e) 文体政策:新文案保持物种中性,世界观不一致记为 UX-17(OPEN,待所有者裁定)。**
+既有 16 条文案写的是劫匪 / 行商 / 老丐这类**不指明物种**的人物,与 2026-08-28「本作
+一切角色都是虾」的裁定并存——本轮**新 20 条照既有写法,不虾化、也不宣称两边一致**,
+把「事件文案与全员是虾的世界观不一致」如实记入 `40_ux_backlog.md` **UX-17(OPEN)**,
+待所有者裁定(虾化 or 明示豁免)。关闭需各自动作 + 闸门证据,不因本轮转绿而自行关闭。
+
