@@ -23,8 +23,8 @@
 **一句统一风格句,只描述画风,绝不点名任何游戏对象**——把物件清单写进风格句,
 生图模型会把每样东西画进每一张图。每个资源的主体只写在它自己那一条 prompt 里。
 
-当前风格句(水墨武侠向)——**以 `assets/seed_manifest.json` 的 `style_block` 为准**:
-> Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting
+当前风格句(2026-08-31 起:武虾 · 分层 register)——**以 `assets/seed_manifest.json` 的 `style_block` 为准**(两处逐字一致,已核 byte-identical):
+> Chinese wuxia game-art illustration with a deliberate SPLIT REGISTER: the head is fully cartoon (rounded simplified head-carapace, large expressive eyes with clear highlights, appealing, never scary); the body is semi-realistic (overlapping carapace plates, distinct segment joints, ridges and spines, clear directional light, soft shadow, glossy shell sheen)
 
 > **为什么改这一句。** 档案原先写的是
 > `ink-wash wuxia painting, muted earth tones, soft paper texture, side view, flat lighting`,
@@ -38,6 +38,30 @@
 >
 > **只有一句风格句。** 以后改风格,改 `seed_manifest.json` 的 `style_block`
 > **并同步这里**;两处不一致时,下一次重画就会和现有美术对不上。
+
+> **为什么换这一句(2026-08-31,武虾轮)。** 上一句只描述水墨武侠,六张立绘照它出的是
+> 「人形水墨武侠人物」;而 2026-08-28 的世界裁定(见 `90_decisions.md`)是**一切角色都是虾**。
+> 收敛路径有实录:纯写实 → 吓人;纯 Q 版 → 平;「介于两者之间」→ 糊。结论是**分层
+> register**,两半都必须写进同一句——头全卡通(圆化头胸甲、大而有高光的眼、讨喜、
+> 绝不吓人)+ 身体半写实(叠压甲片、清晰体节、棘刺脊线、方向光与柔和阴影、硬壳光泽)。
+> 本轮六张 `assets/characters/*.png` 正是用上面这句出的;`style_block` 与本节引文
+> 逐字一致,缺一半就回弹到 mush。
+
+> **画风改向(2026-08-31,武虾轮):人形水墨武侠人物 → 非人形真虾体 + 头卡通身写实。**
+> 执行 2026-08-28「一切角色都是虾」裁定,**冷面执行**:只有形象与称号是虾,事件/功法/
+> 招式的文案不动。身份不再靠人体——没有躯干、没有腰、没有腿(头胸甲在前、卷曲分节的
+> 腹尾为底座),改由**壳色 + 非人道具**承载(草帽、头巾、葫芦、竹棒)。四条生产规则
+> 本轮验证并逐字归档于 `final/delivery_notes_wuxia.md` §1:
+> (a) **污染词**——会把虾拽回人形的措辞(头身比、短粗腿、系带长袍、两条前肢、
+> `mascot`)一律不写,用「头胸甲在前 + 卷曲腹部为底 + 无躯干/腰/腿」替代;
+> (b) **年龄写在壳上**(磨损、疤、下垂的颚足),不靠眯眼;**性别绝不走粉色 + 睫毛 +
+> 包脸颊头巾**,用棱角眼 + 平硬眉 + 无睫毛、脑后系方巾、冷绯红(东邪)表达;
+> (c) **「缺失」必须写成正面的不对称**——杨过的独臂写成「一只巨螯大于头 + 左侧一枚
+> 光滑圆残板」,绝不写「没有手臂」;
+> (d) **构图交给后处理**——prompt 只管紧凑纵向剪影、双螯收在前;裁切按墨迹包围盒 →
+> 缩放进 96×128 → **底对齐 + 水平居中**;高度归一被否(会把杨过巨螯切掉至多 42px)。
+> 另两条硬规则:生图模型画不出 alpha,`remove_bg` 必做(本轮实测六图透明占比
+> 47.8–66.8%);抠图后**从画布边框泛洪补内部空洞**(六图修补 0–6770 px)。
 
 ## 字体(硬要求)
 
@@ -156,6 +180,26 @@ Godot 4.4 + 本仓库字体实测(字号 12):`重剑无锋` **48 px**、
 > 它逼出来的补偿机器(见 `## 定位章 — 相机拥有可见性`)。(b) **闸门断言游戏级
 > 属性,不断言引擎级属性**:一条闸门只能靠改动引擎本该自己算的东西
 > (`offset/position/size/z-order`)来满足,那要删的是闸门,不是调精灵。
+>
+> **`portrait_ink_rect` 是纹理矩形,不是墨迹(2026-08-31,武虾轮盲区记录)。**
+> `player.gd:469` / `enemy.gd:328` 发布的 `portrait_ink_rect` 是**纹理矩形**派生:
+> `Rect2(精灵全局位 + offset − tex.w/2, sprite_top)` 到 `tex_size`,offset 恒为脚锚
+> `(0, −tex.y/2)`;`ink_world_dx/dy` 逐帧严格从**这个矩形**重算(`player.gd:502-503` /
+> `enemy.gd:355-356`,只此一路、永不二次计算)——**从不读 alpha 像素**。推论:
+> `abs(ink_world_dx/dy) <= 1.0` 对**任何**像素内容都读 ≈0,全绿证明的是「纹理按常数
+> 脚锚挂在脚上」,**不证明「画出来的内容站在自己的格子上」**。底边有透明留白的新图
+> 会把立绘悬空而钉子照绿——这是**钉子的结构性盲区**,不是某一届图的缺陷。真正的落脚
+> 检查是逐 PNG 的 **alpha 包围盒**(底边 vs y=127、水平中心 vs x=48);本轮已实测
+> 六张新图:`bottom_gap = 0` 全部(墨迹触及底行)、水平中心偏差 0 / −0.5(奇数宽
+> 半像素,记为发现非缺陷)、`east_heretic` top=3(记为偏差,不修),观测值在
+> `final/delivery_notes_wuxia.md` §3.2。本轮的绿是**常数脚锚 × 真实墨迹**构造出来的
+> (后处理底对齐,留白 ≈0),不是像素恰好蒙对——这个区别就是本条记录的意义。
+> 钉子、阈值、surface 白名单、`portrait_ink_rect` 这个名字本轮一律不改。可选的未来
+> 落脚钉**提议给所有者,本轮不落**:(a) 便宜版——提交 stdlib alpha-bbox 脚本 +
+> 一条 pytest 钉六张图的 bbox 底缝 ≈0、中心 ≈x=48(纯资产级,零引擎改动,冻结六个值);
+> (b) 彻底版——把 `visibility_probe.gd` 既有 `blank_texture` 资产级 alpha 扫描扩展为
+> 把 bbox 边缘发布上 surface(白名单只加)+ 新 playtest 卡(引擎改动 + 按
+> `implementer.md:23` 自跑)。所有者裁定。
 >
 > **形态闸门必须自我解释(2026-08-29, facility-result-pin)。** 凡是白名单式、
 > 逐字式、枚举式的断言,落笔前先问一句:「一次合法的改动会不会让它变红?」会,
@@ -341,6 +385,12 @@ applied on the gate side) will produce the real verdict.
 
 **每个主体先「定妆」一次锁定外观,之后所有图都从那个已定妆的主体出。**
 
+> **本表已于 2026-08-31(武虾轮)执行了一次,产出的正是本轮这六张立绘**(计划 → 已执行)。
+> 两条生产期学到的硬规则:(1) 第 3 步 `remove_bg` 必做——生图模型画不出 alpha,
+> 会把棋盘格画成不透明像素(本轮实测透明占比 47.8–66.8%);(2) 抠图后必须
+> **从画布边框泛洪补内部空洞**(六图修补 0–6770 px,东邪 15.7% / 西毒 5.2%)。
+> 全流程配方见 `final/delivery_notes_wuxia.md` §1。
+
 | 步骤 | 做什么 |
 |---|---|
 | 1 · 定妆 | 六个人物各 `create_character` 一次(道具用 `create_object`),**先看定妆图再往下走** |
@@ -357,6 +407,11 @@ applied on the gate side) will produce the real verdict.
 **主体(已定妆的身份)和图像(从主体派生的姿势/场景)是两层,不是一张平表。**
 一个 seed 不再足以标识一个人物。
 
+**该形状已于 2026-08-31 实现**:`assets/seed_manifest.json` 现为两层——
+`subjects`(六条已定妆身份:id / name / species / appearance,**人物条目上不再有 seed**)
++ `images`(每张图:subject + scene + 输出路径);九条非人物资产(地形×2、背景、音频×6)
+留在 `assets` 数组,seed/prompt 原样保留。`style_block` 即本轮那句分层 register。
+
 | 项 | 现状 | 该是什么 |
 |---|---|---|
 | **杨过的 prompt** | `a young swordsman in deep blue robes holding a heavy iron sword` | **缺"独臂"**。`20_content.md` §1 明写他是**独臂神雕侠**,而 prompt 从没提过,所以出来的立绘是双臂的 |
@@ -365,6 +420,12 @@ applied on the gate side) will produce the real verdict.
 | **战败音效** | 没有。`game_lost` 只调了 `stop_music()` | 战败当前是**静音**的,该有一个下沉的收尾音 |
 | **背景乐循环点** | 未设 | 30 秒一圈重头播,接缝听得见 |
 | **招式音效** | 31 个招式共用一个 `hit.wav` | 至少按外功门类分几种 |
+
+> **第 1、2 行已于 2026-08-31(武虾轮)解决**,按本节自己的配方:杨过的「独臂」按
+> 不对称正面写法落进定妆 appearance(一只巨螯大于头 + 左侧一枚光滑圆残板,不写
+> 「没有手臂」);洪七公的打狗棒以**非人道具**落进同一 appearance(竹棒 + 龙虾双钳 +
+> 酒葫芦)——见 `assets/seed_manifest.json` 的 `subjects`,新 prompt 不再有缺项。
+> 第 3–6 行(背景图尺寸、战败音效、背景乐循环点、招式音效)仍然 open,本轮未涉及。
 
 **背景图还有一条硬约束:必须偏亮。** `grid_lines.gd` 画的是 35% 透明度的深色墨线,
 背景一深,格线就消失——而"格子可见"是可读性硬要求第一条。

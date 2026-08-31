@@ -502,3 +502,43 @@ EVIDENCE 块并标注被本实测取代,实测值落 `final/delivery_notes_touch
   一个节点 + 一行 `_unhandled_input` 闸;按钮位置实现者可调(画布内、不压既有命中区)——`clicks:`
   真命中测试即证明。
 
+## 武虾立绘落地:四个虾种裁定 + 画风换向(2026-08-31,项目所有者裁定)
+
+**四个「待定虾种」由所有者逐条裁定,名册 `assets/characters/roster.json` 照录,守护测试
+`tests/test_shrimp_roster.py` 不改且绿。** 2026-08-28「武虾:本作的一切角色都是虾」条目里
+挂着的四行待定,自此闭合:
+
+| 角色 | 虾种(逐字) | 对应理由(逐字) |
+|---|---|---|
+| 东邪 `east_heretic` | 樱花虾(正樱虾) | 深海群游、绯红半透,聚散如落英,对桃花岛 |
+| 南帝 `south_emperor` | 罗氏沼虾 | 南方淡水巨虾,一对细长蓝螯,对大理段皇爷 |
+| 中神通 `central_divine` | 玻璃虾 | 通体透明、内里一览无余,对先天功 |
+| 杨过 `yang_guo` | 枪虾 | 一只螯极大而另一侧空缺(独臂);且与虾虎鱼结伴共生(神雕) |
+
+(西毒 皮皮虾 / 北丐 龙虾 两行此前已写好,原样未动;六行 `art_status` 由 `pending` 翻为
+`completed`。)**杨过的称号与去名化 note 原样保留**——去名化是独立一轮的事,已记
+`40_ux_backlog.md` UX-15(OPEN);本轮不改名(改名会打断编译期资源引用,与「证明几何
+没坏」搅在一起就分不清红是谁造成的)。
+
+**画风换向裁定:角色从「人形水墨武侠人物」改为「非人形的真虾体 + 头卡通身写实」。**
+试验收敛记录:纯写实 → 吓人;纯 Q 版 → 平;「介于两者之间」→ 糊;结论是分层 register
+必须**写进同一句**——头全卡通(圆化头胸甲、大而有高光的眼、讨喜绝不吓人)+ 身体半写实
+(叠压甲片、清晰体节、棘刺脊线、方向光与柔和阴影、硬壳光泽)。风格句唯一来源 =
+`assets/seed_manifest.json` 的 `style_block`,与 `30_presentation.md`「画风」节逐字同步
+(本轮已核 byte-identical);完整配方(虾种表、污染词、年龄/性别表达、不对称正面化、
+构图→后处理、remove_bg + 边框泛洪补洞)逐字归档于 `final/delivery_notes_wuxia.md` §1。
+
+**立绘几何重实测(2026-08-31;换图不换几何——钉子必须重新量,不能沿用旧绿):**
+`portrait_grid_alignment` **30/30**(24 条墨迹线在 f40 静态腿与 f820 走位腿全部
+`ink_world_dx/dy = 0.0`)、六单位八层可见性 `portrait_visible=true / portrait_fail_layer="" /
+portrait_covered_frac=0.0`、`camera_transform_follows_unit` **9/9**、`spine_to_ending`
+**42/42 零 runtime error**;逐 PNG alpha 包围盒 `bottom_gap=0` 全部(墨迹触及底行,
+纹理矩形盲区在本套图上不存在)、水平中心偏差 0 / −0.5(奇数宽半像素,记为发现非缺陷)、
+`east_heretic top=3` 记为偏差不修。零红钉、零阈值放宽、零 yaml/脚本/PNG 改动;
+纹理矩形盲区(`portrait_ink_rect` 是纹理矩形派生、全绿不证明墨迹落脚)记入
+`30_presentation.md` 盲区记录,可选 alpha-bbox 落脚钉提议给所有者、本轮不落。
+观测值:`final/delivery_notes_wuxia.md` §3。**过渡文件 `WUXIA_ART_HANDOFF.md` 的内容
+已逐字归档进 `final/delivery_notes_wuxia.md` §1(归档先于删除、回滚路径见同文件 §7);
+根文件删除被管线「必需产物」守卫拒绝(5 次尝试,实录该文件 §7)——删除待有删除权限的
+步骤/配置执行,归档完整性已核验(§一–§六齐备、风格句与 `style_block` byte-identical)。**
+
