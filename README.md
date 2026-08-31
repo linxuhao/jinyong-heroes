@@ -17,7 +17,67 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-equipment-battle — gear you drew can now be equipped, and it fights (2026-08-31)
+## Latest round: jinyong-event-pool-36 — a full 36-month journey never repeats an event (2026-08-31)
+
+The travel-event pool was 16 rows, so a player who roamed every month hit the
+seen-bag reset on roam #17 and started watching 山道遇劫匪 again — roadmap
+completeness item 3 was ❌. This round appends 20 new events (pool = **36**, the
+exact journey length: 3 years × 12 months) with zero mechanism changes: same
+row shape, the same five effect types, draw logic / `events_seen` semantics /
+`battle_id` stub / map node-event channel untouched, and the frozen 16 rows
+byte-identical (machine-pinned verbatim by the test mirrors).
+
+**What landed:**
+
+- **20 new events** (`scripts/data/event_data.gd`): 河滩论剑 / 荒寺晚钟 /
+  荒村毒井 / 虎啸危崖 / 上元灯会 / 当铺旧刀 / 茶馆说书 / 街角残局 / 铸剑回炉 /
+  崖上采药 / 山道花轿 / 荒冢埋剑 / 客栈夜账 / 雁足传书 / 风雪隘口 / 醉汉传拳 /
+  河伯娶亲 / 疫村施药 / 登门求教 / 坠马客商 — twenty distinct scenes, no
+  reskins. Every row is a real trade-off across different currencies
+  (silver ↔ attributes, attributes ↔ practice, immediate vs long-term); no
+  option strictly dominates the other, and no row assumes the player has money
+  (opening silver is 0; negative amounts clamp to 0, so each row keeps at least
+  one option a penniless player still gains from). New prose stays
+  species-neutral exactly like the frozen 16 — the unresolved 「一切角色都是虾」
+  lore question is recorded as **UX-17 (OPEN, owner decision)** in
+  `design/40_ux_backlog.md`, not papered over.
+- **Two no-repeat gates**: unit `_test_no_repeat_full_journey`
+  (`tests/test_event_data.gd` — runs the real `EventLogic.draw_unseen_id` 36
+  times on a fresh profile with a fixed-seed RNG, marks each id seen exactly
+  the way the game does, asserts the seen-bag ladder 0→36 never shrinks (no
+  mid-journey reset) and all 36 ids are distinct, plus ≥20 non-frozen ids and
+  a ≥36-row size floor) and playtest `event_pool_new_event_resolved.yaml`
+  (the **78th** scenario — a debug seeder marks every id seen except the
+  showcase `cliff_herbs`, so the roam draw is deterministic; the scenario pins
+  draw → render (`event_title` / `event_body`) → select → resolve with the
+  on-screen `events_seen_count` ladder 35→36 and no pool reset).
+- **Observables & plumbing** (append-only): `CultivationScreen.event_title` /
+  `event_body` surfaces, the `debug_seed_events_seen` debug action
+  (`project.godot` + `playtest/_common.yaml`), and ~80 new zh→en keys in the
+  i18n EN dictionary (`tests/test_i18n_coverage.py` untouched; a new
+  `_test_i18n_entries` unit gate closes the static guard's blind spot by
+  requiring every event title / body / option label to be an EN key).
+- **Design archive**: `design/20_content.md` §4 (pool 36 + new-row trade-off
+  patterns), `design/00_roadmap.md` completeness item 3 ❌→✅ citing both
+  gates, `design/90_decisions.md` (2026-08-31 rulings a–e),
+  `design/99_changelog.md` row, `design/40_ux_backlog.md` UX-17 (OPEN,
+  record-only).
+
+**Verification status (honest):** the pool (36 unique ids, frozen 16
+verbatim), both gates' code, the seeder, the i18n entries and all five
+design-doc updates are verified in the tree by direct read. The playtest
+scenario's red-first four values were **measured** via the temporary-rollback
+protocol (fail frame **f140** / `events_seen_count == 35` / observed 16 on the
+16-row pool / **2** green asserts before red —
+`final/delivery_notes_event_pool_playtest.md`). The unit gate's red-first
+values are structurally derived, not sidecar-measured (the unit-suite leg was
+unreachable at implementation time — `final/delivery_notes_event_pool.md`).
+The official compile / 78-scenario playtest / pytest / unit-suite runs are
+produced by the downstream gate steps (`compile_report.json` /
+`playtest_report.json` / `test_report.json`), so those criteria stay pending
+that evidence — see `final/verify_report.json`.
+
+## Round: jinyong-equipment-battle — gear you drew can now be equipped, and it fights (previous round)
 
 The 12 equipment cards (铁剑…长剑 / 布衣…软猬甲 / 草鞋…凌波靴) were inventory
 dead ends: drawn, displayed, never equippable. This round gives the profile
@@ -625,7 +685,9 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   `MapData.NODES` entry-content + `active_event_id` / `active_battle_id` /
   `active_facility_id` / `declared_gap_types`, `MapScreen` EVENT + FACILITY
   phase + `pressed_connected`; `EventLogic` pure statics over
-  `EventData.TABLE` (16 rows); `FacilityData.TABLE` (2 rows) +
+  `EventData.TABLE` (36 rows — 16 frozen + 20 added 2026-08-31;
+  `draw_unseen_id` draws unseen ids and only resets when the pool is
+  exhausted, so a 36-month all-roam journey never resets); `FacilityData.TABLE` (2 rows) +
   `silver_cost()` / `for_node()` / `def(id)`; `SkillData.cost` /
   `insufficient_energy` / `spend` with `Player.energy` / `energy_max`.
 - **i18n** (`scripts/autoload/i18n.gd`): the EN dictionary is the copy
@@ -635,7 +697,8 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   `tests/test_i18n_coverage.py` keeps lookups honest.
 - **Playtest contract** (the project's test "API"): `playtest/_common.yaml`
   declares the scene, the allowed actions (incl. debug injections and
-  `use_facility` / `debug_grant_silver` / `debug_grant_equip`), the
+  `use_facility` / `debug_grant_silver` / `debug_grant_equip` /
+  `debug_seed_events_seen`), the
   observable-surface whitelist
   (incl. the twelve new touch-reach button blocks and the six
   `pressed_connected` vars) and `scenario_order`; each `playtest/*.yaml` is
@@ -643,9 +706,11 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   or changed/unchanged token on every assert line). `clicks:` entries are
   `<Node>[ +dx,dy][ left|right|middle]` — a **true GUI hit test** (aim at the
   control/unit body, never a `*_ClickTarget`); `hovers:` are motion-only.
-  77 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
-  clicks-only storyline spine `clicks_only_storyline.yaml` and the facility
-  click companion `map_facility_buttons_click.yaml`.
+  78 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
+  clicks-only storyline spine `clicks_only_storyline.yaml`, the facility
+  click companion `map_facility_buttons_click.yaml`, and the no-repeat
+  proof `event_pool_new_event_resolved.yaml` (a NEW travel event drawn,
+  rendered, selected and resolved on screen).
 - **Unit tests**: GDScript files with a top-level `static func run() -> bool`
   are collected by `tests/unit_test_runner.gd`'s explicit append-only `TESTS`
   registry (28 files), run headless. SceneTree-extending integration suites
@@ -852,8 +917,8 @@ results are transcribed into the design archive (`design/00_roadmap.md`,
 - `scenes/` — Godot scenes: `ui/` (hud, health_bar), `segments/`
   (creation, map, transition, sect_select, cultivation, ending),
   `battlefield.tscn`, `main.tscn` / `menu.tscn`
-- `playtest/` — 77 headless playtest scenarios + the `_common.yaml` contract
-  (78 yaml files); incl. the clicks-only storyline spine and the facility
+- `playtest/` — 78 headless playtest scenarios + the `_common.yaml` contract
+  (79 yaml files); incl. the clicks-only storyline spine and the facility
   click companion; frozen yamls are append-only (authorized edits stay
   machine-pinned by the superset fixture)
 - `tests/` — GDScript unit suites (28 files in the TESTS registry),
@@ -871,5 +936,8 @@ results are transcribed into the design archive (`design/00_roadmap.md`,
   red-first evidence: `final/delivery_notes_touch_reach_red_first.md`;
   the taps-only walkthrough:
   `final/delivery_notes_touch_reach_walkthrough.md`; the facility round's
-  red-then-green record: `final/delivery_notes_facility.md`)
+  red-then-green record: `final/delivery_notes_facility.md`; the
+  event-pool round's gate evidence:
+  `final/delivery_notes_event_pool.md` +
+  `final/delivery_notes_event_pool_playtest.md`)
 - `assets/` — placeholder textures, seed portraits, NotoSansSC font, audio
