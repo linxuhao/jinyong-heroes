@@ -17,7 +17,67 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: wuxia-shrimp-portraits — every character is now a shrimp (武虾, 2026-08-31)
+## Latest round: jinyong-equipment-battle — gear you drew can now be equipped, and it fights (2026-08-31)
+
+The 12 equipment cards (铁剑…长剑 / 布衣…软猬甲 / 草鞋…凌波靴) were inventory
+dead ends: drawn, displayed, never equippable. This round gives the profile
+three slots (兵刃/护甲/鞋履), a touch-only equip surface on the roster panel,
+one tier formula, and feeds equipped gear into real encounters.
+
+**What landed:**
+
+- **Save model** (`scripts/data/player_profile.gd`): `equipped` — a plain
+  String-keyed Dictionary `{"weapon","armor","boots"}` (JSON-lossless, same
+  hard constraint as every other field). `equip()` validates slot / id-in-
+  inventory / category match (an armor id can never enter the weapon slot);
+  `unequip_slot()` clears; `from_dict()` coerces defensively and repairs
+  equipped ⊆ inventory on load, so **legacy saves without `equipped` load as
+  three empty slots — no crash, nothing wiped**. No autosave: equipment is a
+  free action, following the cultivation save/load model.
+- **One formula, one place** (`scripts/data/equipment_data.gd`): tier parsed
+  from the id suffix (`eq_sword_1..4 → 1..4`, malformed ids degrade to 0);
+  bonuses are category-keyed constants only — weapon → attack `+2×tier`,
+  armor → health `+5×tier`, boots → initiative `+2×tier` plus `+1` move at
+  tier ≥ 3. Never 12 hand-written per-item literals. The full derivation is
+  tracked for the design archive (see verification status below).
+- **Gear enters battle** (`scripts/data/battle_setup.gd`): `derive_stats`
+  adds the equipment bonuses (empty-equipped output is bit-identical to the
+  base formulas — the reversibility baseline), `build_character` mirrors
+  `gear_attack/health/initiative/move_bonus` onto the CharacterData, and the
+  stale "no live caller yet" header was replaced with the real one
+  (`battlefield.gd:651` → `BattleSetup.build_character(SaveManager.profile)`).
+  Equip before an encounter and the derived stats differ; unequip and they
+  return to baseline.
+- **Roster panel goes interactive** (`scripts/ui/roster_panel.gd` +
+  `scenes/ui/roster_panel.tscn`): a 装/卸 button pool on the 物品 rows
+  (focus_mode 0, clicks-only — no parallel keyboard-cursor list,
+  `cursor_markers_visible == false` preserved). Equipping consumes no month,
+  no action, no phase; the previous round's read-only guarantee was
+  deliberately superseded (the panel now writes exactly one profile surface —
+  `equipped` — and nothing else), recorded in the panel header.
+- **Contracts & tests**: two new playtest nails (`roster_equip_free_action.yaml`
+  free-action + panel-level reversibility; `equipment_in_battle_diff.yaml`
+  real event grant → click equip → real encounter → `changed` → unequip →
+  baseline), append-only surface observables (RosterPanel equipped_*/equip_*
+  counts, Player gear_* bonuses, EquipButton blocks), static contract test +
+  `tests/test_roster_equipment_guards.py` (no-autosave scan, focus_mode=0,
+  surface appends), three new GDScript unit files (formula matrix, profile
+  round-trip/hostile/validation, battle-setup legacy equality + per-slot
+  direction + reversibility), i18n entries 「装上/卸下」.
+
+**Verification status (honest):** implementation, unit-test registration,
+contract appends, and i18n are verified in the tree (see
+`final/verify_report.json`). The gate artifacts (`compile_report.json`,
+`playtest_summary.md`, `vision_report.json`, `test_report.json`) are produced
+by the steps after the verifier and were **not available at verification
+time** — compile/playtest/vision/pytest green status is therefore pending
+those artifacts. Two debts are recorded, not hidden: the two new scenarios'
+self-run observed values and the red-first four-value measurements are
+pending a real sidecar run, and the design-archive updates
+(`40_progression.md` §8/§9, `90_decisions.md` ruling, `99_changelog.md` row,
+`30_presentation.md`) are not yet in the repo.
+
+## Round: wuxia-shrimp-portraits — every character is now a shrimp (武虾, 2026-08-31)
 
 The 2026-08-28 world ruling (`design/90_decisions.md`) — **all characters are
 shrimp** — is now visible on screen: the six 96×128 character portraits were
@@ -462,6 +522,20 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   each with `pressed_connected` published on its screen; every button is
   `focus_mode = FOCUS_NONE` and delegates to the same handler its keyboard
   shortcut calls.
+- **Equipment system** (jinyong-equipment-battle round): `PlayerProfile.equipped`
+  (three String-keyed slots) with `equipped_id(slot)` / `equip(slot, id)` /
+  `unequip_slot(slot)` — `equip` returns `false` unless the id is in
+  `inventory` and its category matches the slot; `scripts/data/equipment_data.gd`
+  (pure statics `slot_of` / `tier_of` / `bonuses_for` / `sum_bonuses`, five
+  category constants, defensive tier parse); `BattleSetup.derive_stats`
+  consumes `sum_bonuses(profile.get("equipped"))` so an empty/legacy profile
+  is bit-identical to the base formulas; `CharacterData.gear_*_bonus` mirrors
+  expose the bonuses to battle; RosterPanel publishes
+  `equipped_weapon/armor/boots`, `equip_button_count`,
+  `equip_pressed_connected` and drives the 装/卸 pool
+  (`EquipButton{i}`, `focus_mode = 0`); playtest surface: those RosterPanel
+  observables + `Player.gear_attack_bonus/gear_health_bonus/
+  gear_initiative_bonus/gear_move_bonus` in `playtest/_common.yaml`.
 - **Camera ownership** (`scripts/camera_follower.gd`, attached to the
   `Camera` node of `main.tscn` / `menu.tscn`): follows
   `CombatManager.get_active_unit()` during `STATE_BATTLE`, clamps to the
