@@ -3,6 +3,8 @@
 ## print PASS/FAIL at the end; never relies on assert() (stripped in release).
 
 const EventData = preload("res://scripts/data/event_data.gd")
+const EventLogic = preload("res://scripts/data/event_logic.gd")
+const PlayerProfileScript = preload("res://scripts/data/player_profile.gd")
 
 ## Expected row data, verbatim from step2_design §8.6.
 const ROW_EFFECTS := {
@@ -89,6 +91,7 @@ static func run() -> bool:
 	ok = _test_texts(ok)
 	ok = _test_unknown(ok)
 	ok = _test_fresh_instances(ok)
+	ok = _test_no_repeat_full_journey(ok)
 	if ok:
 		print("PASS test_event_data")
 	else:
@@ -211,6 +214,68 @@ static func _test_fresh_instances(ok: bool) -> bool:
 	all1[0].title = "mutated"
 	var all2: Array = EventData.all()
 	ok = _expect(ok, all2[0].title == "山道遇劫匪", "all() instances fresh")
+	return ok
+
+
+## Executable no-repeat gate (roadmap completeness item 3, ❌->✅).
+## A full journey = 3 years x 12 months = 36 roams. Run the REAL
+## EventLogic.draw_unseen_id once per month on a fresh profile and mark each id
+## seen exactly as cultivation.gd:467-469 does (append-if-absent). Assert the
+## seen-bag grows monotonically 0->36 with no mid-journey reset, and that all 36
+## drawn ids are distinct. On the current 16-row pool this gate is RED at draw 17
+## (the reset branch clears the bag, so the ladder drops back to 1); it stays red
+## until event_rows_i18n_mirrors lands >= 36 rows.
+static func _test_no_repeat_full_journey(ok: bool) -> bool:
+	# Pre: build the id set from the real table (the size floor is asserted LAST
+	# so the first red on the 16-pool is the no-repeat failure at draw 17).
+	var all: Array = EventData.all()
+	var all_ids := {}
+	for def in all:
+		all_ids[def.id] = true
+	# 16-frozen baseline: the row ids that predate this round's pool growth. 36
+	# distinct draws over only these 16 ids would force >= 20 new ids; the set
+	# label stays self-documenting if a later round grows the pool further.
+	var FROZEN16 := {
+		"bandits": true, "merchant": true, "ruins": true, "beggar": true, "tomb_bed": true,
+		"wounded_eagle": true, "peach_maze": true, "snake_bile": true, "dragon_scrap": true,
+		"flood_ferry": true, "escort_job": true, "dali_market": true, "night_rain": true,
+		"gambling_den": true, "quanzhen_scripture": true, "lost_purse": true,
+	}
+	# Fresh hermetic profile + deterministic, independent RNG stream.
+	var profile: PlayerProfile = PlayerProfileScript.new()
+	profile.flags["events_seen"] = []   # defensive: mirrors the sanitized bag
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260831
+	var drawn := {}
+	for i in range(1, 37):
+		var id: String = EventLogic.draw_unseen_id(profile, rng)
+		ok = _expect(ok, id != "", "draw %d returns a non-empty id" % i)
+		ok = _expect(ok, all_ids.has(id), "draw %d id is in TABLE (got %s)" % [i, id])
+		# No-repeat: every drawn id must be new across the whole journey.
+		ok = _expect(ok, not drawn.has(id), "draw %d repeats id %s (no-repeat violated)" % [i, id])
+		drawn[id] = true
+		# Mark seen EXACTLY as cultivation.gd:467-469 does (append-if-absent).
+		var seen: Array = profile.flags.get("events_seen", [])
+		if not seen.has(id):
+			seen.append(id)
+		profile.flags["events_seen"] = seen
+		# Monotonic ladder 0->36: any shrinkage proves the zero-RNG reset branch
+		# fired mid-journey — MEASURED, not reasoned.
+		var bag_size: int = (profile.flags["events_seen"] as Array).size()
+		ok = _expect(ok, bag_size == i, "draw %d seen-bag size == %d (reset fired; got %d)" % [i, i, bag_size])
+	# Post: 36 distinct ids across the full journey.
+	var distinct: Array = drawn.keys()
+	ok = _expect(ok, distinct.size() == 36, "36 draws -> 36 distinct ids (got %d)" % distinct.size())
+	# Pigeonhole over the frozen baseline: 36 distinct draws over only 16 frozen
+	# ids must include >= 20 ids OUTSIDE FROZEN16 (i.e. newly-added rows).
+	var new_ids := 0
+	for did in distinct:
+		if not FROZEN16.has(did):
+			new_ids += 1
+	ok = _expect(ok, new_ids >= 20, "journey drew >= 20 new (non-frozen) ids (got %d)" % new_ids)
+	# Size floor asserted LAST so the first red on the 16-pool lands on the
+	# no-repeat violation at draw 17, not here.
+	ok = _expect(ok, all.size() >= 36, "TABLE has >= 36 rows (got %d)" % all.size())
 	return ok
 
 
