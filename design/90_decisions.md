@@ -660,3 +660,63 @@ ACTION_PICK case 3 抽取后立即 `_sync_surface()`(原实现抽完直接 `_ren
 单元闸门 `_test_no_repeat_full_journey` 与 pytest 守卫的官方 PASS 仍以 5_test 产物(`test_report.json`)
 为准——该产物不在本步上下文,不冒充实测。
 
+## jinyong-shrimpcopy2 — 事件散文全员虾化与「冻结 16 条」散文半边解冻(2026-08-31)
+
+本条记 `jinyong-shrimpcopy2` 轮的裁定与落地。数据与取舍表见 `20_content.md` §4;本轮只改
+`scripts/data/event_data.gd` 的散文(title / text / 两个 option label),id / effects / 选项结构 /
+36 行数 / 行序一个字节未动。
+
+**(a) 「冻结 16 条」的散文半边解冻——为什么当初冻,为什么现在解。** 冻结出自上一轮
+`jinyong-event-pool-36` 裁定 (a)(原文保留于上节,不删):扩池轮必须证明
+**append-only**——池 16→36 的每一行既有数据逐字不动,由 `tests/test_event_data.gd`
+的四张镜像机器化,以证明该轮没有偷改旧行。解冻出自所有者 2026-08-31 裁定:
+**一切角色都是虾,事件里的路人也不例外**(2026-08-28「一切角色都是虾」的落地答案,
+即 `40_ux_backlog.md` UX-17 的裁定)——玩家一个月里读得最多的文字就是游历事件,
+那里站着一群人,是设定露馅最频繁的地方;文案必须与世界观一致,故既有行的散文必须可改。
+**解除范围仅限散文(title / text / option label)**:id、effects(type/value/target)、
+选项结构、行数 36、行序**仍然冻结**——`ROW_EFFECTS` 镜像本轮一字未改,即为
+「没有借改文案动数值」的机器证明;四张镜像里只有散文三张跟改。
+
+**(b) 事件层落地(28 条 A 类重写 / 8 条 B 类逐字未动)。** 凡写到人的地方,那是一只虾,
+以**钳 / 螯 / 须(触须)/ 甲壳(头胸甲)/ 蜷起的尾节 / 尾扇 / 步足 / 复眼**行文,不点虾种:
+路人是无名之辈,六种已定虾种(皮皮虾/龙虾/樱花虾/罗氏沼虾/玻璃虾/枪虾)仍归六位命名
+角色,不新造虾种表;河伯是名号,保持名号不点种;巨雕/猴子/大雁/蛇/虎/马是动物,不虾化。
+改的是「做这些事的是谁」:手提→钳里提着、伸手→伸钳、拍着胸脯→拍着甲壳、揉着腰→捶着
+甲壳、手舞足蹈→挥舞双螯、有人→几只虾、四下无人→四下不见虾影、人声→虾声;冠名人物词
+(劫匪/行商/老丐/掌柜/郎中/村民/少年/艄公/镖头/老僧/老道/药翁/说书人/剑客/刀主/向导/
+巫师/老铁匠)一律换成虾描述。8 条 B 类行(`ruins` / `tomb_bed` / `wounded_eagle` /
+`peach_maze` / `ancient_bell` / `wedding_train` / `sword_mound` / `wild_goose_letter`)不写人、
+无人体动作,逐字未动——不为此扩 diff。
+
+**(c) 江湖照旧,零海底化。** 客栈 / 镖局 / 钱庄 / 书铺 / 赌坊 / 山道 / 渡口 / 古墓 / 马车 /
+银两 / 抄经 / 钢刀等场景器物行当逐字保留;禁词(游过去/潜入/水流/海底/水底/下潜/潜游/
+洄游/洋流/珊瑚/海藻/鳃)由守卫挡在散文外;**flood_ferry 的「泅水而过」刻意保留**——泅水
+渡过暴涨的河是陆上武功,不是海底化,守卫把它列为受保护字面量,防止未来一轮好心
+「修」成水下写法。
+
+**(d) 守卫与同步。** 新守卫 `tests/test_event_prose_shrimp.py`(stdlib-only pytest,仿
+`test_shrimp_roster.py` 的「判断靠人、提醒靠机器」):HUMAN ×38 / UNDERWATER ×12 /
+SPECIES ×13 三张 denylist(逐 token 命中报行)+ 4 处受保护字面量(#78 的 `崖上采药`
+标题 / `重金购芝`、`泅水而过`、`破财消灾`);先落先红——在改前语料上实测红 39 对
+(行,token)(派生清单 `final/shrimp_guard_red_first_notes.md`),最后一条 A 类行落地后
+转绿,交付文件上零命中。同步面:`ROW_TITLES` / `ROW_TEXTS` / `ROW_LABELS` 逐字节跟改;
+`_test_fresh_instances` :387 的 bandits 标题字面量跟到 `山道遇劫`(钉的是新鲜性性质,值
+跟着它钉的数据走,交付说明逐行记档);`i18n.gd` EN 条目 ~34 条**原位替换**(键与值同改,
+不并排追加;EN 值同样写出虾身);README 标题提及 ×4;playtest #78 两枚字面量钉
+**零 diff**(`崖上采药` / `重金购芝` 不含人形词,按构造冻结,逐行核对见
+`final/delivery_notes_shrimpcopy2.md` §(d))。
+
+**(e) 闸门实测(2026-08-31,本步上下文中的本轮 5_compile / 5_vision 产物,5_design 补写)。**
+编译 **95/95** 零错误;playtest **78/78 场景全 PASS**(硬闸门 `passed: true`、`spec_used: true`、
+180 帧、零 runtime error):`event_pool_new_event_resolved` **15/15**(重写后散文在屏上走完
+「抽到/渲染/选中/结算」四腿)、`event_travel_effects` **19/19**、`spine_to_ending` **42/42**、
+`save_load_roundtrip` **14/14** 等既有网零回归。视觉闸门 `passed: true` 但 **blind**
+(`endpoint_unreachable`,`judged_by: human` 人眼代判;无逐问答案,本轮无 Q6 计数可引用)——
+与既往 blind 轮同立场,不作为数字断言的替代证据。pytest 守卫与 GDScript 单元套件
+(EN 成员资格闸、`_test_no_repeat_full_journey`)的官方 PASS 以 5_test 产物
+(`test_report.json`)为准——该产物不在本步上下文,不冒充实测。
+`40_ux_backlog.md`:**UX-17 → CLOSED(jinyong-shrimpcopy2)**(证据 =
+`playtest_summary.md: event_pool_new_event_resolved 15/15` + 78/78 全 PASS)、新开
+**UX-19(OPEN,record-only)**:事件外人形散文清单(`final/human_prose_sweep_notes.md`,
+本轮只记不改)。
+

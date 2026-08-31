@@ -186,7 +186,7 @@
 `draw_unseen_id` 36 次、断言 36 个互异 id 且 seen 阶梯 0→36 无中途清空)与 playtest
 场景 `event_pool_new_event_resolved`(屏上抽到、渲染、选中、结算一条新事件)。
 
-**银钱换物 (item-with-cost)。** `merchant` 行商路过——花钱买物,一物一价;
+**银钱换物 (item-with-cost)。** `merchant` 车马过路——花钱买物,一物一价;
 `dali_market` 大理市集——二选一,花不同的钱买皮甲或快靴。
 
 **物品 vs 属性 (item-vs-attr)。** `tomb_bed` 古墓寒玉——床上练内力,还是床畔捡剑。
@@ -194,7 +194,7 @@
 **属性二选一 (attr-A-vs-attr-B)。** `ruins` 古墓残碑——悟性与福缘二选一;
 `peach_maze` 桃花迷阵——闯阵的身法,还是观潮的悟性。
 
-**练功 vs 金钱 (growth-vs-money)。** `dragon_scrap` 降龙残谱——强记掌谱练功,还是卖给书贾换银两。
+**练功 vs 金钱 (growth-vs-money)。** `dragon_scrap` 降龙残谱——强记掌谱练功,还是卖与书铺换银两。
 
 **花钱练功/买属性 (paid-growth)。** `wounded_eagle` 神雕负伤——花银两施药换练功,
 还是静观换悟性;`quanzhen_scripture` 全真抄经——免费抄经涨悟性,还是花银两求教剑理
@@ -203,15 +203,15 @@
 **花钱买属性 vs 白拿 (paid-attr-vs-free-attr)。** `snake_bile` 蛇胆奇效——重金购蛇胆
 涨根骨,还是掉头就走白拿一点福缘。
 
-**花钱过路 vs 自力 (pay-vs-effort)。** `bandits` 山道遇劫匪——花钱消灾,还是自力周旋;
+**花钱过路 vs 自力 (pay-vs-effort)。** `bandits` 山道遇劫——花钱消灾,还是自力周旋;
 `flood_ferry` 渡口风波——付钱渡河,还是泅水而过换内力。
 
 **银两 vs 属性 (money-vs-attr)。** `escort_job` 镖行招募——接下镖单挣银两,还是婉拒独行换悟性。
 
-**道德·福缘 vs 银两 (moral fortune-vs-silver)。** `lost_purse` 遗落的褡裢——送还失主
+**道德·福缘 vs 银两 (moral fortune-vs-silver)。** `lost_purse` 遗落的褡裢——归还失物
 涨福缘,还是收起走人得银两;`gambling_den` 赌坊喧嚣——入局三把搏一把银两,还是袖手旁观涨福缘。
 
-**施舍 (charity)。** `beggar` 老丐乞食——施舍银两,得福缘回报。
+**施舍 (charity)。** `beggar` 巷口乞食——施舍银两,得福缘回报。
 
 **(本轮追加 20 条;2026-08-31 `jinyong-event-pool-36`,同一取舍词汇,格式照冷冻
 16 条——只记取舍形状,不抄数值。新文案按既有 16 条的写法不指明物种,与
@@ -245,17 +245,17 @@
 练功。
 
 **出炉换器 vs 旁观知理 (paid-item vs free-knowledge)。** `smithy` 铸剑回炉——出银把
-旧剑回炉重铸得一把好剑,还是旁观剑理换悟性;`fallen_rider` 坠马客商——帮坠马客商
+旧剑回炉重铸得一把好剑,还是旁观剑理换悟性;`fallen_rider` 途中坠马——帮坠马的虾
 拣拾货物得银两,还是捡起散落的快靴自用。
 
 **卖力得酬 vs 出资养体 (earn-by-effort vs pay-for-medicine)。** `cliff_herbs` 崖上采药
-——帮采药人攀崖顶得银两又练身法,还是重金买下崖顶灵芝养内力。
+——帮崖上采药的虾攀崖顶得银两又练身法,还是重金买下崖顶灵芝养内力。
 
 **劳力 vs 养身 (labor vs paid-rest)。** `night_inn` 客栈夜账——帮掌柜算夜账得银两又
 涨悟性,还是温酒暖身贴银两换根骨。
 
-**喝酒求艺 vs 以实招换 (paid-practice vs toughness)。** `drunken_fist` 醉汉传拳——
-买酒向醉汉请教拳理换练功,还是以拳换教、硬挨一顿换根骨。
+**喝酒求艺 vs 以实招换 (paid-practice vs toughness)。** `drunken_fist` 酒肆拳影——
+买酒向喝醉的虾请教拳理换练功,还是以拳换教、硬挨一顿换根骨。
 
 **闸门实测(2026-08-31 本轮 5_compile / 5_vision,5_design 补记)。** 编译 **95/95** 零错误;
 playtest **78 场景**硬闸门 `passed: true`、零 runtime error、**77 PASS / 1 红**——唯一红是本轮
@@ -278,6 +278,41 @@ f200 读到空串;裁定见 `90_decisions.md` (g))。本轮 `5_compile` 官方�
 (78 场景 312 帧,Q6 78 好 / 0 坏)。`40_ux_backlog.md` **UX-18 → CLOSED(jinyong-event-pool-36)**,
 证据 = `playtest_summary.md: event_pool_new_event_resolved 15/15`。单元闸门 `_test_no_repeat_full_journey`
 与 pytest 守卫的官方 PASS 仍以 5_test 产物(`test_report.json`)为准——该产物不在本步上下文,不冒充实测。
+
+**散文改向:全员是虾(2026-08-31 `jinyong-shrimpcopy2`,5_design 记档)。** 上文「本轮追加
+20 条」括注所记「新文案按既有 16 条的写法不指明物种、与 2026-08-28「一切角色都是虾」裁定
+并存(见 UX-17)」**自此被取代**:所有者 2026-08-31 裁定**一切角色都是虾,路人也不例外**,
+36 条事件的散文(title / text / 两个 option label)全部改为「一群虾在武侠世界里行走江湖」——
+凡写人处皆以**钳 / 螯 / 须 / 甲壳 / 蜷起的尾节**行文,不点虾种(六种已定虾种仍归六位命名
+角色,路人一律体态描写、不新造虾种表;河伯保持名号;巨雕/猴子/大雁/蛇/虎/马是动物)。
+**江湖照旧、零海底化**:客栈 / 镖局 / 钱庄 / 书铺 / 赌坊 / 山道 / 渡口 / 古墓 / 马车 / 银两 /
+抄经 / 钢刀等场景器物行当逐字保留,禁词(游过去/潜入/水流/海底/水底/下潜/潜游/洄游/洋流/
+珊瑚/海藻/鳃)不出现,flood_ferry 的「泅水而过」按陆上武功保留并受守卫保护。**最小 diff
+记录**:28 条 A 类行改(34 个散文字段 = 5 标题 山道遇劫匪→山道遇劫 / 行商路过→车马过路 /
+老丐乞食→巷口乞食 / 醉汉传拳→酒肆拳影 / 坠马客商→途中坠马 + 27 正文 + 2 标签
+卖与书贾→卖与书铺 / 送还失主→归还失物),8 条 B 类行(ruins / tomb_bed / wounded_eagle /
+peach_maze / ancient_bell / wedding_train / sword_mound / wild_goose_letter)逐字未动;id /
+effects / 选项结构 / 36 行数逐字节未动(`ROW_EFFECTS` 镜像未改 = 机器证明)——「冻结 16 条」
+仅散文半边解冻,裁定与理由见 `90_decisions.md` 2026-08-31 `jinyong-shrimpcopy2` 条。同步:
+`ROW_TITLES` / `ROW_TEXTS` / `ROW_LABELS` 逐字节跟改、`_test_fresh_instances` :387 的 bandits
+标题字面量跟到 山道遇劫、`i18n.gd` EN 条目 ~34 条原位替换(EN 值同样写出虾身)、README
+标题提及 ×4、playtest #78 两枚字面量钉零 diff(`崖上采药` / `重金购芝` 不含人形词,按构造
+冻结)。新守卫 `tests/test_event_prose_shrimp.py`(stdlib-only,仿 `test_shrimp_roster.py` 的
+「判断靠人、提醒靠机器」):HUMAN ×38 / UNDERWATER ×12 / SPECIES ×13 三张 denylist +
+4 处受保护字面量(`崖上采药` 标题 / `重金购芝` / `泅水而过` / `破财消灾`),先落先红——改前
+语料上实测红 39 对 (行,token)(派生清单 `final/shrimp_guard_red_first_notes.md`),最后一条
+A 类行落地后转绿,交付文件上零命中。
+
+**散文改向闸门实测(2026-08-31 本轮 5_compile / 5_vision,5_design 补记)。** 编译 **95/95**
+零错误;playtest **78/78 场景全 PASS**(硬闸门 `passed: true`、`spec_used: true`、180 帧、
+零 runtime error)——`event_pool_new_event_resolved` **15/15**(重写后散文在屏上走完
+「抽到/渲染/选中/结算」四腿,#78 两枚中文字面量钉 `崖上采药` / `重金购芝` 逐字节匹配交付
+数据)、`event_travel_effects` **19/19**、`spine_to_ending` **42/42**、`save_load_roundtrip`
+**14/14** 等既有网零回归。视觉闸门 `passed: true` 但 **blind**(`endpoint_unreachable`,
+`judged_by: human` 人眼代判;无逐问答案,本轮无 Q6 计数可引用)——与既往 blind 轮同立场,
+不作为数字断言的替代证据。pytest 守卫与 GDScript 单元套件(EN 成员资格闸、
+`_test_no_repeat_full_journey`)的官方 PASS 以 5_test 产物(`test_report.json`)为准——该产物
+不在本步上下文,不冒充实测。
 
 ## 5. 内力消耗缺口(2026-08-26,jinyong-hud 轮记录)
 
@@ -436,12 +471,12 @@ facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点�
 
 少林是洛阳的一条支线,此前**没有任何去的理由**。本轮给它的理由是**确定性绑定**
 一行既有事件:在 `scripts/data/event_data.gd` 的 `EventData.TABLE` 16 行里,
-`night_rain`(标题「破庙夜雨」)是**唯一一行老僧在庙里的场景**——
+`night_rain`(标题「破庙夜雨」)是**唯一一行独坐庙里的老虾的场景**——
 
-> `夜雨滂沱，破庙漏得厉害，\n老僧独坐，就着灯火补屋檐。`
+> `夜雨滂沱，破庙漏得厉害，\n一只老虾独坐，就着灯火补屋檐。`
 
 (text 逐字引自 `event_data.gd`,全角标点与换行转义照源文件;它就是「去一座
-寺院」在现有池子里最近的场景:到了,帮老僧补漏雨的屋檐,或就在檐下练剑。)
+寺院」在现有池子里最近的场景:到了,帮那只老虾补漏雨的屋檐,或就在檐下练剑。引文为 2026-08-31 `jinyong-shrimpcopy2` 轮散文虾化后的现行文本,旧引文「老僧独坐」作废(见 §4「散文改向」条)。)
 两个选项同样是既有数据:「帮工换宿」贴银两 −6 又涨根骨 +1,「檐下练剑」
 练功 +2。本节**不新增任何文案**——「少林专属」指的是**机制专属**:只有少林的
 节点进入会确定性地触发这一行;行本身仍留在共享池里,养成游历的无重复袋子照旧
@@ -466,10 +501,10 @@ facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点�
 `map_node_event_mainline_return` 钉住「开机 `event_id == ""`」与「return 到达即开
 `tomb_bed`」两面。
 
-**洛阳 → `merchant`(标题「行商路过」)。** 洛阳是帝都级的通都大邑、三条边的枢纽;
-一行写行商赶着满载刀剑的马车路过——正是交通枢纽该发生的事。
+**洛阳 → `merchant`(标题「车马过路」;旧题「行商路过」随 2026-08-31 散文虾化作废)。** 洛阳是帝都级的通都大邑、三条边的枢纽;
+一行写一只虾赶着满载刀剑的马车路过——正是交通枢纽该发生的事。
 
-> `一位行商赶着马车路过，\n车上满载刀剑兵刃，正愁销路。`
+> `一只虾赶着马车路过，\n钳里挽着缰绳，满载刀剑兵刃正愁销路。`
 
 两个选项:「买下长剑」贴银两 −20 又得长剑(`eq_sword_3`),「婉拒」无效果。
 **选它的决定性技术理由**:它的 option A 是 **`silver` + `item`、没有 `attr` 效果**。
@@ -479,10 +514,10 @@ facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点�
 `attr_bone` 差分。选一行无 attr 的绑定,使这两个既有钉保持其精确含义。
 
 **武当 → `quanzhen_scripture`(标题「全真抄经」)。** 武当是道教门派之山;一行写
-「全真宫外老道伏案抄经……递来一卷道德经」——全池唯一与道教宫观清修直接对应的场景,
+「全真宫外一只老虾伏案抄经……伸钳递来一卷道德经」(2026-08-31 散文虾化后的现行文本,旧引文「老道伏案抄经」作废,见 §4「散文改向」条)——全池唯一与道教宫观清修直接对应的场景,
 武当最强贴合。
 
-> `全真宫外老道伏案抄经，\n见你驻足，递来一卷道德经。`
+> `全真宫外一只老虾伏案抄经，\n见你驻足，伸钳递来一卷道德经。`
 
 两个选项:「随他抄经」涨智慧 +2,「求教剑理」贴银两 −5 又涨练功 +3。护线时间线在
 武当解算 option A(智慧 +2),其 `tier >= 1 and tier <= 3` 的范围断言吸收这一增量。
