@@ -54,6 +54,10 @@ const TESTS: Array[String] = [
 	# and the PlayerProfile.equipped slots (round-trip / hostile / validation).
 	"res://tests/test_equipment_data.gd",
 	"res://tests/test_player_profile_equipment.gd",
+	# equipment battle layer 2026-08-31: BattleSetup.derive_stats with gear
+	# bonuses (legacy equality, direction matrix, reversibility, build_character
+	# mirrors, tutorial-shape CharacterData defaults).
+	"res://tests/test_battle_setup_equipment.gd",
 ]
 
 

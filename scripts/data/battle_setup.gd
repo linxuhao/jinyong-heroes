@@ -11,10 +11,15 @@ class_name BattleSetup
 ##   attack_range = 1 (主外功近战门派) / 2 (远程门派: 唐门/暗器).
 ## Techniques come from progression_gongfa_data.gd's generic grade stubs
 ## (丁1 / 丙2 / 乙3); GongfaData.mastered mirrors the profile's mastered flags.
-## Consumers: tests/test_battle_setup.gd this round, and future encounter-battle
-## entry code (GameManager.enter_battle is a stub — there is no live caller yet).
+## Consumers: scripts/battlefield.gd:651 BattleSetup.build_character(SaveManager.profile)
+## at encounter entry (the live caller), and tests/test_battle_setup.gd /
+## tests/test_battle_setup_equipment.gd (unit suite).
+## Equipped gear participates via EquipmentData.sum_bonuses in derive_stats;
+## empty/legacy-equipped profiles produce output bit-identical to the base
+## formulas above (reversibility baseline, unit-pinned).
 
 const CharacterData = preload("res://scripts/data/character_data.gd")
+const EquipmentData = preload("res://scripts/data/equipment_data.gd")
 const GongfaData = preload("res://scripts/data/gongfa_data.gd")
 const ProgressionGongfaData = preload("res://scripts/data/progression_gongfa_data.gd")
 
@@ -32,12 +37,13 @@ static func derive_stats(profile) -> Dictionary:
 	var bone: int = _attr(profile, "bone")
 	var inner: int = _attr(profile, "inner")
 	var agility: int = _attr(profile, "agility")
+	var gear: Dictionary = EquipmentData.sum_bonuses(profile.get("equipped") if profile.get("equipped") != null else {})
 	return {
-		"max_health": bone * 5,
+		"max_health": bone * 5 + int(gear.get("health", 0)),
 		"energy": inner * 2,
-		"move_range": 2 + int(floor(float(agility) / 20.0)),
-		"initiative": agility,
-		"attack_damage": 10 + bone,
+		"move_range": 2 + int(floor(float(agility) / 20.0)) + int(gear.get("move", 0)),
+		"initiative": agility + int(gear.get("initiative", 0)),
+		"attack_damage": 10 + bone + int(gear.get("attack", 0)),
 		"attack_range": _attack_range_for(profile),
 	}
 
@@ -63,6 +69,12 @@ static func build_character(profile) -> Resource:
 	cd.initiative = int(stats.initiative)
 	cd.team = 0
 	cd.traits = profile.traits.duplicate()
+
+	var gear: Dictionary = EquipmentData.sum_bonuses(profile.get("equipped") if profile.get("equipped") != null else {})
+	cd.gear_attack_bonus = int(gear.get("attack", 0))
+	cd.gear_health_bonus = int(gear.get("health", 0))
+	cd.gear_initiative_bonus = int(gear.get("initiative", 0))
+	cd.gear_move_bonus = int(gear.get("move", 0))
 
 	var internal_arts: Array = []
 	var all_external: Array = []

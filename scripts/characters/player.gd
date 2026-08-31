@@ -125,6 +125,14 @@ var initiative: int = 0
 ## Team id: 0 = player, 1 = Five Greats.
 var team: int = 0
 
+## Equipment bonus mirrors (written once in setup() from CharacterData.gear_*).
+## Playtest surface for gear-visibility assertions (Player.gear_attack_bonus, etc.).
+## Tutorial / encounter battles with no gear equipped keep 0.
+var gear_attack_bonus: int = 0
+var gear_health_bonus: int = 0
+var gear_initiative_bonus: int = 0
+var gear_move_bonus: int = 0
+
 ## Primary internal art's passive id (engine hooks: shen_diao_power, ...).
 var passive_id: String = ""
 
@@ -294,6 +302,12 @@ func setup(data) -> void:
 	energy_max = data.energy
 	initiative = data.initiative
 	team = 0
+
+	# Equipment bonus mirrors (gear_* from CharacterData, set by build_character).
+	gear_attack_bonus = int(data.gear_attack_bonus)
+	gear_health_bonus = int(data.gear_health_bonus)
+	gear_initiative_bonus = int(data.gear_initiative_bonus)
+	gear_move_bonus = int(data.gear_move_bonus)
 
 	# Grid position from current world position (set by battlefield after
 	# positioning the node).

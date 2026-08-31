@@ -32,3 +32,11 @@ extends Resource
 ## Battle-side trait carrier: profile trait ids copied onto the battle
 ## CharacterData by BattleSetup.build_character (combat hooks key off these).
 @export var traits: Array[String] = []
+
+## Equipment bonus mirrors (set by BattleSetup.build_character from
+## EquipmentData.sum_bonuses). Runtime Resource only — NOT serialized into
+## any save format. Tutorial-path CharacterData instances keep 0 (untouched).
+@export var gear_attack_bonus: int = 0
+@export var gear_health_bonus: int = 0
+@export var gear_initiative_bonus: int = 0
+@export var gear_move_bonus: int = 0
