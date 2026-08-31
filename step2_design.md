@@ -1,355 +1,501 @@
-# Technical Architecture Design — jinyong-shrimpcopy2 (Shrimp Wuxia Event Prose Rewrite)
+# 技术架构设计 — jinyong-huashan (Step 2, Architect)
 
-**Step 2 / Architect — 2026-08-31**
-**Base codebase:** `/home/linxuhao/.AItelier/projects/jinyong-assets` (previous round `jinyong-event-pool-36`, 95/95 scripts compiling, 78 playtest scenarios all PASS, all suites green).
-**Nature of this round:** a surgical, prose-only data-layer edit inside an existing, heavily machine-pinned Godot 4 project. No new runtime dependencies, no new GDScript files, no scene/engine/route decisions, no numeric changes. Exactly one new file (a stdlib-only pytest guard) plus documentation.
+> Project: make the Huashan summit finale on the big map an **actually playable battle** —
+> profile-derived hero, real turn loop, return to MAP — and prove it with a rewritten
+> `playtest/map_battle_node_huashan.yaml` that gates "can fight", not "loaded".
+> Date: 2026-08-31. All repo facts below were re-verified by direct read today; the brief's
+> cited line numbers are used as-is (Step 1 E1 noted the one stale-doc line is at
+> `design/20_content.md:463`, confirmed by read).
 
----
+## 1. 概述 (Overview)
 
-## 1. Overview
+The defect, precisely: `scripts/segments/map.gd::_maybe_start_entry_battle()` (237-242) reads
+`MapData.active_battle_id("huashan") == "huashan_duel"` and calls `GameManager.start_map_battle()`
+(game_manager.gd:183-189), which sets `battle_return_state = STATE_MAP`. But `battlefield.gd`
+routes to the profile-build path (`_setup_encounter_battle`, :627-677) **only** when
+`battle_return_state == "CULTIVATION"` (:69-71). A MAP battle therefore falls through into the
+tutorial path: hard-coded Yang Guo (HP 1000), tutorial overlay replay, `tutorial_battle = true`,
+and a battle that never begins (`phase == "IDLE"`, `current_round == 0`, `turn_order == []`).
 
-Rewrite the prose (`title` / `text` / `option_a.label` / `option_b.label`) of the 36-row journey-event pool in `scripts/data/event_data.gd` so that **every written person — named or passing — is a shrimp**, shown through claws (钳/螯), antennae (须), carapace (甲壳/头胸甲), and curled tail segments (尾节) — while the wuxia world itself (inns, escort agencies, money shops, bookshops, gambling dens, mountain paths, ferries, tombs, carriages, silver, scripture-copying, steel blades) stays **verbatim**. The judging criterion (owner's words): after reading a row, the reader sees *a group of shrimp walking the wuxia jianghu* — not an undersea world, and not a crowd of humans.
+The root cause is one variable carrying two meanings: `battle_return_state` decides BOTH
+*who builds the player character* (profile vs tutorial Yang Guo) AND *where WON/LOST routes*.
+This design **decouples** them:
 
-Everything else is sync and guard-rail work: the three test mirror tables, the EN dictionary, one hardcoded test literal pair, README's title mentions, and (by construction, unchanged) the two playtest #78 literal pins. All remaining human prose elsewhere in the codebase is **swept and recorded, not changed**. Design-archive updates are executed by the **5_design step after the gates**, not by implementation cards.
+- **Build source** = a new `GameManager.map_battle_id` signal (non-empty ⇒ profile build via
+  `BattleSetup.build_character(SaveManager.profile)`, opponent roster resolved from the battle id).
+- **Return target** = `battle_return_state` alone (already works: `request_continue`/
+  `request_retry` route any named segment state — MAP included — and `clear_battle()` on routing;
+  verified at game_manager.gd:244-266. **No new return code.**).
 
-### 1.1 The five frozen invariants (a red here means the edit is wrong — never "fix the mirror")
+The battle itself reuses the proven encounter tail as a **sibling** (`_setup_map_battle`), never
+rewriting the pinned `_setup_encounter_battle` (pinned green by `equipment_in_battle_diff` 47/47).
+The tutorial path is not touched by one byte: `start_battle()` stays hard-gated on TUTORIAL, the
+tutorial branch (:73-98), `_instantiate_enemies()`'s positions/ai_map (:785-800), and the overlay
+wiring are untouched.
 
-1. **ids** — byte-identical, row order unchanged (protects `_test_no_repeat_full_journey`'s seed-20260831 determinism).
-2. **effects** — byte-identical; `ROW_EFFECTS` (`tests/test_event_data.gd` :11-:156) must NOT change. No numeric rebalancing, no type/value/target edits, no mirror edit to accommodate anything.
-3. **option structure** — `{label, effects}` ×2 per row, unchanged; `battle_id` stub stays `null`.
-4. **row count** — exactly 36 rows (`_test_no_repeat_full_journey` and the `>= 36` floor stay green untouched).
-5. **the wuxia world** — no underwaterization (banned phrasing in §4.5), no seafood props, scenes/objects/professions/place names/silver/martial-arts names verbatim; the six decided species (皮皮虾/龙虾/樱花虾/罗氏沼虾/玻璃虾/枪虾) are **never written into event prose** — unnamed passersby get body-feature description only, no species table.
+Scope guard rails honored: no new combat system, no new skills, no new art, no number/formula
+changes; cultivation encounter path semantics unchanged; playtest contracts append-only except the
+one sanctioned rewrite of `map_battle_node_huashan.yaml`.
 
-### 1.2 Tone ruling carried forward (冷面执行, 2026-08-28)
+## 2. Ground-truth anchors (verified 2026-08-31, used as-is)
 
-The prose keeps today's register: sober, classical-flavored 2-line wuxia vignettes. Shrimp anatomy is woven in deadpan — **no puns, no comedy, no cuteness, no emoji**. What changes is *who does the deed and what body does it*; nothing else about the voice changes.
+| Anchor | Fact |
+|---|---|
+| `scripts/data/map_data.gd:48-49` | huashan row: event `declared`/`""`, **battle `active`/`huashan_duel`**, facility `declared`/`""` |
+| `scripts/data/map_data.gd:175-186` | `active_battle_id()` validates presence only — "when a battle table lands, this is where it gets consulted" (the comment anticipates this round) |
+| `scripts/segments/map.gd:236-242` | `_maybe_start_entry_battle()` fires on travel arrival only; writes `entry_battle_id`; calls `GameManager.start_map_battle()` |
+| `scripts/segments/map.gd:99-109` | `_ready()` re-derives `current_node_id` from `SaveManager.profile.map_node`; **never** dispatches entry content → no battle re-trigger loop on return |
+| `scripts/segments/map.gd:52, 260` | `events_resolved_count` is a MapScreen session var, incremented in `_resolve_node_event()` — reset when MapScreen is rebuilt (the E10 persistence problem) |
+| `scripts/autoload/game_manager.gd:142-148` | `start_battle()` hard-gated on TUTORIAL (frozen) |
+| `scripts/autoload/game_manager.gd:156-162` | `start_encounter()` hard-gated on CULTIVATION, sets return = CULTIVATION |
+| `scripts/autoload/game_manager.gd:183-189` | `start_map_battle()` hard-gated on MAP, sets return = MAP |
+| `scripts/autoload/game_manager.gd:215-233` | return-state get/set; `clear_battle()` drops per-battle refs (the lifecycle owner) |
+| `scripts/autoload/game_manager.gd:244-266` | `request_continue`/`request_retry` route WON/LOST to any segment state + `clear_battle()` |
+| `scripts/autoload/game_manager.gd:608-611` | `debug_win_tutorial` → `CombatManager.debug_wipe_enemies()`; `debug_lose_tutorial` → `debug_kill_player()` — both route through the real pipeline in ANY battle with registered units |
+| `scripts/battlefield.gd:64-71` | the only build-source branch today: `battle_return_state == "CULTIVATION"` → `_setup_encounter_battle()` |
+| `scripts/battlefield.gd:73-98` | tutorial fallthrough: Yang Guo + five greats, overlay wiring, `tutorial_battle = true` (frozen) |
+| `scripts/battlefield.gd:411+` | `_create_all_skill_data()` / `_create_all_character_data()` — pure factories; the five greats' CharacterData carry `ai_class` resolved through an ai_map of preloads |
+| `scripts/battlefield.gd:627-677` | `_setup_encounter_battle()`: profile-null guard → `tutorial_battle = false` → `release_stale_units()` → `BattleSetup.build_character(SaveManager.profile)` (:651) → `_instantiate_sparring_partner()` → **synchronous** `_wire_hud` with deferred fallback (:666-668) → `begin_battle.call_deferred()` (:677) |
+| `scripts/battlefield.gd:686-725` | sparring-partner instantiation pattern: setup → guarded field wires → `reserve_tile` → surface name BEFORE `add_child` → `register_enemy` |
+| `scripts/battlefield.gd:733-768` | `_instantiate_player(data)`: start (7,5) for ALL paths, guarded wires, `set_player` (first-call-wins) |
+| `scripts/battlefield.gd:778-830` | tutorial `_instantiate_enemies`: positions dict + ai_map preloads + `enemy.setup(data, ai_controller)` (frozen; the map path must NOT read it) |
+| `scripts/data/battle_setup.gd:36-114` | `derive_stats`: `max_health = bone*5 (+gear health)`, `energy = inner*2`, `move_range = 2+floor(agility/20)`, `initiative = agility`; `build_character` → `character_name = "ProgressionHero"`, skills from equipped external arts, `team = 0` |
+| `scripts/autoload/combat_manager.gd:104, 249-260, 324-328` | `phase ∈ {IDLE, PLAYER_TURN, ENEMY_TURN, ROUND_END}`; `begin_battle()` = guarded `_begin_if_ready()` (phase IDLE + live player + ≥1 enemy ⇒ `current_round = 1`); `reset_battle()` zeroes everything |
+| `scripts/autoload/combat_manager.gd` (turn_order) | `turn_order` holds **name strings** (pinned by `round_one_snapshot_and_turn_order.yaml`: `turn_order[1] == "East Heretic"`), initiative-desc stable snapshot |
+| `scripts/ui/hud.gd:751-759` | `EndTurnButton.disabled = not (CombatManager.is_player_turn() and not paused)` — enabled **iff** it is the player's turn |
+| `scripts/ai/ai_*.gd` (all five read) | zero-RNG, pure functions of state. Round-1 behavior: East Heretic = Tidal Melody only (global **18×1.3=23**, then returns — no move/attack in round 1); Central Divine = Primal Unity "always when ready" (global **30×1.3=39**); South Emperor = heal falls through (allies full) then approaches (0 dmg from far); North Beggar & West Poison = all damage gated at dist ≤ 3 with alignment (0 dmg from far perimeter) |
+| `SaveManager` | `signal loaded(slot)` exists (:30); `new_profile()` (:100) has no signal yet |
+| `SceneManager.current_scene` | scene-key strings: `"battlefield"`, `"map"`, … (:26) |
+| `playtest/_common.yaml` | whitelisted already: CombatManager `current_round/turn_order/phase/active_unit_name/tutorial_battle`; Player `max_health/health/grid_pos/moves_left/energy`; `EndTurnButton.disabled`; MapScreen `events_resolved_count/current_node_id/phase/ended/focus_id`; actions include `end_turn`, `debug_win_tutorial`, `debug_lose_tutorial` |
+| `playtest/click_move_to_tile.yaml` | proven click syntax: `clicks: ["Player +64,0"]` (offset anchored on the live node centre); equality asserts ≥25 frames after the click |
+| `tests/test_map_node_event.gd:101-108` | unit pins: huashan is the only live battle slot, binds `huashan_duel`, carries no event (must stay green) |
 
----
-
-## 2. Verified anchors (re-checked 2026-08-31 — use as-is, do not re-investigate)
-
-| Anchor | Location | Role this round |
-|---|---|---|
-| `EventData.TABLE` (36 rows) | `scripts/data/event_data.gd` :26-:243 | **the only gameplay file edited** (prose fields only); builders `_build`/`_build_option` :247-:281 untouched |
-| `ROW_EFFECTS` mirror | `tests/test_event_data.gd` :11-:156 | byte-identical proof that effects never drifted — **never edited** |
-| `ROW_TITLES` / `ROW_TEXTS` / `ROW_LABELS` mirrors | `tests/test_event_data.gd` :158-:171 / :174-:211 / :214-:251 | byte-for-byte sync targets |
-| `run()` wiring | `tests/test_event_data.gd` :254-:269 | 9 gates incl. texts (:363), fresh-instances (:377), no-repeat journey (:399), labels (:454), EN membership (:468) |
-| `_test_fresh_instances` hardcoded literals | `tests/test_event_data.gd` :383 (`"破财消灾"`, stays) / :387 (`"山道遇劫匪"`, **must follow the new bandits title**) | sanctioned sync, documented |
-| `_test_no_repeat_full_journey` | `tests/test_event_data.gd` :399-:450 | must stay green untouched (seed 20260831) |
-| `_test_i18n_entries` EN membership gate | `tests/test_event_data.gd` :468-:479 | the **real** i18n guard for event prose (`test_i18n_coverage.py` cannot see it — prose enters `tr()` as a variable) |
-| EN dictionary, travel-event block | `scripts/autoload/i18n.gd` :269-:413 | in-place key+value replacement for every changed field |
-| #78 playtest scenario | `playtest/event_pool_new_event_resolved.yaml` — :55 `event_id == "cliff_herbs"`, :57 `event_title == "崖上采药"`, :58 `event_body != ""`, :62 `focused_option_text == "重金购芝"`, :65-:71 resolve ladder | **expected zero diff** (see §7.5) |
-| README title mentions | `README.md` :23, :33-:35, :584 | documentation sync, documented |
-| UX-17 (this round's mandate) | `design/40_ux_backlog.md` :42 (OPEN row), :86 (record) | closed by 5_design with gate evidence |
-| Freeze record to lift | `design/90_decisions.md` §jinyong-event-pool-36 (a) :603-:608, (e) :627-:631 | lift recorded by 5_design, old records kept verbatim |
-| Changelog append point | `design/99_changelog.md` after :135 | exactly ONE appended row, zero cell edits to :133-:135 |
-| Stale-quote risk | `design/20_content.md` §4 (:189/:206/:214/:248/:251/:257), §8.2 (night_rain quote), §8.2b (:469 merchant quote, quanzhen quote), §4 gate-evidence block | refreshed by 5_design only (§12) |
-| Sweep seeds (person words outside events) | `scripts/data/card_data.gd` :33-:35 (`行商分成` card names), `tests/test_card_data.gd` (mirror), `scripts/autoload/i18n.gd` non-event entries (:424 `各派掌门`, :426 `豪杰相迎`) | record-only inventory (§11) |
-| Raw-zh publish path (why #78 pins match raw zh) | `scripts/segments/cultivation.gd` `_sync_surface` publishes `event_title = d.title` / `event_body = d.text` raw | no code change needed |
-
-Grep-verified 2026-08-31: **no playtest yaml other than #78 pins any event prose literal** (searched all changed-title/label candidates across the repo; the only playtest hits are #78's two pins, both preserved by construction). `.aitelier/knowledge.md`, `final/*`, and the previous round's `step2_design.md` also contain event literals — all are pipeline metadata / historical records and are **never edited**.
-
----
-
-## 3. Architecture — one source of truth, four synchronized shadows
+## 3. 架构图 (Architecture & data flow)
 
 ```
-                    scripts/data/event_data.gd  (TABLE — source of truth)
-                     prose fields only: title / text / option_a.label / option_b.label
-                                   │  (per-row atomic diff, one row per edit)
-        ┌──────────────┬───────────┴────────────┬───────────────────────┐
-        ▼              ▼                        ▼                       ▼
- tests/            scripts/autoload/        playtest/                 tests/
- test_event_data.gd  i18n.gd EN dict         event_pool_new_event_    test_event_prose_shrimp.py
- ROW_TITLES(:158)    :269-:413               resolved.yaml            (NEW stdlib guard)
- ROW_TEXTS(:174)     in-place key+value      :57/:62 pins             human/underwater/species
- ROW_LABELS(:214)    replacement             byte-unchanged           token denylists +
- ROW_EFFECTS(:11)    (≈34 entries)           BY CONSTRUCTION          protected-literal pins
- byte-mirror,        (EN membership gate     (guard enforces)         (red over pre-edit corpus,
- effects untouched   :468-:479 must green)                            green after rewrite)
-        │              │                        │                       │
-        └──────────────┴───────────┬────────────┴───────────────────────┘
-                                   ▼
-        Verification ladder (all must be green):
-        GDScript unit suite (28-file registry, unchanged)
-          → pytest (stdlib guards; +1 file)
-          → README/doc literal audit (grep classification, §7.6)
-          → 5_compile / 5_test / 5_vision official gates (authoritative evidence)
-                                   ▼
-        5_design: design-archive updates (§12) — 20_content §4 + §8.2/§8.2b quotes,
-        90_decisions freeze-lift, 40_ux_backlog UX-17 → CLOSED + UX-19 (OPEN) opened,
-        99_changelog exactly one appended row
+ MAP segment (map.gd)                     GameManager (autoload)                BATTLEFIELD scene
+ ─────────────────────                    ───────────────────────               ─────────────────────────
+ _travel() ─────────────────────────────▶ enter BATTLE (unchanged)
+   └─ _maybe_start_entry_battle()         start_map_battle(bid):
+       bid = MapData.active_battle_id(      battle_return_state = MAP   ──┐  return target (routing only)
+             "huashan")  ── "huashan_duel"  map_battle_id      = bid   ──┼▶ build source (NEW, decoupled)
+       guard: MapBattleData.roster_ids     current_state = BATTLE        │
+       (bid) non-empty (fail-safe)         battle_started.emit()         │
+                                                                         ▼
+                                           battlefield._ready():
+                                             if battle_return_state == "CULTIVATION":   (byte-identical branch)
+                                                 _setup_encounter_battle(); return
+                                             if get_map_battle_id() != "":              (NEW branch, sits NEXT TO it)
+                                                 _setup_map_battle(bid); return         (never falls into tutorial)
+                                             … tutorial fallthrough untouched …
+
+ _setup_map_battle(bid)  — mirrors the pinned encounter tail, same ordering:
+   1. guards (profile null / unknown roster ⇒ push_warning + abort)
+   2. CombatManager.tutorial_battle = false        (no tutorial intro overlay — TutorialManager never starts)
+   3. GameManager.release_stale_units()
+   4. player = _instantiate_player(BattleSetup.build_character(SaveManager.profile))   ← PROFILE BUILD
+   5. enemies = _instantiate_map_enemies(bid, _create_all_character_data(_create_all_skill_data()))
+        roster/positions from MapBattleData (OWN tables — never the tutorial dicts)
+   6. _wire_hud(player, enemies) synchronous, deferred fallback          (FIFO flush before the kick)
+   7. CombatManager.begin_battle.call_deferred()                          (round 1 starts — the ONLY kick)
+
+ WON / LOST ──▶ request_continue / request_retry ──▶ battle_return_state ("MAP") ──▶ clear_battle()
+              (clears map_battle_id too — no leak into later boots)      └──▶ MAP segment rebuilt:
+                                                                          current_node_id = profile.map_node
+                                                                          events_resolved_count = GameManager mirror
 ```
 
-**Component responsibilities are strictly separated:**
-- **Implementation cards** touch: `scripts/data/event_data.gd`, `tests/test_event_data.gd` (three prose mirrors + one hardcoded literal), `scripts/autoload/i18n.gd` (event-block EN entries), new `tests/test_event_prose_shrimp.py`, `README.md` (title mentions), `final/delivery_notes_shrimpcopy2.md`. **Nothing else.**
-- **5_design** touches: `design/20_content.md`, `design/90_decisions.md`, `design/40_ux_backlog.md`, `design/99_changelog.md` — after the official gates, using the implementation's delivery notes as raw material.
-- **No card** touches: any `effects` literal, any `.tscn`, `playtest/*.yaml` (zero diff expected), `_common.yaml`, the GDScript unit registry, `cultivation.gd`, `EventLogic`, any other data module's prose.
+Session-counter persistence (E10): `GameManager.map_events_resolved_count` is a session mirror;
+MapScreen writes through on each resolve and seeds from it in `_ready()`; it is reset to 0 when a
+run begins (`SaveManager.new_profile()`) or a save is loaded (`SaveManager.loaded`).
 
----
+## 4. Design decisions (with rejected alternatives)
 
-## 4. Rewrite specification (the implementer executes these rules verbatim)
+### D1 — Build-source/return-target decoupling: the battle id IS the build-source signal
+`GameManager` gains `map_battle_id: String = ""` (+ getter/setter), set **only** by
+`start_map_battle(battle_id)`, cleared **only** in `clear_battle()` (the lifecycle owner — it
+already runs on every WON/LOST segment routing). `battlefield._ready()` branches on
+`map_battle_id != ""`. A non-empty id ⇒ profile build; empty ⇒ tutorial fallthrough untouched.
 
-### 4.1 The single rule: re-attribution
+- **Rejected: branch on `battle_return_state == "MAP"`** — that is exactly the defect's coupling,
+  re-created one level down; any future caller that sets return=MAP for another build source
+  would silently mis-route.
+- **Rejected: separate boolean `battle_build_source`** — strictly less informative than the id
+  (the roster still needs the id) and adds a second field to keep in sync. The id carries both
+  meanings in one write point.
+- **Lifecycle safety**: the only exits from a map battle are the WON/LOST overlays →
+  `request_continue`/`request_retry` → `clear_battle()` ⇒ id cleared before the next battlefield
+  can ever load, so a tutorial boot can never observe a stale id. Pinned by a unit test (§8).
 
-Every agent that performs a person-coded action is explicitly a shrimp, described with body features; the wuxia object and the action stay. The brief's own example is the model: 「一伙劫匪手提钢刀」 → *the blade is held by a shrimp* — 钢刀 stays 钢刀, 提 becomes a claw verb. Fix the **doer**, not just the noun: 「手提钢刀」「赶着马车」「随他抄经」 stop implying human shape because the one doing them now visibly has 钳/须/甲壳/尾节.
+### D2 — Opponent roster: `huashan_duel` → the five greats, from the existing tutorial factory
+New pure data module `scripts/data/map_battle_data.gd` (`class_name MapBattleData`, mirroring the
+`MapData`/`EventData`/`FacilityData` data-layer pattern):
 
-### 4.2 Minimal-diff class rule (decided here so nobody re-litigates it mid-implementation)
+```gdscript
+const ROSTERS: Dictionary = {
+    "huashan_duel": ["East Heretic", "West Poison", "South Emperor", "North Beggar", "Central Divine"],
+}
+## Map-battle layout — OWNED HERE, never read from the tutorial's positions dict.
+## Every tile: walkable interior (col 1..13, row 1..9), Chebyshev distance 6 from the
+## player's spawn (7,5), and NOT on the player's row 5 / column 7 (line-caster deny).
+const POSITIONS: Dictionary = {
+    "huashan_duel": {
+        "East Heretic":   Vector2i(1, 1),
+        "West Poison":    Vector2i(1, 4),
+        "South Emperor":  Vector2i(1, 9),
+        "North Beggar":   Vector2i(13, 9),
+        "Central Divine": Vector2i(13, 1),
+    },
+}
+static func roster_ids(battle_id: String) -> Array[String]   # [] when unknown (fail-safe)
+static func position_for(battle_id: String, name_key: String) -> Vector2i
+```
 
-- **Class A (28 rows) — MUST change:** the row's prose contains a person-role noun, a person-presence word (有人/无人/人声/人手), or a human-body action word (手提/伸手/拍着胸脯/揉着腰/搭手/手舞足蹈/招人/寻人). Exact per-row inventory in §5.
-- **Class B (8 rows) — byte-identical, zero diff:** the row's prose contains none of the above: `ruins` 古墓残碑, `tomb_bed` 古墓寒玉, `wounded_eagle` 神雕负伤 (巨雕 is wildlife), `peach_maze` 桃花迷阵, `ancient_bell` 荒寺晚钟, `wedding_train` 山道花轿, `sword_mound` 荒冢埋剑, `wild_goose_letter` 雁足传书. These rows write no person and no human-body action; the owner's criterion ("every *written* person is a shrimp") is already satisfied. Gratuitous rewrites of Class B would expand diff surface for zero acceptance value. The guard (§6) still protects them — no banned token may *enter* them either.
+Enemy CharacterData comes from the existing `_create_all_character_data(_create_all_skill_data())`
+factory (Step 1 E5); AI controllers resolve from each unit's `data.ai_class` through the new
+helper's OWN ai_map of preloads (five entries, mirroring the tutorial pattern — the tutorial's
+`ai_map` is not read). `character_name` keeps the factory's spelling with spaces ("East Heretic",
+what `turn_order` contains); the **node** name is underscored ("East_Heretic", what the playtest
+surface keys resolve) — same convention as the tutorial; the implementer confirms the tutorial's
+exact naming line and mirrors it.
 
-### 4.3 Shrimp-body lexicon (required vocabulary; at least one anchor per rewritten agent)
+- **Rejected: `assets/characters/roster.json`** as the combat source — it is art/species metadata,
+  not combat data.
+- **Rejected: reusing the tutorial `_instantiate_enemies()`** — it reads the frozen tutorial
+  positions/ai_map dicts (E4 forbids); the map path gets its own helper (§5).
 
-钳 · 螯 · 须 / 触须 · 甲壳 · 头胸甲 · 尾节 / 蜷起的尾节 · 尾扇 · 步足 · 复眼 · 横行.
-Generic 虾 is the setting's core word and is always allowed (一只虾 / 几只虾 / 虾客 / 众虾). What is forbidden is only the six decided **species names** (§4.6).
+### D3 — Round-1 survivability of the gate's differential leg (honest analysis, not a predicted value)
+The gate must drive ONE real player action, so the profile hero must survive the greats' round-1
+turns (hero initiative ≈ 10-20 ⇒ acts **last**). From the AI reads (all zero-RNG pure functions):
 
-### 4.4 Craft rules
+- Guaranteed, position-independent globals in round 1: East Heretic Tidal Melody **23**
+  (branch returns — he does not move or attack again in round 1) + Central Divine Primal Unity
+  **39** ⇒ **floor 62** with the five-great roster.
+- South Emperor / North Beggar / West Poison deal **0** in round 1 from the far perimeter above
+  (their damage branches all gate at dist ≤ 3 with alignment; heal falls through on full allies).
+- Hero HP = bone×5 + gear. The route's fast-forwarded profile bone is not a number this round
+  predicts — the gate run measures it.
 
-1. **Human-body-part words are replaced by shrimp anatomy:** 手提 → 钳里提着 / 长钳提着; 伸手乞食 → 伸钳乞食 (or 捧着破碗的螯); 拍着胸脯 → 拍着甲壳; 揉着腰 → 捶着甲壳/尾节; 揉眼 → 用螯揉着复眼; 搭手 → 援钳 / 伸出长钳; 手舞足蹈 → 挥螯踏节 / 螯足乱划; 缺人手 → 缺虾手 → rephrase 缺个帮工的虾.
-2. **Person-role nouns are replaced by shrimp descriptions** (preferred), e.g. 劫匪 → 拦路的虾; 艄公 → 撑舟的虾; 老僧 → 一只年老的虾 (庙里独坐的那只老虾); 老铁匠 → 铁匠铺里的老虾; 说书人 → 醒木一拍的老虾. Keeping a role word is acceptable **only** when explicitly shrimp-marked (虾客) — the bare human noun may never survive (guard-enforced, §6).
-3. **Collectives are shrimp-marked:** 满堂喝彩 → 满堂虾客喝彩; 有人一夜输光 → 几只虾一夜输光; 四下无人 → 四下不见虾影; 十年无人解出 → 十年无虾解出; 人声鼎沸 → 虾声鼎沸 (or 灯影攒动).
-4. **Pronouns may stay** when their antecedent is the now-explicitly-shrimp agent: quanzhen_scripture 「随他抄经」 stays — 他 is the described shrimp (and its EN "Copy with him" stays).
-5. **Wildlife stays animal:** 巨雕 (wounded_eagle), 猴子 (lantern_festival), 大雁 (wild_goose_letter), 蛇/蛇胆 (snake_bile), 虎 (tiger_pass), 马 (fallen_rider 坠马 — horses exist; a shrimp rider falling from one is a wuxia image). Never shrimped, never seafood'd.
-6. **河伯 stays a name** (river_god): a named deity is a person, so the *scene's* agents (巫师, 村民) are rewritten as shrimp, and 河伯's wedding remains a shrimp affair — but 河伯 itself is a proper name, never species-tagged, never one of the six.
-7. **Places and objects verbatim:** 客栈 · 镖局/镖行 · 钱庄 · 书铺/书摊 · 赌坊 · 山道 · 渡口 · 古墓 · 马车 · 银两/盘缠/银赏 · 抄经/道德经 · 钢刀/长剑/兵刃 · 皮甲/快靴 · 灵芝/蛇胆/药箱/药柜 · 灯摊/谜面 · 花轿 · 铁匠铺 · 当铺/断票 · 茶馆/茶碗 · 棋盘/残局 · 酒肆/温酒 · 鼓号 · 褡裢 · 帛书 · 村舍/荒村/疫村/镇上 (村/镇 as place morphemes stay; only 村民 the person goes) · 白驼山/全真宫/桃花阵/降龙 (faction & martial names).
-8. **No underwaterization:** scenes never move underwater, no seafood props, and the phrasings in §4.5 never appear.
-9. **New-verse shape:** keep the current 2-line body with the `\n` escape exactly where it is today; each line ≈ ≤ 20 CJK chars (current lines run 14–20). Titles ≤ 6 CJK chars, labels ≤ 6 (current max is 5) — this keeps the vision gate's Q6 (no truncation) green and the composite render key (`【%s】\n\n%s\n\n…`) intact.
+**Decision rule (pre-authorized, data-only):** run the gate with the five-great roster. If the
+measured hero dies before the first `phase == "PLAYER_TURN"` frame (i.e. measured
+`Player.max_health <= 62` on this route), the roster row drops **Central Divine** (his Primal
+Unity is the 39 unconditional global) ⇒ floor becomes 23, survivable at bone 10 (HP 50). That is
+a one-line `ROSTERS` change plus the matching unit-pin count update, recorded in the delivery
+notes and `90_decisions.md`. Balance/roster-composition for difficulty is explicitly NEXT round's
+matter (the brief: 数值量级是下一轮); this rule exists only so the gate can prove "can fight" this
+round without touching any number.
 
-### 4.5 Banned phrasing (underwaterization) — and the 泅水而过 tie-breaker (decided)
+### D4 — The widened entry is a SIBLING, not a rewrite of the pinned function
+`_setup_map_battle(battle_id)` mirrors `_setup_encounter_battle()`'s tail (guards →
+`tutorial_battle = false` → stale-ref cleanup → profile build → enemies → sync HUD wire with
+deferred fallback → `begin_battle.call_deferred()`). The CULTIVATION branch (:69-71) and the
+function itself stay **byte-identical** (`equipment_in_battle_diff` 47/47 must not see a diff).
 
-Banned in event prose: 「游过去」「潜入」「水流」「海底」「水底」「下潜」「潜游」「洄游」「洋流」「珊瑚」「海藻」「鳃」. Rivers, floods, rain, snow and crossings stay land-world: 河水暴涨, 夜雨滂沱, 风雪封了隘口 are scenery, not seabed.
+- **Rejected: parameterizing `_setup_encounter_battle(roster)`** — touches the function pinned by
+  an official gate; a sibling that shares the tail achieves the same "widened entry" with zero
+  risk to the pinned path. Some ~25 lines of duplication is the deliberate price of the freeze.
 
-**Tie-breaker (adopted per Step-1 review suggestion, so it is never re-argued during implementation):** flood_ferry's option-B label **「泅水而过」 stays byte-identical**. Swimming across a swollen river is a land-world wuxia feat performed by a shrimp traveler; the owner's ban is on rewriting the jianghu *into* a seabed world, not on a person-crossing a river. The guard pins this literal (§6 protected literals) so a future round cannot "fix" it into an underwater phrasing either.
+**Kick-off ordering (load-bearing, per Step 1 E6/review):** register player → register enemies →
+wire HUD **synchronously** (HUD.setup creates SkillButtons + bars before the deferred flush) →
+`begin_battle.call_deferred()`. `begin_battle()` self-guards (phase IDLE + live player + ≥1
+enemy), so a stray scene load can never trip the empty-round stall guard. Reproducing any other
+order is exactly how the observed frozen state (`phase == "IDLE"`, round 0) is reborn.
 
-### 4.6 Species are never named for passersby
+### D5 — `events_resolved_count` persistence home: GameManager session mirror (E10)
+`MapScreen` is `queue_free()`d by `SceneManager._do_swap` and rebuilt on return, so the session
+counter dies with it. Persistence design (smallest safe surface):
 
-皮皮虾 / 螳螂虾 / 龙虾 / 小龙虾 / 樱花虾 / 罗氏沼虾 / 玻璃虾 / 枪虾 / 濑尿虾 / 对虾 / 基围虾 / 青虾 / 明虾 — none may appear in event prose (guard-enforced). Passersby get body features only; no new species table.
+- `GameManager.map_events_resolved_count: int = 0` (session-scoped, NOT saved).
+- `map.gd::_ready()`: `events_resolved_count = GameManager.map_events_resolved_count` (seed).
+- `map.gd::_resolve_node_event()`: after `events_resolved_count += 1`,
+  `GameManager.map_events_resolved_count = events_resolved_count` (write-through).
+- Resets at run boundaries: `GameManager` connects `SaveManager.loaded` (exists) and a NEW
+  `SaveManager.profile_created` (2 additive lines: signal declaration + one emit in
+  `new_profile()`) and zeroes the mirror on both. Connection is made via
+  `_connect_save_signals.call_deferred()` from `GameManager._ready()` so autoload ordering can
+  never bite (by the first deferred flush all autoloads are in the tree).
 
-### 4.7 EN values are rewritten in the same stroke
+Semantics check against every existing pin (grep-verified 2026-08-31): all `events_resolved_count`
+ladder pins (`map_node_event_shaolin` 1→2→3, `spine_to_ending` ==2, `clicks_only_storyline`
+1→2→3, `map_node_event_mainline_*` 1→2, `roster_*` 0/1) live inside scenarios where MapScreen is
+created once and never rebuilt — the mirror seeds 0 on their single boot and write-through keeps
+the ladders identical. `save_load_roundtrip` asserts **no** `events_resolved_count` value; load
+resetting the mirror to 0 is invisible to it.
 
-The public build is read in English: every replaced EN value must also render a shrimp body ("claws", "antennae", "carapace", "curled tail segments") while preserving wuxia nouns in English (inn, escort agency, money shop, bookshop, gambling den, mountain path, ferry, tomb, carriage, silver, scripture, steel blade). Example register:
-- 「山道遇劫匪」 "Bandits on the Mountain Road" → 「山道遇劫」 "Ambush on the Mountain Road".
-- bandits body → e.g. "On a mountain road a pack of shrimp cuts off your way.\nTheir leader scuttles forward, a steel saber gripped in one long claw, demanding a toll."
+- **Rejected: persisting the counter in the profile/save** — touches the save pipeline and changes
+  "session count" semantics; unnecessary.
+- **Rejected: snapshot-only at `start_map_battle()`** — leaks a stale mirror into a second run in
+  the same process; needs the same reset hooks anyway, so the full mirror is strictly better.
 
----
+### D6 — Start-position reuse
+`_instantiate_player()` hard-codes (7,5) for every path (tutorial + encounter today). The map
+battle reuses it unchanged — the grid is the same 15×11 board, (7,5) is legal and unoccupied by
+the §D2 layout. No change to the shared function.
 
-## 5. Per-row rewrite surface (all 36 rows; "tokens" = what the guard must not find afterwards)
+### D7 — Tutorial byte-freeze mechanics
+No edit inside: `start_battle()`, the tutorial fallthrough (:73-98), `_instantiate_enemies()`
+(+ its positions/ai_map), `_wire_tutorial_overlay`, `TutorialManager.start`, tutorial skill
+phase-lock. The new branch sits **next to** :69-71. Tutorial skill phase-lock is keyed on
+`tutorial_battle` (false here), so the profile hero has all equipped-arts skills from round 1 —
+that is the shared engine behaving on different input, not a tutorial change.
 
-Legend: **A** = change (28 rows), **B** = byte-identical (8 rows). Suggested titles/labels are **suggestions** — the implementer finalizes within §4's rules; the guard and length limits are the contract.
+### D8 — Gate rewrite discipline (the one sanctioned yaml change)
+`playtest/map_battle_node_huashan.yaml` is rewritten **in place, same `name:`** (scenario_order /
+the 78-scenario registry and `ROUND_SCENARIOS` two-place sync stay untouched). Every existing
+assertion line is retained verbatim (f400 MAP; f520 TRAVEL+shaolin; f540 focus; f580
+BATTLE/battlefield/pending_swap) — the machine superset guard (`tests/test_playtest_contract_smoke.py`)
+holds with **no exception record**. Only additions + description/header prose. Red-first evidence
+for every new nail is measured via the sidecar, never predicted (§7.3).
 
-| # | id | cls | person-shape tokens to remove | directive (objects that MUST stay verbatim) |
+## 5. Component list & interfaces (file-by-file change manifest)
+
+### 5.1 `scripts/data/map_battle_data.gd` (NEW)
+Pure static data layer, zero autoload dependency. Contents per §D2. Interface:
+`roster_ids(battle_id) -> Array[String]` (empty when unknown), `position_for(battle_id, name_key)
+-> Vector2i`. Mirrors `MapData`'s fail-safe philosophy: an unknown binding reads as inert, never
+crashes.
+
+### 5.2 `scripts/autoload/game_manager.gd` (4 additive edits)
+1. `var map_battle_id: String = ""` + `set_map_battle_id()`/`get_map_battle_id()` (beside the
+   return-state pair at :215-221).
+2. `func start_map_battle(battle_id: String = "") -> void:` — body unchanged except
+   `map_battle_id = battle_id` (default param keeps the signature backward-compatible).
+3. `clear_battle()`: add `map_battle_id = ""` (lifecycle owner; runs on every WON/LOST segment
+   routing).
+4. `var map_events_resolved_count: int = 0` + deferred connection to `SaveManager.loaded` and the
+   new `SaveManager.profile_created`, both resetting it to 0.
+
+### 5.3 `scripts/autoload/save_manager.gd` (2 additive lines)
+`signal profile_created` declared beside `loaded`; emitted at the end of `new_profile()`.
+
+### 5.4 `scripts/segments/map.gd` (3 small edits)
+1. `_maybe_start_entry_battle()`: after `bid != ""`, guard
+   `MapBattleData.roster_ids(bid).is_empty()` → `push_warning` + return (unresolvable binding is
+   inert, mirroring `active_event_id`'s fail-safe; the map stays playable on a data typo); then
+   `GameManager.start_map_battle(bid)`.
+2. `_ready()`: seed `events_resolved_count` from the mirror.
+3. `_resolve_node_event()`: write-through to the mirror.
+
+### 5.5 `scripts/battlefield.gd` (1 new branch + 2 new functions)
+1. After the CULTIVATION branch (:69-71), the map branch:
+   `var bid := GameManager.get_map_battle_id(); if bid != "": _setup_map_battle(bid); return`
+   — the tutorial fallthrough after it is untouched.
+2. `_setup_map_battle(battle_id: String) -> void` — the sibling per §D4, with the profile-null
+   and unknown-roster guards (push_warning + abort, mirroring :630-632; never a hard crash).
+3. `_instantiate_map_enemies(battle_id: String, all_data: Dictionary) -> Array[Node]` — per-enemy
+   flow copied from the tutorial's pattern (enemy.tscn → `setup(data, ai)` → guarded field wires
+   → `reserve_tile` → surface name before `add_child` → `register_enemy`), but positions from
+   `MapBattleData.position_for` and AI scripts from its own ai_map preloads. Own ai_map const
+   (`ai_east_heretic.gd` … `ai_central_divine.gd` — the same five preloads, independently owned).
+
+### 5.6 Tests (NEW files; existing suites untouched)
+- `tests/test_map_battle_data.gd`: `roster_ids("huashan_duel")` = the five greats (or the measured
+  fallback set — keep in sync with §D3's rule); unknown id → []; every position in-bounds,
+  walkable, pairwise-distinct, ≠ player spawn (7,5); (generic property pins, so a reposition does
+  not break them).
+- `tests/test_map_battle_entry.gd` (template: `tests/test_encounter.gd`): seed a profile, set
+  `current_state = MAP` + return state MAP + `map_battle_id = "huashan_duel"`, instantiate the
+  battlefield, one deferred flush → assert player is the profile build (ProgressionHero,
+  `tutorial_battle == false`, `current_round == 1`, `turn_order.size() == 6` and contains the
+  five greats' names, HUD `pressed_connected["EndTurnButton"] == true`, enemies registered).
+  Also: `clear_battle()` clears `map_battle_id` (no-leak pin); a null profile aborts without
+  crashing (guard pin).
+- `tests/test_map_battle_gate_pins.py` (stdlib pytest, pattern: `test_facility_copy_location.py`):
+  the rewritten yaml must still contain the load-bearing assertion literals
+  (`current_round >= 1`, `turn_order.size() == 6`, `tutorial_battle == false`,
+  `max_health != 1000`, `events_resolved_count == 2` return pin) — an anti-accidental-weakening
+  door, mirroring the facility guard's "防删钉".
+
+### 5.7 Playtest contract appends (append-only)
+`playtest/_common.yaml`: append exactly two entries to the `GameManager` surface block:
+`map_battle_id`, `map_events_resolved_count`. Nothing else changes; no new scenario id; no new
+debug action (`debug_win_tutorial`/`debug_lose_tutorial`/`end_turn`/clicks suffice).
+
+## 6. 技术栈 (Technology choices — all in-repo, per SOTA)
+
+- Godot 4.4 / GDScript; autoload singletons (`GameManager`, `CombatManager`, `SaveManager`,
+  `SceneManager`) as today; signals for state broadcast.
+- `CombatManager` turn engine adopted **as-is** (non-goal: no new combat system).
+- `BattleSetup.build_character(SaveManager.profile)` — the only sanctioned player factory.
+- External Godot turn-queue frameworks/plugins: rejected (would violate the no-new-system /
+  no-new-assets constraints; the in-repo initiative-queue already implements the surveyed
+  architecture).
+- Measurement instrument: `run_tests.sh` → `godot-builder` sidecar (compile → headless playtest of
+  all 78 scenarios → GDScript unit suite). All nail values measured, never predicted.
+
+## 7. Playtest contract — the rewritten `map_battle_node_huashan.yaml`
+
+### 7.1 Scenario skeleton (boot spine preserved; frames marked ⟨meas⟩ are measured, not predicted)
+
+- **Leg A — boot (f3-f400, byte-identical):** 7× ui_accept creation → `debug_win_tutorial` f20 →
+  transition/creation/sect accepts → `debug_fast_forward` f280 → f400 assert
+  `GameManager.current_state == "MAP"` (KEPT verbatim).
+- **Leg B — travel (f420-f545, assertions kept):** luoyang EVENT resolve (count 1) → shaolin
+  EVENT resolve (count 2) → f520 `phase == "TRAVEL" and current_node_id == "shaolin"` (KEPT) →
+  two move_right → f540 `focus_id == "huashan"` (KEPT) → NEW f545
+  `events_resolved_count == 2` (the pre-battle ladder anchor).
+- **Leg C — battle arrival (f550 ui_accept → f580, plus new asserts):**
+  KEPT: `current_state == "BATTLE"`, `SceneManager.current_scene == "battlefield"`,
+  `pending_swap == false`.
+  NEW: `GameManager.map_battle_id == "huashan_duel"` (the binding, consumed end-to-end);
+  `CombatManager.tutorial_battle == false`; `Player.max_health: max_health != 1000 and
+  max_health > 0` (profile-derived, not the tutorial's 1000 — relational per Step 1 E7, no
+  predicted literal); `CombatManager.current_round: current_round >= 1`;
+  `CombatManager.turn_order: turn_order.size() == 6 and turn_order.has("ProgressionHero") and
+  turn_order.has("East Heretic") and turn_order.has("West Poison") and turn_order.has("South
+  Emperor") and turn_order.has("North Beggar") and turn_order.has("Central Divine")`;
+  `CombatManager.phase: phase != "IDLE"`; `CombatManager.active_unit_name != ""`.
+- **Leg D — the player's turn + one real action (frames ⟨meas⟩ — five greats act first, hero
+  last):** assert `phase == "PLAYER_TURN"`, `active_unit_name == "ProgressionHero"`,
+  `EndTurnButton.disabled == false` (HUD gate ⇒ player's turn is live); then
+  `clicks: ["Player +64,0"]` (click_move_to_tile pattern) → ≥25 frames later:
+  `Player.grid_pos: changed`, `Player.moves_left: changed` (**the one real action's differential**).
+- **Leg E — win & return to MAP (frames ⟨meas⟩):** `end_turn` → `debug_win_tutorial` within the
+  same round handoff (before any round-2 enemy turn can kill a low-HP hero; deterministic, so the
+  measured window holds) → WON overlay → `ui_accept` → assert:
+  `GameManager.current_state == "MAP"`, `SceneManager.current_scene == "map"`,
+  `pending_swap == false`, `MapScreen.current_node_id == "huashan"`,
+  `MapScreen.phase == "TRAVEL"`, `MapScreen.ended == false`,
+  `MapScreen.events_resolved_count == 2` (intact across the duel),
+  `GameManager.map_battle_id == ""` (cleared — no leak into later boots).
+- **Leg F — lose & return (re-fire + retry routing, frames ⟨meas⟩):** travel shaolin → night_rain
+  re-fires (recorded re-visit policy) → resolve → `events_resolved_count == 3` → travel back to
+  huashan → battle #2 re-fires (`current_state == "BATTLE"`, `map_battle_id == "huashan_duel"`,
+  `current_round >= 1`, `tutorial_battle == false`) → `debug_lose_tutorial` → LOST overlay →
+  `ui_accept` → assert MAP return again: `current_state == "MAP"`,
+  `SceneManager.current_scene == "map"`, `current_node_id == "huashan"`,
+  `events_resolved_count == 3`, `ended == false`.
+
+Frame budget: the current file ends at f580; legs D-F land well under the 2999 hard cap.
+Total scenario count stays 78 (rewrite in place, same name).
+
+### 7.2 Line-by-line assertion change table (to be transcribed verbatim into the delivery notes)
+
+| # | Old line (current file) | Disposition | New line | Rationale (old proved "loaded"; new proves "can fight") |
 |---|---|---|---|---|
-| 1 | `bandits` | A | title 劫匪; text 劫匪, 为首之人/之人, 手提 | ambushers are shrimp, saber gripped in a claw; 钢刀/买路财 stay. Suggested title 「山道遇劫」. Labels 破财消灾 / 出手退敌 stay. Sync: mirrors ×2 + `_test_fresh_instances` :387 |
-| 2 | `merchant` | A | title 行商; text 行商 | the cart-driver is a shrimp (reins in claw/步足); 马车/刀剑兵刃/销路 stay. Suggested title 「车马过路」. Labels stay. (20_content §8.2b quote refreshed by 5_design) |
-| 3 | `ruins` | B | — | byte-identical |
-| 4 | `beggar` | A | title 老丐; text 老丐, 伸手 | an old shrimp with worn antennae begs, claw out, compound eyes sizing you up; 巷口 stays. Suggested title 「巷口乞食」. Labels 施舍/切磋武学 stay |
-| 5 | `tomb_bed` | B | — | byte-identical |
-| 6 | `wounded_eagle` | B | — (巨雕 wildlife) | byte-identical |
-| 7 | `peach_maze` | B | — | byte-identical (海岛 is a land word — never red) |
-| 8 | `snake_bile` | A | text 弟子 | the hawker is a White Camel Mountain shrimp, pouch on its antennae; 白驼山/蛇胆/真元 stay. Labels stay |
-| 9 | `dragon_scrap` | A (label only) | label_b 书贾 | label_b → 「卖与书铺」(书铺 is a sanctioned wuxia noun). text & title byte-identical |
-| 10 | `flood_ferry` | A | text 艄公 | the boatman is a shrimp poling the boat, indifferent; 河水/渡口/舟 stay. Labels **both stay** — 「泅水而过」 is the protected land-world feat (§4.5) |
-| 11 | `escort_job` | A | text 镖头, 人手 | the escort agency's shrimp chief sees your 身手 (idiom stays); 镖/南边 stay. Labels stay |
-| 12 | `dali_market` | A | text 掌柜, 拍着胸脯 | the shopkeeper shrimp pounds its own carapace; 市集/皮甲/快靴 stay. Labels stay |
-| 13 | `night_rain` | A | text 老僧 | an old shrimp sits alone mending the eaves by lamplight; 破庙/夜雨/灯火/屋檐 stay. Labels stay. (20_content §8.2 quote refreshed by 5_design) |
-| 14 | `gambling_den` | A | text 有人 | 几只虾 lost a whole travel purse; 赌坊/盘缠 stay. Labels stay |
-| 15 | `quanzhen_scripture` | A | text 老道 | an old shrimp bends over the desk copying; 全真宫/道德经 stay. Label_a 随他抄经 **stays** (§4.4-4). (20_content §8.2b quote refreshed by 5_design) |
-| 16 | `lost_purse` | A | text 无人; label_a 失主 | 四下不见虾影; label_a → 「归还失物」. label_b 收起走人 stays; 褡裢/银两 stay |
-| 17 | `riverside_duel` | A | text 剑客 | two shrimp schools at opposite ends of the bank; 河滩/执剑裁断 stay. Labels stay |
-| 18 | `ancient_bell` | B | — | byte-identical |
-| 19 | `poisoned_well` | A | text 药翁 | an old shrimp arrives, medicine case on its back; 荒村/井水/药箱 stay. Labels stay |
-| 20 | `tiger_pass` | A | text 商队头目 | the caravan's shrimp chief hawks the talismans; 虎啸/危崖/过路符 stay (虎 wildlife). Labels stay |
-| 21 | `lantern_festival` | A | text 人声 | crowds are shrimp (虾声鼎沸 / 满街虾客); 灯摊/谜面 stay, 猴子 wildlife stays. Labels stay |
-| 22 | `pawnshop` | A | text 刀主 | the blade's owner is a down-and-out shrimp; 当铺/柜台/断票 stay. Labels stay |
-| 23 | `storyteller` | A | text 说书人 (+ collective 满堂) | an old shrimp raps the gavel; 满堂虾客喝彩; 茶馆/旧年剑侠 (tale-subject genre word, kept)/茶碗 stay. Labels stay |
-| 24 | `chess_stall` | A | text 无人 | 十年无虾解出; 街角/棋盘/残局 stay. Labels stay |
-| 25 | `smithy` | A | text 老铁匠 | the smithy's old shrimp smith; 铁匠铺 (place)/炉火/回炉重铸 stay. Labels stay |
-| 26 | `cliff_herbs` | A (text only) | text 采药人, 招人 | the herb-gatherer is a shrimp recruiting fellow climbers; 崖/灵芝 stay. **Title 「崖上采药」 and label_b 「重金购芝」 stay byte-identical** (#78 pins, §7.5); label_a 帮攀崖顶 stays |
-| 27 | `wedding_train` | B | — | byte-identical |
-| 28 | `sword_mound` | B | — | byte-identical |
-| 29 | `night_inn` | A | text 掌柜, 揉眼 | the inn's shrimp keeper rubs its compound eyes with a claw over the ledger; 客栈/账本/温酒 stay. Labels stay |
-| 30 | `wild_goose_letter` | B | — (大雁 wildlife) | byte-identical |
-| 31 | `snow_pass` | A | text 向导 | the guide crouching by the fire is a shrimp; 风雪/隘口/火 stay. Labels stay |
-| 32 | `drunken_fist` | A | title 醉汉; text 醉汉, 手舞足蹈 | a drunken shrimp waves its claws outside the tavern, fist-logic intact; 酒肆/拳理 stay. Suggested title 「酒肆拳影」. Labels stay |
-| 33 | `river_god` | A | text 巫师, 村民 | the shrimp ritualist demands a price, the village shrimp look troubled; 河伯 (name stays)/鼓号/村头 stay. Labels stay |
-| 34 | `plague_village` | A | text 郎中 | the village's healer is an old shrimp sighing over the cabinet; 疫村/药柜 stay. Labels stay |
-| 35 | `young_disciple` | A | text 少年 | a young shrimp paces outside the door; 门外/指点 stay. Labels stay |
-| 36 | `fallen_rider` | A | title 客商; text 客商, 揉着腰, 搭手(寻人搭手) | a traveling shrimp thrown from its horse, goods scattered, pounding its own carapace, looking for a claw to help; 马/货物 stay. Suggested title 「途中坠马」. Labels 帮拣银赏/捡靴自用 stay |
+| 1 | f400 `GameManager.current_state: current_state == "MAP"` | KEPT verbatim | — | boot spine unchanged |
+| 2 | f520 `MapScreen.phase: phase == "TRAVEL"` | KEPT verbatim | — | travel leg unchanged |
+| 3 | f520 `MapScreen.current_node_id: current_node_id == "shaolin"` | KEPT verbatim | — | travel leg unchanged |
+| 4 | f540 `MapScreen.focus_id: focus_id == "huashan"` | KEPT verbatim | — | arrival targeting unchanged |
+| 5 | f580 `GameManager.current_state: current_state == "BATTLE"` | KEPT verbatim | — | the swap really happens |
+| 6 | f580 `SceneManager.current_scene: current_scene == "battlefield"` | KEPT verbatim | — | the right scene loaded |
+| 7 | f580 `SceneManager.pending_swap: pending_swap == false` | KEPT verbatim | — | swap settled |
+| 8 | — (absent) | ADDED | f580 `GameManager.map_battle_id == "huashan_duel"` | proves `huashan_duel` is actually CONSUMED (today it is written nowhere) |
+| 9 | — | ADDED | f580 `CombatManager.tutorial_battle == false` | the observed defect asserted false-positive today (`true`) |
+| 10 | — | ADDED | f580 `Player.max_health != 1000 and max_health > 0` | HP derived from the profile, not the tutorial Yang Guo's 1000; relational, no tuned literal |
+| 11 | — | ADDED | f580 `CombatManager.current_round >= 1` | the round ACTUALLY started (observed: 0) |
+| 12 | — | ADDED | f580 turn_order size/has set | non-empty roster with the five greats + profile hero (observed: `[]`) |
+| 13 | — | ADDED | f580 `phase != "IDLE"` | engine left idle (observed: IDLE forever) |
+| 14 | — | ADDED | f580 `active_unit_name != ""` | a current actor is visible |
+| 15 | — | ADDED | ⟨meas⟩ `phase == "PLAYER_TURN"` + `active_unit_name == "ProgressionHero"` + `EndTurnButton.disabled == false` | the hero's turn arrives and the end-turn button is enabled (observed: disabled forever) |
+| 16 | — | ADDED | ⟨meas⟩ `Player.grid_pos: changed` + `Player.moves_left: changed` after one click-move | the one real action's differential (movement works) |
+| 17 | — | ADDED | ⟨meas⟩ MAP-return block after WIN | return target = MAP (not CULTIVATION, not tutorial), map state + counter intact, binding cleared |
+| 18 | — | ADDED | ⟨meas⟩ re-fire + LOST-return block | both endings return to MAP; battle slots re-fire like events (policy) |
+| 19 | header prose ("What is NOT asserted here: the return leg…") | REWRITTEN | new header | the old refusal-to-assert rationale is obsolete; the rewrite states what is now proven and why the old gate was insufficient (not weakened — extended) |
 
-**Change tally:** titles 5, texts 27, labels 2 → **34 changed prose fields** across 28 rows; 8 rows byte-identical; ≈34 EN entries replaced in place; 2 test-file sync points (three mirrors + one `_test_fresh_instances` literal); README ~3 spots; #78 zero diff.
+No existing assertion is dropped, relaxed, or re-based → the machine superset guard passes with
+no exception record.
 
----
+### 7.3 Red-first protocol (measured, sidecar-wired — E12)
+1. Land the rewritten yaml FIRST with the code fix absent (temporary revert of the §5 code
+   changes, kept out of the build), run
+   `godot_playtest_scenario(scenario="map_battle_node_huashan")` **directly against the sidecar**.
+2. Measure and record the four values into the delivery notes: failing frame / first failing
+   assertion / exact error string / green asserts before red. Expected first red is one of
+   f580 `map_battle_id` (field absent) or `tutorial_battle == false` (reads true) — whichever
+   fires first is the MEASURED value, not this prediction.
+3. Restore the code fix, re-run → green; then the full official gate (78/78) plus the unit suite.
 
-## 6. The guard: `tests/test_event_prose_shrimp.py` (NEW, stdlib-only pytest)
+## 8. Design-doc deliverables (executed by the 5_design step from gate artifacts)
 
-Modeled on the repo's `tests/test_shrimp_roster.py` philosophy: **the judgement stays human (prose quality), the reminder is automatic (no person noun, no underwater phrasing, no species name may enter event prose).** Scope: `scripts/data/event_data.gd` **only** — the mirrors are byte-pinned to it by the GDScript suite, EN values are English, and every other file is the sweep's scope (§11), not the guard's.
+1. `design/20_content.md`: fix the stale sentence at **:463** — `battle 槽六节点仍全 declared` is
+   obsolete; record that 华山's battle slot is `active`/`huashan_duel` (mirroring
+   `map_data.gd:49`) and is now a real, gated battle. Add a §11 (same fact-source discipline as
+   §8/§10): the `huashan_duel` implementation — roster row, positions, entry path
+   (`map.gd → start_map_battle(bid) → map_battle_id → _setup_map_battle`), the sibling-not-rewrite
+   ruling, and the §D3 roster/survivability ruling with measured numbers. Update §8.3 item 1
+   (battle slots) to "live on 华山, declared elsewhere".
+2. `design/90_decisions.md`: one dated ruling (2026-08-31) recording: build-source/return-target
+   decoupling via `map_battle_id` (rejected alternatives per §D1), sibling `_setup_map_battle`
+   (rejected parameterization per §D4), counter persistence home (rejected profile-persistence per
+   §D5), roster = five greats from the existing factory with the pre-authorized one-line fallback.
+3. `design/99_changelog.md`: **exactly one appended line** for this round; no existing line or
+   cell changes.
+4. `design/00_roadmap.md`: completeness table row 2 (map node types) updated from THIS round's
+   gate artifacts only (`battle ✅ 华山 — playtest gate map_battle_node_huashan n/n`, numbers from
+   `playtest_summary.md`; nothing predicted).
+5. `design/40_ux_backlog.md`: append the 11 measured findings from the brief, record-only
+   (monthly loop no-feedback & near-static numbers; focus highlight below perception threshold;
+   character-page transparency bleed; map is a vertical list with no geography; silent event
+   resolution; monthly deck four identical runs; shrimp only on the battle screen; creation has
+   no name/portrait; save/load/delete mixed into "本月行动"; empty practice screen; ending has no
+   summary). Marked OPEN, unscheduled, explicitly out of this round's scope.
 
-```python
-"""Shrimp-prose guard for the 36 journey events (jinyong-shrimpcopy2).
-Denylists are token-level CJK substrings built from the PRE-edit corpus —
-never character-level bans (手 appears in legitimate 出手/身手 idioms)."""
-from pathlib import Path
+## 9. Verification & regression matrix (hard gate)
 
-SRC = Path(__file__).resolve().parents[1] / "scripts" / "data" / "event_data.gd"
+- Compile: zero errors (95/95 baseline + new files).
+- Playtest: **78/78 scenarios PASS**, hard gate `passed: true`, zero runtime errors. Named
+  non-regression pins to quote in the delivery notes: `spine_to_ending` (42/42),
+  `clicks_only_storyline` (47/47), `equipment_in_battle_diff` (47/47 — the encounter path is
+  byte-identical), `cultivation_changes_combat` (30/30), `save_load_roundtrip` (14/14),
+  `event_travel_effects` (19/19), `facility_use_reusable` (49/49), `terminal_victory_
+  8_12_rounds_hp_15_40` (6/6), `tutorial_win_routes_to_transition` (8/8),
+  `tutorial_loss_restarts_tutorial` (5/5), `map_node_event_shaolin` (32/32), `round_one_snapshot_
+  and_turn_order`, `battle_end_turn_attack_buttons`, `click_move_to_tile`.
+- Unit suite: existing suite green + `tests/test_map_battle_data.gd` + `tests/test_map_battle_entry.gd`;
+  `tests/test_map_node_event.gd` must stay green untouched (it already pins huashan as the only
+  live battle slot).
+- Visual gate: run per the round's standard blind/human-fallback rules; no new geometry or
+  palette introduced (enemy portraits already exist for the five greats).
 
-HUMAN_TOKENS = [
-    # person-role nouns (pre-edit corpus inventory)
-    "劫匪", "行商", "老丐", "掌柜", "郎中", "村民", "少年", "醉汉", "客商",
-    "老僧", "老道", "药翁", "书贾", "失主", "刀主", "向导", "说书人", "剑客",
-    "弟子", "艄公", "镖头", "头目", "巫师", "老铁匠",
-    # person-presence / human-body phrases
-    "之人", "有人", "无人", "人声", "人手", "招人", "寻人",
-    "手提", "伸手", "手舞足蹈", "搭手", "揉着腰", "揉眼", "拍着胸脯",
-]
-UNDERWATER_TOKENS = [
-    "游过去", "潜入", "水流", "海底", "水底", "下潜", "潜游",
-    "洄游", "洋流", "珊瑚", "海藻", "鳃",
-    # NOTE: 泅水而过 (flood_ferry) is a land-world river-crossing feat — deliberately NOT banned.
-]
-SPECIES_TOKENS = [
-    "皮皮虾", "螳螂虾", "龙虾", "小龙虾", "樱花虾", "罗氏沼虾", "玻璃虾",
-    "枪虾", "濑尿虾", "对虾", "基围虾", "青虾", "明虾",
-]
-PROTECTED = [
-    '"title": "崖上采药"',  # playtest #78 f200 pin
-    '"重金购芝"',           # playtest #78 f210 pin
-    '"泅水而过"',           # kept land-world feat (§4.5)
-    '"破财消灾"',           # _test_fresh_instances :383 (unchanged, pinned cheap)
-]
-```
-
-Four test functions: `test_no_human_tokens`, `test_no_underwater_tokens`, `test_no_species_tokens` (each failure message names the offending token **and the row id** — split the source on `"id": "` and attribute by offset), and `test_protected_literals_present` (fails *before* the pipeline gate if a future edit drifts a #78 pin or the kept feat). ~70 lines total; no dependencies beyond `pathlib`.
-
-**Landing order is deliberate:** the guard is committed **first**, while the corpus still contains the person words — its red is the round's **measured red-first evidence** (record the failing token count and affected rows in the delivery notes). It turns green when the last Class A row lands. (Red-first measurement discipline for *new playtest pins* does not apply here — there are no new pins; this guard's red is measured by construction.)
-
----
-
-## 7. Sync contracts
-
-### 7.1 Test mirrors (`tests/test_event_data.gd`)
-`ROW_TITLES` :158-:171 (5 values), `ROW_TEXTS` :174-:211 (27 values), `ROW_LABELS` :214-:251 (2 values) updated **byte-for-byte** with the new strings, including the `\n` escapes exactly as written in `event_data.gd` (all three files must carry identical runtime strings). `ROW_EFFECTS` :11-:156 **never edited** — if `_test_option_effects` reds after a prose edit, an effects literal was corrupted: revert the edit, do not touch the mirror. Same-commit discipline: **one row = one diff** touching its data cell, its three mirror cells, and its EN entries, so any red is attributable to exactly one row.
-
-### 7.2 EN dictionary (`scripts/autoload/i18n.gd` :269-:413)
-For every changed field, **replace the existing `"<zh>": "<en>",` line in place** (key AND value) — never append a second entry for the same row (duplicate keys in a GDScript dictionary literal are a latent bug). ≈34 lines. The EN membership gate (`_test_i18n_entries` :468-:479) must stay green; `test_i18n_coverage.py` is blind to event prose (variable-path `tr()`) — the gate, not the pytest, is the guard (SOTA-confirmed).
-
-### 7.3 `_test_fresh_instances` hardcoded literals (:377-:388)
-:383 `"破财消灾"` — unchanged. :387 `"山道遇劫匪"` — becomes the new bandits title **in the same commit as the bandits row**. This is sanctioned mirror-sync (the literal pins the *freshness property*; its value follows the data it pins), and it must be listed in the delivery notes. It is not a playtest assertion and not an assertion-weakening.
-
-### 7.4 README.md (documentation sync, documented)
-:23 (narrative mention 山道遇劫匪), :33-:35 (twenty-rows title list — 醉汉传拳 / 坠马客商 change), :584 (行商路过). Sync changed titles only; list every edit in the delivery notes. README is documentation, not the playtest contract; a stale title would misdocument the build.
-
-### 7.5 Playtest #78 — expected ZERO diff, documented either way
-The two prose pins (:57 `event_title == "崖上采药"`, :62 `focused_option_text == "重金购芝"`) pin literals containing **no person word**; this design freezes both strings byte-identical (`cliff_herbs` title + option_b label; enforced by the guard's protected-literal test). `event_body != ""` (:58) is shape-only and survives the text rewrite. The :65-:71 resolve ladder rides untouched effects. The delivery notes must still state, line by line, for **both** pin lines: "checked — unchanged — and why" (the brief requires documenting each changed pin line; the honest answer here is *none changed*, with the construction argument). If — contrary to this design — any pin had to change, the measured red-first protocol (temporary-rollback method, byte-exact restore, four measured values) applies; **predicted values are never recorded as measurements**. No other playtest yaml may be touched: grep shows no frozen scenario pins any changed literal (§2).
-
-### 7.6 Grep classification protocol (run BEFORE the first prose edit)
-Grep every zh literal that is about to change across the whole repo; classify each hit:
-(a) `tests/test_event_data.gd` mirrors → sync (sanctioned, §7.1); (b) `scripts/autoload/i18n.gd` EN → sync (sanctioned, §7.2); (c) `playtest/*.yaml` → ONLY #78's two pins are sanctioned, and by design neither changes — any other playtest hit is a **STOP**: preserve that literal byte-identical and record the conflict; (d) `design/*.md` → **not edited by implementation** — handed to 5_design (§12); (e) `README.md` → sync + document (§7.4); (f) `.aitelier/knowledge.md`, `final/*`, previous `step2_design.md` → **never edited** (pipeline metadata / historical records). Known sites from the 2026-08-31 scout: `design/20_content.md` (:189/:206/:214/:248/:251/:257 §4 shape lines, §8.2/§8.2b quote blocks, §4 gate-evidence block), `design/40_ux_backlog.md` :42, `design/90_decisions.md` :636, `design/99_changelog.md` :133-:135, `final/delivery_notes.md` :186 — all deferred to 5_design or left as historical record, except README.
-
----
-
-## 8. Execution order & rollback (irreversibility constraint satisfied)
-
-Every phase is a plain-text edit on a git-tracked tree; the rollback path is `git checkout -- <file>` per file or `git reset` to the recorded baseline hash. Per-row atomic diffs keep partial rollback meaningful, and the mirrors + EN gate + guard make any half-applied state **loud (red), never silent**. There is no delete-then-write step and no data loss window. The one forbidden "fix" is editing `ROW_EFFECTS` or weakening any mirror/gate to make a red disappear — a red always means the prose edit is wrong.
-
-- **Phase 0 — baseline.** Record `git rev-parse HEAD` in the delivery notes; run the §7.6 classification grep; run the full pytest suite + GDScript unit suite once to record the green starting state.
-- **Phase 1 — guard lands RED.** Commit `tests/test_event_prose_shrimp.py`; measure and record its red over the pre-edit corpus (failing token count + affected rows). Do not touch prose yet.
-- **Phase 2 — Class A frozen-16 slice (12 rows: bandits, merchant, beggar, snake_bile, dragon_scrap, flood_ferry, escort_job, dali_market, night_rain, gambling_den, quanzhen_scripture, lost_purse).** Per-row single diffs; run the unit suite after the slice.
-- **Phase 3 — Class A appended-20 slice (16 rows: riverside_duel, poisoned_well, tiger_pass, lantern_festival, pawnshop, storyteller, chess_stall, smithy, cliff_herbs, night_inn, snow_pass, drunken_fist, river_god, plague_village, young_disciple, fallen_rider).** Same discipline; run unit suite + full pytest (guard now green).
-- **Phase 4 — #78 verification.** Guard protected-literal test + (recommended) one sidecar self-run of `event_pool_new_event_resolved.yaml`; record counts in the delivery notes.
-- **Phase 5 — README sync + delivery notes.** `final/delivery_notes_shrimpcopy2.md`: (a) per-changed-line inventory (old → new for all 34 fields + `_test_fresh_instances` + README); (b) the #78 pin check statement (§7.5); (c) the sweep inventory (§11); (d) self-run evidence. Official gate evidence comes only from the pipeline's `compile_report.json` / `playtest_summary.md` / `test_report.json` / `vision_report.json` — never from predictions or repo files.
-- **Phase 6 — 5_design.** Design-archive updates (§12) after the gates.
-
----
-
-## 9. Proposed task decomposition (PM may re-slice; the interfaces are §§4-7)
-
-| Task | Input (fixed interface) | Output | Definition of done |
-|---|---|---|---|
-| T1 (impl) | §6 token lists (frozen), §8 Phase 0-1 | guard file + baseline hashes + measured red evidence | guard red on pre-edit corpus; suites otherwise green |
-| T2 (impl) | §5 rows 1-16 directives, §4 rules, §7 sync contracts | 12 frozen-16 Class A rows rewritten + mirrors + EN (+ :387) | unit suite green on the slice; zero effects diff |
-| T3 (impl) | §5 rows 17-36 directives, §7.5 | 16 appended Class A rows rewritten + mirrors + EN; #78 check/self-run | all-36 guard green; unit + pytest green; pin statement recorded |
-| T4 (impl) | §7.4, §11 | README sync + `final/delivery_notes_shrimpcopy2.md` (changed-line inventory + sweep inventory) | every changed line documented; sweep has file:line rows |
-| T5 (5_design) | §12, T4's delivery notes, official gate artifacts | design/ updates; UX-17 CLOSED; UX-19 OPEN; one changelog row | gates passed:true first; archives consistent; changelog append-only respected |
-
-**Per-row checklist (every Class A row):** prose fields only · no HUMAN/UNDERWATER/SPECIES token · wuxia nouns verbatim · ≥1 body-feature anchor per rewritten agent · title ≤6 / labels ≤6 CJK chars · body keeps the 2-line `\n` shape · mirrors synced byte-for-byte · EN key replaced in place · `ROW_EFFECTS` diff empty · Class B neighbours untouched.
-
----
-
-## 10. Playtest contract statement
-
-No scenario is added, removed, or edited; `playtest/_common.yaml` is untouched (`event_title` / `event_body` / `focused_option_text` / `debug_seed_events_seen` already whitelisted). The only playtest edits this round could ever sanction are #78's two literal pins — by design neither changes (§7.5), so there are **no new pins and no new red-first measurements owed**. All 78 scenarios stay green *by construction* (prose is data; `EventLogic`, `draw_unseen_id`, effects, option structure, and RNG streams are untouched — `event_travel_effects` 19/19, `save_load_roundtrip` 14/14 and the whole regression net are structurally immune) and are verified by the pipeline gates; `spine_to_ending` 42/42 must remain untouched-green as always. The addon's playtest-spec duties (observable surface + scenario skeleton incl. one to-endgame scenario) are already satisfied by the existing 78-scenario contract; this round declares **no contract change**.
-
----
-
-## 11. Record-only sweep: human prose outside the 36 events
-
-**Scope (player-visible string literals only; ids/comments/code excluded):** `scripts/data/facility_data.gd`, `map_data.gd`, `tutorial_fillers.gd`, `encounter_data.gd`, `card_data.gd`, `trait_data.gd`, `gongfa_data.gd`, `scripts/autoload/i18n.gd` (entries **outside** the `# --- Travel events ---` block), `scenes/*.tscn` (`text=` / label strings), plus their prose-pinning test mirrors where they exist.
-
-**Method:** broad recall-first grep over a single-char/short CJK class — `(人|僧|道|翁|匠|丐|匪|商|客|师|郎|主|民|徒|兄|姐|妹|侠|豪|杰|掌门|官|兵|贼|盗)` — then human-classify each hit: a person inside a player-visible literal → record; an id, a comment, or a place/idiom morpheme (客栈, 道德经, 主角 UI 标签) → skip. Precision is human work here; the sweep must not miss.
-
-**Known seed hits (2026-08-31 scout):** `scripts/data/card_data.gd` :33-:35 — card display names 「行商分成」 ×3 (economy cards); `tests/test_card_data.gd` — the matching card-prose mirror; `scripts/autoload/i18n.gd` :424 (ending 「各派掌门纷纷登门请教」 — 掌门), :426 (「皆有豪杰相迎」 — 豪杰).
-
-**Output format (one row per hit):** `file:line | quoted literal | person words found` — into `final/delivery_notes_shrimpcopy2.md` §sweep. **This round changes none of them.** 5_design transcribes the inventory into the new OPEN backlog item **UX-19 「事件外的人形文案清单」** in `design/40_ux_backlog.md` (queue table, after UX-18), so later rounds can fix the rest one slice at a time with attributable reds.
-
----
-
-## 12. Design-archive changes (executed ONLY by 5_design, after the gates pass)
-
-Implementation cards never edit `design/`. This section is the sanctioned change-list for 5_design (the "设计变更" declaration required by the pipeline):
-
-1. **`design/20_content.md` §4** — record the prose direction: all written persons in the 36 events are shrimp (body-feature lexicon, no species names), wuxia world verbatim, Class A/B minimal-diff record (28 changed / 8 byte-identical), pointer to the freeze-lift in `90_decisions.md`, and the round's gate-evidence line appended per the archive's evidence discipline (official artifact numbers only). **Also refresh the stale verbatim quotes**: §8.2 (night_rain 「老僧独坐…」 → new prose) and §8.2b (merchant 「一位行商赶着马车路过…」, quanzhen_scripture 「全真宫外老道伏案抄经…」 → new prose) — these quote data and must not go stale.
-2. **`design/90_decisions.md`** — NEW dated section (2026-08-31, jinyong-shrimpcopy2) recording the **freeze-lift**: why it was frozen (pool-expansion round `jinyong-event-pool-36` had to prove append-only with zero touching of existing rows; machine-pinned by the mirrors, ruling (a) :603-:608); why the owner lifted it (2026-08-31 ruling: **all characters are shrimp — passersby included**; prose consistency is mandatory; UX-17 resolved); **lift scope = prose only** (id / effects / option structure / 36-row count / row order remain frozen); old records kept verbatim. Plus the event-layer landing summary (28 rows, lexicon, 「泅水而过」 kept, species never named, guard file).
-3. **`design/40_ux_backlog.md`** — UX-17 row :42 → **CLOSED(jinyong-shrimpcopy2)** with this round's evidence (official `playtest_summary.md` 78/78, `test_report.json`, vision Q6, guard green) — written **after** the gate run; implementation cards must **not** self-close it. NEW row **UX-19 (OPEN)**: 「事件外的人形文案清单」 with the §11 file:line inventory; note "record-only this round; one slice at a time later". A dated record line in the 记录 section per the archive's conventions.
-4. **`design/99_changelog.md`** — append **exactly ONE row** (date 2026-08-31) summarizing the prose rewrite + syncs + guard + closures. **Zero edits to any existing row's cells** — :133-:135 carry last round's own corrigendum chain; the earlier accidental cell corruption (restored by the driver) must not be repeated.
-
-No `design/00_roadmap.md` / `design/README.md` changes are required (no completeness item moves); if 5_design finds a stale claim, correct minimally with a dated note.
-
----
-
-## 13. Tech stack & linter manifest
-
-- **Godot 4 headless CLI** — `godot --headless --path . -s res://tests/unit_test_runner.gd`; the 28-file GDScript unit registry is unchanged (no new `.gd` files; the new guard is Python, so the compile count stays 95).
-- **Python 3 + pytest, stdlib-only** — the repo's established static-guard layer; the new file follows `tests/test_shrimp_roster.py`'s precedent (no new dependencies, Godot-free).
-- **`godot_playtest_scenario` sidecar** — optional self-run of `event_pool_new_event_resolved.yaml` in Phase 4.
-- **git** — baseline hash + per-file checkout as the rollback path (§8).
-- **linter_manifest.json** — unchanged mapping, re-emitted: `.py: ruff`, `.md/.yaml/.yml/.json/.tscn: basic`; `.gd` deliberately excluded (owned by the `gdscript_check` gate, not the manifest).
-
----
-
-## 14. Extensibility
-
-The guard + mirrors make every future backlog slice (UX-19) a repeat of this round's per-row discipline: sweep → record → one slice → sync mirrors/EN → gates. Adding event rows later automatically inherits the guard (new rows are scanned too). The token lists are append-only data in one test file — extending the denylist when new person prose enters other data modules is a one-line change per token, and the protected-literal pins keep #78 and 「泅水而过」 safe from well-meaning future "fixes".
-
----
-
-## 15. Risk register
+## 10. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Underwaterization (the owner's most-feared failure) | §4.5 banned-token guard + protected 「泅水而过」 + delivery-notes quotes reviewed in 5_review |
-| Effects drift while editing inline dicts | per-row minimal diffs; `ROW_EFFECTS` red = revert the edit, never the mirror |
-| Mirror desync | same-commit per-row discipline; mirrors red by design on a miss |
-| EN gate blind spot (pytest can't see event prose) | the GDScript membership gate is the guard; in-place key replacement, no duplicate keys |
-| Stale design quotes (§8.2/§8.2b) | explicitly assigned to 5_design (§12.1) |
-| 99_changelog cell corruption (last round's incident) | append-only, exactly one row, zero cell edits (§12.4) |
-| Species leakage into passersby | SPECIES_TOKENS guard (§6) |
-| #78 pin drift | guard protected-literal test fails before the pipeline gate does (§6) |
-| Title/label growth breaking vision Q6 | §4.4-9 length limits + the vision gate itself |
-| Prose quality (the actual hard part) | human judgement stays with implementer/reviewer; the guard is a floor, not a ceiling (`test_shrimp_roster` philosophy) |
-| Frozen-scenario conflict | grep classification protocol (§7.6); today's evidence: no frozen yaml pins any changed literal |
+| Hero dies in round 1 before acting (floor 62 global with five greats) | §D3: far-perimeter positions; pre-authorized one-line roster fallback (drop Central Divine → floor 23); decision made from MEASURED gate evidence, recorded honestly |
+| Frame timing for the player's turn (5 enemy turns first) | Deterministic engine (zero-RNG AI, seeded RNG outside battle) — measured once, holds forever; generous ⟨meas⟩ margins; `at:` values re-baselined exactly like prior rounds did |
+| `map_battle_id` leaks into a tutorial boot | Cleared in `clear_battle()` (the only WON/LOST exit); unit pin asserts the clear; the branch reads the id, never the return state |
+| `events_resolved_count` ladder regressions | Mirror is additive; grep-verified no existing pin spans a MapScreen rebuild; `save_load_roundtrip` asserts no counter value |
+| Tutorial byte-freeze violation | No edit inside the tutorial branch/`_instantiate_enemies`/`start_battle`; sibling functions only; `equipment_in_battle_diff` + tutorial scenarios are the tripwires |
+| `turn_order.size() == 6` breaks if the roster changes | Intentional loud failure (gate discipline); the §D3 fallback updates the same line knowingly |
+| Synchronous HUD wire unreachable | Same deferred-fallback pattern as the encounter path (:666-668) |
 
----
+## 11. 扩展性考虑 (Extensibility, deliberately bounded)
 
-## 16. Success criteria mapping
+- The NEXT map battle slot (e.g. a shaolin battle) is **one `ROSTERS`/`POSITIONS` row** in
+  `MapBattleData` + one `map_data.gd` slot flip — the entry path is battle-id-driven and needs
+  zero new code. No speculative battle-type hierarchy, per-battle BGM/intro hooks, or reward
+  tables this round.
+- The id now flows end-to-end, so a future per-battle intro overlay or music has a natural home
+  (keyed by `map_battle_id`) — recorded as a horizon, not built.
+- Balance/roster tuning for difficulty is next round's lever and touches only `MapBattleData`.
 
-| Brief criterion | Carried by |
-|---|---|
-| Every written person in the 36 events is a shrimp; world verbatim, no underwaterization | §4 spec + §5 table + guard (§6) |
-| ids / effects / option structure / 36-row count byte-identical | five frozen invariants (§1.1); unchanged `ROW_EFFECTS` is the machine proof |
-| Mirrors + EN synced; `_test_event_data.gd` fully green (EN gate, no-repeat journey) | §7.1-7.3; verification ladder (§3) |
-| #78 pins synced and passing (15/15); 78 scenarios zero regression | §7.5 + §10; official gates |
-| Zero compile errors, hard gate `passed: true`, zero runtime errors, pytest + GDScript suites green | pipeline gates (authoritative artifacts only) |
-| Sweep recorded as new OPEN item with file:line | §11 + §12.3 (UX-19) |
-| 20_content §4 / 90_decisions freeze-lift / 40_ux_backlog UX-17 CLOSED + UX-19 OPEN / 99_changelog one row | §12 (5_design, after gates) |
-| Open-and-play delivery | no scene/engine/route/resource decisions; prose-only data edit on an already-green project |
+## 12. PM decomposition hints (suggested subtask split)
+
+1. **Data & decoupling**: `map_battle_data.gd` + GameManager (id field, start_map_battle(bid),
+   clear_battle, counter mirror) + SaveManager signal + map.gd wiring + unit tests
+   (`test_map_battle_data.gd`).
+2. **Battlefield entry**: `_setup_map_battle` + `_instantiate_map_enemies` + branch +
+   `test_map_battle_entry.gd`.
+3. **Gate rewrite**: yaml rewrite per §7.1-7.2 + `_common.yaml` surface appends +
+   `test_map_battle_gate_pins.py` + red-first measurement (sidecar) + delivery notes with the
+   line-by-line table.
+4. **Docs**: the five design-doc updates (from gate artifacts only; changelog = exactly one line).
+   Subtasks 1-2 are code, 3 is contract, 4 is records; 1 and 2 can parallelize after 1 lands the
+   GameManager field.
+
+## 产出前自检 (self-check)
+
+- Covers all MVP goals: profile build + `tutorial_battle == false` + no overlay replay (§D1/D4);
+  real round start with visible actor, enabled end-turn, working move/skills (§7.1 legs C-D);
+  WIN/LOST → MAP with map state and counter intact (§D5, legs E-F); `huashan_duel` consumed and
+  roster-determining (§D2, assert #8); gate rewritten with line-by-line documentation (§7.2);
+  design-doc updates specified (§8).
+- Single-responsibility components, no new abstraction layers; everything reuses SOTA-recommended
+  in-repo mechanisms (`BattleSetup`, `CombatManager`, request_continue/retry routing, debug
+  actions, click-move pattern).
+- Interfaces are concrete signatures/lines a PM can split and an implementer can write directly.
+- No over-design: rejected alternatives recorded; extension points documented but not built.
+- `linter_manifest.json` re-emitted: `.gd` deliberately excluded (the `gdscript_check` gate owns
+  it per addon guidance); `.md/.yaml/.json/.tscn` → `basic`, `.py` → `ruff` — matches the files
+  this design touches.
