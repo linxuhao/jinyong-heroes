@@ -29,13 +29,13 @@
 # calendar back to CARD_PICK). Those buttons are NOT state-gated, only
 # phase-gated, so they advance a month under a direct scene boot.
 #
-# RED-FIRST EVIDENCE — TEMPORARY PLACEHOLDER (do not treat as measured).
-# The follow-up measurement task fills real measured values here via the
-# TEMPORARY RED-FIRST REVERT method and OVERWRITES this block.
-#   fail frame:       <filled by measurement>
-#   first assertion:  <filled by measurement>
-#   exact error:      <filled by measurement>
-#   red-before-green: <filled by measurement>
+# RED-FIRST EVIDENCE (measured 2026-08-31, TEMPORARY RED-FIRST REVERT on
+# roster_panel.gd open(), direct sidecar, restored byte-identical. Measured,
+# not predicted.)
+#   fail frame:       50
+#   first assertion:  RosterPanel.is_open: is_open == true
+#   exact error:      observed=false
+#   red-before-green: 4
 name: roster_panel_cultivation_open_close
 description: >-
   Entry reachability + content presence + no-consumption + re-sync in

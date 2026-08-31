@@ -215,3 +215,30 @@ errors (6, lines `:365`/`:382`) were already handled by `fix_save_manager_deck_b
   **ZERO runtime errors**.**
 - Not modified: `playtest/spine_to_ending.yaml`, frozen artifacts,
   `playtest/_common.yaml`, `ROUND_SCENARIOS`, other scenarios.
+
+## 10. `roster_panel_cultivation_open_close` red-first measurement (2026-08-31)
+
+**Task:** `measure_roster_cultivation_red_first` — measure the red-before-green for
+`roster_panel_cultivation_open_close.yaml` from a REAL run (TEMPORARY RED-FIRST REVERT
+protocol) and overwrite the placeholder block.
+
+- **Baseline (un-reverted tree):** `godot_playtest_scenario(scenario="roster_panel_cultivation_open_close")`
+  → **16/16 PASS**, hard gate `passed: True`, **zero** runtime errors.
+- **Revert applied:** `open()` body neutralized to a no-op (`pass`), each line commented
+  with `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`. `RosterOpenButton` still exists;
+  its `pressed` signal still delivers into the no-op.
+- **Measured four values (VERBATIM from the run's report):**
+  - fail frame: **50**
+  - first assertion: **`RosterPanel.is_open: is_open == true`**
+  - exact error: **`observed=false`**
+  - red-before-green: **4** (the four boot asserts at f30: visible / phase / month / RosterOpenButton.visible)
+- **Run summary (reverted):** 14/16, two FAILs (f50 `RosterPanel.is_open`, f120 `RosterPanel.is_open`),
+  two runtime `push_error`s (`aim: node is not visible in tree: RosterCloseButton` — expected: the
+  close button stays hidden when `open()` is a no-op).
+- **Restore:** `scripts/ui/roster_panel.gd` restored byte-identical; re-run confirmed **16/16 PASS**,
+  hard gate `passed: True`, zero runtime errors.
+- **Overwrite:** placeholder block at lines 32–38 of `playtest/roster_panel_cultivation_open_close.yaml`
+  replaced with the measured four values + method note. `name:`/`description:`/`scene:`/timeline
+  bytes untouched.
+- Not modified: `playtest/spine_to_ending.yaml`, frozen artifacts, the already-measured
+  `roster_panel_item_nail.yaml` RED-FIRST block.
