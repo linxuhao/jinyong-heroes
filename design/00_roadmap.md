@@ -78,7 +78,7 @@
 |---|---|---|
 | 1 | 六段骨架可从头玩到结局 | ✅ 已达 |
 | 2 | 地图三类节点全部实装 | event ✅ / battle ✅(华山)/ facility ✅(少林 / 武当)——其余五节点 facility 槽仍 `declared`(见 `20_content.md` §10) |
-| 3 | 事件池够撑一次完整旅程不重复 | ✅ 36 条(2026-08-31 `jinyong-event-pool-36` 扩池完成)——两道不重复闸门 `_test_no_repeat_full_journey`(单元,跑真实 `draw_unseen_id` 36 抽)与 `event_pool_new_event_resolved`(playtest,屏上结算一条新事件)承载该性质;实测 PASS 计数由 5_compile 证据步骤补记(见 `20_content.md` §4) |
+| 3 | 事件池够撑一次完整旅程不重复 | ✅ 36 条(2026-08-31 `jinyong-event-pool-36` 扩池完成)——两道不重复闸门 `_test_no_repeat_full_journey`(单元,跑真实 `draw_unseen_id` 36 抽)与 `event_pool_new_event_resolved`(playtest,屏上结算一条新事件)承载该性质。**闸门实测已补记(2026-08-31 本轮 5_compile / 5_vision)**:编译 **95/95** 零错误;playtest **78 场景**硬闸门 `passed: true`、零 runtime error、**77 PASS / 1 红**——唯一红是本轮新场景 `event_pool_new_event_resolved` **13/15**:屏上抽中(`event_id == "cliff_herbs"`) / 选中(f210 `focused_option_text`) / 结算(f230 `events_seen_count == 36`,seen 阶梯 f140 35 → f230 36 无清空)全绿,红的是本轮**新增两个渲染观测面**(f200 `event_title` / `event_body` 实测空串)→ 如实记 `40_ux_backlog.md` **UX-18(OPEN)**,红不属「不重复」性质本身,本条 ✅ 维持;视觉闸门 passed(78 场景 312 帧,Q6 78 好 / 0 坏);单元闸门 `_test_no_repeat_full_journey` 的官方 PASS 待 5_test 产物(`test_report.json`,不在本步上下文,不预测)(详见 `20_content.md` §4) |
 | 4 | 玩家点得动:立绘几何四条缺口 | ✅ 已达 —— 四条(立绘高一格 / 名牌压腿 / 特质要点击才显示 / 手机无退回控件)已在既往轮次落地,本条此前标 ❌ 是**过期**记载(见下「第 4 条核对」) |
 | 5 | 全部角色为「武虾」形象 | ✅ 已达(2026-08-31,武虾轮)——六张立绘换为非人形真虾体(头卡通 + 身半写实),四个「待定虾种」按所有者裁定填入、六行 `art_status` → `completed`,守卫 `tests/test_shrimp_roster.py` 不改且绿;换图后立绘几何逐条重实测零红:`portrait_grid_alignment` **30/30**(24 条墨迹线 dx/dy 全 0.0,f40+f820)、六单位八层可见性全过、`camera_transform_follows_unit` **9/9**、`spine_to_ending` **42/42**;证据 `final/delivery_notes_wuxia.md` §3 + 本轮闸门产物,裁定见 `90_decisions.md` 2026-08-31 条 |
 | 6 | 英文可玩(build in public 的观众不都读中文) | ✅ 已达并已上锁 —— 见下 |

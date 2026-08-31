@@ -630,3 +630,21 @@ fixture 数据。
 把「事件文案与全员是虾的世界观不一致」如实记入 `40_ux_backlog.md` **UX-17(OPEN)**,
 待所有者裁定(虾化 or 明示豁免)。关闭需各自动作 + 闸门证据,不因本轮转绿而自行关闭。
 
+**(f) 闸门实测回填与一条新欠账(2026-08-31,5_design 证据步骤):屏上「渲染」腿 13/15,记 UX-18。**
+本轮官方闸门:编译 **95/95** 零错误;playtest **78 场景**硬闸门 `passed: true`、`spec_used: true`、
+零 runtime error、**77 PASS / 1 红**——唯一红是本轮新场景 `event_pool_new_event_resolved`
+**13/15**:f200 两断言红(`CultivationScreen.event_title == "崖上采药"` 实测**空串**、
+`CultivationScreen.event_body != ""` 实测**空串**),同帧及其后断言全绿(`event_id == "cliff_herbs"`
+抽中、f140/f200 `events_seen_count == 35`、f210 `focused_option_text` 选中、f230
+`events_seen_count == 36` 结算阶梯 + 相位/月份回 CARD_PICK)——「抽到 / 选中 / 结算 / 无清空」
+屏上实测成立,唯「渲染」腿缺。红落在本轮**新增的两个观测面**(`cultivation.gd` `_sync_surface`
+发布 `event_title` / `event_body`)的时序/接线,不在玩法:既有渲染走 `tr()` 标签路径,冻结 16 条的
+`event_travel_effects` **19/19** 仍绿,视觉闸门 Q6 78 好 / 0 坏。修法留给下一轮:核对发布点时序 →
+修 → 复测该场景至 **15/15**,零断言放松、零阈值放宽、零冻结场景改动;缺陷如实记
+`40_ux_backlog.md` **UX-18(OPEN)**。单元闸门 `_test_no_repeat_full_journey` 的官方 PASS 以
+5_test 产物(`test_report.json`)为准——该产物不在本步上下文,不冒充实测;完整度第 3 条 ✅ 维持
+(不重复性质由单元闸门 + 屏上 seen 阶梯承载,红的两条断言钉的是新增观测面而非该性质)。
+另记验证报告点出的 cosmetic 项:`event_data.gd` 头注释仍写「first batch of 4 / 16 event rows」,
+零闸门影响,下一轮顺手改。既有 77 场景零回归全 PASS(`spine_to_ending` 42/42、
+`event_travel_effects` 19/19、`equipment_in_battle_diff` 47/47 等全部在列)。
+

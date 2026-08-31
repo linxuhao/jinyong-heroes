@@ -257,6 +257,17 @@
 **喝酒求艺 vs 以实招换 (paid-practice vs toughness)。** `drunken_fist` 醉汉传拳——
 买酒向醉汉请教拳理换练功,还是以拳换教、硬挨一顿换根骨。
 
+**闸门实测(2026-08-31 本轮 5_compile / 5_vision,5_design 补记)。** 编译 **95/95** 零错误;
+playtest **78 场景**硬闸门 `passed: true`、零 runtime error、**77 PASS / 1 红**——唯一红是本轮
+新场景 `event_pool_new_event_resolved` **13/15**:屏上「抽中(`event_id == "cliff_herbs"`) /
+选中(f210 `focused_option_text`) / 结算(f230 `events_seen_count == 36`;seen 阶梯 f140 35 →
+f230 36,无清空)」全绿,红的是本轮**新增的两个渲染观测面**(f200 `event_title == "崖上采药"`
+实测空串、`event_body != ""` 实测空串)——红不属「不重复」性质本身:既有渲染走 `tr()` 标签路径,
+冻结 16 条的 `event_travel_effects` **19/19** 仍绿。缺陷如实记 `40_ux_backlog.md` **UX-18(OPEN)**。
+视觉闸门 passed(78 场景 312 帧,六问全部 `failed: false`,Q6 78 好 / 0 坏);单元闸门
+`_test_no_repeat_full_journey` 的官方 PASS 以 5_test 产物(`test_report.json`)为准——该产物
+不在本步上下文,不预测。
+
 ## 5. 内力消耗缺口(2026-08-26,jinyong-hud 轮记录)
 
 **本轮的技能按钮内力消耗显示必须用已存在的数值,不许就地发明一个数。**
