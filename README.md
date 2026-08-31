@@ -20,7 +20,7 @@ camera**, and sprites only stand on their own tiles.
 ## Latest round: jinyong-event-pool-36 — a full 36-month journey never repeats an event (2026-08-31)
 
 The travel-event pool was 16 rows, so a player who roamed every month hit the
-seen-bag reset on roam #17 and started watching 山道遇劫匪 again — roadmap
+seen-bag reset on roam #17 and started watching 山道遇劫 again — roadmap
 completeness item 3 was ❌. This round appends 20 new events (pool = **36**, the
 exact journey length: 3 years × 12 months) with zero mechanism changes: same
 row shape, the same five effect types, draw logic / `events_seen` semantics /
@@ -31,8 +31,8 @@ byte-identical (machine-pinned verbatim by the test mirrors).
 
 - **20 new events** (`scripts/data/event_data.gd`): 河滩论剑 / 荒寺晚钟 /
   荒村毒井 / 虎啸危崖 / 上元灯会 / 当铺旧刀 / 茶馆说书 / 街角残局 / 铸剑回炉 /
-  崖上采药 / 山道花轿 / 荒冢埋剑 / 客栈夜账 / 雁足传书 / 风雪隘口 / 醉汉传拳 /
-  河伯娶亲 / 疫村施药 / 登门求教 / 坠马客商 — twenty distinct scenes, no
+  崖上采药 / 山道花轿 / 荒冢埋剑 / 客栈夜账 / 雁足传书 / 风雪隘口 / 酒肆拳影 /
+  河伯娶亲 / 疫村施药 / 登门求教 / 途中坠马 — twenty distinct scenes, no
   reskins. Every row is a real trade-off across different currencies
   (silver ↔ attributes, attributes ↔ practice, immediate vs long-term); no
   option strictly dominates the other, and no row assumes the player has money
@@ -581,7 +581,7 @@ head and a gold ground marker marks the occupied tile; casting a move spends
 its inner-qi cost (内力: N in the top strip; a too-expensive move greys into
 「内力不足」; the free basic 重剑无锋 always stays available). On the map,
 左右/上下 cycle the adjacent nodes and 回车 travels (or tap `TravelButton{i}`);
-every mainline stop opens its node event on arrival (洛阳 行商路过 / 武当 全真抄经 /
+every mainline stop opens its node event on arrival (洛阳 车马过路 / 武当 全真抄经 /
 襄阳 降龙残谱; 无名谷 fires on the return trip; 少林 off the 洛阳 branch fires
 破庙夜雨) — resolve with 上下选择，回车定夺 or by tapping the option buttons.
 **At 少林 and 武当 (the two sect nodes), press F — or tap the 进入设施 button — to
