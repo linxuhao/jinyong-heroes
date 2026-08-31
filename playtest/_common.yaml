@@ -277,6 +277,10 @@ surface:
   - ink_world_dx
   - ink_world_dy
   - camera_offset_y
+  - gear_attack_bonus
+  - gear_health_bonus
+  - gear_initiative_bonus
+  - gear_move_bonus
   East_Heretic:
   - health
   - max_health
@@ -1010,6 +1014,11 @@ surface:
   - pressed_connected
   - item_count
   - gongfa_count
+  - equipped_weapon
+  - equipped_armor
+  - equipped_boots
+  - equip_button_count
+  - equip_pressed_connected
   RosterOpenButton:
   - visible
   - size
@@ -1025,6 +1034,18 @@ surface:
   RosterBodyLabel:
   - visible
   - text
+  EquipButton0:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - focus_mode
+  EquipButton1:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  - focus_mode
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -1101,3 +1122,5 @@ scenario_order:
 - gongfa_pick_empty_keyboard_return
 - roster_panel_item_nail
 - roster_panel_cultivation_open_close
+- roster_equip_free_action
+- equipment_in_battle_diff

@@ -1,0 +1,132 @@
+# Free-action + panel-level reversibility nail (jinyong-equipment-battle).
+#
+# THE ROUND'S FREE-ACTION PIN. Clicks-only (no keyboard): the player opens
+# the roster panel from the map, equips eq_sword_3 (granted by the REAL
+# merchant event through EventLogic.apply_option_effects), then immediately
+# unequips it. At every frame the month/phase/count invariants hold:
+# phase stays "TRAVEL" (or "EVENT" before resolution), events_resolved_count
+# is unchanged across the open/equip/close cycle, and ended stays false.
+#
+# RULING (c) for the WRITE PATH: the panel now writes profile.equipped, and
+# the free-action pins (phase, events_resolved_count) still hold byte-for-byte.
+# The cultivation-phase month/phase pins already live in the untouched
+# roster_panel_cultivation_open_close.yaml; this scenario extends the same
+# invariant to the write path.
+#
+# REVERSIBILITY: equip → equipped_weapon == "eq_sword_3" → unequip →
+# equipped_weapon == "". One round trip, no autosave, no side effects.
+#
+# DIRECT map.tscn boot (roster_panel_item_nail precedent): no full boot
+# sequence needed; the map segment is self-contained for this test.
+#
+# RED-FIRST EVIDENCE — to be measured by the implementer via the sanctioned
+# temporary-revert method (comment out _on_equip_pressed body, run, record,
+# restore byte-identical). See final/delivery_notes_equipment.md.
+name: roster_equip_free_action
+description: >-
+  Free-action + panel-level reversibility: merchant grants eq_sword_3 via
+  EventLogic, click EquipButton0 to equip (equipped_weapon changes to
+  eq_sword_3), click again to unequip (back to empty string). Phase and
+  events_resolved_count unchanged at every frame (free action). All input
+  is click-only (touch path).
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.visible: visible == true
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+    RosterOpenButton.visible: visible == true
+# Fund silver before the merchant grant (same rationale as
+# roster_panel_item_nail): debug_grant_silver goes through
+# EventLogic.apply_option_effects, grants 32 so merchant option_a -20
+# leaves silver at 12 and any silver differential is satisfiable.
+- at: 35
+  actions:
+  - debug_grant_silver
+# wuming_valley → luoyang via the tappable travel button (merchant event
+# auto-fires on arrival).
+- at: 40
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 50
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+    MapScreen.events_resolved_count: events_resolved_count == 0
+# Resolve the merchant: option_a grants eq_sword_3 into inventory via
+# EventLogic.apply_option_effects (the real code path — never a bare write).
+- at: 60
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 70
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.event_id: event_id == ""
+    MapScreen.events_resolved_count: events_resolved_count == 1
+# Open the roster panel (click = true hit test).
+- at: 80
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 90
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterPanel.equipped_weapon: equipped_weapon == ""
+    RosterPanel.equipped_armor: equipped_armor == ""
+    RosterPanel.equipped_boots: equipped_boots == ""
+    RosterPanel.equip_button_count: equip_button_count >= 1
+    RosterPanel.equip_pressed_connected: equip_pressed_connected >= 1
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+    MapScreen.cursor_markers_visible: cursor_markers_visible == false
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+# Click EquipButton0: the first equipment row in inventory is eq_sword_3
+# (the merchant just granted it). The button reads "装上" (equip).
+- at: 100
+  actions: []
+  clicks:
+  - EquipButton0
+- at: 110
+  actions: []
+  assert:
+    RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3"
+    RosterPanel.equipped_armor: equipped_armor == ""
+    RosterPanel.equipped_boots: equipped_boots == ""
+    RosterPanel.equipped_weapon: changed
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+    MapScreen.ended: ended == false
+# Click EquipButton0 again: the button now reads "卸下" (unequip).
+# One round trip reverses the state.
+- at: 120
+  actions: []
+  clicks:
+  - EquipButton0
+- at: 130
+  actions: []
+  assert:
+    RosterPanel.equipped_weapon: equipped_weapon == ""
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+# Close the panel.
+- at: 140
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 150
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+    MapScreen.ended: ended == false
+    RosterOpenButton.visible: visible == true

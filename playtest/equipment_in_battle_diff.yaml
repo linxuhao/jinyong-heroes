@@ -1,0 +1,309 @@
+# Real grant → click equip → real encounter → changed → unequip → baseline.
+#
+# THE ROUND'S CORE DIFFERENTIAL NAIL (jinyong-equipment-battle). Three legs
+# through a REAL encounter (battlefield.gd:651 → BattleSetup.build_character
+# → derive_stats with EquipmentData.sum_bonuses):
+#
+#   Leg 1: UNEQUIPPED battle — assert gear_attack_bonus == 0 (and the other
+#          three gear mirrors == 0), max_health > 0 (registers observation
+#          for `changed`).
+#   Leg 2: EQUIPPED battle — after clicking EquipButton0 through the panel,
+#          re-travel to huashan; assert gear_attack_bonus changed AND > 0
+#          (0 → +6 from eq_sword_3 tier 3 × ATTACK_PER_TIER 2).
+#   Leg 3: UNEQUIPPED again — after clicking EquipButton0 to unequip,
+#          re-travel; assert gear_attack_bonus == 0 AND changed (reversed).
+#
+# REAL CODE PATH: eq_sword_3 enters inventory via the merchant event
+# (EventLogic.apply_option_effects, the same path as roster_panel_item_nail).
+# The player equips it via a click on EquipButton0 (true hit test on the
+# real control, never *_ClickTarget). The battle reads equipped gear through
+# BattleSetup.build_character → derive_stats → EquipmentData.sum_bonuses.
+#
+# ROUTE: full boot (menu → creation → tutorial → cultivation → map) reusing
+# the proven map_battle_node_huashan frame sequence. The map topology:
+#   wuming_valley → luoyang → shaolin → huashan
+# After each battle win (debug_win_tutorial → WON → ui_accept → MAP), the
+# player is at huashan (current_node_id persists). Re-travel requires going
+# to shaolin first (huashan's only neighbor), then back to huashan.
+#
+# MEASURED ROUTE NOTE (2026-08-31): the post-battle return node after
+# debug_win_tutorial → WON → ui_accept is the MAP segment at huashan
+# (battle_return_state == "MAP" set by start_map_battle, game_manager.gd:186).
+# Shaolin fires its night_rain event on every arrival (events_resolved_count
+# increments each pass). The re-travel steps are derived from the adjacency
+# table: huashan: [shaolin], shaolin: [luoyang, huashan].
+#
+# NO absolute tuned values: all gear diffs are `changed` or relational
+# (`> 0`, `== 0`). The `== 0` baseline is the same shape as
+# facility_id == "" (zero-baseline relation, sanctioned).
+name: equipment_in_battle_diff
+description: >-
+  Equipment in battle differential: real merchant grant of eq_sword_3,
+  click-to-equip through the roster panel, three encounter legs showing
+  gear_attack_bonus 0 → >0 (changed) → 0 (changed, reversed). All through
+  the real code path (EventLogic → profile.inventory → profile.equipped →
+  BattleSetup.build_character → derive_stats).
+timeline:
+# ── Leg 0: Boot to MAP (proven huashan route) ──────────────────────────
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+# ── Travel to luoyang (merchant event fires on arrival) ────────────────
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 440
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+# Resolve merchant: option_a grants eq_sword_3 (real EventLogic path).
+- at: 450
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 460
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+# ── Travel to shaolin (luoyang → wudang focus → shaolin focus) ─────────
+- at: 470
+  actions:
+  - move_right
+- at: 480
+  actions:
+  - move_right
+- at: 490
+  actions:
+  - ui_accept
+# Shaolin fires night_rain on arrival — resolve it before continuing.
+- at: 510
+  actions:
+  - ui_accept
+- at: 520
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+# ── Travel to huashan (shaolin → luoyang focus → huashan focus) ────────
+- at: 530
+  actions:
+  - move_right
+- at: 540
+  actions:
+  - move_right
+- at: 550
+  actions:
+  - ui_accept
+# ── Leg 1: BATTLE UNEQUIPPED ───────────────────────────────────────────
+- at: 580
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    SceneManager.current_scene: current_scene == "battlefield"
+    Player.gear_attack_bonus: gear_attack_bonus == 0
+    Player.gear_health_bonus: gear_health_bonus == 0
+    Player.gear_initiative_bonus: gear_initiative_bonus == 0
+    Player.gear_move_bonus: gear_move_bonus == 0
+    Player.max_health: max_health > 0
+# ── Win battle 1 → return to MAP ───────────────────────────────────────
+- at: 590
+  actions:
+  - debug_win_tutorial
+- at: 610
+  actions:
+  - ui_accept
+- at: 630
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+# ── Equip sword through the panel (Leg 2 prep) ─────────────────────────
+- at: 640
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 650
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterPanel.equipped_weapon: equipped_weapon == ""
+    RosterPanel.equip_button_count: equip_button_count >= 1
+    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
+- at: 660
+  actions: []
+  clicks:
+  - EquipButton0
+- at: 670
+  actions: []
+  assert:
+    RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3"
+    RosterPanel.equipped_weapon: changed
+    MapScreen.phase: phase == "TRAVEL"
+- at: 680
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 690
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+# ── Re-travel to huashan (Leg 2: equipped) ─────────────────────────────
+# huashan's only neighbor is shaolin. Shaolin's night_rain fires on arrival.
+# From shaolin, neighbors are [luoyang, huashan]: two move_rights to cycle.
+- at: 700
+  actions:
+  - move_right
+- at: 710
+  actions:
+  - ui_accept
+- at: 720
+  actions:
+  - ui_accept
+- at: 730
+  actions:
+  - move_right
+- at: 740
+  actions:
+  - move_right
+- at: 750
+  actions:
+  - ui_accept
+# ── Leg 2: BATTLE EQUIPPED ─────────────────────────────────────────────
+- at: 780
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    Player.gear_attack_bonus: changed
+    Player.gear_attack_bonus: gear_attack_bonus > 0
+    Player.max_health: max_health > 0
+# ── Win battle 2 → return to MAP ───────────────────────────────────────
+- at: 790
+  actions:
+  - debug_win_tutorial
+- at: 810
+  actions:
+  - ui_accept
+- at: 830
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+# ── Unequip sword through the panel (Leg 3 prep) ───────────────────────
+- at: 840
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 850
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3"
+- at: 860
+  actions: []
+  clicks:
+  - EquipButton0
+- at: 870
+  actions: []
+  assert:
+    RosterPanel.equipped_weapon: equipped_weapon == ""
+    MapScreen.phase: phase == "TRAVEL"
+- at: 880
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 900
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+# ── Re-travel to huashan (Leg 3: unequipped again) ─────────────────────
+- at: 910
+  actions:
+  - move_right
+- at: 920
+  actions:
+  - ui_accept
+- at: 930
+  actions:
+  - ui_accept
+- at: 940
+  actions:
+  - move_right
+- at: 950
+  actions:
+  - move_right
+- at: 960
+  actions:
+  - ui_accept
+# ── Leg 3: BATTLE UNEQUIPPED AGAIN (reversibility) ─────────────────────
+- at: 990
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    Player.gear_attack_bonus: gear_attack_bonus == 0
+    Player.gear_attack_bonus: changed

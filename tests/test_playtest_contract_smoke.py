@@ -73,6 +73,8 @@ ROUND_SCENARIOS: list[str] = [
     "gongfa_pick_empty_keyboard_return",
     "roster_panel_item_nail",
     "roster_panel_cultivation_open_close",
+    "roster_equip_free_action",
+    "equipment_in_battle_diff",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1657,3 +1659,98 @@ def test_touch_reach_surface_contract() -> None:
     assert "end_overlay_pressed_connected" in blocks["GameManager"], (
         "surface GameManager block missing end_overlay_pressed_connected"
     ) + _escape
+
+
+def test_equipment_surface_contract() -> None:
+    """Static contract pin for the jinyong-equipment-battle round.
+
+    Pins ``roster_equip_free_action`` and ``equipment_in_battle_diff`` against
+    ``playtest/_common.yaml`` and ``ROUND_SCENARIOS`` (two-place sync):
+
+    - The 5 RosterPanel equipment observables (equipped_weapon /
+      equipped_armor / equipped_boots / equip_button_count /
+      equip_pressed_connected) are whitelisted on the surface.
+    - The 4 Player gear observables (gear_attack_bonus / gear_health_bonus /
+      gear_initiative_bonus / gear_move_bonus) are whitelisted.
+    - Both scenario names appear in scenario_order AND in ROUND_SCENARIOS.
+    - Each scenario file carries at least one differential ``: changed`` line.
+    - No ``*_ClickTarget`` appears in any clicks list in the two files.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+
+    # The 5 RosterPanel equipment observables are whitelisted.
+    assert "RosterPanel" in blocks, "surface has no RosterPanel block"
+    roster_items = blocks["RosterPanel"]
+    assert roster_items, "RosterPanel surface block parsed empty (vacuous pass guard)"
+    roster_equipment_vars = (
+        "equipped_weapon", "equipped_armor", "equipped_boots",
+        "equip_button_count", "equip_pressed_connected",
+    )
+    for var in roster_equipment_vars:
+        assert var in roster_items, (
+            f"RosterPanel.{var} not whitelisted on the surface"
+        )
+
+    # The 4 Player gear observables are whitelisted.
+    assert "Player" in blocks, "surface has no Player block"
+    player_items = blocks["Player"]
+    assert player_items, "Player surface block parsed empty (vacuous pass guard)"
+    player_gear_vars = (
+        "gear_attack_bonus", "gear_health_bonus",
+        "gear_initiative_bonus", "gear_move_bonus",
+    )
+    for var in player_gear_vars:
+        assert var in player_items, (
+            f"Player.{var} not whitelisted on the surface"
+        )
+
+    # Two-place sync: both scenario names in scenario_order AND ROUND_SCENARIOS.
+    order = _items_under(text, "scenario_order")
+    for name in ("roster_equip_free_action", "equipment_in_battle_diff"):
+        assert name in order, (
+            f"{name} not in _common.yaml scenario_order (two-place sync)"
+        )
+        assert name in ROUND_SCENARIOS, (
+            f"{name} not in ROUND_SCENARIOS (two-place sync)"
+        )
+
+    # Per-file static checks.
+    for name in ("roster_equip_free_action", "equipment_in_battle_diff"):
+        path = PLAYTEST_DIR / (name + ".yaml")
+        assert path.is_file(), f"{name}.yaml missing"
+        ftext = path.read_text(encoding="utf-8")
+        assert re.search(
+            rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+        ), f"{name}.yaml name: does not equal its basename"
+
+        has_diff_line = False
+        for lineno, line in enumerate(ftext.splitlines(), start=1):
+            m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+            if m is not None:
+                assert m.group(1).isdigit(), (
+                    f"{name}.yaml line {lineno}: non-integer timeline "
+                    f"'at' value {m.group(1)!r}"
+                )
+            if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+                has_op = any(
+                    op in line for op in ["==", "!=", "<", ">", "and", "or"]
+                )
+                has_diff = "changed" in line or "unchanged" in line
+                assert has_op or has_diff, (
+                    f"{name}.yaml line {lineno} assert missing "
+                    f"comparison operator: {line.strip()}"
+                )
+                if line.rstrip().endswith(": changed"):
+                    has_diff_line = True
+        assert has_diff_line, (
+            f"{name}.yaml missing a line ending `: changed` "
+            f"(differential rule)"
+        )
+
+        # No *_ClickTarget in clicks.
+        for item in _items_under(ftext, "clicks"):
+            target = item.split()[0]
+            assert not target.endswith("_ClickTarget"), (
+                f"{name}.yaml uses forbidden *_ClickTarget: {target}"
+            )
