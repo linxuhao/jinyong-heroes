@@ -14,12 +14,19 @@ extends RefCounted
 
 const ATTR_KEYS: Array[String] = ["bone", "inner", "agility", "wisdom", "fortune"]
 const ATTR_FLOOR: int = 10
+const EquipmentData = preload("res://scripts/data/equipment_data.gd")
 
 var attrs: Dictionary = {"bone": 10, "inner": 10, "agility": 10, "wisdom": 10, "fortune": 10}
 var traits: Array[String] = []
 var gongfa: Array[Dictionary] = []   # each {"id": String, "grade": String, "practice": int, "mastered": bool}
 var silver: int = 0
 var inventory: Array[String] = []
+# Three equipment slots (兵刃/护甲/鞋履): slot -> an inventory equipment id or "".
+# Plain Dictionary with String keys ONLY (a typed Dictionary is not JSON
+# round-trip safe — godot#97137; save_manager's serialize_failed guard fails on
+# non-String keys). Equipped ids are always a subset of inventory (see equip()
+# and the from_dict repair).
+var equipped: Dictionary = {"weapon": "", "armor": "", "boots": ""}
 var companions: Array[String] = []   # empty this round; schema reserved (step2_design C2)
 var cultivation: Dictionary = {"year": 1, "month": 1, "sect_id": ""}
 var map_node: String = "wuming_valley"   # design/40_progression.md §5 start node 无名谷
@@ -99,6 +106,7 @@ func to_dict() -> Dictionary:
 		"map_node": map_node,
 		"flags": flags.duplicate(true),
 		"main_external_id": main_external_id,
+			"equipped": _equipped_snapshot(),
 	}
 
 
@@ -162,6 +170,26 @@ static func from_dict(d: Variant) -> PlayerProfile:
 	# inventory / companions — non-empty Strings only.
 	_append_string_array(p.inventory, src.get("inventory", []))
 	_append_string_array(p.companions, src.get("companions", []))
+	# inventory must be coerced BEFORE equipped: the equipped-subset-of-inventory
+	# repair below needs the coerced inventory to compare against.
+
+	# equipped — three slots (weapon/armor/boots), each an inventory equipment id
+	# or "". (a) non-Dictionary equipped (null / String / Array — or a LEGACY save
+	# with no "equipped" key, which .get defaults to {}) -> keep the three-empty
+	# slot default: no crash, nothing wiped. (b) only the three known slot keys are
+	# read; a value is accepted iff it is a non-empty String, else "". Unknown slot
+	# keys are naturally dropped. (c) invariant repair: an equipped id that is not
+	# in the (already-coerced) inventory is dropped to "" — equipped is a subset of
+	# inventory after load.
+	var src_equipped: Variant = src.get("equipped", {})
+	if src_equipped is Dictionary:
+		var eq_src: Dictionary = src_equipped
+		for slot in EquipmentData.SLOTS:
+			var v: Variant = eq_src.get(slot, "")
+			if v is String and (v as String) != "" and p.inventory.has(v as String):
+				p.equipped[slot] = v as String
+			else:
+				p.equipped[slot] = ""
 
 	# cultivation — year 1..3, month 1..12, sect_id a String.
 	var src_cult: Variant = src.get("cultivation", {})
@@ -200,6 +228,56 @@ static func from_dict(d: Variant) -> PlayerProfile:
 		p.main_external_id = src_main as String
 
 	return p
+
+
+## Equipped-slot id (defensive .get(slot, "")); "" for an unknown slot.
+func equipped_id(slot: String) -> String:
+	var v: Variant = equipped.get(slot, "")
+	if v is String:
+		return v as String
+	return ""
+
+
+## Equip `id` into `slot`. All failures are silent `false` (never push_error).
+## Validation matrix (task_plan equipment_data_layer §3.1):
+##   (a) slot not in EquipmentData.SLOTS            -> false
+##   (b) id == ""                                    -> false (use unequip_slot to clear)
+##   (c) id not in `inventory`                       -> false (装上的前提是该 id 真在 inventory 里)
+##   (d) EquipmentData.slot_of(id) != slot           -> false (an armor id can never enter the weapon slot)
+##   (e) same id already equipped in that slot       -> true (idempotent, no state change)
+##   (f) different id in that slot                   -> true, overwrite (swap semantics;
+##        the displaced item stays in inventory)
+func equip(slot: String, id: String) -> bool:
+	if not EquipmentData.SLOTS.has(slot):
+		return false
+	if id == "":
+		return false
+	if not inventory.has(id):
+		return false
+	if EquipmentData.slot_of(id) != slot:
+		return false
+	equipped[slot] = id
+	return true
+
+
+## Clear `slot` back to the empty slot. Invalid slot -> false; else set "" and
+## return true (idempotent — clearing an already-empty slot is true).
+func unequip_slot(slot: String) -> bool:
+	if not EquipmentData.SLOTS.has(slot):
+		return false
+	equipped[slot] = ""
+	return true
+
+
+## Fresh plain {"weapon": v, "armor": v, "boots": v} each call (deep-copy
+## semantics — caller mutation must not corrupt the live profile). String keys
+## only, so to_dict stays JSON-lossless.
+func _equipped_snapshot() -> Dictionary:
+	return {
+		"weapon": equipped_id("weapon"),
+		"armor": equipped_id("armor"),
+		"boots": equipped_id("boots"),
+	}
 
 
 ## Appends every non-empty String of `src` (a Variant that may not even be an
