@@ -43,18 +43,105 @@ EQUIPMENT_ROSTER_OBSERVABLES: tuple[str, ...] = (
 )
 
 
+def _strip_gdscript_comments(text: str) -> str:
+    """Remove whole-line GDScript comments from source text.
+
+    A line is stripped if its first non-whitespace character is '#'
+    (covers both single-# comments and ## doc-comments).  Inline /
+    trailing comments on code lines are preserved — the guard is
+    intentionally conservative (red rather than miss).
+
+    Mirrors the repo precedent for comment-tolerant token scanning
+    (tests/test_playtest_contract_smoke.py::_bad_timeline_at_values).
+    """
+    lines = text.split("\n")
+    kept = [ln for ln in lines if not ln.lstrip().startswith("#")]
+    return "\n".join(kept)
+
+
 def test_no_autosave_in_roster_panel() -> None:
     """(a) roster_panel.gd must not call autosave/save_game/save_profile.
 
     Ruling (b): equipment follows the cultivation save/load model — change
     the profile, never persist. Adding an autosave call would silently
     violate this ruling; the guard makes it mechanical.
+
+    Comment lines are stripped before scanning so the doc-comment at
+    roster_panel.gd:8 (which legitimately names the method to document
+    the invariant) does not false-positive the guard.
     """
-    text = ROSTER_GD.read_text(encoding="utf-8")
+    text = _strip_gdscript_comments(ROSTER_GD.read_text(encoding="utf-8"))
     for forbidden in ("autosave(", "save_game(", "save_profile("):
         assert forbidden not in text, (
             f"roster_panel.gd contains forbidden call {forbidden!r} — "
             f"equipment must not trigger autosave (ruling b)." + _ESCAPE
+        )
+
+
+def test_no_autosave_guard_strips_comment_lines() -> None:
+    """Regression: comment lines naming the forbidden method are stripped,
+    so the guard passes on the real roster_panel.gd and on synthetic
+    comment-only text.
+
+    Acceptance criterion 1: the real file's stripped text must NOT contain
+    "autosave(" (line 8 doc-comment is the sole occurrence and is stripped).
+    Acceptance criterion 2: synthetic "## the panel never calls
+    SaveManager.autosave() here.\n" strips to empty; "## x.autosave()\nvar y = 1\n"
+    strips to "var y = 1".
+    """
+    # Real file: the only occurrence of "autosave(" is in a ## doc-comment.
+    raw = ROSTER_GD.read_text(encoding="utf-8")
+    assert "autosave(" in raw, (
+        "Sanity check failed: expected 'autosave(' to appear in "
+        "roster_panel.gd raw text (inside the doc-comment at line 8). "
+        "If the comment was removed or reworded, this test's premise "
+        "is outdated — update the test."
+    )
+    stripped = _strip_gdscript_comments(raw)
+    assert "autosave(" not in stripped, (
+        "After stripping comment lines, 'autosave(' should be absent from "
+        "roster_panel.gd. If present, a REAL (non-comment) call exists "
+        "and the main guard (a) should catch it."
+    )
+
+    # Synthetic: a comment-only line strips to empty.
+    synthetic_comment_only = "## the panel never calls SaveManager.autosave() here.\n"
+    result = _strip_gdscript_comments(synthetic_comment_only)
+    assert "autosave(" not in result, (
+        "Comment line naming autosave() must be stripped entirely."
+    )
+
+    # Synthetic: comment line removed, code line preserved verbatim.
+    synthetic_mixed = "## x.autosave()\nvar y = 1\n"
+    result_mixed = _strip_gdscript_comments(synthetic_mixed)
+    assert result_mixed == "var y = 1", (
+        f"Expected 'var y = 1' after stripping, got {result_mixed!r}. "
+        "Comment lines must be removed; code lines preserved verbatim."
+    )
+
+
+def test_no_autosave_guard_still_catches_real_calls() -> None:
+    """Regression: a genuine non-comment 'autosave(' line in the file body
+    is NOT stripped and would red the guard.
+
+    Acceptance criterion 3: "var cb := func(): SaveManager.autosave()\n"
+    retains "autosave(" after stripping (the guard would fail correctly).
+    """
+    real_call_text = "var cb := func(): SaveManager.autosave()\n"
+    stripped = _strip_gdscript_comments(real_call_text)
+    assert "autosave(" in stripped, (
+        "A real (non-comment) line containing 'autosave(' must survive "
+        "comment stripping — the guard must still be able to catch it."
+    )
+
+    # Also verify the full token set: save_game( and save_profile( on a
+    # real code line are not stripped.
+    for token in ("save_game(", "save_profile("):
+        # Realistic call line: "    SaveManager.save_game()\n"
+        call_line = f"    SaveManager.{token[:-1]}()\n"
+        stripped_call = _strip_gdscript_comments(call_line)
+        assert token in stripped_call, (
+            f"Token {token!r} on a real code line must survive stripping."
         )
 
 
