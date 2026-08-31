@@ -95,12 +95,23 @@ blockers are resolved in the tree:
   **36/36** with its own measured red-first (f110 / `equipped_weapon changed
   since frame 0` / exact error in the delivery notes / 35 green before red).
 
-The official gate artifacts (`compile_report.json`, `playtest_summary.md`,
-`vision_report.json`, `test_report.json`) are produced by the steps after the
-verifier; the POST-FIX official re-run has not landed yet, so
-compile/playtest/vision/pytest green status stays pending those artifacts
-(UX-16 records the same honest state: fix landed, post-fix gate evidence
-pending).
+**Official gate evidence (2026-08-31, read by 5_review from the landed step
+artifacts): compile 95/95 scripts, 0 errors; playtest 77/77 scenarios PASS,
+0 runtime errors, hard gate `passed: true` — including
+`equipment_in_battle_diff` 47/47, `roster_equip_free_action` 36/36,
+`spine_to_ending` 42/42, `save_load_roundtrip` 14/14 and
+`cultivation_changes_combat` 30/30; vision gate passed (all six questions
+`failed: false`).** One review-round blocker remained after those runs:
+`tests/test_roster_equipment_guards.py::test_no_autosave_guard_strips_comment_lines`
+expected `"var y = 1"` while the comment-stripping helper preserves the code
+line's trailing newline. Fixed test-side exactly as prescribed (the assertion
+now reads `assert result_mixed.strip() == "var y = 1"`; the helper and the
+other four guards are unchanged; no game code, scenario or threshold
+touched). Its official 44/44 pytest re-run and the GDScript unit-suite
+re-run are produced by the downstream `test_report.json` (5_test), so that
+one criterion stays pending that artifact — everything above is green on
+landed evidence. UX-16 is CLOSED on the 47/47 gate evidence
+(`design/40_ux_backlog.md`).
 
 ## Round: wuxia-shrimp-portraits — every character is now a shrimp (武虾, 2026-08-31)
 
