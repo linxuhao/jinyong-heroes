@@ -75,6 +75,7 @@ ROUND_SCENARIOS: list[str] = [
     "roster_panel_cultivation_open_close",
     "roster_equip_free_action",
     "equipment_in_battle_diff",
+    "event_pool_new_event_resolved",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen

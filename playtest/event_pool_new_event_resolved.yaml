@@ -1,0 +1,72 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+# On-screen proof that a NEW event (cliff_herbs) is drawn, rendered, selected,
+# and resolved through real input: after debug_seed_events_seen leaves exactly
+# one unseen id (the showcase id), the roam draw is deterministic (1-element
+# unseen pool, no RNG dependence); events_seen_count ladder 35 -> 36 with no
+# pool reset proves on screen the 36-month no-repeat property.
+#
+# RED-FIRST EVIDENCE (measured 2026-08-31):
+#   failing frame:         at: 140
+#   first failing assert:  events_seen_count == 35
+#   exact error:           observed events_seen_count = 16 (expected 35)
+#   green before red:      at: 130 (phase == "CARD_PICK", events_seen_count == 0) — both pass
+name: event_pool_new_event_resolved
+description: >-
+  Boundary-month proof: after debug_seed_events_seen leaves exactly one unseen
+  id (cliff_herbs), the roam draw is deterministic (1-element unseen pool, no
+  RNG dependence); the NEW event is drawn, rendered (title/body/labels),
+  selected (option B focus asserted), then resolved (option A); events_seen_count
+  ladder 35 -> 36 with no pool reset proves on screen that the 36-row pool
+  never resets mid-journey.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [debug_win_tutorial]}
+- {at: 40, actions: [ui_accept]}
+- {at: 60, actions: [ui_accept]}
+- {at: 70, actions: [ui_accept]}
+- {at: 80, actions: [ui_accept]}
+- {at: 90, actions: [move_right]}
+- {at: 100, actions: [ui_accept]}
+- {at: 110, actions: [ui_accept]}
+- at: 130
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.events_seen_count: events_seen_count == 0
+- {at: 135, actions: [debug_seed_events_seen]}
+- at: 140
+  assert:
+    CultivationScreen.events_seen_count: events_seen_count == 35
+- {at: 150, actions: [ui_accept]}
+- {at: 160, actions: [move_down]}
+- {at: 170, actions: [move_down]}
+- {at: 180, actions: [move_down]}
+- {at: 190, actions: [ui_accept]}
+- at: 200
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.event_id: event_id == "cliff_herbs"
+    CultivationScreen.events_seen_count: events_seen_count == 35
+    CultivationScreen.event_title: event_title == "崖上采药"
+    CultivationScreen.event_body: event_body != ""
+- {at: 205, actions: [move_down]}
+- at: 210
+  assert:
+    CultivationScreen.focused_option_text: focused_option_text == "重金购芝"
+- {at: 215, actions: [move_up]}
+- {at: 220, actions: [ui_accept]}
+- at: 230
+  assert:
+    CultivationScreen.events_seen_count: events_seen_count == 36
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 2
+    CultivationScreen.event_id: event_id == ""
+    CultivationScreen.attr_agility: changed
+    CultivationScreen.silver: changed

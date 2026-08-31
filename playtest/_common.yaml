@@ -1128,3 +1128,4 @@ scenario_order:
 - roster_panel_cultivation_open_close
 - roster_equip_free_action
 - equipment_in_battle_diff
+- event_pool_new_event_resolved
