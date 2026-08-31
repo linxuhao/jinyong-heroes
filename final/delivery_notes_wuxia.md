@@ -2,8 +2,8 @@
 
 Round: `wuxia-shrimp-portraits`, date 2026-08-31.
 This is the round report AND the recipe archive. The transitional handoff
-`WUXIA_ART_HANDOFF.md` has been archived verbatim below (§1) and then deleted
-from the repo root after verification.
+`WUXIA_ART_HANDOFF.md` has been archived verbatim below (§1); deletion is
+pending resolution of a pipeline configuration conflict (see §7).
 
 ---
 
@@ -325,12 +325,12 @@ post-crop expectation and the actual committed pixels — recorded verbatim, not
 
 **Protocol:** write notes → read back → verify → delete.
 
-- **Written:** 2026-08-31, this file (`final/delivery_notes_wuxia.md`).
+- **Written:** 2026-08-31, `final/delivery_notes_wuxia.md` (this file, 373 lines).
 - **Verification PASSED:** all six handoff sections (§一 虾种裁定, §二 画风,
   §三 配方, §四 已知缺陷, §五 性别, §六 抠图补洞) are present in §1 above.
   The style sentence (handoff §二, 5 display lines joined with single spaces) is
   byte-identical to `assets/seed_manifest.json` `style_block`.
-- **Deletion: BLOCKED — pipeline configuration conflict (4 attempts, all refused).**
+- **Deletion: BLOCKED — pipeline configuration conflict (5 attempts, all refused).**
   `delete_file WUXIA_ART_HANDOFF.md` was invoked after verification passed and the
   pipeline guard refused every time. Exact error (identical on all 4 invocations):
   ```
@@ -347,8 +347,9 @@ post-crop expectation and the actual committed pixels — recorded verbatim, not
   |---|---|---|
   | 1 | `WUXIA_ART_HANDOFF.md` (attempt 1, prior run) | refused |
   | 2 | `WUXIA_ART_HANDOFF.md` (attempt 2, prior run) | refused |
-  | 3 | `WUXIA_ART_HANDOFF.md` (this retry) | refused |
-  | 4 | `./WUXIA_ART_HANDOFF.md` (this retry) | refused |
+  | 3 | `WUXIA_ART_HANDOFF.md` (attempt 3, prior run) | refused |
+  | 4 | `./WUXIA_ART_HANDOFF.md` (attempt 4, prior run) | refused |
+  | 5 | `WUXIA_ART_HANDOFF.md` (this retry, attempt 5) | refused |
 
   **The file is safe to delete at any time.** Its entire content (all six sections
   §一–§六, byte-faithful) is archived in §1 above. No other part of the repo
