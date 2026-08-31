@@ -62,19 +62,28 @@ Chinese name — is now one tap away.
   (UX-13 no-`equipped` field / UX-14 §9 loadout promise vs auto-equip — both
   OPEN, record-only), and the `design/99_changelog.md` `roster_panel` row.
 
-**Honest status: the two new scenarios are NOT yet green on this tree**
-(measured sidecar runs, 2026-08-30 — see "Verification status (honest)"
-below): `roster_panel_item_nail` **35/36** (red at f110
-`MapScreen.silver: changed` — a fresh boot has silver 0 and the merchant's
-option_a is silver −20, clamped to 0, so silver never changes; the 青锋剑 pin
-itself measured green) and `roster_panel_cultivation_open_close` **15/16**
-plus **6 runtime errors** (red at f110 `CultivationScreen.month: changed` —
-`debug_step_month` is gated on `GameManager.current_state`, which a direct
-scene boot does not set, and the documented clicks-only fallback was not
-implemented; the runtime errors are `Invalid access … 'economy' /
-'equipment' / 'growth'` at `save_manager.gd:365/:382`). No official
-75-scenario gate run exists yet; the 75 in the counts below is the
-`scenario_order` registry count, not a gate-measured green count.
+**Status (updated 2026-08-31): the review blockers are fixed and both new
+scenarios self-run green on the current tree** (sidecar runs, see
+"Verification status (honest)" below): `roster_panel_item_nail` **36/36
+PASS** — the f110 silver differential was resolved by funding silver BEFORE
+the merchant event with the whitelisted `debug_grant_silver` action (frame
+f35; grants 32 = 4 × max facility cost through
+`EventLogic.apply_option_effects`, never a bare profile write, so merchant
+`option_a` −20 leaves 12 and the frame-0-baseline `changed` holds).
+`roster_panel_cultivation_open_close` **16/16 PASS, hard gate
+`passed: true`, 0 runtime errors** — the month advance is now a real
+clicks-only month (CultOptionButton0 card pick → CultOptionButton2 做工 →
+`_after_action` calendar advance; the `debug_step_month` token was gated on
+`GameManager.current_state`, which a direct scene boot never sets), and the
+6 direct-boot runtime errors are eliminated by a
+`save_manager.gd::_ensure_deck` deck-boot guard
+(`if not decks.has(cat): _init_decks()`). Both scenarios' red-first evidence
+is MEASURED (never predicted) — the nail's four values are in the bullet
+above; the cultivation scenario's measured four values are **f50** /
+**`RosterPanel.is_open: is_open == true`** / **`observed=false`** /
+**4** green asserts before red. No official post-fix 75-scenario gate run
+exists yet; the 75 in the counts below is the `scenario_order` registry
+count, not a gate-measured green count.
 
 ## Round: touch-single-surface — buttons are the option list, every state has a tappable exit (previous round)
 
@@ -474,8 +483,9 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Verification status (honest)
 
-**jinyong-roster (this round, 2026-08-30) — delivery verified by direct read;
-both new scenarios measured NOT green, downstream gates pending:**
+**jinyong-roster (this round, 2026-08-30; blockers fixed + both red-firsts
+measured 2026-08-31) — delivery verified by direct read; both new scenarios
+self-run green on the current tree; downstream gates pending:**
 
 - **Landed and verified in the tree**: `scripts/ui/roster_panel.gd` +
   `scenes/ui/roster_panel.tscn` instanced as `RosterPanel` into BOTH segment
@@ -495,35 +505,40 @@ both new scenarios measured NOT green, downstream gates pending:**
   `aim: node not found: CultOptionButton0 (spec: CultOptionButton0)` /
   red-before-green 9) — no third correction row (append-only archive
   honored).
-- **NOT green (measured sidecar runs, 2026-08-30; root causes still in the
-  tree)**: `roster_panel_item_nail` **35/36** — f110
-  `MapScreen.silver: changed` red (fresh boot `profile.silver = 0`
-  (`player_profile.gd:21`); merchant `option_a` is silver −20
-  (`event_data.gd:35`); `apply_option_effects` clamps `maxi(0−20, 0) = 0`
-  (`event_logic.gd:42`); the 青锋剑 pin at f130 measured green).
-  `roster_panel_cultivation_open_close` **15/16** — f110
-  `CultivationScreen.month: changed` red (`debug_step_month` early-returns
-  unless `GameManager.current_state == "CULTIVATION"`,
-  `cultivation.gd:695-696`; autoload default is `STATE_TUTORIAL`; the
-  documented clicks-only fallback was never implemented) **plus 6 runtime
-  errors** (`Invalid access to property or key 'economy' / 'equipment' /
-  'growth'` at `save_manager.gd:365/:382` — deck table not initialized on the
-  direct-boot path). Fix direction: fund silver via the sanctioned
-  `debug_grant_silver` pipeline action (or a travel-path silver source)
-  before the merchant grant; play one real month by clicks instead of the
-  gated debug token; root-cause the deck-initialization errors (0 runtime
-  errors is an acceptance criterion). `roster_panel_cultivation_open_close.yaml`
-  still carries a TEMPORARY PLACEHOLDER RED-FIRST block — that scenario's
-  red-first was never measured.
+- **Fixed and self-run green (2026-08-31 sidecar runs, per
+  `final/delivery_notes_roster.md` §2/§9/§10)**: the 2026-08-30 baseline reds
+  (`roster_panel_item_nail` 35/36 at f110 `MapScreen.silver: changed`;
+  `roster_panel_cultivation_open_close` 15/16 at f110
+  `CultivationScreen.month: changed` plus 6 `save_manager.gd:365/:382`
+  deck-table runtime errors) are all resolved on the tree:
+  (1) `save_manager.gd::_ensure_deck` now boots the six decks on demand
+  (`if not decks.has(cat): _init_decks()`) — a direct scene boot no longer
+  indexes an uninitialized deck table; (2) the nail funds silver at f35 via
+  the whitelisted `debug_grant_silver` action (32 = 4 × max facility cost,
+  routed through `EventLogic.apply_option_effects` — never a bare profile
+  write), so `silver: changed` is satisfiable; (3) the cultivation scenario's
+  month advance is a real clicks-only month (CultOptionButton0 card pick →
+  CultOptionButton2 做工 → `_after_action` advances the calendar), phase-gated
+  and not state-gated. Measured self-run results on the fixed tree:
+  `roster_panel_item_nail` **36/36 PASS** (青锋剑 pin green at f130),
+  `roster_panel_cultivation_open_close` **16/16 PASS, hard gate
+  `passed: true`, 0 runtime errors**. The cultivation scenario's RED-FIRST
+  block is now MEASURED (no placeholder remains): fail frame **50** / first
+  assertion **`RosterPanel.is_open: is_open == true`** / exact error
+  **`observed=false`** / red-before-green **4** (TEMPORARY RED-FIRST REVERT on
+  `roster_panel.gd open()`, direct sidecar run, restored byte-identical).
 - **Pending downstream evidence (not producible at verification time — not
   guessed, counted as unmet)**: compile 0 errors; GDScript unit suite green;
   `tests/test_i18n_coverage.py` / `tests/test_playtest_contract_smoke.py` /
   `tests/test_facility_copy_location.py` green; the vision gate;
   `spine_to_ending` timing. Their reports (`compile_report.json`,
   `vision_report.json`, `test_report.json`) are pipeline artifacts produced
-  after this step. No official 75-scenario playtest gate run exists yet — the
-  registry count (75) is not a gate-measured green count; the most recent
-  gate-measured count below (73/73) is the previous round's.
+  after this step. No official POST-FIX 75-scenario playtest gate run exists
+  yet — the registry count (75) is not a gate-measured green count; the
+  latest OFFICIAL gate run (2026-08-30, pre-fix) measured 73/75 with the two
+  scenario defects, and the 2026-08-31 fixes are evidenced by direct sidecar
+  self-runs (36/36 and 16/16, 0 runtime errors) until the downstream gate
+  re-run lands the official 75/75 count.
 
 **touch-single-surface (previous round, 2026-08-30) — fully evidenced (red-first
 MEASURED post-review + official gate run):**
