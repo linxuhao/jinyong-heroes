@@ -1,530 +1,197 @@
-# 技术架构设计 — jinyong-roster (人物栏 · 功法栏 · 物品栏)
+# 技术架构设计 — 武虾立绘:六图换装记录对齐 + 立绘几何重证 (wuxia-shrimp-portraits)
 
-**Step 2 (Architect) · 2026-08-30 · Single lever:** one tappable, read-only roster panel
-(character / gongfa / items) openable from CULTIVATION and MAP, proven by a clicks-only
-correspondence nail whose first-red is measured, plus the two recorded debts (README counts,
-facility-pin failure message) and the two record-only backlog rows (UX-13 / UX-14).
+> Round date: **2026-08-31** (use exactly this date in every record this round: changelog row, decision sections, backlog entry, delivery notes, roadmap flip).
 
-**Inputs honored:** Project Brief + verbatim spec, `step1_sota.md` (reuse-only conclusion),
-`design/` (30_presentation 指针可达性 (f)/(g) single-surface rules, 31_touch_coverage survey,
-40_progression §7–§9, 40_ux_backlog format, 90_decisions ruling format, 99_changelog
-append-only archive). Everything below reuses in-repo machinery; **zero new dependencies**.
+## 0. 概述
 
----
+The six shrimp PNGs are **already in the repo** (committed by the driver before this round) — they are this round's **input**, never its output. Nobody may generate, draw, replace, or "fix" `assets/characters/*.png`; the only permitted interaction is *reading their pixels* to measure ink. This round therefore has exactly three kinds of work:
 
-## 1. 概述
+1. **Records catch up with the art (data + docs).** `roster.json` gets the four owner-ruled species and all six `art_status` flipped; `seed_manifest.json` becomes the two-layer subject/image structure with the new split-register style sentence; the design archive (`30_presentation` / `90_decisions` / `40_ux_backlog` / `99_changelog`) records the art-direction change, the executed 定妆 process, the species rulings, and the de-naming backlog item.
+2. **Geometry is re-proven, not assumed.** The new PNGs have different ink silhouettes than the old human figures, and every pinned nail is built on ink. All three nails (`portrait_grid_alignment`, `portrait_visibility` six-unit values, `camera_transform_follows_unit`) are **re-measured with observed values**, plus a pixel-true alpha-bbox footing check per PNG (the texture-rect blind-spot measurement), plus a full gate run. Red nails are reported with root cause — thresholds are never loosened, nails never edited, art never redrawn to fit.
+3. **The recipe is archived and the transitional file deleted.** `WUXIA_ART_HANDOFF.md`'s content lands verbatim in `final/delivery_notes_wuxia.md` (archive → verify → delete, in that order), and roadmap completeness item 5 flips ❌→✅ in `5_design` backed by gate evidence.
 
-The player's data already exists (`PlayerProfile`: attrs / traits / gongfa / silver /
-inventory / cultivation) and one path is dead: 12 equipment cards append ids into
-`profile.inventory` (`scripts/data/event_logic.gd` item effects, `scripts/data/card_data.gd:36-48`)
-and **nothing ever renders them**. This round adds a single new *display-only* surface:
+**Shape of this round:** zero engine-code changes, zero `playtest/*.yaml` changes, zero surface-whitelist changes, zero new UI strings, four guard tests byte-identical. The only code-adjacent artifact is a *transitional* pytest probe (written, run, deleted — never committed, see C7-M2).
 
-- **Entry** — a visible, tappable `RosterOpenButton` in both stable segments
-  (`CULTIVATION`, `MAP`; `design/40_progression.md §8`), delivered as one self-contained
-  instanced scene so hosts change by **one node + one input-gate line** each.
-- **Panel** — three sections, all read from `SaveManager.profile` at open time:
-  (a) 人物: five attributes, silver, innate traits, current year/month, sect;
-  (b) 功法: each learned art with grade / practice / 大成 marker;
-  (c) 物品: `profile.inventory` resolved via the frozen `CardData.display_name_of(id)`,
-  unknown ids degrade lazily to the raw id (never crash, never `push_error`).
-- **Close** — a pinned `RosterCloseButton` **and** a tap-outside dim layer (both exist;
-  the button is what the scenario clicks).
-- **Single-surface conformance** — the panel has **zero internal selectable options**
-  (pure display rows + two controls), publishes `cursor_markers_visible == false`, and
-  while open owns all input (host `_unhandled_input` gated by one boolean; the dim layer's
-  STOP filter covers every host control). No `▶` is ever printed anywhere.
-- **Read-only hard guarantee** — open/close never call `SaveManager.autosave()`, never
-  write any profile field, never consume a month/action, never touch `spine_to_ending.yaml`
-  timing (the panel is not a phase; the spine never opens it).
+## 1. 现状锚点 (verified facts this design is built on — do not re-investigate)
 
-Nail discipline: the scenario drives the **real grant path**
-(`map.gd::_resolve_node_event → EventLogic.apply_option_effects`, merchant `option_a` →
-silver −20 + item `eq_sword_3` 青锋剑 — deterministic, already unit-pinned in
-`tests/test_map_node_event.gd:274-292`), then `click:` opens the panel and asserts
-`青锋剑` inside `RosterBodyLabel.text`. Text-name pins are the sanctioned exception to the
-no-absolute-numbers rule (`30_presentation.md` relative-numeric discipline); every other
-assert is structural (`==` on session counters/phases) or differential (`changed`).
+- **PNGs:** six files under `./assets/characters/` (`west_poison / north_beggar / east_heretic / south_emperor / central_divine / yang_guo`), all **96×128 RGBA (colortype 6)**. Filenames unchanged.
+- **Guard semantics (`./tests/test_shrimp_roster.py`, read in full):** three tests — PNG stems ↔ roster keys one-to-one both directions, and `title`/`species` non-empty strings per row. It does **not** check `art_status`, does not judge shrimp-ness, and must stay byte-identical. Any non-empty species string passes; `art_status: "completed"` is therefore free.
+- **`seed_manifest.json` has no code readers.** Repo-wide search: referenced only from `WUXIA_ART_HANDOFF.md`, `design/30_presentation.md`, `design/99_changelog.md` (prose). Restructuring it is a docs-layer change with zero runtime/compile impact.
+- **Roster current state:** `west_poison` / `north_beggar` rows complete (species + `art_status: "pending"`); four rows carry `species: "待定虾种"`; `yang_guo` row carries `title: "待定称号(去名化)"` and the de-naming `note`.
+- **Style sentence source of truth:** `WUXIA_ART_HANDOFF.md` §二 (exact English sentence, display-wrapped over 5 lines). The 30_presentation 画风 section currently carries the OLD sentence `Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting`.
+- **Geometry observables are published and whitelisted:** `portrait_ink_rect`, `ink_world_dx`, `ink_world_dy`, `camera_offset_y`, `sprite_top`, `portrait_tex_size`, `portrait_visible`, `portrait_fail_layer`, `portrait_covered_frac` are on the per-unit blocks of `./playtest/_common.yaml`'s surface whitelist (append-only — names persist; verify by grep before the probe run, never delete). `portrait_ink_rect` is **texture-rect derived** (`player.gd:469` / `enemy.gd:328`; `ink_world_dx/dy` published strictly from it at `player.gd` L502-503 / `enemy.gd` L355-356 — provenance anchors: `.aitelier/knowledge.md` jinyong-camera (2026-08-29) entry, and `README.md` "Alignment observables" section).
+- **Measurement precedents:** probe-contradiction inline YAML via `godot_playtest_scenario` (`final/portrait_probe_notes.md`, `final/portrait_cover_probe_notes.md`); gate runs go through the godot-builder sidecar (`run_tests.sh` POSTs `/compile` `/playtest` `/script`; there is no local godot binary).
+- **Known art defects to carry verbatim into the report** (handoff §四): `yang_guo`'s giant claw renders smaller than the cast-design image; `central_divine`'s Taoist crest reads helmet-like and the body is extremely pale (low contrast); `east_heretic`'s antenna tips touch the top edge (bbox top == 0 is *expected*); overall cuteness level is the user-pinned direction (2026-08-31 reference images), not a drift.
 
-## 2. 架构图(文字)
+## 2. 架构图(数据流)
 
 ```
-                            SaveManager.profile  (READ-ONLY for this round)
-                              attrs / traits / gongfa / silver / inventory / cultivation
-                                      │ read at open()/refresh()
-                                      ▼
- scenes/segments/cultivation.tscn ─┐
- scenes/segments/map.tscn ─────────┤  each instances ONE node:
-                                   │      RosterPanel  (scenes/ui/roster_panel.tscn)
-                                   ▼
- scenes/ui/roster_panel.tscn  =  RosterPanel (Control, full-rect, mouse_filter=2 ALWAYS)
-                                   ├─ RosterOpenButton  (「角色」, focus_mode=0, visible iff !is_open)
-                                   └─ RosterOverlay     (visible iff is_open)
-                                        ├─ RosterDim    (ColorRect, STOP; click-outside → close)
-                                        └─ RosterBox    (Panel, STOP; absorbs inside clicks)
-                                             ├─ RosterBodyLabel   (composed 人物/功法/物品 text)
-                                             └─ RosterCloseButton (「关闭」, focus_mode=0)
-
- name resolvers (use, never modify):
-   CardData.display_name_of(id)              -> "" on unknown  (FROZEN, card_data.gd:82-84)
-   ProgressionGongfaData.display_name_of(id) -> "" on unknown  (progression_gongfa_data.gd:216-220)
-   ProgressionGongfaData.PRACTICE_TO_MASTER  -> {"D":4,"C":6,"B":8,"A":10}  (:22)
-   ProgressionGongfaData.SECTS               -> id + display_name (少林/武当/丐帮/峨眉/唐门, :48-74)
-   TraitData.get_def(id).display_name        -> null-guarded     (trait_data.gd:48-52)
-
- grant path under the nail (real code, no field writes):
-   click TravelButton0 → map EVENT(merchant) → click EventOptionButton0
-     → map.gd::_resolve_node_event → EventLogic.apply_option_effects
-     → profile.inventory += "eq_sword_3" (青锋剑) → click RosterOpenButton → assert 青锋剑
-
- host input ownership (the ONLY host code change, one guard each):
-   cultivation.gd / map.gd::_unhandled_input:  if roster panel is_open: return
-   (keyboard branches byte-identical whenever the panel is closed)
+INPUTS (read-only)                      WORK                                   OUTPUTS
+------------------                      ----                                   -------
+WUXIA_ART_HANDOFF.md ──§一/§二/§三..六──→ C1 roster.json (species+art_status) ─→ tests/test_shrimp_roster.py GREEN
+                     ──§二 exact sentence→ C2 seed_manifest.json two-layer ──→ (no code readers; docs sync target)
+                     ──§一..§六 verbatim ─→ C8 final/delivery_notes_wuxia.md ──→ THEN delete WUXIA_ART_HANDOFF.md
+assets/characters/*.png (6, read-only)─→ C7-M1 godot_playtest_scenario       ─→ observed ink_world_dx/dy, portrait_visible/fail_layer, camera pass counts
+                                      ─→ C7-M2 temp pytest alpha-bbox probe  ─→ per-PNG footing values (probe file deleted after capture)
+                                      ─→ C7-M3 full gate (sidecar)           ─→ compile 0 errors / all scenarios / spine_to_ending / unit suite
+C1+C2 observed values ─────────────────→ C3..C6 design/ archive (5_design)   ─→ 30/90/40_ux_backlog/99 updated, roadmap item 5 ✅
 ```
+
+Ordering invariant: **nothing in `design/` needs to exist before measurement** (M1/M2 are read-only against the PNGs and engine). The final gate run (M3) must execute on the tree that already contains C1+C2, so the measured tree is the delivered tree.
 
 ## 3. 组件列表
 
-### 3.1 `scripts/ui/roster_panel.gd` + `scenes/ui/roster_panel.tscn` (NEW, self-contained)
-- **职责:** entry button + overlay + three-section display + close affordances + observables.
-  Reads `SaveManager.profile` only; **writes nothing, saves nothing, consumes nothing**.
-- **Scene tree:** exactly as in §2. Root `RosterPanel`: full-rect anchors, `mouse_filter = 2`
-  (IGNORE) **permanently** — the SegmentHost STOP-swallow defect class
-  (`99_changelog.md` 2026-08-25 条) forbids a full-rect default-STOP host; children keep
-  receiving clicks because parent-IGNORE does not block children (same documented semantics).
-  `RosterDim` STOP is what blocks the host's own controls while open (panel = the single
-  operation surface while open); `RosterBox` STOP so only *outside* clicks close.
-- **Geometry:** `RosterOpenButton` top-right of the canvas, target rect ≈ `(830, 8)–(950, 48)`
-  (above cultivation's OptionsBox column `x 610–950, y 80–620`; inside the 960×704 canvas in
-  both hosts). Hittability needs no gate — `clicks:` is a true hit test, so occlusion /
-  IGNORE / zero-size / off-screen delivery fails with `push_error` and turns the gate red.
-  `RosterBox` centered ≈ 640×560; body label autowraps inside the box (vision-gate Q6 safe,
-  global theme + NotoSansSC, no art assets).
-- **Public API (class_name `RosterPanel extends Control`):**
-  - `func open() -> void` / `func close() -> void` — flip `is_open`, sync `visible`, `refresh()`.
-    No `SaveManager.autosave()`, no profile/flags writes, no month/action counters, no phase.
-  - `var is_open: bool = false`
-  - `func refresh() -> void` — recompute all observables + `body_text` from the live profile.
-  - `func _compose_body(p: PlayerProfile) -> String` — **pure** string builder (unit-testable);
-    same profile in → byte-identical string out.
-  - Resolvers (private, all null-guarded, degrade lazily): `_name_of_item(id)`
-    (`CardData.display_name_of`, `""` → raw id), `_name_of_gongfa(id)`
-    (`ProgressionGongfaData.display_name_of`, `""` → raw id), `_name_of_trait(id)`
-    (`TraitData.get_def(id)` null → raw id), `_sect_display(sect_id)` (`SECTS` scan,
-    miss → raw id, `""` → 「无门无派」).
-- **Published observables (recomputed in `refresh()`, `SaveManager.loaded` connected for
-  re-sync — cultivation.gd:114-135 precedent):**
-  `is_open`, `visible`, `body_text`, `cursor_markers_visible` (`"▶" in body_text`),
-  `pressed_connected` (`{"RosterOpenButton": bool, "RosterCloseButton": bool}`, wired in
-  `_ready` mirroring `map.gd::_wire_buttons`), `item_count`, `gongfa_count`.
-- **Panel display rows (not options — shown normally per the brief):**
-  - 人物: `根骨/内力/身法/悟性/福缘` values from `p.attrs`; `银两` = `p.silver`;
-    `先天特质` = trait display names (empty list → 「（无）」); `第 %d 年 %d 月`;
-    `门派` = sect display.
-  - 功法: per `p.gongfa` entry `{id, grade, practice, mastered}` — name, grade letter,
-    `练度 %d/%d` where the cap is `PRACTICE_TO_MASTER.get(grade, -1)` (grade `""` or unknown
-    → practice shown without cap; hostile rows read via `.get()` with defaults, never crash),
-    `大成` marker when `mastered == true`. Empty list → 「（无）」.
-  - 物品: per `p.inventory` id → `_name_of_item`. Empty list → 「（无）」.
-- **gongfa entry read rule:** every field via `entry.get("id","") / .get("grade","") /
-  .get("practice",0) / .get("mastered",false)` — `from_dict` coerces but the panel never
-  assumes (edge case 3 of step1_sota).
+### C1 — Roster completion — `./assets/characters/roster.json`
+- **职责:** fill the four 「待定虾种」 with the owner rulings (verbatim, no rewording), flip all six `art_status` from `"pending"` to `"completed"`.
+- **接口/契约:** JSON shape unchanged (`_why` array + `characters` map of `{title, species, art_status, note?}`). The two already-written rows (`west_poison`, `north_beggar`) stay **byte-identical except `art_status`**. `yang_guo`'s `title` and `note` stay byte-identical (de-naming is a separate round → C5). Validation: `python -m pytest tests/test_shrimp_roster.py` green; `json.loads` parses.
+- **Exact values to write** (format follows the roster's established `<species> — <reason>` prose):
+  - `east_heretic.species` = `"樱花虾(正樱虾) — 深海群游、绯红半透,聚散如落英,对桃花岛"`
+  - `south_emperor.species` = `"罗氏沼虾 — 南方淡水巨虾,一对细长蓝螯,对大理段皇爷"`
+  - `central_divine.species` = `"玻璃虾 — 通体透明、内里一览无余,对先天功"`
+  - `yang_guo.species` = `"枪虾 — 一只螯极大而另一侧空缺(独臂),与虾虎鱼结伴共生(神雕)"`
+  - all six rows: `"art_status": "completed"`
 
-### 3.2 Host integration: `scenes/segments/cultivation.tscn`, `scenes/segments/map.tscn`
-(+ `scripts/segments/cultivation.gd`, `scripts/segments/map.gd`)
-- **职责:** instance `res://scenes/ui/roster_panel.tscn` as node **`RosterPanel`** (same name
-  in both scenes → one surface block resolves under both boots). No new host copy, no new
-  host button, no i18n entries in hosts (`tests/test_facility_copy_location.py` untouched).
-- **Input gate (the only host script change):** first line of each `_unhandled_input`:
-  `if _roster_open(): return` where `_roster_open()` is a null-safe
-  `get_node_or_null("RosterPanel")` read of `is_open`. Keyboard branches stay byte-identical
-  whenever the panel is closed; while open the host keyboard grammar (incl. map EVENT /
-  FACILITY modals and cultivation's choice phases) is inert — the panel owns input. This is
-  an input-*ownership* guard, not a new input action (see §7 ruling (b)/(d)).
-
-### 3.3 i18n: `scripts/autoload/i18n.gd` (append entries only)
-- New keys (Chinese-as-key, EN values) for every new player-facing string, e.g.:
-  `「角色」→ "Character"`, `「关闭」→ "Close"`, section headers `人物/功法/物品`,
-  `银两`, `先天特质`, `门派`, `无门无派`, `（无）`, `大成` (reuse the existing grade-step
-  entry if present), `练度 %d/%d`, `第 %d 年 %d 月`, grade letter labels.
-- Scene `text =` literals (`RosterOpenButton` / `RosterCloseButton`) are auto-translated
-  whole strings but MUST have EN entries — `tests/test_i18n_coverage.py` scans scene `text=`,
-  `tr()` call sites, and `.text =` assignments; all three channels stay green.
-- Composed strings wrapped in `tr()` at composition sites in `roster_panel.gd`.
-- **No new `.text =` Chinese literals in `map.gd`** — panel copy lives in
-  `roster_panel.gd` / `i18n.gd` only.
-
-### 3.4 Playtest contract additions (append-only)
-- **`playtest/_common.yaml`** — append four NEW surface blocks (nothing existing changes):
-  ```yaml
-  RosterPanel:
-  - visible
-  - is_open
-  - body_text
-  - cursor_markers_visible
-  - pressed_connected
-  - item_count
-  - gongfa_count
-  RosterOpenButton:
-  - visible
-  - size
-  - mouse_filter
-  - text
-  - focus_mode
-  RosterCloseButton:
-  - visible
-  - size
-  - mouse_filter
-  - text
-  - focus_mode
-  RosterBodyLabel:
-  - visible
-  - text
+### C2 — Manifest restructure — `./assets/seed_manifest.json`
+- **职责:** convert the flat table into the two-layer structure that `design/30_presentation.md` §重画的流程 already mandates, and swap `style_block` to the sentence that actually produced these six images.
+- **接口/契约:** top-level shape:
+  ```json
+  {
+    "_why": [ "...two-layer rationale, seeds are not identity..." ],
+    "style_block": "<S — exact string below>",
+    "subjects": [ { "id": "...", "name": "...", "species": "...", "appearance": "..." } × 6 ],
+    "images":  [ { "subject": "...", "scene": "...", "path": "res://assets/characters/<id>.png", "transparent": true } × 6 ],
+    "assets":  [ ...the 9 non-character records (terrain floor/border, backdrop summit, 6 audio) byte-unchanged... ]
+  }
   ```
-  Append two names to `scenario_order` (tail, after `gongfa_pick_empty_keyboard_return`):
-  `roster_panel_item_nail`, `roster_panel_cultivation_open_close`. No new actions.
-- **`tests/test_playtest_contract_smoke.py`** — append the same two names to
-  `ROUND_SCENARIOS` in the same order (two-place sync; `test_round_scenarios_present_on_disk_and_in_order`
-  enforces order match). The smoke test's click-anchor whitelist check requires every
-  `clicks:` target to be whitelisted — `TravelButton0` / `EventOptionButton0` already are;
-  `RosterOpenButton` / `RosterCloseButton` are covered by the new blocks.
-- **Facility anti-delete pin failure message (brief goal; additive only):** extend the
-  shared `_escape` string (`tests/test_playtest_contract_smoke.py:1069-1076`) with an
-  explicit form-gate sentence, e.g.:
-  `" This is a FORM gate: it requires two literal assertion lines (phase != \"FACILITY\" and facility_use_count == 0) to appear verbatim in the scenario file — they are the machine-readable evidence of the definitional property 'arrival never enters a facility'. A red here is CORRECT when the observables or their expression legitimately change; the fix is to update this pin together with the equivalent new assertion in the same change — not to rename around it and not to keep a dead old-text line just to stay green."`
-  All three asserts already inherit `_escape`; no regex/line is weakened, nothing frozen is
-  touched (`_bad_timeline_at_values`, `test_facility_copy_location.py`, `card_data.gd`).
+- **The style sentence S (canonical, single physical line):**
+  `Chinese wuxia game-art illustration with a deliberate SPLIT REGISTER: the head is fully cartoon (rounded simplified head-carapace, large expressive eyes with clear highlights, appealing, never scary); the body is semi-realistic (overlapping carapace plates, distinct segment joints, ridges and spines, clear directional light, soft shadow, glossy shell sheen)`
+  - **Normalization rule (pin this):** the handoff §二 wraps S across 5 display lines; the canonical value joins those lines with **single spaces**, no other change. Store S in `style_block` as ONE JSON string, and in `design/30_presentation.md`'s 画风 blockquote as ONE physical markdown line (no internal newline — a wrapped blockquote would break byte-identity). Byte-exact equality between the two files is an acceptance criterion.
+- **Identity fields:**
+  - `subjects[].id` = the six roster/PNG stems. `subjects[].species` = **copies the C1 species string verbatim** (roster is the guard-enforced source of truth; the manifest mirrors it for the art recipe reader — one prose, two consumers).
+  - `subjects[].name` = title + identity, e.g. `"西毒(皮皮虾)"`, `"杨过(独臂神雕侠)"`.
+  - `subjects[].appearance` = English prompt-style locked appearance (the 定妆 record). **Assembled only from recorded facts**, never from pixel guessing: (a) the split register (cartoon head / semi-realistic body); (b) shrimp body plan: head-carapace in front, curled segmented abdomen as the base, **NO torso / NO waist / NO legs**; (c) identity carried by shell base colour + non-human accessories (straw hat, headscarf, gourd, bamboo staff) — the old robe colours map to shell tones: west_poison dark shell with faint toxic-green sheen; north_beggar faded red, worn/scarred shell, long drooping maxillipeds (age on the body); east_heretic cold crimson (never pink), square kerchief tied at the back of the head (never wrapping cheeks), angular eyes + flat hard brows, no lashes; south_emperor imperial golden-amber shell; central_divine near-fully transparent glass body, pale Taoist crest; yang_guo deep-blue clean glossy shell, erect antennae, **no maxillipeds** (young); (d) `yang_guo` asymmetry written **positively** (the recipe's proven phrasing): one giant right claw larger than the head + a smooth round residual plate on the left — never "no arm / armless / empty sleeve".
+  - `images[].scene` = pose/scene only, per handoff §三.4: side-view standing portrait, **compact vertical silhouette with claws held in front (not splayed)**, plain solid background, full body inside the frame, no text, no watermark. Composition/crop/scale/bottom-align/centering are **post-process**, not prompt, and are recorded as such (handoff §三.4/§三.5/§六).
+  - **No seeds on subjects/images.** A seed identifies a *reproducible image*, not a *person* — that is the recorded reason the shape changed. The 9 non-character `assets` records keep their `seed`/`prompt`/`transparent` fields unchanged.
+- **Validation:** `json.loads` parses; the six `images[].path` basenames == the six `subjects[].id` == the six PNG stems == the six roster keys; the 9 legacy `assets` records diff-clean against the old file.
 
-### 3.5 New playtest scenarios (2 files; both must be self-run)
-**S1 — `playtest/roster_panel_item_nail.yaml`** (the round's nail)
-`scene: res://scenes/segments/map.tscn` (direct boot; autoloads verified to load —
-`_common.yaml` header). Skeleton (frame numbers are the implementer's to re-baseline against
-the actual run; structure and assertions are the contract):
-```yaml
-name: roster_panel_item_nail
-description: >-
-  Correspondence nail: a REAL event path (map.gd::_resolve_node_event ->
-  EventLogic.apply_option_effects, merchant option_a) grants eq_sword_3 (青锋剑),
-  then clicks open the roster panel and assert the item's Chinese name appears;
-  close restores the same state (phase / node / session counters unchanged).
-  Ruling (b) pin: the panel also opens OVER the unresolved merchant modal —
-  phase / event_id / events_resolved_count untouched while open — and after
-  closing, the SAME EventOptionButton0 click resolves the event normally:
-  the modal grammar resumes because the panel owned input while open.
-# RED-FIRST EVIDENCE block pasted here from the measured run (§6).
-timeline:
-- at: 10   # boot
-  assert:
-    MapScreen.visible: visible == true
-    MapScreen.phase: phase == "TRAVEL"
-    MapScreen.current_node_id: current_node_id == "wuming_valley"
-    RosterOpenButton.visible: visible == true
-- at: 20   # travel wuming_valley -> luoyang (real path, clicks only)
-  clicks: [TravelButton0]
-- at: 30
-  assert:
-    MapScreen.phase: phase == "EVENT"
-    MapScreen.event_id: event_id == "merchant"
-    MapScreen.current_node_id: current_node_id == "luoyang"
-    MapScreen.events_resolved_count: events_resolved_count == 0   # baseline for the mid-modal pin
-- at: 35   # ruling (b) pin: OPEN the panel OVER the unresolved modal (true hit test)
-  clicks: [RosterOpenButton]
-- at: 40   # panel owns input; the modal underneath is untouched
-  assert:
-    RosterPanel.is_open: is_open == true
-    MapScreen.phase: phase == "EVENT"
-    MapScreen.event_id: event_id == "merchant"
-    MapScreen.events_resolved_count: events_resolved_count == 0   # opening resolved/consumed nothing
-    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品")'   # three sections render even with an empty inventory
-    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
-    MapScreen.cursor_markers_visible: cursor_markers_visible == false
-    RosterCloseButton.visible: visible == true
-- at: 45   # close back into the SAME unresolved modal
-  clicks: [RosterCloseButton]
-- at: 50   # modal intact — its grammar is about to be PROVEN by walking it, not asserted as prose
-  assert:
-    RosterPanel.is_open: is_open == false
-    RosterPanel.visible: visible == false
-    MapScreen.phase: phase == "EVENT"
-    MapScreen.event_id: event_id == "merchant"
-- at: 55   # the SAME option click resolves normally -> grammar resumed byte-identical
-  clicks: [EventOptionButton0]
-- at: 60
-  assert:
-    MapScreen.phase: phase == "TRAVEL"
-    MapScreen.event_id: event_id == ""
-    MapScreen.events_resolved_count: events_resolved_count == 1
-    MapScreen.silver: changed          # grant landed (differential; no absolute silver)
-- at: 65   # OPEN the panel again, now after the grant (true hit test proves tappable)
-  clicks: [RosterOpenButton]
-- at: 70
-  assert:
-    RosterPanel.is_open: is_open == true
-    RosterBodyLabel.text: 'text.contains("青锋剑")'   # THE correspondence pin
-    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
-    MapScreen.cursor_markers_visible: cursor_markers_visible == false
-    MapScreen.phase: phase == "TRAVEL"
-    RosterCloseButton.visible: visible == true
-    RosterPanel.pressed_connected: pressed_connected.size() >= 2
-- at: 75   # CLOSE
-  clicks: [RosterCloseButton]
-- at: 80
-  assert:
-    RosterPanel.is_open: is_open == false
-    RosterPanel.visible: visible == false
-    MapScreen.phase: phase == "TRAVEL"
-    MapScreen.current_node_id: current_node_id == "luoyang"
-    MapScreen.events_resolved_count: events_resolved_count == 1   # consumed nothing
-    MapScreen.ended: ended == false
-    RosterOpenButton.visible: visible == true
-```
-Notes: `events_resolved_count == 1` is a session-counter ladder pin (precedent
-`map_node_event_shaolin.yaml` f460), not a balance literal. The name pin is the sanctioned
-text-correspondence exception. The file carries a `: changed` line (silver) satisfying the
-smoke test's relative-numeric rule; every dotted assert line carries an operator.
+### C3 — `./design/30_presentation.md` (executed by the `5_design` step; content fixed HERE)
+Four surgical edits; the executor locates anchors by quoted text (line numbers drift):
+1. **画风 section — sentence swap + dated rationale.** Replace the current blockquote sentence with **S** (one physical line). Append a dated paragraph (2026-08-31): the style changed to the split register (head fully cartoon + body semi-realistic) because pure realism scared, pure chibi under-delivered, and "somewhere between" produced mush — the two halves must be written explicitly inside one sentence; the only-one-sentence rule is unchanged (change `style_block`, sync this section, both or nothing).
+2. **Art-direction record.** A dated entry: characters changed from *human ink-wash martial-artist figures* to **non-human real shrimp bodies, cartoon head + semi-realistic body**, executed under the 2026-08-28 「一切角色都是虾」 world constraint (cold-face: only image + title are shrimp; event/gongfa/skill prose untouched). Rationale per handoff §三: contamination words that pull shrimp into humanoid form (head-to-body ratio, short thick legs, robes with belts, two forelimbs, `mascot`) are replaced by carapace-front + curled-abdomen-base + NO torso/waist/legs; age/gender expression rules; asymmetry-as-positive; composition→post-process; `remove_bg` + border flood-fill hole repair.
+3. **「重画的流程:先定妆,再出图」 → executed.** Add a dated line above the 4-step table: **this table was executed exactly once, 2026-08-31, producing these six portraits**, with two hard rules learned in production (step 3 `remove_bg` is mandatory — generative models cannot draw alpha; after cutout, flood-fill from the canvas border to repair interior holes — 0–6770 px repaired across the six). Below the 「现状/该是什么」 table: mark rows 1–2 (yang_guo missing one-arm / north_beggar missing dog-beating staff) as **resolved by this round's portraits** (one-arm via positive asymmetry; staff as a non-human accessory); rows 3–6 (backdrop aspect, defeat SFX, music loop, per-category SFX) remain open. Mark the two-layer manifest shape as **now implemented** (point at `assets/seed_manifest.json`).
+4. **Texture-rect blind-spot record (Step-1 reviewer-mandated, record-level deliverable) — insert as a new dated blockquote directly after the blockquote containing `裁定立对位的是新 pin playtest/portrait_grid_alignment.yaml`… (the camera-owns-visibility block whose 两条原则 ends the paragraph — the caveat must sit next to the claim it qualifies).** Required content, all five points:
+   1. `portrait_ink_rect` is **texture-rect derived** (`player.gd:469` / `enemy.gd:328`; `ink_world_dx/dy` published strictly from it at `player.gd` L502-503 / `enemy.gd` L355-356 — verify line numbers at write time; provenance: `.aitelier/knowledge.md` jinyong-camera 2026-08-29 entry + `README.md` Alignment observables), never alpha;
+   2. therefore `abs(ink_world_dx/dy) <= 1.0` all-green does **not** prove the drawn content stands on its own tile — the two numbers read ≈0 for *any* pixel content;
+   3. transparent bottom padding floats a portrait while the nail stays green — a **structural blind spot of the nail**, not a defect of any particular image;
+   4. the true footing check is each PNG's **alpha bbox** (bottom edge vs y=127, horizontal centre vs x=48), measured this round, values in `final/delivery_notes_wuxia.md`;
+   5. this round's bottom padding is expected ≈0 because post-processing is bottom-aligned — the green is **constructed** by the constant foot-anchor offset `(0, −tex.y/2)`, not coincidentally matching pixels; that distinction is the point of the record.
+   End the record with: nail, thresholds, surface whitelist, and the name `portrait_ink_rect` are **not** changed; the optional future footing nail is **proposed to the owner, not landed** — (a) cheap: commit the stdlib alpha-bbox script + a pytest pinning each PNG's bbox bottom gap ≈ 0 and centre ≈ x=48 (asset-level, zero engine change, freezes six values); (b) thorough: extend `visibility_probe.gd`'s existing `blank_texture` asset-level alpha scan to publish bbox edges onto the surface (whitelist append-only) + a new playtest card (engine change + self-run per `configs/addons/game_harness/implementer.md:23`).
 
-**S2 — `playtest/roster_panel_cultivation_open_close.yaml`** (entry reachability in
-CULTIVATION + content presence + no-consumption + re-sync)
-`scene: res://scenes/segments/cultivation.tscn`:
-```yaml
-name: roster_panel_cultivation_open_close
-timeline:
-- at: 20   # boot: fresh profile, month 1 (structural start state)
-  assert:
-    CultivationScreen.visible: visible == true
-    CultivationScreen.phase: phase == "CARD_PICK"
-    RosterOpenButton.visible: visible == true
-- at: 30
-  clicks: [RosterOpenButton]
-- at: 40
-  assert:
-    RosterPanel.is_open: is_open == true
-    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品")'
-    RosterPanel.gongfa_count: gongfa_count > 0      # relational; year-1 month-1 start grant
-    RosterPanel.cursor_markers_visible: cursor_markers_visible == false
-    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
-- at: 50
-  clicks: [RosterCloseButton]
-- at: 60
-  assert:
-    RosterPanel.is_open: is_open == false
-    CultivationScreen.phase: phase == "CARD_PICK"   # consumed no month/action
-    CultivationScreen.month: month == 1             # structural ladder at fresh boot
-- at: 70   # one real month advance via the DEBUG path (mirror
-  actions: [debug_step_month]                      # cultivation_month_cycle_and_deck_bookkeeping's token)
-- at: 80
-  assert:
-    CultivationScreen.month: changed               # deterministic differential, no literal
-- at: 90   # reopen: panel re-syncs after state changed underneath
-  clicks: [RosterOpenButton]
-- at: 100
-  assert:
-    RosterPanel.is_open: is_open == true
-- at: 110
-  clicks: [RosterCloseButton]
-- at: 120
-  assert:
-    RosterPanel.is_open: is_open == false
-```
-Implementer verifies the exact debug token against
-`playtest/cultivation_month_cycle_and_deck_bookkeeping.yaml` (`debug_step_month` /
-`debug_fast_forward`) and mirrors its real usage; if neither advances a month standalone,
-fall back to one real month played by clicks (card + a non-travel action) keeping the
-`changed` line on `CultivationScreen.month` or `CultivationScreen.silver`. Month `== 1` at
-boot is a structural start-state pin (same class as the boot asserts existing scenarios
-already carry), not a balance literal.
+### C4 — `./design/90_decisions.md` append (5_design executes; content fixed HERE)
+Append ONE new section at the end of the file, following the house format `## Title (date, context)`:
+- **Title:** `## 武虾立绘落地:四个虾种裁定 + 画风换向(2026-08-31,项目所有者裁定)`
+- **Four species rulings table** (verbatim from the brief/handoff §一): east_heretic→樱花虾(正樱虾) — deep-sea schooling, crimson translucent, gathering/scattering like falling blossoms — Peach Blossom Island; south_emperor→罗氏沼虾 — southern freshwater giant prawn, one pair of long blue claws — Dali; central_divine→玻璃虾 — fully transparent, innards visible — 先天功; yang_guo→枪虾 — one claw huge, other side empty (one-armed); partners with goby (神雕). Explicitly resolve the 2026-08-28 mapping table's 待定 rows; state that `yang_guo`'s title change is **deferred** (→ UX-15, C5).
+- **Art-direction ruling:** human→non-human shrimp body; split register head-cartoon/body-semi-realistic with the trial-and-error convergence record (realistic→scary; chibi→flat; in-between→mush); style-sentence single source = `seed_manifest.json` `style_block`, byte-synced with `30_presentation.md`; full recipe archived in `final/delivery_notes_wuxia.md`.
 
-### 3.6 GDScript unit test: `tests/test_roster_panel.gd` (NEW)
-Registered in the unit-suite registry exactly like `tests/test_facility_data.gd`. Pins:
-1. item resolution: crafted profile with `eq_sword_3` → `_compose_body()` contains `青锋剑`;
-2. unknown id degrade: inventory `["definitely_not_an_id"]` → body contains the raw id,
-   no `push_error`, no crash;
-3. honest empty states: default profile → three sections render with 「（无）」 rows;
-4. gongfa row: `{id, grade:"C", practice:3, mastered:false}` → name + `练度 3/6` (cap from
-   `PRACTICE_TO_MASTER`); `mastered:true` → 大成 marker; `grade:""` → no cap shown, no crash;
-5. purity: same profile twice → identical string;
-6. read-only: `profile.to_dict()` before `open()`+`close()` == after (bit-identical);
-7. `cursor_markers_visible == false` for every composed body.
+### C5 — `./design/40_ux_backlog.md` append (5_design executes; content fixed HERE)
+- **One new OPEN row (next free id: UX-15)** in the 队列 table: **de-naming `yang_guo`** — the roster `note` converted per brief. Fields: 状态 = `**OPEN** — 独立一轮(资源改名会打断编译期引用,不得与几何证明轮混做)`; 界面 = `角色资源命名`; 看见什么 = `yang_guo.png` is the only human-named resource; renaming touches the PNG/resource name + three reference sites (`scenes/player.tscn`, `assets/characters/roster.json`, `assets/seed_manifest.json`) + the title de-naming (「杨过/独臂神雕侠」→ a non-human-name title); 玩家因此做不到什么 = a human name appears in a public build; the five experts are titles and survive as-is, the protagonist has no non-name title yet — needs its own round (rename + three references + title in one step, compile + full gate re-run).
+- **One dated 记录 line** (2026-08-31, round `wuxia-shrimp-portraits`): the roster note was converted to UX-15 (OPEN) per brief; this round does NOT rename the resource, the title, or any reference. **Do not** touch any other row's status (no OPEN→CLOSED flips belong to this round).
 
-### 3.7 Design-doc updates (for `5_design` to land)
-| File | Change |
-|---|---|
-| `design/30_presentation.md` | New subsection 「## 角色面板(roster panel, 2026-08-30)」 after 指针可达性: content (three sections + degradation), entry (`RosterOpenButton` in CULTIVATION/MAP), close affordances, single-surface conformance (zero internal selectables, `cursor_markers_visible == false`, dim-layer STOP = sole surface while open), read-only guarantee. |
-| `design/31_touch_coverage.md` | One new row: roster overlay open state has ≥1 visible wired control (`RosterCloseButton`), touch-only exit **Y**; entry button covered in every cultivation/map phase. |
-| `design/40_ux_backlog.md` | Two new OPEN record-only rows (§8 below) + one dated 记录 line. |
-| `design/90_decisions.md` | New section with the seven rulings of §7. |
-| `design/99_changelog.md` | **Verify, do not extend, row :126** (`touch_single_surface(修红实测收口)`) — it already holds the measured four values verbatim (f140 / `CultOptionButton0.visible: visible == true` / `aim: node not found: CultOptionButton0 (spec: CultOptionButton0)` / red-before-green 9); record the verification conclusion in the delivery report; **no third correction row** (append-only archive: corrections are new rows and this correction already exists — step1 §14(b), reviewer-confirmed). Append ONE new row for this round's own design change. |
-| `README.md` | Replace every stale 「71 scenarios」/「71 headless playtest scenarios」 (at least :402/:501/:507; sweep all occurrences incl. :554) with the **measured** final count from this round's official gate run (predicted 75 = 73 + 2; paste the measured value from `playtest_summary.md`). This is plain prose — **not** under the append-only archive rule — so a direct edit is sanctioned; state that distinction in the delivery notes. |
+### C6 — `./design/99_changelog.md` append (5_design executes; content fixed HERE)
+- **Append exactly ONE row** to the existing table; **no existing row may change** (append-only archive). Round id `wuxia-shrimp-portraits`, date `2026-08-31`. Content (what column): six portraits swapped to 武虾 (round input, PNGs never rewritten); roster four species filled by owner ruling + six `art_status` → completed, guard green; manifest two-layer + split-register `style_block` byte-synced with 30_presentation 画风; 30_presentation art-direction record + 定妆 table → executed + texture-rect blind-spot record; 90_decisions species + direction rulings; 40_ux_backlog UX-15 (OPEN, de-naming deferred); geometry re-measured with observed values (dx/dy, six-unit visibility, camera nail) + per-PNG alpha-bbox footing, values in `final/delivery_notes_wuxia.md`; recipe archived then `WUXIA_ART_HANDOFF.md` deleted; roadmap item 5 ✅. Reason column: first visible landing of the world constraint for build-in-public audiences; layers unchanged so nails must be re-measured, not inherited — a red is a finding, never loosened.
 
-## 4. 接口规范(契约面)
+### C7 — Measurement instruments (the round's true deliverable)
 
-- **Node names are load-bearing:** `RosterPanel`, `RosterOpenButton`, `RosterCloseButton`,
-  `RosterBodyLabel` must exist verbatim in both host scenes (assert expressions resolve
-  against live nodes; the smoke test requires click anchors whitelisted).
-- **Surface contract:** new observables listed in §3.4 only; no existing block edited,
-  no threshold relaxed, no frozen scenario touched. `test_edited_scenarios_assert_superset`
-  guards *edits*; this round only *adds* files.
-- **Click anchors:** `RosterOpenButton` / `RosterCloseButton` are Button bodies
-  (`focus_mode = 0`) — never `*_ClickTarget` (2026-08-29 ruling). The tap-outside dim layer
-  is never a click anchor in scenarios.
-- **Assertion grammar:** every dotted assert line carries a comparison operator or
-  `changed`/`unchanged`; numbers are structural counters/phases or differentials; the ONLY
-  game-content literals are the text pins (青锋剑, section headers, 「（无）」).
-- **Gate assertions stay game-level:** no `offset/position/size/z-order/mouse_filter` gates;
-  `mouse_filter` may remain in the whitelist (legacy shape) but no assert depends on it —
-  hittability is proven by the click itself.
+**M1 — Engine-true re-measurement (`godot_playtest_scenario`, primary instrument; zero repo-file changes):**
+- **M1a.** Run the existing `playtest/portrait_grid_alignment.yaml` **unmodified**. Record per unit (Player + five enemies) the observed `ink_world_dx` / `ink_world_dy` at the f40 static leg AND at the walk-arrival leg (f820), plus the scenario's pass count. 12 alignment lines × 2 legs expected.
+- **M1b.** Run the existing `playtest/camera_transform_follows_unit.yaml` **unmodified**. Record pass count (e.g. 9/9).
+- **M1c. Probe-contradiction inline YAML (established technique; passed as the `scenario=` parameter, NEVER staged into `playtest/`):** one inline timeline asserting, at f40, a sentinel equality for each of 6 units × 8 observables (`portrait_visible`, `portrait_fail_layer`, `portrait_covered_frac`, `sprite_top`, `portrait_tex_size`, `portrait_ink_rect`, `ink_world_dx`, `ink_world_dy`) — every assert deliberately false so the harness prints the `observed` value; transcribe all 48 observed values into the delivery notes. This is how the brief's six-unit `portrait_visible` / `portrait_fail_layer` requirement is satisfied without editing the frozen camera-level `portrait_visibility.yaml`. Precondition: grep `_common.yaml` first to confirm every observable name is still whitelisted (append-only — if a name is somehow absent, STOP and report; do not edit the whitelist).
+- If any M1 leg reds for the wrong reason (e.g. the timing-sensitive walk leg misses its tile — impossible from a PNG swap, which changes neither AI nor timing): follow the yaml's own red-for-the-wrong-reason protocol — report the five enemies' `grid_pos`, treat as a finding; **ink thresholds untouched**.
 
-## 5. 数据流
+**M2 — Pixel-true footing measurement (one-off transitional pytest probe):**
+- **Artifact location (Step-1 reviewer suggestion #1, resolved):** a **temporary** file `./tests/test_tmp_alpha_bbox_probe.py`, written via `test_write`, executed via the pytest runner, **then deleted with `delete_file` in the same task — it is NEVER committed**. Only the measured VALUES land (in the delivery notes). Committing a pinned version is exactly the optional future nail (a) in C3.4, which stays owner-decision-only.
+- **Decoder:** pure stdlib (`zlib` + `struct`) RGBA-8-bit non-interlaced PNG reader — parse IHDR/IDAT/IEND, concatenate + decompress IDAT, undo per-scanline filters 0–4 (None/Sub/Up/Average/Paeth), 4 bytes/px. **Reject anything else loudly** (bit depth ≠ 8, colortype ≠ 6, interlaced → hard error, no silent fallback). ~60 lines, no dependencies (repo pytest imports stdlib + PyYAML only).
+- **Metrics per PNG (all six):** bbox at `alpha > 0` AND bbox at `alpha ≥ 8` (antialiasing-fringe guard); report left/right/top/bottom, from which the report derives `bottom_gap = 127 − bottom` (0 = touches the bottom row → feet anchor true) and `h_center_offset = (left+right)/2 − 47.5`; opaque-pixel counts at both thresholds. Expected: `east_heretic` top == 0 (known defect, not a geometry bug); all six bottom_gap ≈ 0 (bottom-aligned post-process) and h_center_offset ≈ 0.
+- **Edge cases (from Step-1):** an all-transparent decode (bbox undefined) must be reported explicitly, never folded into a pass; both raw and thresholded bboxes recorded; interior holes are not expected (flood-fill was applied) but per-image counts are recorded, not assumed.
+- **Extraction:** a single always-false assert embedding all six result rows in its message (pytest prints it) — the same probe-contradiction trick as M1c. Cross-check option (only if stdlib and M1 numbers disagree): Godot `Image.get_used_rect()` via the sidecar `/script` endpoint; not planned by default.
 
-1. Grant: `map.gd::_resolve_node_event` (real path) → `EventLogic.apply_option_effects`
-   → `profile.inventory.append("eq_sword_3")` (dedup append, `event_logic.gd:45-48`).
-2. Open: `RosterOpenButton.pressed → RosterPanel.open()` → `refresh()` reads
-   `SaveManager.profile` → `_compose_body()` → `RosterBodyLabel.text`; observables recomputed.
-3. Close: `RosterCloseButton.pressed` / dim-layer click → `close()`; profile untouched.
-4. Load: `SaveManager.loaded → refresh()` (stale-after-load impossible).
-5. While open nothing can mutate the profile: host keyboard gated, host controls covered by
-   the dim STOP layer, and no timer/phase machine writes profile outside input handlers.
+**M3 — Official gate evidence (supporting + formal):**
+- Full `run_tests.sh` (sidecar `/compile` + `/playtest` + `/script`) on the final tree (after C1+C2). Official counts land in downstream step artifacts (`compile_report.json` / `playtest_summary.md` / `test_report.json`); the implementer's own run is supporting evidence pasted into the delivery notes. Required: compile 0 errors; all playtest scenarios green with 0 runtime errors; hard gate `passed: true`; GDScript unit suite green; `spine_to_ending` fully green; `tests/test_shrimp_roster.py` green.
+- **5_vision** frames support the 肉眼可见 descriptions. **Blind-gate fallback (Step-1 reviewer suggestion #3, resolved):** if the vision gate is blind AND no usable frames exist for the new portraits, the delivery notes state that explicitly and mark the visual-acceptance sub-item **unverified-this-round** — descriptions of what is visible are then written ONLY from the handoff's cast-design record and labelled as such, never presented as frame-verified. No fabricated descriptions, ever.
 
-## 6. 红先于绿:实测协议(MEASURED, never predicted)
+### C8 — `./final/delivery_notes_wuxia.md` + deletion of `WUXIA_ART_HANDOFF.md`
+- **职责:** the round's report AND the recipe archive. Structure:
+  1. **Recipe archive** — `WUXIA_ART_HANDOFF.md` §一–§六 **verbatim**: species table; the style sentence (with the trial-and-error note); contamination words; age expression (body, not squinting; no human beards); gender pitfalls (pink + lashes + cheek-wrapping headscarf; fix = angular eyes/hard brows/no lashes, back-tied square kerchief, cold crimson, re-assert "shrimp head, no human face"); asymmetry-as-positive (the only way to draw "missing"); composition → post-process (compact vertical silhouette; crop by ink bbox → scale into 96×128 → **bottom-align + horizontal-centre**; height-normalize is rejected — it cuts yang_guo's claw by up to 42px); `remove_bg` mandatory (models paint the checkerboard opaque; 47.8–66.8% transparent measured); border flood-fill hole repair (interior holes 15.7% east_heretic / 5.2% west_poison; 0–6770 px filled); known defects §四.
+  2. **Records changed** — C1/C2 summary (before → after).
+  3. **Observed geometry values** — M1 tables (six units × dx/dy at both legs; six-unit `portrait_visible` / `portrait_fail_layer` / `portrait_covered_frac`; camera pass counts), M2 alpha-bbox table (six PNGs × bbox / bottom_gap / h_center_offset / counts, both thresholds), M3 gate counts. Every `observed` value from every self-run scenario pasted here (implementer.md:23 hard condition).
+  4. **肉眼可见 per-portrait descriptions** — which is the mantis shrimp's folded club; which has the lobster's double claws + bamboo staff (+ gourd); which has the giant river prawn's extra-long blue claws; which is near-fully transparent; which has exactly one giant claw. Each description tied to vision-gate frames (or honestly marked unverified per the M3 fallback).
+  5. **Red-nail findings** — any red with root cause; post-process fix suggestions ONLY when the root cause is image footing (e.g. bottom transparent padding); owner decides; this round redraws nothing.
+  6. **Known art defects** — handoff §四 verbatim, so they are not mistaken for new geometry bugs.
+- **Deletion protocol (irreversible — see §6):** write the notes → **verify the archive** (read back; every section §一–§六 present, sentence S byte-identical) → only then `delete_file ./WUXIA_ART_HANDOFF.md` → the changelog row records the deletion. Rollback = recreate the root file from the notes (byte-faithful source).
 
-Method = the twice-proven TEMPORARY RED-FIRST REVERT + direct sidecar call
-(`record_measured_red_first_and_reconcile`; `touch_single_surface(修红实测收口)`):
-1. In `scripts/ui/roster_panel.gd`, comment out the open handler body so `open()` is a
-   no-op (panel never opens; button still exists and clicks still deliver), each block
-   marked `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`.
-2. Run the sidecar directly, NOT through the gate:
-   `godot_playtest_scenario(scenario="roster_panel_item_nail")`.
-3. Record the four measured values — failing frame / first failing assertion (expected
-   shape: `RosterPanel.is_open: is_open == true` at the post-open frame) / exact error
-   string / green asserts before red — into the scenario header RED-FIRST EVIDENCE block
-   and the delivery notes.
-4. Restore byte-identical (zero revert markers left in `scripts/`), re-run both new
-   scenarios green, then the full official gate.
-Predictions are never quoted as observations; the brief's example (f140 / 9-green) is the
-*previous* round's measurement, not this one's.
+### C9 — `5_design` closure
+- Flip roadmap completeness item 5 ❌ → ✅ (`./design/00_roadmap.md`), wording: reached 2026-08-31 — six shrimp portraits shipped, roster complete with guard green, style sentence synced; evidence paths `final/delivery_notes_wuxia.md` + gate artifacts. Add one dated line to the 第 4 阶段 bullet (replacement executed after the geometry nails landed, per its own timing constraint). Leave every other row/bullet untouched.
+- Execute C3–C6 design edits; run the **final sync check**: `style_block` in `assets/seed_manifest.json` vs the 30_presentation 画风 sentence — must be byte-identical (diff the exact character sequences, not an eyeball pass).
 
-## 7. 设计裁定(going verbatim into `design/90_decisions.md`)
+## 4. playtest 契约影响(零改动)
 
-- **(a) Panel is a pure display overlay, not a phase.** No `match phase:` arm, no new state
-  string, no save/write. The single-surface rule is satisfied *vacuously* (zero internal
-  selectables) and *actively* (`cursor_markers_visible == false` published and asserted;
-  no `▶` anywhere).
-- **(b) Openable in ANY phase of CULTIVATION/MAP — including map EVENT/FACILITY modals and
-  cultivation's choice phases — with host `_unhandled_input` gated by `is_open`; both
-  ownership claims below are pinned by assertions, not carried by prose (review round 1:
-  option (ii) chosen over (i), reason below).** Rationale: **convenience** — "who am I /
-  what do I carry" is phase-independent information, and the moment a player most wants
-  it is right before committing an event choice (spend the silver? take the sword?).
-  Option (i) — hiding the entry button during map EVENT/FACILITY — was defensible: the
-  modals have their own tappable exits (`EventOptionButton0/1`, `FacilityUseButton` /
-  `FacilityLeaveButton`), so a modal-gated entry costs only a few deferred clicks, never
-  a trap. (ii) is chosen because the convenience is real exactly at that moment, and
-  because it keeps the panel phase-blind — the scene stays self-contained (one node +
-  one input-gate line per host, no visibility-sync coupling to the host's phase
-  machine). Its price is that the two ownership claims must be measured, and they are:
-  S1's inserted segment (f35–f60) opens the panel over the unresolved `merchant` modal,
-  asserts the modal untouched while open (`phase == "EVENT"`, `event_id == "merchant"`,
-  `events_resolved_count == 0`), closes, then the SAME `EventOptionButton0` click
-  resolves normally (`events_resolved_count == 1`, `silver: changed`) — "while open, the
-  modal keys are inert; on close the grammar resumes byte-identical" is carried by that
-  walked segment. `spine_to_ending` never opens the panel → its timing is untouched by
-  construction.
-- **(c) Close = close button AND tap-outside.** The button is pinned by a real click (the
-  tap-outside layer alone cannot be hit-tested by the harness meaningfully); the dim layer's
-  STOP filter is what makes the panel the sole operation surface while open (host option
-  buttons unreachable underneath).
-- **(d) No new keyboard action this round.** Open/close are click-only; no `project.godot`
-  input-map change, no new action token, zero grammar-clash surface. Keyboard shortcuts are
-  additive-later; visible tappable controls are the sole mechanism (brief: shortcut-less
-  is acceptable, button-less is not).
-- **(e) Read-only hard guarantee.** `open()/close()` never call `SaveManager.autosave()`
-  (anti-example: `map.gd:256` `_resolve_node_event` autosaves — that is the event path, not
-  the panel), never write profile/flags, never consume a month/action. `save_load_roundtrip`
-  stays green; SaveManager surface unchanged.
-- **(f) Degradation, never invention.** Item names via frozen `CardData.display_name_of`,
-  gongfa via `ProgressionGongfaData.display_name_of`, traits via `TraitData.get_def()`,
-  sect via `SECTS`; every resolver miss degrades to the raw id or an honest 「（无）」 row.
-  No new data fields, no new systems, no equipment semantics — the panel only *shows* what
-  `PlayerProfile` already stores.
-- **(g) Self-contained instanced scene.** One `.tscn` carries entry + overlay so hosts gain
-  one node and one input-gate line; button placement (top-right) is implementer-tunable
-  within "inside canvas, never under an existing hit area" — the click hit test is the proof.
+No `playtest/*.yaml` is added, edited, or deleted. No `_common.yaml` surface change. No superset-fixture or `ROUND_SCENARIOS` change. M1c probes exist only as inline `scenario=` YAML at call time — nothing staged. The append-only contract is untouched by construction; `test_edited_scenarios_assert_superset` has nothing new to check.
 
-## 8. 记录级欠账:UX-13 / UX-14(OPEN, record-only → `design/40_ux_backlog.md`)
+## 5. 红钉协议 (red nails are findings)
 
-- **UX-13** | OPEN | 角色页/装备 | `PlayerProfile` has no `equipped` field and no equipment
-  system exists; the 12 equipment cards (`scripts/data/card_data.gd:36-48`) live only as
-  inventory strings (write points: `scripts/data/event_logic.gd` item effects, cultivation
-  card item effects), now visible via the roster panel but not equippable or battle-relevant
-  | 玩家看得见抽到的装备,却装不上——「看见」本轮还账,「装上」欠着
-- **UX-14** | OPEN | 角色页/战前 | `design/40_progression.md §9` promises 战前选装 (已学功法
-  不限数量,战前选装) while `scripts/data/battle_setup.gd:94-96` auto-equips the top-2
-  external arts by grade (3 with 左右互搏) — the promised player choice does not exist
-  | 设计承诺的选择不存在;auto-equip 是既成行为,差距记档待后续独立一轮
+If any pinned check reds: report the observed value + root cause; do **not** loosen a threshold, do **not** edit a nail/yaml, do **not** touch the camera/coordinate layer, do **not** redraw a PNG. Only if the root cause is demonstrably the **image's footing** (e.g. bottom transparent padding shifting the effective feet) may the report PROPOSE a post-process fix for the owner. A red `portrait_grid_alignment` on the new art is precisely the experiment's point: it would reveal whether the old geometry was merely coincidental. Timing-leg reds are handled per M1's wrong-reason protocol.
 
-## 9. 边缘情况(covered by code rules above)
+## 6. 不可逆操作与回滚
 
-Unknown/missing ids (raw-id degrade); empty sections (「（无）」); hostile gongfa rows
-(`.get()` defaults, grade `""`); duplicate inventory ids (display is per-row, name pin does
-not depend on count); re-sync after in-scene load (`SaveManager.loaded`); input ownership
-while open; `spine_to_ending` timing (panel not a phase, never opened by the spine);
-`tests/test_touch_option_surface_gate.gd` traversal (panel adds no phase; the always-visible
-`RosterOpenButton` is additive visible+wired control in every choice phase); vision gate Q6
-(autowrap inside a fixed box, existing theme/font, nothing overflows 960×704).
+Exactly one irreversible operation exists: deleting `WUXIA_ART_HANDOFF.md`. Sequence: **archive (C8 §1) → verify (read-back, all six sections + S byte-identical) → delete → record**. Never "delete then write". Rollback = recreate from `final/delivery_notes_wuxia.md`. All other writes (roster, manifest, design docs) are plain file writes with parse/diff validation and no destructive step; the transitional M2 probe is deleted only after its values are transcribed into the notes.
 
-## 10. 技术栈
+## 7. 实施顺序 (PM decomposes along this; dependencies explicit)
 
-Godot 4.4 GDScript + Controls only (Control/Button/Panel/ColorRect/Label, existing
-`global_theme.tres` + NotoSansSC); existing data resolvers; existing playtest sidecar
-(`aitelier/tools/godot_playtest`) + pytest guards; **no new packages, no plugins, no art
-assets, no theme changes, no camera/coord touches, no input-map changes.**
+1. **T1** C1 roster edit + guard pytest green. *(independent)*
+2. **T2** C2 manifest restructure + parse/diff validation. *(independent of T1)*
+3. **T3** M2 alpha-bbox probe → capture values → delete probe. *(independent of T1/T2; PNGs fixed)*
+4. **T4** M1a/M1b/M1c harness runs → capture observed values. *(independent of T1/T2/T3)*
+5. **T5** M3 full gate self-run. *(after T1+T2 — measured tree must be the delivered tree)*
+6. **T6** C8 delivery notes (needs T3+T4+T5 outputs + handoff verbatim) → verify archive → `delete_file` handoff. *(strictly last of the implementer tasks)*
+7. **T7 = `5_design` step** C3–C6 design edits + C9 roadmap flip + final byte-sync check, citing gate artifacts.
 
-## 11. 不可逆操作与回滚
+## 8. 技术栈
 
-None. All changes are additive files plus small guarded edits; the only history file
-(`design/99_changelog.md`) receives one appended row and NO rewrites (row :126 verified, not
-edited). README count is plain prose and git-reversible. No schema migration, no data
-rewrite, no save-format change (`save_load_roundtrip` untouched and must stay green).
+- **stdlib `json`** — roster/manifest edits + parse validation (no new dependencies anywhere).
+- **pytest (existing runner)** — roster guard + the transitional M2 probe (stdlib-only decoder inside).
+- **`godot_playtest_scenario(scenario=...)`** — M1 measurements; inline probe YAML for M1c.
+- **Existing gate (`run_tests.sh` → godot-builder sidecar)** — M3 official evidence; no local godot binary exists and none is sought.
+- **`test_write` / `read_test_written` / `delete_file`** — the implementer's write path (it cannot write binary — which is exactly why the PNGs are inputs).
+- **Linters per `linter_manifest.json`** — `.json`/`.md`/`.yaml` = `basic`; `.py` = `ruff` (covers the transient probe file, which is deleted in-task); **`.gd` deliberately absent** — GDScript is checked by the `gdscript_check` gate, and this round writes zero GDScript anyway.
 
-## 12. 给 PM 的分解建议(顺序即依赖)
+## 9. 扩展性考虑
 
-1. **T1 组件:** `scripts/ui/roster_panel.gd` + `scenes/ui/roster_panel.tscn` + i18n entries +
-   `tests/test_roster_panel.gd` (registry). Accept: unit suite green; compose pure; degrade rules.
-2. **T2 接入:** instance into both `.tscn`; one-line input gate in both `_unhandled_input`;
-   observables live. Accept: compile clean; both scenes show the button; no host copy added.
-3. **T3 契约:** `_common.yaml` surface blocks + scenario_order; two scenario files;
-   `ROUND_SCENARIOS` append; facility-pin `_escape` extension. Accept:
-   `test_playtest_contract_smoke.py` green (incl. new two-place sync).
-4. **T4 钉子实测:** self-run both scenarios via sidecar; TEMPORARY RED-FIRST REVERT on
-   `roster_panel.gd` open handler; paste the four measured values into the scenario header
-   + delivery notes; restore byte-identical. Accept: both scenarios green with observed
-   values pasted; red-first values measured not predicted.
-5. **T5 文档与欠账:** README counts (measured), `99_changelog.md` (verify :126 + one new row),
-   `40_ux_backlog.md` (UX-13/14 + 记录行), `90_decisions.md` (§7 rulings),
-   `30_presentation.md` + `31_touch_coverage.md`. Accept: all five pytest guards green.
-6. **T6 终验:** official full gate — all playtest scenarios PASS (73 → 75), hard gate
-   `passed: true`, 0 runtime errors, compile 0 errors (predicted +2 `.gd` files; paste
-   measured), `spine_to_ending` byte-untouched and green, vision gate non-blind and passed;
-   record counts against predictions.
+- The two-layer manifest is the **template for the next character**: add one `subjects` row (name + appearance + species), one `images` row (subject + scene + path), one roster row, one PNG — the recipe in `final/delivery_notes_wuxia.md` is the how-to that saves a dozen rerolls (contamination words, age/gender rules, asymmetry phrasing, hole-fill).
+- The texture-rect blind-spot record + the proposed optional nail (a/b) leave the owner a cheap path to a real footing pin without this round pre-empting the decision.
+- `subjects[].species` mirroring the roster string keeps one prose for two consumers (guard-enforced roster; art-recipe manifest) and prevents the next rewrite from drifting the two apart.
 
-## 13. 非目标(unchanged from the brief)
+## 10. Step-1 评审意见的处置 (all three addressed)
 
-No equipment system / `equipped` field / pre-battle loadout (recorded UX-13/14 only);
-no numerical or balance tuning (read-only display); no new data fields, systems, or save
-writes; no art assets; no regression into parallel `▶` UI (all four segments'
-`cursor_markers_visible` stay `false`); the three frozen artifacts
-(`_bad_timeline_at_values`, `test_facility_copy_location.py`, `card_data.gd::display_name_of`)
-and the camera/coord layers are used, never modified.
+1. **Decoder artifact location ambiguity** → resolved in C7-M2: one-off temp pytest probe, deleted in-task, never committed; values only in the delivery notes; committing is the optional future nail (a), owner-decision-only.
+2. **Missing provenance anchor for `portrait_ink_rect`** → resolved in §1 and C3.4: `.aitelier/knowledge.md` jinyong-camera (2026-08-29) entry (player.gd L502-503 / enemy.gd L355-356 publish `ink_world_dx/dy` strictly from the published `portrait_ink_rect`) + `README.md` "Alignment observables" section; line numbers verified at write time.
+3. **Blind vision gate with no prior frames** → resolved in C7-M3: state it explicitly, mark the visual sub-item unverified-this-round, describe only from the handoff's cast-design record and label it, never fabricate.
 
-## 14. 自检
+## 11. 禁改清单 (touching any of these is rework)
 
-- Covers every brief goal: panel (three sections, degradation) ✓; tappable open AND close ✓;
-  single-surface + `cursor_markers_visible == false` ✓; read-only/no-save/no-turn ✓;
-  STABLE_STATES entry ✓; real-path nail with measured red-first ✓; README counts ✓;
-  99_changelog verified-not-rewritten + this round's row ✓; facility-pin failure message ✓;
-  UX-13/14 record-only ✓; design/ five-file update set ✓.
-- Components single-responsibility; the only host coupling is one input-gate line.
-- Researcher's recommendations adopted verbatim (reuse-only; rejected alternatives —
-  PopupPanel/Window, CanvasLayer, grab_focus, external themes — stay rejected).
-- Interfaces concrete enough for PM to split by §12; no over-design (no tabs, no
-  configuration, no caching layer).
-- `linter_manifest.json` mirrors the repo's existing manifest (`.gd` deliberately excluded —
-  it is checked by the `gdscript_check` gate, not the manifest).
+- `./assets/characters/*.png` — read pixels only; never generate/draw/replace/repair.
+- `./tests/test_shrimp_roster.py`, `tests/test_playtest_contract_smoke.py`, `tests/test_facility_copy_location.py`, `tests/test_i18n_coverage.py` — byte-identical.
+- `./playtest/**` (all yamls, `_common.yaml` whitelist), superset fixture, `ROUND_SCENARIOS` — zero edits.
+- `./scripts/camera_follower.gd`, `./scripts/coord.gd`, `ink_world_dx/dy` math, `camera_offset_y`, `PORTRAIT_TEX_Y` — zero edits.
+- `./scripts/autoload/i18n.gd` — zero new strings (no UI text this round).
+- `./design/99_changelog.md` — append-only; existing rows untouched.
+- `yang_guo` naming — file name, title, and note stay; de-naming is UX-15 (OPEN), a separate round.
+- No new systems, numbers, equipment/gongfa/event pools; no threshold relaxation anywhere.
+
+## 12. 自检
+
+- [x] Covers every brief goal: C1 (roster+status+guard), C2 (two-layer manifest+style), C3/C4/C5/C6 (design docs), C7 (geometry re-measurement with observed values + red protocol), C8 (recipe archive + deletion), C9 (roadmap item 5 with gate evidence).
+- [x] Single-responsibility components; no new abstraction layers; measurement reuses the repo's own instruments (harness + pytest) per Step-1 recommendations.
+- [x] Interfaces concrete enough for PM to split: exact strings, exact JSON shape, exact anchors, explicit task order with dependencies.
+- [x] Irreversible operation (handoff deletion) has archive→verify→delete→record with a rollback path.
+- [x] Over-engineering avoided: zero engine/code changes, no new nail landed, no framework introduced.
+- [x] `linter_manifest.json` matches the file types this round touches (`.json`, `.md`, transient `.py`; `.gd` intentionally excluded).
