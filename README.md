@@ -17,7 +17,92 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-event-pool-36 — a full 36-month journey never repeats an event (2026-08-31)
+## Latest round: jinyong-shrimpcopy2 — every person in the 36 journey events is now a shrimp (2026-08-31)
+
+The 2026-08-28 ruling 「一切角色都是虾」 finally has its answer (owner ruling,
+2026-08-31), and the text a player reads most often — the 36 travel events —
+was the last place humans were still standing in it. This round rewrites the
+event-pool prose so every written person — named or passing — is a shrimp,
+shown through claws (钳/螯), antennae (须), carapace (甲壳/尾节) and curled tail
+segments, while the wuxia world itself stays verbatim: inns, escort agencies,
+money shops, bookshops, gambling dens, mountain paths, ferries, tombs,
+carriages, silver, scripture-copying and steel blades are all untouched.
+**No scene moves underwater** — no 游过去 / 潜入 / 水流 / 海底 phrasing anywhere,
+no seafood props.
+
+**What changed (prose only):**
+
+- **28 Class-A rows rewritten (34 prose fields: 5 titles + 27 texts + 2
+  labels)** in `scripts/data/event_data.gd`: 山道遇劫匪→山道遇劫 (the steel
+  saber is now gripped in a long claw), 行商路过→车马过路 (a shrimp drives the
+  cart, reins in its claws), 老丐乞食→巷口乞食 (an old shrimp begs with a claw
+  held out, antennae drooping, compound eyes sizing you up), 醉汉传拳→酒肆拳影
+  (a drunken shrimp waves both claws), 坠马客商→途中坠马 (a thrown rider pounds
+  its own carapace and looks for a long claw to help), plus 27 bodies
+  re-attributed: every 劫匪/行商/老丐/掌柜/郎中/村民/少年/艄公/镖头/老僧/老道/
+  药翁/说书人/剑客/刀主/向导/巫师/老铁匠 is a shrimp now; 有人→几只虾, 四下无人
+  →四下不见虾影, 手提→钳里提着, 伸手→伸钳, 拍着胸脯→拍着甲壳, 手舞足蹈→挥舞双螯.
+- **8 Class-B rows byte-identical** (no written person, no human-body action):
+  古墓残碑 / 古墓寒玉 / 神雕负伤 / 桃花迷阵 / 荒寺晚钟 / 山道花轿 / 荒冢埋剑 /
+  雁足传书. Wildlife stays wildlife (巨雕 / 猴子 / 大雁 / 蛇 / 虎), and horses
+  stay horses — a shrimp rider falling from one is the wuxia image.
+- **The frozen-16 freeze is lifted for prose only** (owner ruling 2026-08-31;
+  the lift record belongs to `design/90_decisions.md`, written by the 5_design
+  step after the gate run): ids, effects, option structure, row order and the
+  36-row count are byte-identical — `ROW_EFFECTS` in `tests/test_event_data.gd`
+  was never edited, which is the machine proof that no number moved.
+- **Unnamed passersby are never assigned a species**: none of 皮皮虾 / 龙虾 /
+  樱花虾 / 罗氏沼虾 / 玻璃虾 / 枪虾 appears in event prose (the six decided
+  species stay with the six named characters); body features only.
+  flood_ferry's 「泅水而过」 is deliberately kept — swimming a flooded river is
+  a land-world wuxia feat, not a seabed rewrite — and the guard pins it.
+
+**Sync (byte-for-byte, in the same change):** `ROW_TITLES` / `ROW_TEXTS` /
+`ROW_LABELS` mirrors, the `_test_fresh_instances` literal (山道遇劫), ~34
+`scripts/autoload/i18n.gd` EN entries replaced in place (every EN value also
+renders a shrimp body — "reins in its claws", "antennae droop",
+"compound eyes"), and 4 title mentions in this README.
+
+**New guard:** `tests/test_event_prose_shrimp.py` (stdlib-only pytest, modeled
+on `test_shrimp_roster.py`) denies person-role / human-body / underwater /
+species tokens in `event_data.gd` and pins the 4 protected literals (崖上采药
+title, 重金购芝 label, 泅水而过, 破财消灾). It landed **first** and was red over
+the pre-edit corpus (39 (row, token) pairs across 28 rows — derived inventory
+in `final/shrimp_guard_red_first_notes.md`); it is green over the delivered
+file.
+
+**Playtest #78 (`event_pool_new_event_resolved.yaml`): zero diff.** Both
+literal pins (`event_title == "崖上采药"` :57, `focused_option_text ==
+"重金购芝"` :62) contain no person word, and the `cliff_herbs` title +
+option_b label were frozen byte-identical, so the pins still byte-match the
+data; the check is documented line-by-line in
+`final/delivery_notes_shrimpcopy2.md` §(d). No other playtest yaml changed.
+
+**Record-only sweep:** human prose outside the 36 events was swept and
+recorded, not changed — `card_data.gd:33-35` (行商分成 ×3), `facility_data.gd:31`
+(弟子), `map_data.gd:69/:70/:72` (掌门 / 豪杰), `trait_data.gd` (敌人 / 单人),
+their i18n mirrors and `tests/test_card_data.gd:50`; full inventory in
+`final/human_prose_sweep_notes.md` and `final/delivery_notes_shrimpcopy2.md`
+§(e). The new OPEN backlog item carrying this inventory (UX-19) is opened by
+the 5_design step after the gate run, together with **UX-17 → CLOSED** on this
+round's gate evidence.
+
+**Verification status (honest, 2026-08-31):** verified in the tree by direct
+read at final verification — 36 rows (28 rewritten / 8 byte-identical), the
+three prose mirrors byte-synced, EN keys replaced in place (all old
+person-titled keys gone), the guard's token lists return zero hits over the
+delivered prose, and the #78 pins byte-match the data. The official gate
+evidence for this round — compile zero errors, 78/78 scenarios
+no-regression, pytest + GDScript unit suites, the vision gate, hard gate
+`passed: true` — is produced by the downstream gate steps
+(`compile_report.json` / `playtest_summary.md` / `test_report.json` /
+`vision_report.json`) and stays pending that evidence; the design-archive
+updates (`design/20_content.md` §4, `design/90_decisions.md` freeze-lift,
+`design/40_ux_backlog.md` UX-17 → CLOSED + UX-19 OPEN,
+`design/99_changelog.md` one appended row) belong to the 5_design step after
+the gates — see `final/verify_report.json`.
+
+## Round: jinyong-event-pool-36 — a full 36-month journey never repeats an event (previous round)
 
 The travel-event pool was 16 rows, so a player who roamed every month hit the
 seen-bag reset on roam #17 and started watching 山道遇劫 again — roadmap
@@ -83,14 +168,11 @@ the moment the roam draw lands, the publication (raw zh, matching the zh
 playtest pins) carries a defensive `push_warning` for unknown ids
 (:862-866), a unit pin `_test_event_title_body_surface`
 (`tests/test_cultivation.gd:314`) guards the publish/clear pair, and the
-stale file headers in `event_data.gd` now read 36 rows. **No post-fix
-official re-run exists yet** (the sidecar was unreachable at the fix task;
-`final/delivery_notes_event_pool_playtest.md` §Measured re-run), so the
-**15/15** confirmation, the 78/78 no-regression count, zero compile errors,
-the pytest / GDScript unit-suite runs and the vision gate are produced by the
-downstream gate steps (`compile_report.json` / `playtest_report.json` /
-`test_report.json` / `vision_report.json`) and stay pending that evidence —
-see `final/verify_report.json`.
+stale file headers in `event_data.gd` now read 36 rows. **The post-fix official re-run has since landed** (2026-08-31, recorded in
+`design/40_ux_backlog.md`): **78/78 scenarios PASS**, hard gate
+`passed: true`, zero runtime errors, `event_pool_new_event_resolved` **15/15**
+(f200 `event_title == "崖上采药"` / `event_body != ""` green after the
+`_sync_surface()` fix), and the vision gate passed with Q6 78 good / 0 bad.
 
 ## Round: jinyong-equipment-battle — gear you drew can now be equipped, and it fights (previous round)
 
