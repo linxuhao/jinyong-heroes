@@ -253,6 +253,7 @@ func _on_accept() -> void:
 					event_id = _draw_event()
 					phase = "EVENT"
 					_event_focus = 0
+					_sync_surface()   # NEW: publish event_title/event_body the moment the roam draw lands
 				4:
 					_on_save()
 					return
@@ -861,6 +862,8 @@ func _sync_surface() -> void:
 	var d = EventData.def(event_id)
 	event_title = d.title if d != null else ""
 	event_body = d.text if d != null else ""
+	if event_id != "" and d == null:
+		push_warning("CultivationScreen: event_id '%s' has no EventData def - title/body stay empty" % event_id)
 
 
 func _categories_of(cards: Array) -> Array:

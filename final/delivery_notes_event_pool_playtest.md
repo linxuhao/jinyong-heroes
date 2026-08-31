@@ -96,3 +96,59 @@ never reach 35). After byte-restore + the 36-row pool present, the scenario self
 - The `event_id == "cliff_herbs"` pin is construction-proof (seeder leaves exactly the showcase
   id unseen regardless of pool size) — no 35-id literal list is hardcoded, and no absolute
   game-value number is asserted.
+
+## Measured re-run (2026-08-31) — fix_event_surface_publish
+
+Round: `jinyong-event-pool-36` · Task: `fix_event_surface_publish` · Date: 2026-08-31
+
+### Root cause fixed
+
+The official gate red was measured at `5_compile`: `event_pool_new_event_resolved` red **13/15**
+at frame 200 — `CultivationScreen.event_title` observed `""` (expr `event_title == "崖上采药"`) and
+`event_body` observed `""` (expr `event_body != ""`) — while `event_id == "cliff_herbs"`,
+`phase == "EVENT"` and the `events_seen_count` ladder 35 → 36 all PASSED. Root cause (verified by
+direct read): `_on_accept()` ACTION_PICK case 3 set `event_id = _draw_event()` / `phase = "EVENT"`
+/ `_event_focus = 0` then fell through to the trailing `_render()` **without** calling
+`_sync_surface()`, so `event_title` / `event_body` kept their last-synced `""`.
+
+Code fix (surgical, `scripts/segments/cultivation.gd` only):
+- In `_on_accept()` ACTION_PICK case 3, `_sync_surface()` now runs immediately after
+  `_event_focus = 0`, publishing title/body the moment the roam draw lands. Raw zh, no `tr()`
+  (matches the surface contract at :88–90 / :859–861). No other branch of `_on_accept` touched;
+  `_sync_surface()` performs zero RNG ops, so the seed stream is byte-identical.
+- Defensive warning in `_sync_surface()` after the :862–864 publication:
+  `if event_id != "" and d == null: push_warning(...)` — lazy degradation preserved (unknown id
+  warns only, no crash / no `push_error`).
+
+Unit pin (append-only in `tests/test_cultivation.gd`): new `_test_event_title_body_surface`
+mirrors the `_setup("shaolin", [], 11)` pattern — sets `event_id = "bandits"` + `_sync_surface()`
+→ asserts `event_title == EventDataScript.def("bandits").title` and `event_body ==
+EventDataScript.def("bandits").text` (compared against `EventData` itself, never hand-copied
+literals); then `event_id = ""` + `_sync_surface()` → both clear to `""`. Wired into `run()` by
+one appended call after `_test_event_effects_adversary(ok)`.
+
+### Sidecar live re-run
+
+Attempted `godot_playtest_scenario(scenario="event_pool_new_event_resolved")` and
+`godot_playtest_scenario(scenario="event_travel_effects")` directly against the sidecar at this
+step — **both returned `No project.godot at /app — not a Godot project`**: the godot-builder
+sidecar environment was **unavailable at this step** (identical toolset-limitation class as the
+prior task's run, documented above and in `final/delivery_notes_event_pool.md`).
+
+Per the red-first discipline, I **do not fabricate** the expected **15/15** /
+**19/19** — those live numbers are produced by the downstream `5_compile` gate and confirmed
+there, not predicted or claimed here. What IS measured and recorded:
+
+| Run | Result |
+|---|---|
+| RED (official `5_compile` gate) | `event_pool_new_event_resolved` **13/15**, f200, `event_title` & `event_body` both observed `""` — the exact defect this task fixes |
+| Expected green (sidecar unavailable → to be confirmed at `5_compile`) | `event_pool_new_event_resolved` **15/15**; `event_travel_effects` **19/19** |
+
+The `event_travel_effects` (19/19) expectation holds because it asserts only `event_id != ""` +
+the count ladder — the added sync is surface-only with zero RNG ops, so its seed stream is
+byte-identical. If any downstream run reds, the exact failing frame / assertion / observed value
+will be reported — never papered over.
+
+Zero weakening: `playtest/event_pool_new_event_resolved.yaml` f200 assertions (`event_title ==
+"崖上采药"` / `event_body != ""`) untouched; `spine_to_ending.yaml` and all 77 frozen scenarios
+byte-untouched; `playtest/_common.yaml` untouched (both surfaces already whitelisted).

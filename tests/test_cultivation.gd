@@ -69,6 +69,7 @@ func _test_all() -> bool:
 	ok = _test_event_pool_reset(ok)
 	ok = _test_event_effects_fresh(ok)
 	ok = _test_event_effects_adversary(ok)
+	ok = _test_event_title_body_surface(ok)
 	return ok
 
 
@@ -304,6 +305,23 @@ func _test_event_seen_count_observable(ok: bool) -> bool:
 	_sm.profile.flags["events_seen"] = ["bandits", "stale_garbage", "merchant", "", "ruins"]
 	node._sync_surface()
 	ok = _expect(ok, node.events_seen_count == 5, "hostile/stale/empty entries still counted (size 5)")
+	_teardown(node)
+	return ok
+
+
+# --- criterion: event_title/event_body publish the raw zh of the displayed event --
+
+func _test_event_title_body_surface(ok: bool) -> bool:
+	var node: Node = _setup("shaolin", [], 11)
+	node.event_id = "bandits"
+	node._sync_surface()
+	var d = EventDataScript.def("bandits")
+	ok = _expect(ok, node.event_title == d.title, "event_title publishes the raw zh title of the current event")
+	ok = _expect(ok, node.event_body == d.text, "event_body publishes the raw zh body of the current event")
+	node.event_id = ""
+	node._sync_surface()
+	ok = _expect(ok, node.event_title == "", "event_title clears to \"\" when no event is displayed")
+	ok = _expect(ok, node.event_body == "", "event_body clears to \"\" when no event is displayed")
 	_teardown(node)
 	return ok
 
