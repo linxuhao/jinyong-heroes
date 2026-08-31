@@ -51,6 +51,7 @@ func _test_all() -> bool:
 	ok = _test_draw_shape_and_counts(ok)
 	ok = _test_reshuffle_and_determinism(ok)
 	ok = _test_trait_deck_excludes_owned(ok)
+	ok = _test_deck_boot_guard(ok)
 	ok = _test_save_guard_and_atomic(ok)
 	ok = _test_roundtrip_continuity(ok)
 	ok = _test_snapshot_roundtrip_observability(ok)
@@ -153,6 +154,43 @@ func _test_trait_deck_excludes_owned(ok: bool) -> bool:
 	for c in cards:
 		var id: String = (c as Dictionary)["id"] as String
 		ok = _expect(ok, id != "iron_shirt", "yearly draw never offers iron_shirt")
+	return ok
+
+
+# --- criterion 6b: direct-boot deck guard -------------------------------------
+
+func _test_deck_boot_guard(ok: bool) -> bool:
+	# A direct scene boot of cultivation.tscn (or map.tscn) never reaches
+	# new_profile()/_restore_decks()/_fallback_fresh_profile(), so `decks` stays
+	# `{}`. The _ensure_deck guard must boot the six real decks on demand instead
+	# of raising Godot 4.4's "Invalid access to property or key" on a missing-key
+	# `[]` lookup. Simulate that state: live profile present, decks uninitialized.
+	_sm.new_profile({}, [])
+	_sm.decks = {}
+	# Criterion 1: _draw_one boots the deck table itself (guard inside _ensure_deck).
+	var card: Dictionary = _sm._draw_one("economy")
+	var keys := ["id", "display_name", "category", "effect_type", "effect_value", "effect_target"]
+	for k in keys:
+		ok = _expect(ok, card.has(k), "direct-boot draw_one returns card dict with key " + k)
+	ok = _expect(ok, _sm.decks.has("economy"), "direct-boot draw_one initialized the economy deck")
+	ok = _expect(ok, _sm.decks.size() == 6, "direct-boot draw_one built all six DECK_CATEGORIES")
+	# Criterion 2: subsequent direct-boot draws on the other monthly cats work.
+	_sm.decks = {}
+	ok = _expect(ok, _sm._draw_one("economy").has("id"), "direct-boot economy draw ok")
+	ok = _expect(ok, _sm._draw_one("equipment").has("id"), "direct-boot equipment draw ok")
+	ok = _expect(ok, _sm._draw_one("growth").has("id"), "direct-boot growth draw ok")
+	ok = _expect(ok, _sm.decks.size() == 6, "multi-category direct-boot draw leaves six decks built")
+	# Criterion 3: normal path unchanged — the guard is a no-op on initialized decks.
+	_sm.new_profile({}, [])
+	ok = _expect(ok, _sm.eco_left == 12 and _sm.eq_left == 12 and _sm.growth_left == 9,
+		"normal new_profile counts unchanged: 12/12/9")
+	ok = _expect(ok, _sm.pow_left == 6 and _sm.art_left == 6 and _sm.trait_left == 8,
+		"normal new_profile counts unchanged: 6/6/8")
+	# The guard must not clear drawn / rebuild remaining on an already-initialized
+	# deck: after new_profile + one draw, eco_left drops to 11 (not reset to 12).
+	_sm.draw_cards(true)
+	ok = _expect(ok, _sm.eco_left == 11 and _sm.eq_left == 11 and _sm.growth_left == 8,
+		"guard is no-op on initialized decks (one draw -> 11/11/8)")
 	return ok
 
 

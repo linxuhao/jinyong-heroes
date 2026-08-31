@@ -379,6 +379,14 @@ func _draw_one(cat: String) -> Dictionary:
 ## CardData def and (trait deck only) ids the profile now owns — a hand-edited
 ## save must never re-offer an owned trait.
 func _ensure_deck(cat: String) -> void:
+    # Direct-boot guard: a direct scene boot of cultivation.tscn (or map.tscn)
+    # never reaches new_profile()/_restore_decks()/_fallback_fresh_profile(), so
+    # `decks` stays `{}`. Boot the six real decks on demand before indexing the
+    # missing key (Godot 4.4 raises on a missing-key `[]` lookup). On the normal
+    # path new_profile() already populated every DECK_CATEGORIES deck, so this
+    # guard is a no-op and never clears drawn/rebuilds remaining.
+    if not decks.has(cat):
+        _init_decks()
     var pool: Dictionary = decks[cat]
     var remaining: Array = pool["remaining"]
     if remaining.is_empty():
