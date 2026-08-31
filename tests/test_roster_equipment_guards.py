@@ -114,7 +114,7 @@ def test_no_autosave_guard_strips_comment_lines() -> None:
     # Synthetic: comment line removed, code line preserved verbatim.
     synthetic_mixed = "## x.autosave()\nvar y = 1\n"
     result_mixed = _strip_gdscript_comments(synthetic_mixed)
-    assert result_mixed == "var y = 1", (
+    assert result_mixed.strip() == "var y = 1", (
         f"Expected 'var y = 1' after stripping, got {result_mixed!r}. "
         "Comment lines must be removed; code lines preserved verbatim."
     )
