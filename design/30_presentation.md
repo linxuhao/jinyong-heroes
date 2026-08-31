@@ -1015,8 +1015,10 @@ phase 名字面量清单(那样加一个 phase 就会漏)。`GONGFA_PICK` 空列
   `mastered == true` → 大成标记。hostile 行一律 `.get()` 带默认值,绝不崩。空列表 → 「（无）」。
 - **物品** — `p.inventory` 每个 id 经**冻结的** `CardData.display_name_of(id)` 解析为中文名
   (`card_data.gd:82-84`,未知 id 返回 `""`),未知 id **惰性降级为原始 id**(显示出来),
-  不崩、不 `push_error`。空列表 → 「（无）」。「看见」本轮还账,「装上」欠着(见
-  `design/40_ux_backlog.md` UX-13 / UX-14)。
+  不崩、不 `push_error`。空列表 → 「（无）」。装备行(2026-08-31 起)可装可卸,见下节
+  「装备:从只读到自由动作」;「看见」由 2026-08-30 轮还账,「装上」由
+  jinyong-equipment-battle 轮还账(UX-13 凭 `roster_equip_free_action` 36/36 关闭,
+  UX-14 战前选装仍 OPEN)。
 
 ### 入口
 
@@ -1041,4 +1043,26 @@ phase 名字面量清单(那样加一个 phase 就会漏)。`GONGFA_PICK` 空列
 打开 / 关闭**从不**调用 `SaveManager.autosave()`(反例:`map.gd::_resolve_node_event` 会存档——
 那是事件路径,不是面板),不写 `profile` / flags、不消耗月份 / 行动、不改 phase。
 `save_load_roundtrip` 保持绿;`spine_to_ending` 永不打开面板 → 其时序逐字节未动。
+
+**(2026-08-31 更新:本节保证被 jinyong-equipment-battle 轮有意推翻——面板现在恰好写
+`profile.equipped` 三槽;原文按档案纪律保留,取代裁定与新事实见下节与
+`90_decisions.md` 2026-08-31 条。)**
+
+### 装备:从只读到自由动作(2026-08-31,jinyong-equipment-battle)
+
+物品节里的**装备行**(id 经 `EquipmentData.slot_of` 判定为三槽装备的 inventory 行)各绑定
+一个装 / 卸按钮,池上限 `MAX_EQUIP_BUTTONS = 12`(= 12 张装备牌;超出的重复行保持纯文本
+渲染,状态按 id 键控,任何一行都能切换该槽)。按钮文本就是装备状态——该槽已装此 id 显示
+「卸下」,否则「装上」(两键入 `i18n.gd` EN 字典,文案守卫覆盖)。点击只写
+`profile.equipped`(`equip()` 校验槽位 / id 在 inventory / 类别前缀匹配;同槽装新 id =
+直接换装,被换下的留在背包),随后 `refresh()` 重排;**不 autosave、不耗月份 / 行动、
+不改 phase / 计数**——`roster_equip_free_action` 36/36 与
+`roster_panel_cultivation_open_close` 16/16 把这条自由动作不变量钉在真实运行里。
+单一操作面 conformity 不变:全部按钮 `focus_mode = 0`(按钮持有 Godot 内建焦点会在
+`_unhandled_input` 之前吞掉 ui_up/ui_down),无并行 `▶` 键盘光标列表,
+`cursor_markers_visible == false` 保持。面板新观测量:`equipped_weapon / equipped_armor /
+equipped_boots`(三槽镜像)、`equip_button_count`、`equip_pressed_connected`;战斗侧镜像
+`Player.gear_attack/health/initiative/move_bonus` 让「换把剑,这场战斗数值不一样」可被
+差分断言(`equipment_in_battle_diff`;该场景本轮官方运行 16/32 红——帧布局把面板点击排在
+返回 MAP 之前,如实记 `40_ux_backlog.md` UX-16,零断言放松)。
 

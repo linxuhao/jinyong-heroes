@@ -542,3 +542,39 @@ portrait_covered_frac=0.0`、`camera_transform_follows_unit` **9/9**、`spine_to
 根文件删除被管线「必需产物」守卫拒绝(5 次尝试,实录该文件 §7)——删除待有删除权限的
 步骤/配置执行,归档完整性已核验(§一–§六齐备、风格句与 `style_block` byte-identical)。**
 
+## jinyong-equipment-battle — 角色面板只读保证被有意推翻(2026-08-31;取代 2026-08-30 jinyong-roster 裁定 (e))
+
+- **被取代:2026-08-30 jinyong-roster 裁定 (e)「只读硬保证」**(`open()/close()` 从不
+  autosave、不写 profile/flags、不耗月份/行动、不改 phase)。旧条原文逐字保留于上文,
+  由本条明文取代——一条被静默删除的保证,和从来没有过那条保证,是两回事;
+  `scripts/ui/roster_panel.gd` 头注释已改写为新事实并指回本条。
+- **为什么 (e) 当时是对的:** 那一轮的全部任务就是证明面板零副作用——open/close/refresh
+  纯只读,只读保证是那个证明的最锋利形式,month/phase/计数不变量的闸门靠它钉住。
+  若当时就带写路径,「面板不产生副作用」将无从证明。
+- **现在改了什么:** 装备需要一个写路径,而角色页是本轮指定的触控操作面。面板现在恰好
+  写**一个** profile 面:物品行「装上 / 卸下」按钮池经 `SaveManager.profile.equip() /
+  unequip_slot()` 只写 `equipped` 三槽,随后 `refresh()`。这是本轮全仓唯一的新 profile
+  写入点。
+- **(e) 不冲突的部分原样保留:** 仍然不调 autosave / save_game(装备沿用养成段存 / 读
+  模型,改 profile 不落盘)、不消耗月份 / 行动、不改 phase、不写任何其他 profile 字段
+  ——`roster_panel_cultivation_open_close.yaml` 16/16 与 `roster_equip_free_action`
+  36/36 把这条自由动作不变量钉在真实运行里。
+- **单一操作面(touch-single-surface 规则)不变:** 新控件全部是按钮(`focus_mode = 0`
+  ——按钮持有 Godot 内建焦点会在 `_unhandled_input` 之前吞掉 ui_up/ui_down),
+  没有并行的键盘光标 `▶` 列表,`cursor_markers_visible == false` 保持。
+- **相邻两条的 scope 更正:** 2026-08-30 (a)「面板是纯展示 overlay」与 (f)「无装备语义」
+  除物品行装备按钮外仍然为真——按钮池是本轮新增的唯一例外,(f) 的「无装备语义」自此
+  由本条接替:装备语义存在,且只经这一个写入口。旧记录原文不删。
+- **Open question(实测欠账,如实记:修复已落、闸门证据未拿到):** 本轮官方闸门
+  (`playtest_summary.md`,2026-08-31)实测 `equipment_in_battle_diff` **16/32** 红
+  (6 条 runtime error:`aim: node not found: RosterOpenButton / EquipButton0 /
+  RosterCloseButton`;断言首红 f630 `GameManager.current_state == "MAP"` 实测
+  `BATTLE`)——场景把面板装 / 卸点击排在 `debug_win_tutorial` 返回 MAP 之前,BATTLE 态下
+  map 段及其 RosterPanel 不在树上;硬闸门因此 `passed: false`。**修法已定:重排该场景
+  帧布局(先返回 MAP 再开面板),零断言放松、零阈值放宽,留给下一轮**;记
+  `40_ux_backlog.md` UX-16(OPEN)。功能层证据已绿:`roster_equip_free_action` 36/36
+  (面板自由动作腿)+ `tests/test_battle_setup_equipment.gd`(空槽等价 / 方向 / 可逆);
+  装备进真实遭遇战的 `changed` 差分官方闸门证据待重排后重测。两条新钉子的修红实测四值
+  (临时回退直连边车法)仍欠一次实测——`final/delivery_notes_equipment.md` 里为结构
+  预测,按档案纪律不得当实测引用。
+
