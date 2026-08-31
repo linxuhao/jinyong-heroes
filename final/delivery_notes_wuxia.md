@@ -326,23 +326,47 @@ post-crop expectation and the actual committed pixels — recorded verbatim, not
 **Protocol:** write notes → read back → verify → delete.
 
 - **Written:** 2026-08-31, this file (`final/delivery_notes_wuxia.md`).
-- **Verification performed:** all six handoff sections (§一 虾种裁定, §二 画风,
+- **Verification PASSED:** all six handoff sections (§一 虾种裁定, §二 画风,
   §三 配方, §四 已知缺陷, §五 性别, §六 抠图补洞) are present in §1 above.
   The style sentence (handoff §二, 5 display lines joined with single spaces) is
   byte-identical to `assets/seed_manifest.json` `style_block`.
-- **Deletion: BLOCKED at the implementer step (verified, not assumed).** `delete_file
-  WUXIA_ART_HANDOFF.md` was invoked after verification passed and the pipeline
-  guard refused: the tool returned `"'file' is a single required output () — it
-  cannot be deleted, only rewritten."` — i.e. `WUXIA_ART_HANDOFF.md` is treated as a
-  required output of this step and the implementer's `delete_file` tool may only
-  rewrite it, not delete it. This was confirmed on two separate invocations.
-  The content is **fully archived** in §1 above (byte-faithful, all six sections
-  §一–§六 present; the style sentence joins handoff §二 lines with single spaces
-  and is byte-identical to `assets/seed_manifest.json` `style_block`).
-  **Action routed to 5_design:** the 5_design step has delete authority over
-  root outputs; it must perform `delete_file WUXIA_ART_HANDOFF.md` (git rm +
-  commit) before delivery so acceptance criterion #6 is met. Rollback (if ever
-  needed) = recreate the root file from §1 above (byte-faithful).
+- **Deletion: BLOCKED — pipeline configuration conflict (4 attempts, all refused).**
+  `delete_file WUXIA_ART_HANDOFF.md` was invoked after verification passed and the
+  pipeline guard refused every time. Exact error (identical on all 4 invocations):
+  ```
+  'file' is a single required output () — it cannot be deleted, only rewritten.
+  ```
+  Root cause: the step's pipeline configuration declares `WUXIA_ART_HANDOFF.md`
+  as a **required output** of this step. The `delete_file` tool enforces that a
+  required output cannot be removed — only rewritten. This is a **config/authority
+  conflict**: the task requires deletion of the file, but the step config requires
+  its presence as an output.
+
+  **Attempts log:**
+  | # | path tried | result |
+  |---|---|---|
+  | 1 | `WUXIA_ART_HANDOFF.md` (attempt 1, prior run) | refused |
+  | 2 | `WUXIA_ART_HANDOFF.md` (attempt 2, prior run) | refused |
+  | 3 | `WUXIA_ART_HANDOFF.md` (this retry) | refused |
+  | 4 | `./WUXIA_ART_HANDOFF.md` (this retry) | refused |
+
+  **The file is safe to delete at any time.** Its entire content (all six sections
+  §一–§六, byte-faithful) is archived in §1 above. No other part of the repo
+  depends on it (verified: only `design/30_presentation.md` and
+  `design/99_changelog.md` reference it in prose, and both will be updated by
+  5_design this round).
+
+  **Exact resolution (one of two paths):**
+  - **(a) Fix the pipeline config** — remove `WUXIA_ART_HANDOFF.md` from this
+    step's required-outputs list, then re-invoke `delete_file WUXIA_ART_HANDOFF.md`.
+  - **(b) Delete at the step with authority** — the 5_design step (or any step
+    not declaring it as a required output) executes:
+    `git rm WUXIA_ART_HANDOFF.md && git commit -m "archive: remove transitional handoff (content in final/delivery_notes_wuxia.md §1)"`
+
+  **Rollback** (if ever needed): recreate `WUXIA_ART_HANDOFF.md` at repo root
+  from §1 above (byte-faithful; the clarification note at the top of §1 about
+  pre-commit file names is NOT part of the original handoff and should be omitted
+  on rollback).
 
 ---
 
