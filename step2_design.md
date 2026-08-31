@@ -24,8 +24,10 @@ This design **decouples** them:
 - **Build source** = a new `GameManager.map_battle_id` signal (non-empty ⇒ profile build via
   `BattleSetup.build_character(SaveManager.profile)`, opponent roster resolved from the battle id).
 - **Return target** = `battle_return_state` alone (already works: `request_continue`/
-  `request_retry` route any named segment state — MAP included — and `clear_battle()` on routing;
-  verified at game_manager.gd:244-266. **No new return code.**).
+  `request_retry` route any named segment state — MAP included; verified at
+  game_manager.gd:244-266. **No new return code.** Those two routers also clear `map_battle_id`
+  (clear-at-route). `clear_battle()` does NOT own that clear — it runs mid-swap on every scene
+  change (see D1's five-call-site walkthrough).
 
 The battle itself reuses the proven encounter tail as a **sibling** (`_setup_map_battle`), never
 rewriting the pinned `_setup_encounter_battle` (pinned green by `equipment_in_battle_diff` 47/47).
@@ -43,14 +45,14 @@ one sanctioned rewrite of `map_battle_node_huashan.yaml`.
 |---|---|
 | `scripts/data/map_data.gd:48-49` | huashan row: event `declared`/`""`, **battle `active`/`huashan_duel`**, facility `declared`/`""` |
 | `scripts/data/map_data.gd:175-186` | `active_battle_id()` validates presence only — "when a battle table lands, this is where it gets consulted" (the comment anticipates this round) |
-| `scripts/segments/map.gd:236-242` | `_maybe_start_entry_battle()` fires on travel arrival only; writes `entry_battle_id`; calls `GameManager.start_map_battle()` |
+| `scripts/segments/map.gd:236-242` | `_maybe_start_entry_battle()` fires on travel arrival only; writes `entry_battle_id`; calls `GameManager.start_map_battle(bid)` this round (id passed through) |
 | `scripts/segments/map.gd:99-109` | `_ready()` re-derives `current_node_id` from `SaveManager.profile.map_node`; **never** dispatches entry content → no battle re-trigger loop on return |
 | `scripts/segments/map.gd:52, 260` | `events_resolved_count` is a MapScreen session var, incremented in `_resolve_node_event()` — reset when MapScreen is rebuilt (the E10 persistence problem) |
-| `scripts/autoload/game_manager.gd:142-148` | `start_battle()` hard-gated on TUTORIAL (frozen) |
-| `scripts/autoload/game_manager.gd:156-162` | `start_encounter()` hard-gated on CULTIVATION, sets return = CULTIVATION |
-| `scripts/autoload/game_manager.gd:183-189` | `start_map_battle()` hard-gated on MAP, sets return = MAP |
-| `scripts/autoload/game_manager.gd:215-233` | return-state get/set; `clear_battle()` drops per-battle refs (the lifecycle owner) |
-| `scripts/autoload/game_manager.gd:244-266` | `request_continue`/`request_retry` route WON/LOST to any segment state + `clear_battle()` |
+| `scripts/autoload/game_manager.gd:142-148` | `start_battle()` hard-gated on TUTORIAL (frozen); this round adds exactly ONE line inside it — `map_battle_id = ""` (write-at-entry; no tutorial behavior moves) |
+| `scripts/autoload/game_manager.gd:156-162` | `start_encounter()` hard-gated on CULTIVATION, sets return = CULTIVATION; adds one line `map_battle_id = ""` (write-at-entry) |
+| `scripts/autoload/game_manager.gd:183-189` | `start_map_battle()` hard-gated on MAP, sets return = MAP; takes the battle id this round (`battle_id: String = ""`) and writes it BEFORE `battle_started`/`state_changed` fire |
+| `scripts/autoload/game_manager.gd:215-233` | return-state get/set (:215-221); `clear_battle()` (:228-233) drops per-battle refs ONLY — `enemies_alive` / `_player` / `_overlay_layer` — it touches neither `battle_return_state` nor (new) `map_battle_id` (why the encounter path survives swaps today); its 5 call sites: scene_manager.gd:192, game_manager.gd:249, 262, 342, 376 |
+| `scripts/autoload/game_manager.gd:244-266` | `request_continue`/`request_retry` route WON/LOST to any segment state + `clear_battle()`; this round each also clears `map_battle_id` (clear-at-route, one line each) |
 | `scripts/autoload/game_manager.gd:608-611` | `debug_win_tutorial` → `CombatManager.debug_wipe_enemies()`; `debug_lose_tutorial` → `debug_kill_player()` — both route through the real pipeline in ANY battle with registered units |
 | `scripts/battlefield.gd:64-71` | the only build-source branch today: `battle_return_state == "CULTIVATION"` → `_setup_encounter_battle()` |
 | `scripts/battlefield.gd:73-98` | tutorial fallthrough: Yang Guo + five greats, overlay wiring, `tutorial_battle = true` (frozen) |
@@ -65,7 +67,9 @@ one sanctioned rewrite of `map_battle_node_huashan.yaml`.
 | `scripts/ui/hud.gd:751-759` | `EndTurnButton.disabled = not (CombatManager.is_player_turn() and not paused)` — enabled **iff** it is the player's turn |
 | `scripts/ai/ai_*.gd` (all five read) | zero-RNG, pure functions of state. Round-1 behavior: East Heretic = Tidal Melody only (global **18×1.3=23**, then returns — no move/attack in round 1); Central Divine = Primal Unity "always when ready" (global **30×1.3=39**); South Emperor = heal falls through (allies full) then approaches (0 dmg from far); North Beggar & West Poison = all damage gated at dist ≤ 3 with alignment (0 dmg from far perimeter) |
 | `SaveManager` | `signal loaded(slot)` exists (:30); `new_profile()` (:100) has no signal yet |
-| `SceneManager.current_scene` | scene-key strings: `"battlefield"`, `"map"`, … (:26) |
+| `SceneManager.current_scene` | scene-key strings: `"battlefield"`, `"map"`, … (:26); `SCENE_MAP["TUTORIAL"] == "battlefield"` (:35-46) — the TUTORIAL-state boot IS a battlefield `_ready()` route |
+| `scripts/autoload/scene_manager.gd:143-192` | `_do_swap`: :151-152 `_teardown_battle_refs()` (only when `_current_node != null`; the map is always hosted at the MAP → battlefield arrival, so it ALWAYS runs there) → :190 `CombatManager.reset_battle()` → :192 `GameManager.clear_battle()` — mid-swap teardown on EVERY swap, running BEFORE :171 `packed.instantiate()` / :174 `add_child`, i.e. between the entry write and the new battlefield's `_ready()` read. NOT modified this round |
+| `scripts/autoload/game_manager.gd:334-345, 375-383` | `menu_load_game()` (loads restricted to `STABLE_STATES` :339 — never boots a battlefield) and `restart_game()` (routes to TUTORIAL whose scene IS the battlefield — a `_ready()` route that bypasses every `start_*`; gains one line `map_battle_id = ""`) |
 | `playtest/_common.yaml` | whitelisted already: CombatManager `current_round/turn_order/phase/active_unit_name/tutorial_battle`; Player `max_health/health/grid_pos/moves_left/energy`; `EndTurnButton.disabled`; MapScreen `events_resolved_count/current_node_id/phase/ended/focus_id`; actions include `end_turn`, `debug_win_tutorial`, `debug_lose_tutorial` |
 | `playtest/click_move_to_tile.yaml` | proven click syntax: `clicks: ["Player +64,0"]` (offset anchored on the live node centre); equality asserts ≥25 frames after the click |
 | `tests/test_map_node_event.gd:101-108` | unit pins: huashan is the only live battle slot, binds `huashan_duel`, carries no event (must stay green) |
@@ -99,10 +103,10 @@ one sanctioned rewrite of `map_battle_node_huashan.yaml`.
    6. _wire_hud(player, enemies) synchronous, deferred fallback          (FIFO flush before the kick)
    7. CombatManager.begin_battle.call_deferred()                          (round 1 starts — the ONLY kick)
 
- WON / LOST ──▶ request_continue / request_retry ──▶ battle_return_state ("MAP") ──▶ clear_battle()
-              (clears map_battle_id too — no leak into later boots)      └──▶ MAP segment rebuilt:
-                                                                          current_node_id = profile.map_node
-                                                                          events_resolved_count = GameManager mirror
+ WON / LOST ──▶ request_continue / request_retry ──▶ route via battle_return_state ("MAP")
+              (each clears map_battle_id — clear-at-route;          └──▶ MAP segment rebuilt:
+               clear_battle() does NOT touch it — it runs               current_node_id = profile.map_node
+               mid-swap, between the entry write and _ready())          events_resolved_count = GameManager mirror
 ```
 
 Session-counter persistence (E10): `GameManager.map_events_resolved_count` is a session mirror;
@@ -111,21 +115,90 @@ run begins (`SaveManager.new_profile()`) or a save is loaded (`SaveManager.loade
 
 ## 4. Design decisions (with rejected alternatives)
 
-### D1 — Build-source/return-target decoupling: the battle id IS the build-source signal
-`GameManager` gains `map_battle_id: String = ""` (+ getter/setter), set **only** by
-`start_map_battle(battle_id)`, cleared **only** in `clear_battle()` (the lifecycle owner — it
-already runs on every WON/LOST segment routing). `battlefield._ready()` branches on
-`map_battle_id != ""`. A non-empty id ⇒ profile build; empty ⇒ tutorial fallthrough untouched.
+### D1 — Build-source/return-target decoupling: the battle id IS the build-source signal, owned by battle-entry writes (not by `clear_battle()`)
+`GameManager` gains `map_battle_id: String = ""` (+ getter/setter). `battlefield._ready()` branches
+on `map_battle_id != ""`: non-empty ⇒ profile build; empty ⇒ tutorial fallthrough untouched.
 
+**Lifecycle = write-at-entry + clear-at-route** — deliberately isomorphic to how
+`battle_return_state` already works (each entry sets it; `clear_battle()` never touches it; that is
+why the encounter path survives scene swaps today). (Revision note, 2026-08-31: the first cut of
+this design named `clear_battle()` the lifecycle owner on the false premise that it runs only on
+WON/LOST exits. It runs mid-swap on EVERY scene change; the corrected five-call-site walkthrough
+below is the whole reason the ownership moved.)
+
+- **Write-at-entry (the load-bearing discipline): whoever routes the world into a battlefield
+  `_ready()` declares the build source in the same call, before any swap can start.**
+  - `start_map_battle(battle_id)` → `map_battle_id = battle_id`, written with the other field
+    writes BEFORE `battle_started.emit()` / `state_changed.emit(STATE_BATTLE)`. The ordering is the
+    guarantee: `state_changed` is what synchronously drives `SceneManager._on_state_changed` →
+    `swap_to("battlefield")` → `_do_swap`, so the write is already on record when the mid-swap
+    teardown runs.
+  - `start_encounter()` (:156-162) → ONE added line `map_battle_id = ""` (beside
+    `battle_return_state = STATE_CULTIVATION`).
+  - tutorial `start_battle()` (:142-148) → ONE added line `map_battle_id = ""` (beside
+    `current_state = "BATTLE"`). Nothing else in the function moves: the tutorial battlefield
+    branch, overlay wiring and `_instantiate_enemies()` are untouched; tripwires
+    `tutorial_win_routes_to_transition` / `tutorial_loss_restarts_tutorial` stay green.
+  - `restart_game()` (:375-383) → ONE added line `map_battle_id = ""` (beside `clear_battle()`):
+    it routes to TUTORIAL, and `SCENE_MAP["TUTORIAL"] == "battlefield"` — a battlefield `_ready()`
+    that bypasses every `start_*` function. Without this line, a mid-battle restart would boot the
+    tutorial battlefield with the map id still live.
+- **Clear-at-route (keeps §7 Leg E/F's post-battle observable true):** `request_continue()` /
+  `request_retry()` (:244-266) — the semantic endpoint where `battle_return_state` is consumed —
+  each gain ONE unconditional line `map_battle_id = ""` (the battle is over whichever segment it
+  routes to). After WON/LOST the field observably reads `""` on the MAP leg (§7.1 Leg E
+  `map_battle_id == ""`), and no later boot can inherit it.
+- **`clear_battle()` (:228-233) gets NO line for this field — this IS the fix.** All five call
+  sites, walked (verified by direct read 2026-08-31):
+  1. `scene_manager.gd:192` inside `_teardown_battle_refs()`, called from `_do_swap()` at :152
+     (only when `_current_node != null`; at the MAP → battlefield arrival the map is always
+     hosted, so it ALWAYS runs there) and BEFORE `packed.instantiate()` (:171) /
+     `host.add_child(inst)` (:174). A clear owned here sits **exactly between the entry write and
+     the new battlefield's `_ready()` read**: `start_map_battle` writes the id → `state_changed` →
+     `_do_swap` → teardown wipes it → `_ready()` reads `""` → tutorial fallthrough → Yang Guo,
+     `tutorial_battle == true` — the very defect this round fixes, re-created by the fix itself.
+     Control group proving the diagnosis: `battle_return_state` survives that same swap precisely
+     because `clear_battle()` never touches it (it clears `enemies_alive` / `_player` /
+     `_overlay_layer` only). The new field now follows the same precedent.
+     `_teardown_battle_refs()` / `_do_swap()` are NOT modified (generic teardown stays generic;
+     the fix lives entirely in the new field's write policy). The teardown's
+     `CombatManager.reset_battle()` (:190) is kept — a fresh engine per battle is existing,
+     desired semantics.
+  2. `game_manager.gd:249` `request_continue()` — battle-over routing; the id's clear lives HERE
+     as its own explicit line (clear-at-route above), not as a `clear_battle()` side effect.
+  3. `game_manager.gd:262` `request_retry()` — same.
+  4. `game_manager.gd:342` `menu_load_game()` — loads are restricted to `STABLE_STATES`
+     (CULTIVATION/MAP, :339) ⇒ it never boots a battlefield ⇒ nothing reads the id; no write
+     needed, and the `clear_battle()` it calls is (correctly) inert for this field.
+  5. `game_manager.gd:376` `restart_game()` — see the write-at-entry bullet: this one DOES route
+     into a battlefield `_ready()`, so it writes `""` itself.
+- **Every route into `battlefield._ready()` and its guarantee:**
+  - R1 `state_changed("BATTLE")` swap — fired only by the three `start_*` functions
+    (write-at-entry). ✓
+  - R2 `state_changed("TUTORIAL")` swap — `finish_creation()` (reachable only after restart/boot,
+    where the id is already `""`) and `restart_game()` (writes `""`). ✓
+  - R3 `retry_requested` → `reload_battle()` — the tutorial-LOST retry; a return-TUTORIAL LOST
+    cannot coexist with a live map id (a map battle's LOST has return MAP and routes to MAP, where
+    `reload_battle` no-ops against the in-flight swap). ✓
+  - Load path: `menu_load_game()` never boots a battlefield (STABLE_STATES gate). ✓
+  - Boot default: `SceneManager._ready()`'s `swap_to("battlefield")` on a fresh process — id `""`. ✓
+- **Rejected: owning the clear in `clear_battle()`** — the round-1 error; see call site 1.
+- **Rejected: clear-on-consume (`_setup_map_battle` clears right after reading)** —
+  `_setup_map_battle` runs inside `_ready()`, so a consume-clear makes `map_battle_id` read `""`
+  by the time §7 Leg C's f580 assertion evaluates `map_battle_id == "huashan_duel"` — a frozen leg
+  would go red. It would also kill the §11 horizon (a per-battle intro/BGM hook keyed by the id
+  needs it live for the whole battle). (The LOST→retry re-entry concern was checked and is safe
+  under consume-clear too — retry routes LOST to MAP and the re-fire re-enters through
+  `start_map_battle` — but the frozen-leg contradiction alone disqualifies it.)
 - **Rejected: branch on `battle_return_state == "MAP"`** — that is exactly the defect's coupling,
   re-created one level down; any future caller that sets return=MAP for another build source
   would silently mis-route.
 - **Rejected: separate boolean `battle_build_source`** — strictly less informative than the id
   (the roster still needs the id) and adds a second field to keep in sync. The id carries both
   meanings in one write point.
-- **Lifecycle safety**: the only exits from a map battle are the WON/LOST overlays →
-  `request_continue`/`request_retry` → `clear_battle()` ⇒ id cleared before the next battlefield
-  can ever load, so a tutorial boot can never observe a stale id. Pinned by a unit test (§8).
+- **Pins:** the load-bearing unit pin drives the REAL swap (§5.6 Leg 1 — it crosses the mid-swap
+  `clear_battle()` and is red under the round-1 ownership), and §7 Leg C asserts the live id at
+  f580 end-to-end in the official gate. The branch reads the id, never the return state.
 
 ### D2 — Opponent roster: `huashan_duel` → the five greats, from the existing tutorial factory
 New pure data module `scripts/data/map_battle_data.gd` (`class_name MapBattleData`, mirroring the
@@ -255,15 +328,27 @@ Pure static data layer, zero autoload dependency. Contents per §D2. Interface:
 -> Vector2i`. Mirrors `MapData`'s fail-safe philosophy: an unknown binding reads as inert, never
 crashes.
 
-### 5.2 `scripts/autoload/game_manager.gd` (4 additive edits)
+### 5.2 `scripts/autoload/game_manager.gd` (additive edits — the id's lifecycle lives here)
 1. `var map_battle_id: String = ""` + `set_map_battle_id()`/`get_map_battle_id()` (beside the
    return-state pair at :215-221).
-2. `func start_map_battle(battle_id: String = "") -> void:` — body unchanged except
-   `map_battle_id = battle_id` (default param keeps the signature backward-compatible).
-3. `clear_battle()`: add `map_battle_id = ""` (lifecycle owner; runs on every WON/LOST segment
-   routing).
-4. `var map_events_resolved_count: int = 0` + deferred connection to `SaveManager.loaded` and the
-   new `SaveManager.profile_created`, both resetting it to 0.
+2. `func start_map_battle(battle_id: String = "") -> void:` — body unchanged except ONE line
+   `map_battle_id = battle_id` placed with the other field writes BEFORE `battle_started.emit()` /
+   `state_changed.emit(STATE_BATTLE)` (write-before-emit is the ordering guarantee per D1; the
+   default param keeps no-arg call sites source-compatible).
+3. `start_encounter()` (:156-162): ONE added line `map_battle_id = ""` (write-at-entry; the
+   encounter build source is its own CULTIVATION branch and the map branch must read inert there).
+4. tutorial `start_battle()` (:142-148): ONE added line `map_battle_id = ""` (write-at-entry; the
+   tutorial battlefield branch / overlay wiring / `_instantiate_enemies()` untouched).
+5. `restart_game()` (:375-383): ONE added line `map_battle_id = ""` (its TUTORIAL route boots a
+   battlefield without any `start_*` call — D1 R2).
+6. `request_continue()` / `request_retry()` (:244-266): ONE added line each —
+   `map_battle_id = ""` (clear-at-route; unconditional, the battle is over either way).
+7. `var map_events_resolved_count: int = 0` + deferred connection to `SaveManager.loaded` and the
+   new `SaveManager.profile_created`, both resetting it to 0 (unchanged from the round-1 design).
+8. **`clear_battle()` (:228-233) gets NO line for this field** — deliberately: it runs mid-swap on
+   every scene change (D1's walkthrough), and a mid-swap clear is exactly the wipe that
+   re-creates the defect. `battle_return_state` has never been cleared there either; the new
+   field follows the same precedent.
 
 ### 5.3 `scripts/autoload/save_manager.gd` (2 additive lines)
 `signal profile_created` declared beside `loaded`; emitted at the end of `new_profile()`.
@@ -293,13 +378,40 @@ crashes.
   fallback set — keep in sync with §D3's rule); unknown id → []; every position in-bounds,
   walkable, pairwise-distinct, ≠ player spawn (7,5); (generic property pins, so a reposition does
   not break them).
-- `tests/test_map_battle_entry.gd` (template: `tests/test_encounter.gd`): seed a profile, set
-  `current_state = MAP` + return state MAP + `map_battle_id = "huashan_duel"`, instantiate the
-  battlefield, one deferred flush → assert player is the profile build (ProgressionHero,
-  `tutorial_battle == false`, `current_round == 1`, `turn_order.size() == 6` and contains the
-  five greats' names, HUD `pressed_connected["EndTurnButton"] == true`, enemies registered).
-  Also: `clear_battle()` clears `map_battle_id` (no-leak pin); a null profile aborts without
-  crashing (guard pin).
+- `tests/test_map_battle_entry.gd` (template: `tests/test_encounter.gd` — extends SceneTree,
+  `-s` invocation driven by `run_tests.sh` like `test_encounter.gd`, autoloads fetched from root
+  in the deferred `_run`). **The load-bearing leg drives the REAL `SceneManager` swap, not a
+  direct `add_child` of the battlefield.** In `-s` mode there is no `/root/Main`, so the test
+  builds a minimal shell (`Main` + `SceneHost` Node2D + `SegmentLayer/SegmentHost` Control under
+  root — `_do_swap`'s HUD lookup `/root/Main/HUDLayer` is null-guarded, so its absence is safe)
+  inside the deferred `_run`; the boot-default `swap_to("battlefield")` then harmlessly fails
+  `host_missing` before the shell exists, so no tutorial battlefield is auto-hosted. Then:
+  seed the profile (as `_spawn_encounter_battlefield` does) → `_gm.current_state = "CULTIVATION"`
+  (direct assignment emits nothing) → `_gm.enter_segment("MAP")` (validated edge, hosts the real
+  map scene) → await one frame (`pending_swap` settles) → **`_gm.start_map_battle("huashan_duel")`
+  — the real entry** → the real `_do_swap` runs: map freed → `_teardown_battle_refs()` →
+  **`clear_battle()` mid-swap** → battlefield instantiated → `_ready()` reads the id → deferred
+  `begin_battle` kick. Await ~4 `process_frame`s, then assert: `SceneManager.current_scene ==
+  "battlefield"`, `pending_swap == false`, `GameManager.get_map_battle_id() == "huashan_duel"`
+  (the id SURVIVED the mid-swap teardown), the hosted `Main/SceneHost/Battlefield` exists, the
+  player is the profile build (`character_data.character_name == "ProgressionHero"` — NOT Yang
+  Guo), `CombatManager.tutorial_battle == false`, `current_round == 1`, `phase != "IDLE"`,
+  `turn_order.size() == 6` containing `ProgressionHero` + the five greats, and 5 enemies
+  registered. Deliberately NOT asserted in this harness (environment, not behavior): HUD wiring
+  and the specific `phase` value (a low-initiative test profile acts last; enemy-turn pacing is
+  frame-dependent in `-s`) — both are pinned end-to-end by the playtest gate's Legs C/D instead.
+  Because this leg crosses the mid-swap `clear_battle()`, it is RED under the round-1
+  (clear_battle-owned) lifecycle and GREEN only under the fixed write-at-entry lifecycle — it
+  pins the player-visible entry, not a field assignment. Its pre-fix red is MEASURED (§7.3): with
+  the old ownership temporarily re-introduced, the profile-build assertions fail through the
+  tutorial fallthrough.
+  Additional legs: **(2) write-at-entry discipline** — with `map_battle_id` hand-planted to
+  `"huashan_duel"`, running the `start_battle()` path (state TUTORIAL) and the `start_encounter()`
+  path (state CULTIVATION) each leaves the field `""` (no stale window even from a planted value);
+  **(3) clear-at-route** — from WON/LOST with return MAP, `request_continue()` /
+  `request_retry()` each leave `map_battle_id == ""` (§7 Leg E/F's observable pinned at unit
+  level); **(4) guard** — a null profile aborts `_setup_map_battle` without crashing (direct
+  function-contract leg; tests the guard, not the entry path).
 - `tests/test_map_battle_gate_pins.py` (stdlib pytest, pattern: `test_facility_copy_location.py`):
   the rewritten yaml must still contain the load-bearing assertion literals
   (`current_round >= 1`, `turn_order.size() == 6`, `tutorial_battle == false`,
@@ -403,8 +515,15 @@ no exception record.
 2. Measure and record the four values into the delivery notes: failing frame / first failing
    assertion / exact error string / green asserts before red. Expected first red is one of
    f580 `map_battle_id` (field absent) or `tutorial_battle == false` (reads true) — whichever
-   fires first is the MEASURED value, not this prediction.
-3. Restore the code fix, re-run → green; then the full official gate (78/78) plus the unit suite.
+   fires first is the MEASURED value, not this prediction. This run also records the pre-fix red
+   of §7 Leg C's `map_battle_id == "huashan_duel"` (the end-to-end guarantee for the real-swap
+   property).
+3. Measure the REAL-SWAP unit pin's pre-fix red the same way (§5.6 Leg 1): temporarily
+   re-introduce the round-1 `clear_battle()`-owned lifecycle (one-line revert), run
+   `tests/test_map_battle_entry.gd` through the unit-suite harness, record failing assertion /
+   exact message / which leg, then restore. The pin must be RED under the old ownership and GREEN
+   only after the write-at-entry fix.
+4. Restore the code fix, re-run → green; then the full official gate (78/78) plus the unit suite.
 
 ## 8. Design-doc deliverables (executed by the 5_design step from gate artifacts)
 
@@ -416,7 +535,9 @@ no exception record.
    ruling, and the §D3 roster/survivability ruling with measured numbers. Update §8.3 item 1
    (battle slots) to "live on 华山, declared elsewhere".
 2. `design/90_decisions.md`: one dated ruling (2026-08-31) recording: build-source/return-target
-   decoupling via `map_battle_id` (rejected alternatives per §D1), sibling `_setup_map_battle`
+   decoupling via `map_battle_id`, including the corrected lifecycle ruling (write-at-entry at
+   every battlefield `_ready()` route + clear-at-route; `clear_battle()` untouched, all five call
+   sites walked — rejected alternatives per §D1), sibling `_setup_map_battle`
    (rejected parameterization per §D4), counter persistence home (rejected profile-persistence per
    §D5), roster = five greats from the existing factory with the pre-authorized one-line fallback.
 3. `design/99_changelog.md`: **exactly one appended line** for this round; no existing line or
@@ -454,9 +575,9 @@ no exception record.
 |---|---|
 | Hero dies in round 1 before acting (floor 62 global with five greats) | §D3: far-perimeter positions; pre-authorized one-line roster fallback (drop Central Divine → floor 23); decision made from MEASURED gate evidence, recorded honestly |
 | Frame timing for the player's turn (5 enemy turns first) | Deterministic engine (zero-RNG AI, seeded RNG outside battle) — measured once, holds forever; generous ⟨meas⟩ margins; `at:` values re-baselined exactly like prior rounds did |
-| `map_battle_id` leaks into a tutorial boot | Cleared in `clear_battle()` (the only WON/LOST exit); unit pin asserts the clear; the branch reads the id, never the return state |
+| `map_battle_id` stale into a later battlefield `_ready()` | Write-at-entry: the three `start_*` entries + `restart_game()` write the field before any swap; clear-at-route in `request_continue`/`request_retry`; `clear_battle()` deliberately untouched (it runs mid-swap); the real-swap unit pin crosses the mid-swap teardown and §7 Leg C asserts the live id at f580 |
 | `events_resolved_count` ladder regressions | Mirror is additive; grep-verified no existing pin spans a MapScreen rebuild; `save_load_roundtrip` asserts no counter value |
-| Tutorial byte-freeze violation | No edit inside the tutorial branch/`_instantiate_enemies`/`start_battle`; sibling functions only; `equipment_in_battle_diff` + tutorial scenarios are the tripwires |
+| Tutorial byte-freeze violation | No edit inside the tutorial battlefield branch/`_instantiate_enemies`; the ONLY `start_battle` change is the single write-at-entry line (behavior frozen); sibling functions only; `equipment_in_battle_diff` + tutorial scenarios are the tripwires |
 | `turn_order.size() == 6` breaks if the roster changes | Intentional loud failure (gate discipline); the §D3 fallback updates the same line knowingly |
 | Synchronous HUD wire unreachable | Same deferred-fallback pattern as the encounter path (:666-668) |
 
@@ -472,9 +593,10 @@ no exception record.
 
 ## 12. PM decomposition hints (suggested subtask split)
 
-1. **Data & decoupling**: `map_battle_data.gd` + GameManager (id field, start_map_battle(bid),
-   clear_battle, counter mirror) + SaveManager signal + map.gd wiring + unit tests
-   (`test_map_battle_data.gd`).
+1. **Data & decoupling**: `map_battle_data.gd` + GameManager (id field written at all four
+   battlefield `_ready()` routes — `start_map_battle(bid)` / `start_encounter` / `start_battle` /
+   `restart_game` — and cleared at `request_continue`/`request_retry`; counter mirror) +
+   SaveManager signal + map.gd wiring + unit tests (`test_map_battle_data.gd`).
 2. **Battlefield entry**: `_setup_map_battle` + `_instantiate_map_enemies` + branch +
    `test_map_battle_entry.gd`.
 3. **Gate rewrite**: yaml rewrite per §7.1-7.2 + `_common.yaml` surface appends +
