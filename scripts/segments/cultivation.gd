@@ -215,7 +215,7 @@ func _cycle_focus(dir: int) -> void:
 		"ATTR_PICK":
 			_attr_focus = (_attr_focus + dir + 5) % 5
 		"EVENT":
-			_event_focus = 0 if dir > 0 else 1
+			_event_focus = (_event_focus + dir + 2) % 2
 		"YEAR_END":
 			_year_choice = 1 if dir > 0 else 0  # down -> 另投他派(1), up -> 留在本门(0)
 		"SECT_SWITCH":
