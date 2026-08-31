@@ -237,6 +237,10 @@ debug_grant_silver={
 "deadzone": 0.5,
 "events": []
 }
+debug_seed_events_seen={
+"deadzone": 0.5,
+"events": []
+}
 
 [rendering]
 

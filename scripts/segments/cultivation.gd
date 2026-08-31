@@ -34,6 +34,10 @@ const _A_ID_BY_SCHOOL := {
 ## profile.inventory append. See _debug_grant_equip.
 const _DEBUG_EQUIP_ID: String = "eq_sword_3"
 
+## Showcase event id: the single id the debug seeder leaves unseen, so a
+## 1-element draw is deterministic. Introduced by the event-pool-36 round.
+const SHOWCASE_ID: String = "cliff_herbs"
+
 ## Surface: cultivation year (1..3).
 var year: int = 1
 
@@ -80,6 +84,15 @@ var event_id: String = ""
 ## reset branch of _draw_event refills it (guaranteeing a non-empty draw — never
 ## an empty event, never a stall).
 var events_seen_count: int = 0
+
+## Surface: title of the currently displayed 游历 event ("" when none).
+## Published as RAW zh (== what the zh-rendered build displays); playtest
+## exact-literal pins assume zh. Do not tr() here.
+var event_title: String = ""
+
+## Surface: body text of the currently displayed 游历 event ("" when none).
+## Same locale coupling as event_title: raw zh literal.
+var event_body: String = ""
 
 ## Surface: true once the DEBUG fast-forward has run.
 var fast_forward_used: bool = false
@@ -152,6 +165,8 @@ func _process(_delta: float) -> void:
 		_debug_grant_art()
 	if Input.is_action_just_pressed("debug_grant_equip"):
 		_debug_grant_equip()
+	if Input.is_action_just_pressed("debug_seed_events_seen"):
+		_debug_seed_events_seen()
 
 
 func _roster_open() -> bool:
@@ -798,6 +813,21 @@ func _debug_grant_equip() -> void:
 	_sync_surface()
 
 
+## DEBUG/TEST-ONLY: mark every pool id seen EXCEPT SHOWCASE_ID, leaving exactly
+## one unseen id so the next roam draw is deterministic (1-element pool).
+## Reuses the identical append-if-absent branch shape as the real mark at
+## _apply_event_option (line 467–469 pattern). Zero RNG ops. Never called by
+## gameplay; harness-only (project.godot empty events list).
+func _debug_seed_events_seen() -> void:
+	if GameManager.current_state != "CULTIVATION":
+		return
+	var seen: Array = SaveManager.profile.flags.get("events_seen", [])
+	for def in EventData.all():
+		if def.id != SHOWCASE_ID and not seen.has(def.id):
+			seen.append(def.id)
+	_sync_surface()
+
+
 # ---------------------------------------------------------------------------
 # Surface sync + rendering
 # ---------------------------------------------------------------------------
@@ -826,6 +856,11 @@ func _sync_surface() -> void:
 		gongfa_grades.append(str(entry.get("grade", "")))
 		gongfa_names.append(ProgressionGongfaData.display_name_of(id))
 	events_seen_count = (SaveManager.profile.flags.get("events_seen", []) as Array).size()
+	# Locale coupling: published as RAW zh (== zh-rendered build output); playtest
+	# pins exact zh literals. Do not tr() here — mirrors how event_id is published.
+	var d = EventData.def(event_id)
+	event_title = d.title if d != null else ""
+	event_body = d.text if d != null else ""
 
 
 func _categories_of(cards: Array) -> Array:

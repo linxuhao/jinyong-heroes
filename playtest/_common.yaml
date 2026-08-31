@@ -178,6 +178,7 @@ actions:
 - debug_spend_player_qi
 - use_facility
 - debug_grant_silver
+- debug_seed_events_seen
 surface:
   CombatManager:
   - current_round
@@ -770,6 +771,8 @@ surface:
   - gongfa_grades
   - gongfa_names
   - events_seen_count
+  - event_title
+  - event_body
   - pressed_connected
   - cursor_markers_visible
   - option_focus
