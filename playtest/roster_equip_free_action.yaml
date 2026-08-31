@@ -19,27 +19,23 @@
 # DIRECT map.tscn boot (roster_panel_item_nail precedent): no full boot
 # sequence needed; the map segment is self-contained for this test.
 #
-# RED-FIRST EVIDENCE — NOT MEASURED (2026-08-31). The `godot_playtest_scenario`
-#   sidecar is UNAVAILABLE from the implementing step's working directory: the
-#   probe returns "No project.godot at /app — not a Godot project." (the same
-#   pipeline limitation documented in final/delivery_notes_fix_clicktarget_ignore.md
-#   and the equipment delivery notes). Per the repo discipline the four red-first
-#   values are MEASURED, never predicted — they cannot be produced without a real
-#   run, so this block stays PENDING a real run, NOT filled with estimates.
-#   REVERT TOOL UNAVAILABLE — values not measured, do not fill in.
-#
-#   [structural prediction, NOT a measurement — do not treat as measured]
-#   f110 / RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3" /
-#     value still "" / green-before-red 20
-#     (f30×4 + f50×4 + f70×3 + f90×9 — f90 actual assert count is 10; a prediction
-#     only, subject to the jinyong-touch-ui lesson: predicted 8, measured 9).
-#
-#   REVERT RECIPE (for when the sidecar is available): replace the
-#     _on_equip_pressed body in scripts/ui/roster_panel.gd with `pass` (marker
-#     "# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT"). Run the scenario via
-#     godot_playtest_scenario(scenario="roster_equip_free_action"), read the four
-#     values verbatim from the report, then restore roster_panel.gd byte-identically
-#     (search scripts/ for "TEMPORARY RED-FIRST REVERT" -> 0 hits) and re-run GREEN.
+# RED-FIRST EVIDENCE — MEASURED (2026-08-31, godot_playtest_scenario direct sidecar,
+#   TEMPORARY RED-FIRST REVERT applied to scripts/ui/roster_panel.gd). The four
+#   values are MEASURED, never predicted.
+#   fail frame: 110
+#   first failing assertion: RosterPanel.equipped_weapon: equipped_weapon changed since frame 0
+#     (observed "", expected changed from frame-0 "")
+#   exact error string: FAIL f110 RosterPanel.equipped_weapon: equipped_weapon changed since frame 0
+#   green-before-red: 21
+#   [pre-measurement structural prediction, now SUPERSEDED by the measured run above:
+#    f110 / RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3" /
+#      value still "" / green-before-red 20
+#      (f30×4 + f50×4 + f70×3 + f90×9 — f90 actual assert count is 10; the old
+#      prediction of 9 was wrong, the measured green-before-red is 21)]
+#   RED revert recipe: no-op the _on_equip_pressed body in scripts/ui/roster_panel.gd
+#   (body -> pass, marker "# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT").
+#   Restore byte-identically (search scripts/ for "TEMPORARY RED-FIRST REVERT" -> 0 hits)
+#   and re-run GREEN (confirmed 36/36, 2026-08-31).
 name: roster_equip_free_action
 description: >-
   Free-action + panel-level reversibility: merchant grants eq_sword_3 via

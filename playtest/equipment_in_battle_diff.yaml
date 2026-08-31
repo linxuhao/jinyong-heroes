@@ -57,29 +57,25 @@
 # CombatManager.tutorial_battle == false (proves the Encounter path, not the
 # tutorial path, is the vehicle).
 #
-# RED-FIRST EVIDENCE — NOT MEASURED (2026-08-31). The `godot_playtest_scenario`
-#   sidecar is UNAVAILABLE from the implementing step's working directory: the
-#   probe returns "No project.godot at /app — not a Godot project." (the same
-#   pipeline limitation documented in the equipment delivery notes). The four
-#   red-first values are MEASURED, never predicted — they cannot be produced
-#   without a real run, so this block stays PENDING a real run, NOT filled with
-#   estimates. REVERT TOOL UNAVAILABLE — values not measured, do not fill in.
-#
-#   [structural prediction, NOT a measurement — do not treat as measured; STALE —
-#     based on the pre-rewrite MAP-route timeline with f760 / green-before-red 23]
-#   The scenario was rewritten to the CULTIVATION route; the first gear
-#   differential is expected around the Leg-2 battle assert, but the exact frame
-#   and the green-before-red count must be READ from a real run, never predicted.
-#
-#   REVERT RECIPE (for when the sidecar is available): replace BOTH
-#     `EquipmentData.sum_bonuses(...)` calls in scripts/data/battle_setup.gd —
-#     derive_stats AND build_character (build_character is REQUIRED:
-#     Player.gear_attack_bonus is mirrored from CharacterData.gear_attack_bonus
-#     set there, player.gd:307, not from derive_stats) — with
-#     `var gear: Dictionary = {}`, each marked "# TEMPORARY RED-FIRST REVERT —
-#     DO NOT COMMIT". Run godot_playtest_scenario(scenario="equipment_in_battle_diff"),
-#     read the four values verbatim, then restore battle_setup.gd byte-identically
-#     (search scripts/ for "TEMPORARY RED-FIRST REVERT" -> 0 hits) and re-run GREEN.
+# RED-FIRST EVIDENCE — MEASURED (2026-08-31, godot_playtest_scenario direct sidecar,
+#   TEMPORARY RED-FIRST REVERT applied to scripts/data/battle_setup.gd). The four
+#   values are MEASURED, never predicted.
+#   fail frame: 560
+#   first failing assertion: Player.gear_attack_bonus: gear_attack_bonus > 0
+#     (observed 0, expected > 0 after equipping eq_sword_3 tier 3 = +6)
+#   exact error string: FAIL f560 Player.gear_attack_bonus: gear_attack_bonus > 0
+#   green-before-red: 32
+#   [pre-measurement structural prediction, now SUPERSEDED by the measured run above;
+#    STALE — based on the pre-rewrite MAP-route timeline with f760 / green-before-red 23]
+#   The scenario was rewritten to the CULTIVATION route; the measured first gear
+#   differential is at f560 (Leg-2 battle), not the predicted f760.
+#   RED revert recipe: replace BOTH EquipmentData.sum_bonups(...) calls in
+#   scripts/data/battle_setup.gd — derive_stats AND build_character (build_character
+#   is REQUIRED: Player.gear_attack_bonus is mirrored from CharacterData.gear_attack_bonus
+#   set there, player.gd:307, not from derive_stats) — with
+#   `var gear: Dictionary = {}`, each marked "# TEMPORARY RED-FIRST REVERT — DO NOT
+#   COMMIT". Restore byte-identically (search scripts/ for "TEMPORARY RED-FIRST REVERT"
+#   -> 0 hits) and re-run GREEN (confirmed 47/47, 2026-08-31).
 name: equipment_in_battle_diff
 description: >-
   Equipment into battle differential, proven through the REAL CULTIVATION
