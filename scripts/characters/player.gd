@@ -1253,3 +1253,4 @@ func _apply_sprite_visuals() -> void:
 	# Foot anchor, set exactly once: the sprite never compensates for the
 	# viewport or the HUD — the Camera2D follower owns visibility.
 	_sprite.offset = Vector2(0, -(_sprite.texture.get_height() / 2.0))
+

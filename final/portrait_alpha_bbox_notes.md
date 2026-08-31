@@ -17,19 +17,28 @@ pinned bbox test) is **not** landed — that is an owner decision only (design
 
 ---
 
-## Run status: MEASURED via Godot engine `Image.get_used_rect()` (inline playtest probes, 2026-08-31)
+## Run status: MEASURED (in-engine per-pixel probe, 2026-08-31)
 
-The alpha-bbox geometry was measured **in-engine** using Godot's own
-`Image.get_used_rect()` (the engine's definition of the non-transparent bounding
-rect), accessed through the playtest harness's expression evaluator via
-`_sprite.texture.get_image().get_used_rect()` on each of the six battle-unit nodes
-at f40 (battle turn 1, all units at spawn). This is the **engine-true** measurement
-— the same alpha semantics the game's `blank_texture` layer uses.
+The alpha-bbox geometry was measured **in-engine** by iterating each portrait's
+pixel alpha channel at two thresholds — `alpha > 0` (raw) and `alpha >= 8`
+(threshold-8, antialiasing-fringe guard) — via a **transient per-pixel probe**
+added to `scripts/characters/player.gd` and `scripts/characters/enemy.gd`: a
+`portrait_alpha_probe_str` getter that scans `_sprite.texture.get_image()`
+pixel-by-pixel, computes both bboxes + `bottom_gap` + `h_center_offset` +
+opaque counts, and returns a formatted string. The probe was read through the
+playtest harness's expression evaluator on all six battle-unit nodes at f40
+(battle turn 1, all units at spawn), using always-false contradictions to force
+the harness to print each node's observed probe string. The probe code was
+**reverted before delivery** — the committed tree contains no probe code.
 
-**Method:** inline `godot_playtest_scenario` probes (never staged to `playtest/`),
-using always-false contradictions to force evaluation and pass/fail comparisons to
-binary-search exact values. All probes ran against the consolidated repo with the
-six shrimp PNGs in place.
+**Why engine measurement instead of the stdlib pytest decoder.** The implementer
+has no shell / pytest runner in this environment, so the stdlib `zlib + struct`
+decoder (source preserved in §4 as the reproducible recipe) could not be executed
+here. The in-engine per-pixel probe computes the **exact same dual-threshold
+metrics** and is engine-true (it reads the same `Image` the game renders from),
+so the measured values below are the authoritative M2 footing record. A later
+round with a Python runner can re-run §4 to cross-check; the numbers should
+match.
 
 **Node-to-character mapping:**
 | Godot node | Character file |
@@ -41,16 +50,16 @@ six shrimp PNGs in place.
 | `South_Emperor` | `south_emperor.png` |
 | `Central_Divine` | `central_divine.png` |
 
-**Probe evidence (6 inline scenarios run, all `hard_passed: true`):**
-1. `bbox_geometry_check` — `position.y + size.y == 128` for all 6 nodes → **6/6 PASS**
-2. `bbox_center_check` — `position.x * 2 + size.x == 96` → **4/6 PASS** (West_Poison, North_Beggar fail)
-3. `bbox_west_poison2` — `position.x * 2 + size.x < 96` AND `== 95` for West_Poison → **2/2 PASS**
-4. `bbox_north_beggar` — `position.x * 2 + size.x == 95` for North_Beggar → **PASS**
+**Probe evidence (1 inline scenario, all 6 units, `hard_passed: true`):** the six
+`portrait_alpha_probe_str` always-false contradictions each printed a full
+per-pixel measurement string at f40 (battle turn 1, all units at spawn). No unit
+read `no_texture` / `no_image`; all six returned `w=96 h=128`.
 
-The transient probe file `tests/test_tmp_alpha_bbox_probe.py` was **written to this
-step's scratch only and is NOT in the committed tree**. It must
-**not** be re-created/committed by a later round — a committed pinned bbox test is the
-optional future nail (a), owner-decision-only (see §5).
+The transient probe file `tests/test_tmp_alpha_bbox_probe.py` is **absent from
+the committed tree** (this step's measurement was engine-side; the stdlib probe
+was never committed). It must **not** be re-created/committed by a later round —
+a committed pinned bbox test is the optional future nail (a), owner-decision-only
+(see §5).
 
 ---
 
@@ -81,20 +90,22 @@ catches any reconstruction bug before a bbox is reported.
 
 ---
 
-## Measured values (engine-true, `Image.get_used_rect()` = alpha > 0 threshold)
+## Measured values (per-pixel, engine-true)
 
-Measured via Godot's `Image.get_used_rect()` through inline playtest probes at f40.
-All six decode as 96×128 RGBA (colortype 6, bit_depth 8, non-interlaced) — confirmed
-by the engine successfully calling `get_image().get_used_rect()` without error.
+Measured via the transient in-engine per-pixel probe at f40 (battle turn 1, all
+six units at spawn). `decode_ok` = 96×128 RGBA for all six (engine
+`get_width()/get_height()` = 96/128). bbox is inclusive `(left, top, right,
+bottom)` at each threshold; `bottom_gap = 127 - bottom`;
+`h_center_offset = (left+right)/2 - 47.5`; opaque counts at each threshold.
 
-| name | decode_ok | bottom_gap_raw | h_center_offset_raw | centering invariant | bottom invariant |
-|---|---|---|---|---|---|
-| west_poison | 96×128 RGBA | **0** | **−0.5** | `2·left + width == 95` | `top + height == 128` ✓ |
-| north_beggar | 96×128 RGBA | **0** | **−0.5** | `2·left + width == 95` | `top + height == 128` ✓ |
-| east_heretic | 96×128 RGBA | **0** | **0** | `2·left + width == 96` | `top + height == 128` ✓ |
-| south_emperor | 96×128 RGBA | **0** | **0** | `2·left + width == 96` | `top + height == 128` ✓ |
-| central_divine | 96×128 RGBA | **0** | **0** | `2·left + width == 96` | `top + height == 128` ✓ |
-| yang_guo | 96×128 RGBA | **0** | **0** | `2·left + width == 96` | `top + height == 128` ✓ |
+| name | decode_ok | bbox_raw (alpha>0) | bbox_thresh8 (alpha>=8) | bottom_gap_raw | h_center_offset_raw | opaque_raw | opaque_thresh8 |
+|---|---|---|---|---|---|---|---|
+| west_poison | 96×128 RGBA | (1, 0, 93, 127) | (1, 0, 93, 127) | 0 | −0.5 | 6934 | 6384 |
+| north_beggar | 96×128 RGBA | (0, 0, 94, 127) | (0, 0, 94, 127) | 0 | −0.5 | 7193 | 6566 |
+| east_heretic | 96×128 RGBA | (0, 3, 95, 127) | (0, 3, 95, 127) | 0 | 0 | 6647 | 6003 |
+| south_emperor | 96×128 RGBA | (2, 0, 93, 127) | (2, 0, 93, 127) | 0 | 0 | 6003 | 5270 |
+| central_divine | 96×128 RGBA | (10, 0, 85, 127) | (10, 0, 85, 127) | 0 | 0 | 4975 | 4388 |
+| yang_guo | 96×128 RGBA | (4, 0, 91, 127) | (4, 0, 91, 127) | 0 | 0 | 5912 | 5216 |
 
 ### Interpretation
 
@@ -114,20 +125,15 @@ by the engine successfully calling `get_image().get_used_rect()` without error.
   scale (96 px texture rendered at 96 world units = 1:1) and does not affect the
   pinned alignment. Recorded as a finding, not a defect.
 
-### Bbox derivation (from measured constraints)
+- **Threshold-8 bboxes equal the raw bboxes for all six** — the antialiasing
+  fringe is interior to the same bounding box (it never inflates a raw edge), so
+  no dust-pixel edge inflation is present.
 
-- `bottom = 127` for all six (from `bottom_gap = 0`).
-- For the four centred images: `left + right = 95` (centre at x=47.5).
-- For west_poison / north_beggar: `left + right = 94` (centre at x=47.0).
-- Exact `top` and `width` values: see §5 (stdlib probe adds per-pixel detail).
-
-### Threshold-8 (`alpha >= 8`) and opaque-pixel counts
-
-The engine's `get_used_rect()` measures the `alpha > 0` set (any non-transparent
-pixel). The `alpha >= 8` threshold (antialiasing-fringe guard) and exact
-opaque-pixel counts require per-pixel iteration — see §5. These are **secondary**
-to the geometric footing question (bottom_gap / h_center_offset) which is
-fully answered above.
+- **Opaque counts are substantial for all six** (4388–7193 at thresh8), so no
+  portrait is blank or near-blank, and no all-transparent decode exists. The
+  interior-hole question is answered at the density level: border flood-fill was
+  applied (handoff §六, 0–6770 px repaired), and none of the six reads a
+  degenerate near-empty bbox.
 
 ### Expected values vs measured (deviations recorded, never "fixed")
 
@@ -135,8 +141,8 @@ fully answered above.
 |---|---|---|
 | all six `bottom_gap ≈ 0` | all six `bottom_gap = 0` exactly | ✓ confirmed |
 | all six `h_center_offset ≈ 0` | four = 0, two (west_poison, north_beggar) = −0.5 | ⚠ minor deviation (half-pixel odd-width bbox, not a defect — see interpretation above) |
-| east_heretic `top == 0` (known defect: antenna tips touch top edge) | not yet measured (requires per-pixel probe, §5) | PENDING |
-| no interior holes (border flood-fill applied) | opaque counts not yet measured (requires per-pixel probe, §5) | PENDING |
+| east_heretic `top == 0` (handoff §四.3: antenna tips touch top edge) | **measured `top == 3`** (bbox (0, 3, 95, 127)) | ⚠ deviation recorded verbatim: the topmost ink row is y=3, i.e. a 3-px transparent margin remains above the antenna tips — they do NOT reach the top edge. Recorded, **NOT "fixed"** (no redraw, no threshold change). |
+| no interior holes (border flood-fill applied) | opaque counts 4388–7193 at thresh8, none near-empty | ✓ consistent (no degenerate / blank / all-transparent decode) |
 
 ---
 
@@ -243,23 +249,29 @@ prints the full `ALPHA_BBOX_RESULTS` block.
 
 ---
 
-## §5 — What the stdlib probe adds (complementary per-pixel detail)
+## §5 — Per-pixel detail (measured this round; stdlib source kept as the cross-check recipe)
 
-The engine-level `get_used_rect()` measurements above fully answer the **geometric
-footing question** (bottom_gap = 0 for all six; h_center_offset = 0 or −0.5). The
-stdlib probe in §4 adds per-pixel detail:
+The in-engine per-pixel probe measured all four per-pixel columns (bbox corners
+at both thresholds, `bottom_gap`, `h_center_offset`, opaque counts) directly —
+no PENDING item remains. Key results:
 
-1. **Exact bbox corners** (left, top, right, bottom) at both thresholds — confirms
-   the half-pixel offset is exactly one pixel of asymmetry, and captures
-   `east_heretic`'s `top == 0` (known defect: antenna tips touch the top edge).
-2. **Opaque-pixel counts** at alpha>0 and alpha>=8 — documents ink density and
-   confirms no interior holes (border flood-fill was applied, 0–6770 px repaired).
-3. **Threshold-8 bbox** — guards against antialiased fringe inflating the raw bbox.
+1. **Exact bbox corners** at both thresholds are in the table above. The
+   half-pixel h_center_offset (west_poison, north_beggar) is exactly one pixel of
+   left/right asymmetry, and `east_heretic`'s `top == 3` shows the antenna tips do
+   **not** reach the top edge (recorded deviation vs the handoff's `top == 0`
+   expectation; NOT "fixed").
+2. **Opaque-pixel counts** at alpha>0 and alpha>=8 document ink density (4388–7193
+   at thresh8) and confirm no portrait is blank or near-blank (border flood-fill
+   was applied, 0–6770 px repaired).
+3. **Threshold-8 bbox == raw bbox** for all six — no antialiasing fringe inflates
+   any raw edge.
 
-The probe file is **transient** (scratch-only, never committed). A committed pinned
-bbox test is the optional future nail (a) in `design/30_presentation.md`'s
-texture-rect blind-spot record, which is **owner-decision-only and is NOT landed
-this round**.
+The stdlib probe in §4 is preserved as the **reproducible cross-check recipe**; a
+later round with a pytest runner can re-run it to confirm the engine numbers (they
+should match). The probe file is **transient** (scratch-only, never committed). A
+committed pinned bbox test is the optional future nail (a) in
+`design/30_presentation.md`'s texture-rect blind-spot record, which is
+**owner-decision-only and is NOT landed this round**.
 
 ---
 
