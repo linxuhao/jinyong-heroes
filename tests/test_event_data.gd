@@ -156,7 +156,7 @@ const ROW_EFFECTS := {
 }
 
 const ROW_TITLES := {
-	"bandits": "山道遇劫匪", "merchant": "行商路过", "ruins": "古墓残碑", "beggar": "老丐乞食",
+	"bandits": "山道遇劫", "merchant": "车马过路", "ruins": "古墓残碑", "beggar": "巷口乞食",
 	"tomb_bed": "古墓寒玉", "wounded_eagle": "神雕负伤", "peach_maze": "桃花迷阵",
 	"snake_bile": "蛇胆奇效", "dragon_scrap": "降龙残谱", "flood_ferry": "渡口风波",
 	"escort_job": "镖行招募", "dali_market": "大理市集", "night_rain": "破庙夜雨",
@@ -172,22 +172,22 @@ const ROW_TITLES := {
 
 ## Verbatim body text for all 36 rows (pins the text field byte-for-byte).
 const ROW_TEXTS := {
-	"bandits": "行至山道，一伙劫匪拦住去路。\n为首之人手提钢刀，索要买路财。",
-	"merchant": "一位行商赶着马车路过，\n车上满载刀剑兵刃，正愁销路。",
+	"bandits": "行至山道，一伙拦路的虾截住去路。\n为首一只长钳提着钢刀，索要买路财。",
+	"merchant": "一只虾赶着马车路过，\n钳里挽着缰绳，满载刀剑兵刃正愁销路。",
 	"ruins": "荒野深处露出一角残碑，\n碑文似与古墓武学有关。",
-	"beggar": "巷口一名老丐伸手乞食，\n目光却在你身上暗暗打量。",
+	"beggar": "巷口一只老虾伸钳乞食，\n触须低垂，复眼却在你身上暗暗打量。",
 	"tomb_bed": "荒山之中藏着一座古墓，\n石室中央横着一张寒玉床。",
 	"wounded_eagle": "一只巨雕伏在崖边，\n翅上箭伤未愈，目光如炬。",
 	"peach_maze": "海岛风送来桃花香，\n花影错落，隐成阵势。",
-	"snake_bile": "白驼山弟子叫卖蛇胆，\n称其大补真元，价钱不菲。",
+	"snake_bile": "白驼山来的虾客叫卖蛇胆，\n药袋挂在触须上，称大补真元，价钱不菲。",
 	"dragon_scrap": "书摊上一册残破掌谱，\n隐见「降龙」二字，纸色发黄。",
-	"flood_ferry": "河水暴涨，渡口只余一舟，\n艄公索价甚高，爱搭不理。",
-	"escort_job": "镖头缺人手，见你身手，\n便邀你押一趟去南边的镖。",
-	"dali_market": "市集上皮甲快靴俱全，\n掌柜的拍着胸脯称分量十足。",
-	"night_rain": "夜雨滂沱，破庙漏得厉害，\n老僧独坐，就着灯火补屋檐。",
-	"gambling_den": "镇上赌坊彻夜喧闹，\n有人一夜输光了全部盘缠。",
-	"quanzhen_scripture": "全真宫外老道伏案抄经，\n见你驻足，递来一卷道德经。",
-	"lost_purse": "路旁褡裢里散着银两，\n四下无人，只有风声掠过草叶。",
+	"flood_ferry": "河水暴涨，渡口只余一舟，\n一只虾撑舟而立，索价甚高，爱搭不理。",
+	"escort_job": "镖局里一只虾头领缺个帮工，见你身手，\n便邀你押一趟去南边的镖。",
+	"dali_market": "市集上皮甲快靴俱全，\n铺里的虾拍着甲壳称分量十足。",
+	"night_rain": "夜雨滂沱，破庙漏得厉害，\n一只老虾独坐，就着灯火补屋檐。",
+	"gambling_den": "镇上赌坊彻夜喧闹，\n一只虾一夜输光了全部盘缠。",
+	"quanzhen_scripture": "全真宫外一只老虾伏案抄经，\n见你驻足，伸钳递来一卷道德经。",
+	"lost_purse": "路旁褡裢里散着银两，\n四下不见虾影，只有风声掠过草叶。",
 	"riverside_duel": "河滩上两派剑客各立一端，\n口舌已僵，都请你执剑裁断。",
 	"ancient_bell": "荒寺暮色里铜钟自鸣，\n钟腹内壁隐有呼吸般的铭文。",
 	"poisoned_well": "荒村井水一夜发苦，\n药翁提药箱来，开口要价。",
@@ -220,14 +220,14 @@ const ROW_LABELS := {
 	"wounded_eagle": ["施药疗伤", "静观其变"],
 	"peach_maze": ["循隙闯阵", "阵外观潮"],
 	"snake_bile": ["重金购之", "掉头就走"],
-	"dragon_scrap": ["强记于心", "卖与书贾"],
+	"dragon_scrap": ["强记于心", "卖与书铺"],
 	"flood_ferry": ["付钱渡河", "泅水而过"],
 	"escort_job": ["接下镖单", "婉拒独行"],
 	"dali_market": ["购皮甲", "购快靴"],
 	"night_rain": ["帮工换宿", "檐下练剑"],
 	"gambling_den": ["入局三把", "袖手旁观"],
 	"quanzhen_scripture": ["随他抄经", "求教剑理"],
-	"lost_purse": ["送还失主", "收起走人"],
+	"lost_purse": ["归还失物", "收起走人"],
 	"riverside_duel": ["出招定胜负", "劝散取彩"],
 	"ancient_bell": ["抚钟入息", "敲钟卖铜"],
 	"poisoned_well": ["出银请药", "自学辨毒"],
@@ -384,7 +384,7 @@ static func _test_fresh_instances(ok: bool) -> bool:
 	var all1: Array = EventData.all()
 	all1[0].title = "mutated"
 	var all2: Array = EventData.all()
-	ok = _expect(ok, all2[0].title == "山道遇劫匪", "all() instances fresh")
+	ok = _expect(ok, all2[0].title == "山道遇劫", "all() instances fresh")
 	return ok
 
 
