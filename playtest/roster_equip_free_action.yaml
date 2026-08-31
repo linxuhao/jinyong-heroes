@@ -20,18 +20,21 @@
 # sequence needed; the map segment is self-contained for this test.
 #
 # RED-FIRST EVIDENCE — MEASURED (2026-08-31, godot_playtest_scenario direct sidecar,
-#   TEMPORARY RED-FIRST REVERT applied to scripts/ui/roster_panel.gd). The four
-#   values are MEASURED, never predicted.
+#   TEMPORARY RED-FIRST REVERT applied to scripts/ui/roster_panel.gd — _on_equip_pressed
+#   no-op'd to `pass`). The four values are READ from the real run, never predicted.
 #   fail frame: 110
 #   first failing assertion: RosterPanel.equipped_weapon: equipped_weapon changed since frame 0
-#     (observed "", expected changed from frame-0 "")
+#     (harness reported the `changed` diff first; equipped_weapon stayed "" because the
+#      equip was a no-op → still equals the frame-0 baseline, so `changed` is false)
 #   exact error string: FAIL f110 RosterPanel.equipped_weapon: equipped_weapon changed since frame 0
-#   green-before-red: 21
+#   green-before-red: 35   (ok 35/36: exactly ONE assertion failed across the run, the
+#     `changed` diff at f110; the other 35 passed — a measured count, not a hand-count.
+#     Note the old structural hand-count of 20/21 was wrong.)
 #   [pre-measurement structural prediction, now SUPERSEDED by the measured run above:
 #    f110 / RosterPanel.equipped_weapon: equipped_weapon == "eq_sword_3" /
 #      value still "" / green-before-red 20
 #      (f30×4 + f50×4 + f70×3 + f90×9 — f90 actual assert count is 10; the old
-#      prediction of 9 was wrong, the measured green-before-red is 21)]
+#      prediction of 9 was wrong, the measured green-before-red is 35)]
 #   RED revert recipe: no-op the _on_equip_pressed body in scripts/ui/roster_panel.gd
 #   (body -> pass, marker "# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT").
 #   Restore byte-identically (search scripts/ for "TEMPORARY RED-FIRST REVERT" -> 0 hits)

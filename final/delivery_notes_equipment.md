@@ -63,51 +63,66 @@ slot is populated by this scenario; the armor and boots slots remain empty
 (`gear_attack_bonus` 0 → 6), satisfying the requirement. No armor or boots
 differential is forced (the seed does not grant them).
 
-## Red-first four values — NOT MEASURED (2026-08-31)
+## Red-first four values — MEASURED (2026-08-31, measure_equipment_red_first_evidence)
 
 Per the `record_measured_red_first_and_reconcile` discipline, the red-first
 four values for each new pin are MEASURED from a real run (temporary
-revert + direct sidecar), never predicted.
+revert + direct `godot_playtest_scenario` sidecar), never predicted. The
+sidecar WAS available from this step (`measure_equipment_red_first_evidence`),
+so the values below were READ from real runs with the sanctioned temporary
+reverts applied, then each `.gd` was restored byte-identical (zero
+`TEMPORARY RED-FIRST REVERT` residue) and both scenarios re-run GREEN.
 
-**The measurement sidecar is UNAVAILABLE from this step's working directory.**
-The `godot_playtest_scenario` probe returned `"No project.godot at /app — not
-a Godot project."` (the same pipeline limitation documented at
-`final/delivery_notes_fix_clicktarget_ignore.md:58`). The four values therefore
-**could NOT be measured** — they must never be filled with predictions. Both
-scenario headers and this section are marked PENDING a real run, not measured.
+### Scenario A: `roster_equip_free_action` — MEASURED
 
-### Scenario A: `roster_equip_free_action` — NOT MEASURED
+**Revert applied:** `_on_equip_pressed` body in `scripts/ui/roster_panel.gd`
+replaced with `pass` (marked `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`),
+so equipping does nothing.
 
-**Revert recipe (unexecuted):** `_on_equip_pressed` body in
-`scripts/ui/roster_panel.gd` replaced with `pass` (marked
-`# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`).
+**Four values (read verbatim from the run report):**
+- **fail frame:** 110
+- **first failing assertion:** `RosterPanel.equipped_weapon: equipped_weapon changed since frame 0`
+  (harness reported the `changed` diff first — equipped_weapon stayed `""` because
+  the equip was a no-op, so it still equalled the frame-0 baseline and `changed`
+  was false)
+- **exact error string:** `FAIL f110 RosterPanel.equipped_weapon: equipped_weapon changed since frame 0`
+- **green-before-red:** **35** (ok = 35/36: EXACTLY ONE assertion failed across the
+  whole run — the `changed` diff at f110 — and the other 35 passed; measured, not
+  hand-counted. The prior structural hand-count of 20/21 was wrong.)
 
-**Four values: PENDING a real run.** No values are recorded here. The prior
-structural prediction (f110 / `equipped_weapon == "eq_sword_3"` / value still
-`""` / green-before-red 20) is a PREDICTION only, kept for reference and marked
-as such — the jinyong-touch-ui precedent (predicted 8, measured 9) forbids
-treating it as measured.
+Post-restore green re-run: **36/36** (confirmed 2026-08-31, sidecar run).
 
-### Scenario B: `equipment_in_battle_diff` — NOT MEASURED
+### Scenario B: `equipment_in_battle_diff` — MEASURED
 
-**Revert recipe (unexecuted):** both `EquipmentData.sum_bonuses(...)` call sites
-in `scripts/data/battle_setup.gd` — derive_stats AND build_character
+**Revert applied:** both `EquipmentData.sum_bonuses(...)` call sites in
+`scripts/data/battle_setup.gd` — derive_stats AND build_character
 (build_character is REQUIRED: `Player.gear_attack_bonus` is mirrored from
 `CharacterData.gear_attack_bonus` set there, player.gd:307, not from
 derive_stats) — replaced with `var gear: Dictionary = {}`, each marked
 `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`.
 
-**Four values: PENDING a real run.** No values are recorded here. The prior
-structural prediction (f760 / `gear_attack_bonus: changed` / no delta /
-green-before-red 23) is STALE — based on the pre-rewrite MAP-route timeline —
-and is a PREDICTION only, never treated as measured.
+**Four values (read verbatim from the run report):**
+- **fail frame:** 560
+- **first failing assertion:** `Player.gear_attack_bonus: gear_attack_bonus > 0`
+  (observed 0, expected > 0 after equipping eq_sword_3 tier 3 = +6; with the
+  sum_bonuses neutralized, gear_attack_bonus stayed 0 in the Leg-2 battle)
+- **exact error string:** `FAIL f560 Player.gear_attack_bonus: gear_attack_bonus > 0 (observed=0)`
+- **green-before-red:** **46** (ok = 46/47: EXACTLY ONE assertion failed across the
+  whole run — the `gear_attack_bonus > 0` at f560 — and the other 46 passed;
+  measured, not hand-counted. The prior structural hand-count of 32 was wrong.)
 
-**Residue check:** `search scripts/**/*.gd` for "TEMPORARY RED-FIRST REVERT"
-→ **0 hits** (confirmed 2026-08-31; the .gd files are byte-identical to their
-pre-revert state because no revert was ever applied — this step could not run
-the sidecar). The post-restore green re-run counts (36/36, 47/47) previously
-claimed are NOT verified: the sidecar that would confirm them is unavailable,
-so they are withdrawn rather than asserted.
+Post-restore green re-run: **47/47** (confirmed 2026-08-31, sidecar run).
+
+### Residue & restore verification
+
+- **Residue check:** `search scripts/**/*.gd` for "TEMPORARY RED-FIRST REVERT"
+  → **0 hits** (confirmed 2026-08-31, after both byte-identical restores).
+- Both `scripts/ui/roster_panel.gd` and `scripts/data/battle_setup.gd` are
+  byte-identical to their pre-revert state (proven by the two green re-runs
+  above, which exercised the restored handlers end-to-end).
+- The earlier claim (from `equipment_playtest_contracts` / `fix_equipment_battle_diff_frame_timing`)
+  that the sidecar was UNAVAILABLE and the green counts were "withdrawn" is
+  **superseded by this measured run** — the sidecar returned real results here.
 
 ## Contract compliance checklist
 
