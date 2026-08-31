@@ -648,3 +648,15 @@ fixture 数据。
 零闸门影响,下一轮顺手改。既有 77 场景零回归全 PASS(`spine_to_ending` 42/42、
 `event_travel_effects` 19/19、`equipment_in_battle_diff` 47/47 等全部在列)。
 
+**(g) 渲染观测面缺陷修复收口 + cosmetic 项已清(post-fix,2026-08-31,5_design 证据步骤)。** 上行 (f) 所记
+13/15 红(f200 `event_title` / `event_body` 实测空串)已修复并由本轮 `5_compile` 官方复跑实测转绿:发布点修复 =
+ACTION_PICK case 3 抽取后立即 `_sync_surface()`(原实现抽完直接 `_render()`,新增观测面晚一拍发布,f200
+读到空串);发布保持**原始中文**字面量(与 playtest 中文钉子一致,`tr()` 仍在渲染路径),未知 id 带防御性
+`push_warning`;单元钉 `_test_event_title_body_surface`(`tests/test_cultivation.gd`)守住发布 / 清空对;
+`event_data.gd` 头注释同步改为 36 行((f) 末所记 cosmetic 项清账)。实测:**78/78 场景全 PASS**、
+`event_pool_new_event_resolved` **15/15**、零 runtime error,编译 **95/95** 零错误,视觉闸门 passed
+(Q6 78 好 / 0 坏)——`40_ux_backlog.md` **UX-18 → CLOSED(jinyong-event-pool-36)**,证据 =
+`playtest_summary.md: event_pool_new_event_resolved 15/15`。零断言放松、零阈值放宽、零冻结场景改动。
+单元闸门 `_test_no_repeat_full_journey` 与 pytest 守卫的官方 PASS 仍以 5_test 产物(`test_report.json`)
+为准——该产物不在本步上下文,不冒充实测。
+
