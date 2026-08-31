@@ -1,5 +1,8 @@
-## Unit tests for the read-only roster panel's pure string builder
-## (scripts/ui/roster_panel.gd).
+## Unit tests for the roster panel's pure string builder + equipment row
+## behaviour (scripts/ui/roster_panel.gd). The panel now has ONE write path
+## (the equip-button toggle); the string-builder pins below are unchanged, and
+## the equipment pins add the free-action invariants (mirrors track the profile,
+## the toggle writes ONLY the equipped slot, the pool cap, cursor stays false).
 ##
 ## These are PURE _compose_body / resolver / read-only pins — NO scene boot. A
 ## bare RosterPanel instance (never added to a scene tree) is used so node wiring
@@ -34,6 +37,10 @@ static func run() -> bool:
 	ok = _test_purity(ok)
 	ok = _test_read_only(ok)
 	ok = _test_no_cursor_markers(ok)
+	ok = _test_equip_observables(ok)
+	ok = _test_equip_toggle_writes_only_equipped(ok)
+	ok = _test_pool_cap(ok)
+	ok = _test_cursor_still_false_with_equipment(ok)
 	TranslationServer.set_locale(orig_locale)
 	if ok:
 		print("PASS test_roster_panel")
@@ -169,3 +176,136 @@ static func _test_no_cursor_markers(ok: bool) -> bool:
 			push_error("roster: composed body contains a ▶ cursor marker; body=%s" % b)
 			return false
 	return ok
+
+
+## (h) the three equipment-slot mirrors track the live profile through
+## refresh() (bare instance, no scene tree — the mirrors are profile reads via
+## the defensive equipped_id). equip -> mirrors fill; unequip -> mirrors clear
+## (reversibility). equip_button_count counts the equipment rows.
+static func _test_equip_observables(ok: bool) -> bool:
+	var panel = RosterPanelScript.new()
+	var p: PlayerProfile = SaveManager.profile
+	var saved: Array = p.inventory.duplicate()
+	p.inventory.clear()
+	p.inventory.append("eq_sword_3")
+	p.inventory.append("eq_armor_2")
+	p.inventory.append("eq_boots_4")
+	p.unequip_slot("weapon")
+	p.unequip_slot("armor")
+	p.unequip_slot("boots")
+	panel.refresh()
+	if panel.equipped_weapon != "" or panel.equipped_armor != "" or panel.equipped_boots != "":
+		push_error("roster: empty slots should mirror empty strings; w=%s a=%s b=%s" % [panel.equipped_weapon, panel.equipped_armor, panel.equipped_boots])
+		p.inventory = _restore(p, saved)
+		return false
+	if panel.equip_button_count != 3:
+		push_error("roster: equip_button_count should be 3 for 3 equipment rows; got %d" % panel.equip_button_count)
+		p.inventory = _restore(p, saved)
+		return false
+	p.equip("weapon", "eq_sword_3")
+	p.equip("armor", "eq_armor_2")
+	p.equip("boots", "eq_boots_4")
+	panel.refresh()
+	if panel.equipped_weapon != "eq_sword_3" or panel.equipped_armor != "eq_armor_2" or panel.equipped_boots != "eq_boots_4":
+		push_error("roster: slot mirrors did not track equip; w=%s a=%s b=%s" % [panel.equipped_weapon, panel.equipped_armor, panel.equipped_boots])
+		p.inventory = _restore(p, saved)
+		return false
+	p.unequip_slot("weapon")
+	p.unequip_slot("armor")
+	p.unequip_slot("boots")
+	panel.refresh()
+	if panel.equipped_weapon != "" or panel.equipped_armor != "" or panel.equipped_boots != "":
+		push_error("roster: unequip did not clear mirrors; w=%s a=%s b=%s" % [panel.equipped_weapon, panel.equipped_armor, panel.equipped_boots])
+		p.inventory = _restore(p, saved)
+		return false
+	p.inventory = _restore(p, saved)
+	return ok
+
+
+## (i) the toggle handler writes ONLY the equipped slot: pressing a row equips
+## it, pressing again unequips it (toggle), and no other profile field changes
+## (free action — no silver/gongfa/cultivation/month mutation). Bare instance:
+## refresh() populates _equip_row_ids even though no button node exists.
+static func _test_equip_toggle_writes_only_equipped(ok: bool) -> bool:
+	var panel = RosterPanelScript.new()
+	var p: PlayerProfile = SaveManager.profile
+	var saved: Array = p.inventory.duplicate()
+	p.inventory.clear()
+	p.inventory.append("eq_sword_3")
+	p.unequip_slot("weapon")
+	var baseline: String = _snapshot_minus_equipped(p)
+	panel.refresh()
+	panel._on_equip_pressed(0)   # row 0 == eq_sword_3 -> equip
+	if p.equipped_id("weapon") != "eq_sword_3":
+		push_error("roster: _on_equip_pressed did not equip the row's id; weapon=%s" % p.equipped_id("weapon"))
+		p.inventory = _restore(p, saved)
+		return false
+	if _snapshot_minus_equipped(p) != baseline:
+		push_error("roster: _on_equip_pressed mutated a non-equipped profile field on equip")
+		p.inventory = _restore(p, saved)
+		return false
+	panel._on_equip_pressed(0)   # press again -> unequip (toggle)
+	if p.equipped_id("weapon") != "":
+		push_error("roster: second press did not unequip (toggle); weapon=%s" % p.equipped_id("weapon"))
+		p.inventory = _restore(p, saved)
+		return false
+	if _snapshot_minus_equipped(p) != baseline:
+		push_error("roster: _on_equip_pressed mutated a non-equipped profile field on unequip")
+		p.inventory = _restore(p, saved)
+		return false
+	p.inventory = _restore(p, saved)
+	return ok
+
+
+## (j) pool cap: more equipment rows than MAX_EQUIP_BUTTONS still map only the
+## first 12 (equip_button_count capped); bare instance, no nodes required.
+static func _test_pool_cap(ok: bool) -> bool:
+	var panel = RosterPanelScript.new()
+	var p: PlayerProfile = SaveManager.profile
+	var saved: Array = p.inventory.duplicate()
+	p.inventory.clear()
+	for i in range(15):
+		p.inventory.append("eq_sword_%d" % (1 + (i % 4)))
+	p.unequip_slot("weapon")
+	panel.refresh()
+	if panel.equip_button_count != 12:
+		push_error("roster: equip_button_count should be capped at 12 for 15 rows; got %d" % panel.equip_button_count)
+		p.inventory = _restore(p, saved)
+		return false
+	p.inventory = _restore(p, saved)
+	return ok
+
+
+## (k) cursor_markers_visible stays false even with equipment rows present — the
+## new controls are Buttons, not a "▶" option list (single-surface conformance).
+static func _test_cursor_still_false_with_equipment(ok: bool) -> bool:
+	var panel = RosterPanelScript.new()
+	var p: PlayerProfile = SaveManager.profile
+	var saved: Array = p.inventory.duplicate()
+	p.inventory.clear()
+	p.inventory.append("eq_sword_3")
+	p.inventory.append("eq_armor_1")
+	panel.refresh()
+	if panel.cursor_markers_visible or panel.body_text.contains("▶"):
+		push_error("roster: cursor marker visible with equipment rows present; body=%s" % panel.body_text)
+		p.inventory = _restore(p, saved)
+		return false
+	p.inventory = _restore(p, saved)
+	return ok
+
+
+## JSON-serialisable snapshot of every profile field EXCEPT equipped, to prove
+## the toggle touches nothing else. Dictionary.erase on a missing key is safe.
+static func _snapshot_minus_equipped(p: PlayerProfile) -> String:
+	var d: Dictionary = p.to_dict()
+	d.erase("equipped")
+	return JSON.stringify(d)
+
+
+## Restore a typed Array[String] property from a plain duplicate (clear + append
+## avoids a runtime typed-array reassignment error in Godot 4).
+static func _restore(p: PlayerProfile, saved: Array) -> Array[String]:
+	p.inventory.clear()
+	for id in saved:
+		p.inventory.append(str(id))
+	return p.inventory

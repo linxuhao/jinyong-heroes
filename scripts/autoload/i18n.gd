@@ -485,6 +485,8 @@ const EN: Dictionary = {
 	"练度 %d": "Practice %d",
 	"练度 %d/%d": "Practice %d/%d",
 	"第 %d 年 %d 月": "Year %d, Month %d",
+	"装上": "Equip",
+	"卸下": "Unequip",
 }
 
 

@@ -55,6 +55,102 @@ offset_bottom = -72.0
 autowrap_mode = 3
 text = ""
 
+[node name="EquipButton0" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 165.0
+offset_top = 16.0
+offset_right = 209.0
+offset_bottom = 56.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton1" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 211.0
+offset_top = 16.0
+offset_right = 255.0
+offset_bottom = 56.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton2" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 257.0
+offset_top = 16.0
+offset_right = 301.0
+offset_bottom = 56.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton3" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 165.0
+offset_top = 62.0
+offset_right = 209.0
+offset_bottom = 102.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton4" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 211.0
+offset_top = 62.0
+offset_right = 255.0
+offset_bottom = 102.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton5" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 257.0
+offset_top = 62.0
+offset_right = 301.0
+offset_bottom = 102.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton6" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 165.0
+offset_top = 108.0
+offset_right = 209.0
+offset_bottom = 148.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton7" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 211.0
+offset_top = 108.0
+offset_right = 255.0
+offset_bottom = 148.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton8" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 257.0
+offset_top = 108.0
+offset_right = 301.0
+offset_bottom = 148.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton9" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 165.0
+offset_top = 154.0
+offset_right = 209.0
+offset_bottom = 194.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton10" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 211.0
+offset_top = 154.0
+offset_right = 255.0
+offset_bottom = 194.0
+focus_mode = 0
+text = "装上"
+
+[node name="EquipButton11" type="Button" parent="RosterOverlay/RosterBox"]
+offset_left = 257.0
+offset_top = 154.0
+offset_right = 301.0
+offset_bottom = 194.0
+focus_mode = 0
+text = "装上"
+
 [node name="RosterCloseButton" type="Button" parent="RosterOverlay/RosterBox"]
 anchors_preset = 7
 anchor_left = 0.5
