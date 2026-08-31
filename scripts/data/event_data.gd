@@ -1,7 +1,7 @@
 class_name EventData
 
-## 游历 (travel) event pool — first batch of 4 events, 2 options each
-## (step2_design §8.6). Pure data layer — event resolution (RNG draw, no
+## 游历 (travel) event pool — 36 rows, 2 options each
+## 36-row pool = full 36-month journey (4 baseline + 12 expansion rows + 20 appended 2026-08-31, jinyong-event-pool-36). Pure data layer — event resolution (RNG draw, no
 ## repeat until pool exhausted, consequence application) belongs to the
 ## cultivation segment; this file only supplies the rows.
 
@@ -19,9 +19,10 @@ class EventDef extends RefCounted:
 	var option_b: EventOption
 
 
-## 16 event rows; option fields: {"label", "effects": [...]}.
-## 4 baseline rows (step2_design §8.6 verbatim: bandits / merchant / ruins /
-## beggar) + 12 expansion rows (step2_design §5: tomb_bed ... lost_purse).
+## 36 event rows; option fields: {"label", "effects": [...]}.
+## 16 frozen rows (step2_design §8.6 verbatim: bandits / merchant / ruins /
+## beggar + 12 expansion: tomb_bed ... lost_purse)
+## + 20 appended rows 2026-08-31 (jinyong-event-pool-36: riverside_duel ... fallen_rider).
 const TABLE: Array = [
 	{
 		"id": "bandits", "title": "山道遇劫匪",
