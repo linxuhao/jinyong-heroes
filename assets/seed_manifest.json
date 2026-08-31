@@ -1,42 +1,87 @@
 {
-  "style_block": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting",
-  "assets": [
+  "_why": [
+    "A seed identifies a reproducible IMAGE, not a PERSON. The 定妆 flow fixes a cast identity (subject) first, then derives each portrait image from it — so images reference a subject, never a seed. A seed on a character record is a coincidence that breaks the moment the art is regenerated.",
+    "style_block is the single style sentence for all character portraits. It must stay byte-identical to the 画风 section in design/30_presentation.md; changing one without the other desyncs the next portrait batch.",
+    "Non-character asset records (terrain, backdrop, audio) keep their seed/prompt fields in the assets array below — they are one-off generations with no subject layer."
+  ],
+  "style_block": "Chinese wuxia game-art illustration with a deliberate SPLIT REGISTER: the head is fully cartoon (rounded simplified head-carapace, large expressive eyes with clear highlights, appealing, never scary); the body is semi-realistic (overlapping carapace plates, distinct segment joints, ridges and spines, clear directional light, soft shadow, glossy shell sheen)",
+  "subjects": [
     {
-      "path": "res://assets/characters/yang_guo.png",
-      "seed": 1001,
-      "transparent": true,
-      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a young swordsman in deep blue robes holding a heavy iron sword, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+      "id": "west_poison",
+      "name": "西毒(皮皮虾)",
+      "species": "皮皮虾(雀尾螳螂虾) — 螯击约 23 m/s,单位体重出拳最狠的动物",
+      "appearance": "Head fully cartoon, body semi-realistic; head-carapace in front, curled segmented abdomen as the base, NO torso / NO waist / NO legs; dark shell with a faint toxic-green sheen; mantis-shrimp folded club appendage."
     },
     {
-      "path": "res://assets/characters/east_heretic.png",
-      "seed": 1002,
-      "transparent": true,
-      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, an elegant middle-aged scholar in teal-blue robes playing a jade flute, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+      "id": "north_beggar",
+      "name": "北丐(龙虾)",
+      "species": "龙虾 — 降龙十八掌由一只龙虾使出",
+      "appearance": "Head fully cartoon, body semi-realistic; head-carapace in front, curled segmented abdomen as the base, NO torso / NO waist / NO legs; faded red, worn and scarred shell with long drooping maxillipeds (age on the body); lobster double claws, bamboo staff and wine gourd."
     },
     {
+      "id": "east_heretic",
+      "name": "东邪(樱花虾)",
+      "species": "樱花虾(正樱虾) — 深海群游、绯红半透,聚散如落英,对桃花岛",
+      "appearance": "Head fully cartoon, body semi-realistic; head-carapace in front, curled segmented abdomen as the base, NO torso / NO waist / NO legs; cold crimson shell (never pink); square kerchief tied at the back of the head (never wrapping the cheeks); angular eyes, flat hard brows, no lashes."
+    },
+    {
+      "id": "south_emperor",
+      "name": "南帝(罗氏沼虾)",
+      "species": "罗氏沼虾 — 南方淡水巨虾,一对细长蓝螯,对大理段皇爷",
+      "appearance": "Head fully cartoon, body semi-realistic; head-carapace in front, curled segmented abdomen as the base, NO torso / NO waist / NO legs; imperial golden-amber shell; one pair of long blue claws (giant river prawn)."
+    },
+    {
+      "id": "central_divine",
+      "name": "中神通(玻璃虾)",
+      "species": "玻璃虾 — 通体透明、内里一览无余,对先天功",
+      "appearance": "Head fully cartoon, body semi-realistic; head-carapace in front, curled segmented abdomen as the base, NO torso / NO waist / NO legs; near-fully transparent glass body, pale Taoist crest."
+    },
+    {
+      "id": "yang_guo",
+      "name": "杨过(独臂神雕侠)",
+      "species": "枪虾 — 一只螯极大而另一侧空缺(独臂),与虾虎鱼结伴共生(神雕)",
+      "appearance": "Head fully cartoon, body semi-realistic; head-carapace in front, curled segmented abdomen as the base, NO torso / NO waist / NO legs; deep-blue clean glossy shell, erect antennae, no maxillipeds (young); one giant right claw larger than the head with a smooth round residual plate on the left (positive asymmetry — never 'no arm / armless / empty sleeve')."
+    }
+  ],
+  "images": [
+    {
+      "subject": "west_poison",
+      "scene": "Side-view standing portrait, compact vertical silhouette with claws held in front (not splayed), plain solid background, full body inside the frame, no text, no watermark.",
       "path": "res://assets/characters/west_poison.png",
-      "seed": 1003,
-      "transparent": true,
-      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a fierce fighter in dark purple robes with a faint green poison aura, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+      "transparent": true
     },
     {
-      "path": "res://assets/characters/south_emperor.png",
-      "seed": 1004,
-      "transparent": true,
-      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a regal monk in imperial golden-yellow robes, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
-    },
-    {
+      "subject": "north_beggar",
+      "scene": "Side-view standing portrait, compact vertical silhouette with claws held in front (not splayed), plain solid background, full body inside the frame, no text, no watermark.",
       "path": "res://assets/characters/north_beggar.png",
-      "seed": 1005,
-      "transparent": true,
-      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a ragged beggar in faded red robes with a wine gourd, powerful stance, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+      "transparent": true
     },
     {
-      "path": "res://assets/characters/central_divine.png",
-      "seed": 1006,
-      "transparent": true,
-      "prompt": "Chinese wuxia ink-painting style, flat colors, clean bold outlines, dramatic lighting, a Taoist immortal in pale gray-white robes with a divine aura, full body, side view, plain solid white background, feet at the bottom edge of the frame, centered composition, no text, no watermark"
+      "subject": "east_heretic",
+      "scene": "Side-view standing portrait, compact vertical silhouette with claws held in front (not splayed), plain solid background, full body inside the frame, no text, no watermark.",
+      "path": "res://assets/characters/east_heretic.png",
+      "transparent": true
     },
+    {
+      "subject": "south_emperor",
+      "scene": "Side-view standing portrait, compact vertical silhouette with claws held in front (not splayed), plain solid background, full body inside the frame, no text, no watermark.",
+      "path": "res://assets/characters/south_emperor.png",
+      "transparent": true
+    },
+    {
+      "subject": "central_divine",
+      "scene": "Side-view standing portrait, compact vertical silhouette with claws held in front (not splayed), plain solid background, full body inside the frame, no text, no watermark.",
+      "path": "res://assets/characters/central_divine.png",
+      "transparent": true
+    },
+    {
+      "subject": "yang_guo",
+      "scene": "Side-view standing portrait, compact vertical silhouette with claws held in front (not splayed), plain solid background, full body inside the frame, no text, no watermark.",
+      "path": "res://assets/characters/yang_guo.png",
+      "transparent": true
+    }
+  ],
+  "assets": [
     {
       "path": "res://assets/terrain/floor.png",
       "seed": 1010,
