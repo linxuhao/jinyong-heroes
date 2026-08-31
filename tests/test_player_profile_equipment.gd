@@ -130,14 +130,15 @@ static func _test_hostile_from_dict(ok: bool) -> bool:
 static func _test_equip_validation(ok: bool) -> bool:
 	var p: PlayerProfile = PlayerProfile.new_default()
 	p.inventory.append("eq_sword_3")
+	p.inventory.append("eq_sword_4")   # in inventory for the (f) swap test
 	p.inventory.append("eq_armor_2")
 	p.inventory.append("eq_boots_4")
 	# (a) slot not in SLOTS -> false
 	ok = _expect(ok, not p.equip("necklace", "eq_sword_3"), "unknown slot rejected")
 	# (b) id == "" -> false
 	ok = _expect(ok, not p.equip("weapon", ""), "empty id rejected")
-	# (c) id not in inventory -> false
-	ok = _expect(ok, not p.equip("weapon", "eq_sword_4"), "id not in inventory rejected")
+	# (c) id not in inventory -> false (eq_sword_1 is deliberately ABSENT here)
+	ok = _expect(ok, not p.equip("weapon", "eq_sword_1"), "id not in inventory rejected")
 	# (d) category/slot mismatch -> false
 	ok = _expect(ok, not p.equip("weapon", "eq_armor_2"), "armor id in weapon slot rejected")
 	ok = _expect(ok, not p.equip("boots", "eq_sword_3"), "sword id in boots slot rejected")

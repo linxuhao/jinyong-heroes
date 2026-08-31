@@ -50,6 +50,10 @@ const TESTS: Array[String] = [
 	# roster 2026-08-30: pure _compose_body / resolver / read-only pins
 	# for the read-only roster panel (scripts/ui/roster_panel.gd).
 	"res://tests/test_roster_panel.gd",
+	# equipment 2026-08-31: the tier->effect formula module (EquipmentData)
+	# and the PlayerProfile.equipped slots (round-trip / hostile / validation).
+	"res://tests/test_equipment_data.gd",
+	"res://tests/test_player_profile_equipment.gd",
 ]
 
 

@@ -106,7 +106,7 @@ func to_dict() -> Dictionary:
 		"map_node": map_node,
 		"flags": flags.duplicate(true),
 		"main_external_id": main_external_id,
-			"equipped": _equipped_snapshot(),
+		"equipped": _equipped_snapshot(),
 	}
 
 
