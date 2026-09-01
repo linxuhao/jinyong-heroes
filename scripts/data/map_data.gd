@@ -69,17 +69,21 @@ const ADJACENCY: Dictionary = {
 ## on all 5 seeds and lose. See design/40_progression.md §「华山战备」.
 const HUASHAN_BAR: Dictionary = {"even": 30, "strong": 40}
 
-## Ending tiers, descending by min_total (step2_design §8.8).
-## total = bone + inner + agility + wisdom + fortune.
-## INVARIANT: rows must stay sorted by min_total descending — ending_tier()
-## scans top-down and returns the first row the total reaches. The final row's
-## min_total is always 0, so any total yields at least tier 1.
+## Ending tiers, descending by min_score (R3 D1 — multi-axis score, not the
+## five-attr sum). score = EndingLogic.evaluate(profile, deeds) — the ONLY
+## scoring path. Titles/texts are pinned copy reused elsewhere — byte-identical.
+## INVARIANT: rows must stay sorted by min_score descending — ending_tier_score()
+## scans top-down and returns the first row the score reaches. The final row's
+## min_score is always 0, so any score yields at least tier 1.
+## min_score values set by M2 from the measured 36-month yield curves
+## (measured 2026-09-01, R3 M2, seeded runs) — see design/40_progression.md
+## §「结局评价」. NEVER pinned by a gate literal.
 const ENDING_TIERS: Array = [
-	{"tier": 3, "min_total": 90, "title": "一代宗师",
+	{"tier": 3, "min_score": 90, "title": "一代宗师",
 		"text": "武林为之震动。\n你的名号传遍江湖，各派掌门纷纷登门请教。\n此世武学之巅，自此有了你的名字。"},
-	{"tier": 2, "min_total": 60, "title": "武林名宿",
+	{"tier": 2, "min_score": 60, "title": "武林名宿",
 		"text": "江湖中人都认得你的名号。\n行至何处，皆有豪杰相迎。\n虽未登峰造极，亦是一方武林名宿。"},
-	{"tier": 1, "min_total": 0, "title": "隐于市井",
+	{"tier": 1, "min_score": 0, "title": "隐于市井",
 		"text": "你收起兵刃，隐入市井。\n江湖纷争从此与你无关。\n唯有炊烟与酒香，伴你终老。"},
 ]
 
@@ -120,10 +124,10 @@ static func start_node() -> String:
 	return "wuming_valley"
 
 
-## Highest tier whose min_total the attribute total reaches; 1 floor.
-static func ending_tier(total: int) -> int:
+## Highest tier whose min_score the ending score reaches; 1 floor.
+static func ending_tier_score(score: int) -> int:
 	for row in ENDING_TIERS:
-		if total >= row["min_total"] as int:
+		if score >= row["min_score"] as int:
 			return row["tier"] as int
 	return 1
 

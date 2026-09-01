@@ -67,6 +67,11 @@ var snapshot_decks_string: String = ""
 var loaded_profile_json: String = ""
 var loaded_rng_state: int = 0
 var loaded_decks_string: String = ""
+## Surface: the evaluation_text of the FIRST ending reached this session (R3
+## N-1a cross-leg differential). Written by ending.gd on its first _render; the
+## divergence nail compares leg B's evaluation_text against this to prove two
+## playstyles evaluate differently. "" until the first ending renders.
+var first_ending_evaluation: String = ""
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 

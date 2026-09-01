@@ -1,0 +1,748 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# ENDING DIVERGENT PLAYSTYLES NAIL (R3, 2026-09-01, N-1a).
+#
+# Proves the ending evaluation is driven by in-run choices, not frozen at
+# creation: two playthroughs from the SAME seed but DIFFERENT playstyles reach
+# DIFFERENT ending evaluations.
+#
+#   Leg A (work-heavy): 36 months of 做工 (work) via the clicks-only month
+#     grammar (card + work, the clicks_only_storyline precedent) -> map ->
+#     kunlun -> ENDING. Captures the evaluation record (tier / score /
+#     evaluation_text).
+#   Leg B (practice-heavy): restart -> re-seed the SAME seed -> load ->
+#     debug_fast_forward (practice-heavy: 练功 on the first unmastered art) ->
+#     map -> kunlun -> ENDING. Asserts the evaluation record DIFFERS from
+#     leg A (the cross-leg differential: tier / score / evaluation_text
+#     changed across the leg boundary).
+#
+# The differential assertion's failure means "the two playthroughs evaluated
+# identically" — the exact hole this round closes (pre-fix, both legs share the
+# attrs-only evaluation, so different playstyles can tie).
+#
+# ZERO balance literals: only range pins (tier >= 1, score >= 1) and the
+# cross-leg `changed` differentials. Never pins a min_score or a tier boundary.
+#
+# Every touched ENDING frame asserts UiOcclusionWatch.violations == 0 and
+# scan_ok == true.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
+#   pre-fix tree where the score / evaluation_text surfaces do NOT exist on
+#   EndingScreen and the evaluation is the attrs-only sum):
+#
+#   failing_frame:            f975 (leg A ENDING — the score surface is not
+#                             published by the pre-fix script)
+#   first_failing_assert:     EndingScreen.score
+#   exact_error/observed:     "node property not found: EndingScreen.score"
+#                             (the surface was not yet published by the pre-fix
+#                             script)
+#   green_asserts_before_red: 4 (f400 MAP, f520 TRAVEL/shaolin, f540 focus
+#                             huashan, f580 current_state == "BATTLE")
+name: ending_divergent_playstyles
+description: >-
+  Two playthroughs from the same seed with different playstyles (work-heavy vs
+  practice-heavy) reach DIFFERENT ending evaluations. Leg A: 36 months of work
+  via clicks -> ENDING (range pins tier >= 1, score >= 1). Leg B: restart,
+  re-seed the same seed, practice-heavy fast-forward -> ENDING (cross-leg
+  differential: tier / score / evaluation_text changed). Every touched ENDING
+  frame: UiOcclusionWatch clean. ZERO balance literals.
+scene: res://scenes/menu.tscn
+timeline:
+# ── LEG A: seed a fresh CULTIVATION save, load it, drive 36 work months ─────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (fresh profile, month 1) ─────────────────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+# ── 36 months of WORK (card + work per month, the clicks_only_storyline
+#    grammar). Each month: CultOptionButton0 (card) then CultOptionButton2
+#    (做工). Year-end stay via CultOptionButton0. ─────────────────────────────
+- at: 140
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 145
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 150
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 155
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 160
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 165
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 170
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 175
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 180
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 185
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 190
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 195
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 200
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 205
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 210
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 215
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 220
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 225
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 230
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 235
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 240
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 245
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 250
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 255
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 260
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 265
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 270
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 275
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 280
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 285
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 290
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 295
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 300
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 305
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 310
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 315
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 320
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 325
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 330
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 335
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 340
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 345
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 350
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 355
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 360
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 365
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 370
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 375
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 380
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 385
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 390
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 395
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 400
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 405
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 410
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 415
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 420
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 425
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 430
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 435
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 440
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 445
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 450
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 455
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 460
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 465
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 470
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 475
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 480
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 485
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 490
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 495
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 500
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 505
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 510
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 515
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 520
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 525
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 530
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 535
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 540
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 545
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 550
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 555
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 560
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 565
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 570
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 575
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 580
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 585
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 590
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 595
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 600
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 605
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 610
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 615
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 620
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 625
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 630
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 635
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 640
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 645
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 650
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 655
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 660
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 665
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 670
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 675
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 680
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 685
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 690
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 695
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 700
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 705
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 710
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 715
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 720
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 725
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 730
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 735
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 740
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 745
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 750
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 755
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 760
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 765
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 770
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 775
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 780
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 785
+  actions: []
+  clicks:
+  - CultOptionButton2
+- at: 790
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 795
+  actions: []
+  clicks:
+  - CultOptionButton2
+# ── MAP: travel to kunlun (endpoint -> ENDING) ────────────────────────────────
+- at: 845
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.phase: phase == "TRAVEL"
+- at: 855
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 865
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 875
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 885
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 895
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 905
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 915
+  actions: []
+  clicks:
+  - TravelButton1
+# ── LEG A ENDING: capture the work-heavy evaluation record ───────────────────
+- at: 945
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.score: score >= 1
+    EndingScreen.evaluation_text: evaluation_text != ""
+    SaveManager.first_ending_evaluation: first_ending_evaluation != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG B: restart -> re-seed the SAME seed -> practice-heavy fast-forward ──
+- at: 955
+  actions: []
+  clicks:
+  - RestartButton
+- at: 985
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+- at: 995
+  actions:
+  - debug_win_tutorial
+- at: 1025
+  actions:
+  - ui_accept
+- at: 1055
+  actions:
+  - ui_accept
+- at: 1065
+  actions:
+  - ui_accept
+- at: 1095
+  actions:
+  - move_right
+- at: 1105
+  actions:
+  - move_right
+- at: 1115
+  actions:
+  - move_right
+- at: 1125
+  actions:
+  - move_right
+- at: 1135
+  actions:
+  - move_right
+- at: 1145
+  actions:
+  - ui_accept
+- at: 1155
+  actions:
+  - move_right
+- at: 1165
+  actions:
+  - ui_accept
+- at: 1195
+  actions:
+  - ui_accept
+- at: 1255
+  actions:
+  - debug_fast_forward
+- at: 1375
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+- at: 1395
+  actions:
+  - move_right
+- at: 1405
+  actions:
+  - ui_accept
+- at: 1415
+  actions:
+  - ui_accept
+- at: 1425
+  actions:
+  - move_right
+- at: 1435
+  actions:
+  - ui_accept
+- at: 1445
+  actions:
+  - ui_accept
+- at: 1455
+  actions:
+  - move_right
+- at: 1465
+  actions:
+  - ui_accept
+- at: 1475
+  actions:
+  - ui_accept
+- at: 1485
+  actions:
+  - move_right
+- at: 1495
+  actions:
+  - ui_accept
+# ── LEG B ENDING: the evaluation record DIFFERS from leg A ───────────────────
+- at: 1525
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.score: score >= 1
+    EndingScreen.evaluation_text: evaluation_text != ""
+    SaveManager.first_ending_evaluation: first_ending_evaluation != ""
+    SaveManager.first_ending_evaluation: first_ending_evaluation != evaluation_text
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

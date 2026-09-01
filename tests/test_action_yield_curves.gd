@@ -110,6 +110,8 @@ static func _run_strategy(strategy: String) -> Dictionary:
 		"events_resolved": profile.get_deed("travel_resolved"),
 		"mastered_count": ProgressionMath.mastered_count(profile),
 		"work_income_final": ProgressionMath.work_income(ProgressionMath.mastered_count(profile)),
+		"ending_score": int(EndingLogic.evaluate(profile, profile.deeds)["score"]),
+		"ending_tier": int(EndingLogic.evaluate(profile, profile.deeds)["tier"]),
 	}
 
 
@@ -214,12 +216,12 @@ static func _assert_cross_strategy(ok: bool, table: Array[Dictionary]) -> bool:
 
 static func _print_table(table: Array[Dictionary]) -> void:
 	print("=== R3 M1 ACTION YIELD CURVES (measured 2026-09-01, seeded run) ===")
-	print("strategy | silver_earned | practice_points | attr_points | events_resolved | mastered | work_income_final")
+	print("strategy | silver_earned | practice_points | attr_points | events_resolved | mastered | work_income_final | ending_score | ending_tier")
 	for res in table:
-		print("%s | %d | %d | %d | %d | %d | %d" % [
+		print("%s | %d | %d | %d | %d | %d | %d | %d | %d" % [
 			res["strategy"], res["silver_earned"], res["practice_points"],
 			res["attr_points"], res["events_resolved"], res["mastered_count"],
-			res["work_income_final"],
+			res["work_income_final"], res["ending_score"], res["ending_tier"],
 		])
 
 

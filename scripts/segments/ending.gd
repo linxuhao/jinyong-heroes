@@ -1,10 +1,27 @@
 ## EndingScreen — final segment: tiered ending text.
-## tier = MapData.ending_tier(sum of the 5 attrs); ui_accept restarts the whole
-## game (GameManager.restart_game -> fresh profile + fresh tutorial battle).
+## tier = EndingLogic.evaluate(profile, deeds) — the multi-axis R3 evaluation
+## (attrs + mastery + deeds), computed fresh at the ending screen from the
+## persisted profile. ui_accept restarts the whole game (GameManager.restart_game
+## -> fresh profile + fresh tutorial battle).
 extends Control
 
 ## Surface: ending tier (1..3, MapData.ENDING_TIERS).
 var tier: int = 0
+
+## Surface: the multi-axis ending score (int, EndingLogic.evaluate).
+var score: int = 0
+
+## Surface: the rendered axis-summary text (non-empty, includes the per-axis
+## summary lines the ending screen shows).
+var evaluation_text: String = ""
+
+## Surface: true when this ending's evaluation_text DIFFERS from the first
+## ending reached this session (SaveManager.first_ending_evaluation). The R3
+## N-1a/N-1b cross-leg differential: leg A renders first (first_ending_evaluation
+## set, diverged_from_first false), leg B renders a different playstyle/action
+## and diverged_from_first flips true. Self-contained in the EndingScreen
+## context so the harness can assert it without cross-node references.
+var diverged_from_first: bool = false
 
 ## Surface: true after restart routed onward.
 var done: bool = false
@@ -15,10 +32,9 @@ var pressed_connected: Dictionary = {}
 
 func _ready() -> void:
 	_wire_restart_button()
-	var total: int = 0
-	for key in PlayerProfile.ATTR_KEYS:
-		total += SaveManager.profile.get_attr(key)
-	tier = MapData.ending_tier(total)
+	var ev: Dictionary = EndingLogic.evaluate(SaveManager.profile, SaveManager.profile.deeds)
+	tier = int(ev["tier"])
+	score = int(ev["score"])
 	_render()
 
 
@@ -55,7 +71,15 @@ func _render() -> void:
 	var def: Dictionary = MapData.ending_def(tier)
 	var title: String = def.get("title", "") if not def.is_empty() else ""
 	var text_lines: String = def.get("text", "") if not def.is_empty() else ""
-	body.text = tr("【结局 · %s】\n\n%s\n\n按回车重新开始") % [tr(title), tr(text_lines)]
+	var ev: Dictionary = EndingLogic.evaluate(SaveManager.profile, SaveManager.profile.deeds)
+	var axes: Dictionary = ev["axes"]
+	var summary: String = tr("结局 · 属性：%d") % int(axes["attrs"])
+	summary += "\n" + tr("结局 · 武学：%d") % int(axes["mastery"])
+	summary += "\n" + tr("结局 · 历练：%.1f") % float(axes["deeds"])
+	evaluation_text = summary
+	if SaveManager.first_ending_evaluation == "":
+		SaveManager.first_ending_evaluation = summary
+	body.text = tr("【结局 · %s】\n\n%s\n\n%s\n\n按回车重新开始") % [tr(title), tr(text_lines), summary]
 	var restart_btn: Button = get_node_or_null("RestartButton") as Button
 	if restart_btn != null:
 		restart_btn.text = tr("重新开始")

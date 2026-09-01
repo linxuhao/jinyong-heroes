@@ -243,6 +243,7 @@ surface:
   - last_io_error_code
   - last_io_error_text
   - debug_user_dir_exists
+  - first_ending_evaluation
   Player:
   - health
   - max_health
@@ -821,6 +822,8 @@ surface:
   - last_apply_attr_value
   EndingScreen:
   - tier
+  - score
+  - evaluation_text
   - done
   - visible
   - size
@@ -1162,3 +1165,5 @@ scenario_order:
 - fortune_reroll_budget
 - huashan_readiness_warning
 - huashan_winnable_normal_route
+- ending_divergent_playstyles
+- ending_last_month_choice

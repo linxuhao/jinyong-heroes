@@ -80,6 +80,10 @@ const TESTS: Array[String] = [
 	# strict increase, texture preserved, gear additivity) + readiness verdict
 	# (single-source power, weak<even<strong band ordering).
 	"res://tests/test_battle_setup_readiness.gd",
+	# R3 ending logic 2026-09-01: the multi-axis EndingLogic.evaluate (shape,
+	# legacy-empty deeds, divergence, monotonicity) + MapData.ending_tier_score
+	# (row-order scan, floor 1, ending_tier removed — no dead dual path).
+	"res://tests/test_ending_logic.gd",
 ]
 
 

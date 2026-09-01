@@ -86,6 +86,8 @@ ROUND_SCENARIOS: list[str] = [
     "fortune_reroll_budget",
     "huashan_readiness_warning",
     "huashan_winnable_normal_route",
+    "ending_divergent_playstyles",
+    "ending_last_month_choice",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
