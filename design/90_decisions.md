@@ -843,3 +843,77 @@ Q6 坏答的官方产物仍是 pre-fix 那次(post-fix Q6 复检未执行,端点
 保持 OPEN。pytest 契约冒烟与 GDScript 单元套件以 5_test 产物(`test_report.json`)为准,
 不在本步上下文,不冒充实测。
 
+## jinyong-loop R2 — 月度循环推进与消耗规则的四短路修复(2026-09-01)
+
+本条记 `jinyong-loop` R2 轮的裁定。动因是实测:月度循环的推进规则与消耗规则被
+短路——练功空列表回车死循环(月份不走)、设施无限次「银两→结局分」兑换、
+节点事件每次到访重新结算、已拥有物品照扣钱不给货。四条修法共用一个原则:
+**被短路的规则在短路点接回,零平衡数字移动**(`event_data` / `facility_data` /
+`card_data` 的值与 `MapData.ENDING_TIERS` 一个未动)。
+
+**(a) 软锁出口 = 转属性分配并推进月份,零白送收益。** GONGFA_PICK 空列表的
+确认出口从「静默回 ACTION_PICK、不调 `_after_action()`(月份冻结 → 无限循环)」
+改为:屏显「无可修习的功法,本月照常过去」→ `phase = "ATTR_PICK"` →
+`_after_action()`(唯一推日历路径,年末/结业分支免费继承,与 `_fast_forward`
+同形);空态按钮「返回行动」改「度过本月」,正文加「功法均已大成,无可修习」。
+被否:照调试速通补一次默认练功收益——白送 +1..3 属性 + 一次 RNG 操作,属
+平衡行为改动;debug 双子 `_fast_forward` 一字未动——逃生口自此在玩家路径上
+也存在。两条钉住旧死端的场景(`gongfa_pick_empty_keyboard_return` /
+`clicks_only_gongfa_empty_exit`,不在逐字保护三件套)按 huashan 轮先例原位
+重指向(变更表 `final/delivery_notes_loop.md` §(b)),空态断言逐字保留;
+核心钉子 `softlock_empty_practice_month_advances` 只走纯玩家输入
+(`debug_seed_save` 播种 + 键盘读档 + 纯回车,时间线零 `debug_fast_forward`)。
+
+**(b) 设施复用上限 = 每 profile 月 2 次;裁定 jinyong-facility (e) 的 PENDING。**
+上节 (e) 显式记为待决的三选一(once-per-visit / once-per-period /
+pure-silver-limit)由本条裁定收束为**第 2 形式的具体化**:每 profile 月
+**2** 次(`FACILITY_MONTHLY_USE_CAP`)。理由:全场景普查单月最多 2 次使用
+(`facility_use_reusable` 与 `map_facility_buttons_click` 各 2),上限 2 既保
+「离开→再回→再用」的既有闸门逐字绿,又把实测「40 连按 → 根骨 +81」收敛到
+每月至多 +4;per-entry-1 同样过闸但只把刷法拖慢 3 倍(离开再进即可),
+per-month-1 直接撞红保护闸门。计数器是 GameManager 会话镜像
+(`facility_use_month` / `facility_use_count_this_month`,随日历月重置、随
+`profile_created` / `loaded` 清零,扛过 MapScreen 重建),存档零改动;
+用尽走既有回执通道屏显「本月设施已用尽,下月再来」。**这是规则闸,
+不是平衡数字**:设施银两成本与属性收益一个未动。
+
+**(c) 事件「再出现可以,再结算不行」;结算键 = (节点, 事件) 对。** 每次到访
+仍触发事件(两条保护闸门钉着,不弱化),但每个 `(node_id, event_id)` 对每会话
+至多结算一次:`GameManager.settled_node_events` 会话镜像(与
+`map_events_resolved_count` 同款生命周期)。被否:按 event_id 全局记——养成游历
+抽到同一行会误杀节点绑定,而 §8.2 明写两条通道相互独立。重解屏显
+「此事已有了结,不再重来」、零属性/银两变动,`events_resolved_count` **照常 +1**
+(计数记「解算」不记「发钱」——两条保护闸门的 1→2→3 阶梯因此逐字不漂)。
+诚实边界:会话镜像随读档清零,读档后同一对可再结算一次——与既有
+`map_events_resolved_count` 镜像同款边界,记档非缺陷。
+
+**(d) 购买全有或全无:validate-then-apply,钳位删除。** `EventLogic.validate_option`
+先验(净银两容量 → 物品所有权;纯算术、零变更、零 RNG 抽取——种子流操作序
+不变,`event_travel_effects` 19/19 与 `save_load_roundtrip` 14/14 按构造绿),
+`apply_option_effects` 返回 `{"ok", "reason"}`:拒绝 = **整个选项不生效**
+(旧 `maxi(...,0)` 钳位删除——「付不起就买下买得起的部分」不再是合法结算),
+屏显回执「银两不足」(复用既有键)/「此物已在行囊,无须再购」(新键);
+encounter 照样了结、月份照常推进——被否:「拒绝时保持面板开着」——EVENT 相位
+没有离开键,全拒事件对身无分文的玩家是**新软锁**,且每条脚本 pick 的可负担性
+会变成保护闸门的承重墙。设施通道行为不变(它自己的银两预检在前)。
+
+**(e) 遮挡回归:呈现层几何修复 + 把「按钮压正文」变成引擎性质。** 主题轮
+按钮增高令三屏(拜师 / 教程浮层 / 角色页)按钮列压到正文——修复只动 tscn 的
+anchor / offset / 宽度(零文案、零字号分级、零脚本;`sect_select.gd` 逐字节未动,
+主题与 hud.tscn 未开),并新增 autoload `UiOcclusionWatch`(按钮压非空文本的
+5 判据谓词,同有效 CanvasLayer / 非祖先 / LCA 绘制序 / 双轴 ≥4px / 残可见性
+≥0.5;扫描不完整置 `violations = -1` 防假绿),钉子 `occlusion_no_button_over_text`
+断三帧 `violations == 0` + `scan_ok == true`,零坐标字面量(坐标字面量被否——
+合法的布局微调会误红)。视觉六问问截断不问遮挡,遮挡自此不靠视觉判官看。
+
+**Open questions:** 官方 `test_report.json`(pytest + GDScript 单元套件)在修复树上的
+一次正式复跑仍待 5_test 产物(in-step pytest 56/56 与 `.pytest_cache` 零失败已录,
+不冒充官方产物);`tests/test_facility_data.gd` / `tests/test_map_node_event.gd`
+两处注释仍描述修复前的钳位语义(cosmetic,断言在新语义下照常绿,下轮顺手清);
+结算键落进存档持久层(跨会话记账)是记录在案的地平线,本轮刻意不做
+(会话镜像与 `map_events_resolved_count` 同边界)。
+
+**Out of scope(被否,防回潮):** 任何平衡数字(结局阈值 / 属性公式 / 卡牌收益 /
+华山难度 = R3);把节点事件改成整局只触发一次;为让新钉子变绿而放宽或改写
+保护闸门 (a)(b);`debug_fast_forward` 进软锁钉子的时间线。
+

@@ -574,6 +574,21 @@ facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点�
    到达时**触发,本轮没有 per-profile 一次性标记(扩展 `PlayerProfile.flags`
    的持久化/清洗不在本轮范围)。即少林是一个**可重复访问的内容点**——这是
    有意记录的政策,不是漏做。
+   **2026-09-01 `jinyong-loop` R2 修订(再出现可以,再结算不行):** 重触发政策
+   原样保留(两条保护闸门 `map_node_event_shaolin` / `map_battle_node_huashan`
+   的回访腿逐字节未动、全绿),但**重放时的经济与属性效果不再重新结算**——
+   每个 `(node_id, event_id)` 对每会话至多结算一次(`GameManager.settled_node_events`
+   会话镜像,与 `map_events_resolved_count` 同款生命周期,存档零改动);已结算对
+   重解时屏显「此事已有了结,不再重来」,零属性/银两变动,而 `events_resolved_count`
+   **照常 +1**(计数记「解算」,不记「发钱」——这正是两条保护闸门 1→2→3 阶梯
+   逐字保持绿的原因)。同一收尾还承载 REFUSED 路:选项银两付不起或物品已拥有时
+   **整个选项不生效**(零扣款、零发放;旧 `maxi(...,0)` 钳位删除——「余额不足
+   买下买得起的部分」不再是合法结算),屏显「银两不足」/「此物已在行囊,无须再购」,
+   encounter 照样了结、`events_resolved_count` 照常 +1、月份照常过去——拒绝
+   永不软锁、任何脚本 pick 的可负担性都不变成闸门承重墙。`_resolve_node_event`
+   自此三路共享同一收尾(SETTLED / REFUSED / APPLIED,只有 APPLIED 落账并写入
+   结算集)。闸门(2026-09-01 官方 84/84 全 PASS):`map_node_event_revisit_no_resettle`
+   **33/33**、`event_option_refused_no_charge` **11/11**。
 6. **「打听」行动:档案已声明、未实现。** `design/40_progression.md §2.2` 正面
    特质「江湖阅历」写着「大地图多一个行动:**打听**,揭示相邻节点的内容」——
    该行动本轮未实现、也在本轮范围之外;记在此处以免被读成遗忘。

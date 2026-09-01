@@ -1099,3 +1099,35 @@ MAP(华山)战斗复用教程战场、从不调 `build_character(profile)`,差�
   **98/98** 零错误;视觉闸门官方产物仍是 pre-fix 那次,post-fix Q6 复检未执行
   (端点不可达,如实记录)。`40_ux_backlog.md` **UX-31 → CLOSED(jinyong-theme)**。
 
+## 控件不得遮挡正文(2026-09-01,jinyong-loop R2 轮)
+
+主题轮的按钮增高(Button font_size 15 + content_margins t/b 4 + 边框)曾把三屏的
+按钮列压到固定位置的正文上——拜师屏(「少林」按钮盖住「唐门」行后半)、教程浮层
+(Buttons HBox 的残缺 anchor 对让「继续」拉成 400×440 全高不透明竖条压在正文正中,
+实测 `UiOcclusionWatch.violations == 1`、`violations_text == "Next>Body"`)、角色页
+(12 个装/卸按钮在正文 Rect 内部盖住属性行右半)。视觉闸门 Q6 问的是**截断**、
+不问遮挡——这正是 79/79 全好却漏过三处的原因;遮挡必须由结构性闸门看。
+
+- **呈现层几何修复(三处,零 .gd / 零字号分级 / 零文案改动)**:
+  `sect_select.tscn` BodyLabel `offset_right` 320→110(正文 430px 换行,唐门行
+  完整重现)、SectButton0..4 x −120..120 → 130..370、HintLabel ±100;
+  `tutorial_overlay.tscn` Buttons HBox 补全 anchor 对(`anchor_top/right = 1.0`、
+  `offset_right` −100)成 400×40 底条;`roster_panel.tscn` RosterBodyLabel
+  `offset_right` −16→−190、EquipButton0..11 右移 +297 独立成列。
+  `sect_select.gd`、全局主题、hud.tscn 一律未动。
+- **结构性闸门**:新 autoload `scripts/autoload/ui_occlusion_watch.gd`
+  (`UiOcclusionWatch`,`project.godot` 注册于 SceneManager-last 之前)每帧扫活树,
+  发布 `violations` / `violations_text` / `scan_ok` / `scan_failed_frames`。RED 判据 =
+  可见 Button 画在可见非空 Label/RichTextLabel 之上(同有效 CanvasLayer、
+  非祖先/后代、按最低公共祖先的兄弟序后绘制、双轴重叠 ≥ 4px、透过上层半透明控件的
+  残可见性 ≥ 0.5);扫描不完整置 `violations = -1` 哨兵——**绝不出假绿**。
+  差分场景 `occlusion_no_button_over_text` 在三帧断 `violations == 0` +
+  `scan_ok == true`,零坐标字面量(合法的布局微调不会误红)。
+- **实测(2026-09-01 官方闸门,本轮 5_compile / 5_vision 产物)**:编译 **99/99**
+  零错误;playtest **84/84 场景全 PASS**(硬闸门过、零 runtime error,
+  `occlusion_no_button_over_text` **22/22**;修红 MEASURED:f158
+  `violations == 0` observed 1、`Next>Body`,红前绿 5);视觉闸门 passed 非盲
+  (84 场景 336 帧,六问全 `failed: false`,Q6 **84 好 / 0 坏**)——与结构闸门
+  共同承载七组修前/修后同帧对照(5 拜师 + 教程 s15_frame_0072 + 角色页
+  s75_frame_0110)。`40_ux_backlog.md` **UX-32 → CLOSED(jinyong-loop)**。
+
