@@ -80,6 +80,7 @@ ROUND_SCENARIOS: list[str] = [
     "softlock_empty_practice_month_advances",
     "facility_use_cap_exhausted_zero_delta",
     "map_node_event_revisit_no_resettle",
+    "event_option_refused_no_charge",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen

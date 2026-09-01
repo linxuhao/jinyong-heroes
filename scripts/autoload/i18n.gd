@@ -456,6 +456,7 @@ const EN: Dictionary = {
 	"紫霄宫静室檀香袅袅，\n吐纳之间，内力自生。": "Incense drifts through the quiet hall of the Purple Cloud Palace;\nwith each breath, inner qi gathers.",
 	"回车使用 · 上下离开": "Enter to use · Up/Down to leave",
 	"银两不足": "Not enough silver",
+		"此物已在行囊，无须再购": "This item is already in your pack; no need to buy it again",
 	"\n\n门派设施：%s（F 使用）": "\n\nSect facility: %s (F to use)",
 	"银两 −%d": "Silver −%d",
 	"根骨 +%d": "Bone +%d",
