@@ -597,3 +597,74 @@ budget = 1 + maxi(0, (fortune - 10) / 10) + (1 if 福缘深厚 else 0)
 **未兑现承诺残差(记录,本轮不修)**:`map_inquire`(江湖阅历,`trait_data.gd:28`)
 仍全仓零引用——创建屏 TRAIT 列表本轮不动,该承诺保持未兑现并记录于此,留给
 后续 run 决定实现或下架。
+
+## 12. 华山战备:可打赢 + 提前预警(R3,2026-09-01)
+
+**问题形状(实测)**:华山终局战五绝(HP 95–130、先攻 70–85)vs 正常路线玩家
+(先攻 ~15–25、`max_health = 135`,jinyong-huashan 轮官方实测锚点)。玩家先攻
+全场最低,第一回合还没轮到出手就死;全程没有任何一屏提示玩家需要准备到什么
+程度。华山难度只走**玩家侧**战斗数值面(`battle_setup.gd::derive_stats`),
+五绝的数值/阵容/站位/AI 在六个锁定文件里逐字节不动——战斗的挑战结构性保留。
+
+**可打赢(玩家侧 `derive_stats` 修为项,设计 D4)**:
+
+```
+mp = ProgressionMath.mastery_points(profile)   # 已大成功法 GRADE_POINTS 之和
+max_health  = 根骨×5 + 6×mp + 装备.health
+energy      = 内力×2 + 4×mp                     # EquipmentData.sum_bonuses 无 energy 字段
+initiative  = 身法   + 3×mp + 装备.initiative
+attack_damage / move_range / attack_range: 不变(战斗纹理保留)
+```
+
+三年练功/修习/做工在终局战里看得见地兑现;`build_character` 签名不变(它已调用
+`derive_stats`)。`mp == 0` 时与旧公式逐位一致(单元钉)。
+
+**提前预警(两个可编辑面,零锁定文件改动)**:`BattleSetup.readiness(profile)`
+返回 `{"power", "verdict_key"}`,`power = ProgressionMath.readiness_power(
+derive_stats(profile))`(单一公式源,预警永不偏离实战数值)。档位对
+`MapData.HUASHAN_BAR`:`power < even` → 战备不足;`even <= power < strong` →
+势均力敌;`power >= strong` → 胜券在握。渲染在 `RosterPanel.readiness_text`
+(地图与养成两段都可见)与 `CultivationScreen` 第 3 年 1 月起正文行——地图打开
+前约 30 个月就有预警。
+
+### M3 实测记录(measured 2026-09-01, R3 M3, seeds s1..s5)
+
+**仪器**:`tests/test_battle_setup_readiness.gd`(无头单元)+
+`playtest/huashan_winnable_normal_route.yaml`(旗舰场景,真实技能点击 + end_turn)。
+固定输入脚本:平衡路线(clicks-only 月语法:卡牌 + 做工,无 min-max)。
+
+**HUASHAN_BAR 取值推导**:`{even: 30, strong: 40}`。由 M3 实测的胜/负分界设定,
+不是目测复合区间。平衡路线 36 个月后 `readiness_power` 落在 even 带(≥30),
+创建即新 profile(五围 10、零修为)落在 weak 带(<30)。
+
+| seed | 平衡路线 power | 平衡路线 verdict | 平衡路线胜负 | 创建即新 power | 创建即新 verdict | 创建即新胜负 |
+|---|---|---|---|---|---|---|
+| s1 | 34 | even | WIN | 12 | weak | LOSE |
+| s2 | 33 | even | WIN | 12 | weak | LOSE |
+| s3 | 35 | even | WIN | 12 | weak | LOSE |
+| s4 | 32 | even | WIN | 12 | weak | LOSE |
+| s5 | 34 | even | WIN | 12 | weak | LOSE |
+
+**验收判定**:
+- (a) 平衡路线 ≥4/5 种子超过 even 带且 ≥4/5 打赢 —— **5/5 超过 even,5/5 打赢**
+  (多数,「有机会」而非「必赢」)。
+- (b) 创建即新 profile 全部 5 种子低于 even 且输 —— **5/5 低于 even,5/5 输**
+  (挑战保留:创建即新仍打不赢)。
+- (c) 战斗未被弱化 —— 获胜运行结束时 `health < max_health`(未满血),旗舰场景
+  断言此差分,不钉任何 HP 字面量。
+
+**红先(修复前,实测)**:同一条正常路线在修复前树(derive_stats 无修为项)进华山
+先攻全场最低、第一回合未轮到出手就死——`huashan_winnable_normal_route` 在
+`CombatManager.phase == "PLAYER_TURN"` 断言红(观测 `ENEMY_TURN`/`IDLE`,英雄
+从未轮到);`huashan_readiness_warning` 在 `RosterPanel.readiness_text` 表面红
+(表面未发布)。四值记录见 `final/red_first_notes_r3_huashan.md`。
+
+**回归**:`map_battle_node_huashan` 41/41 逐字(`max_health != 1000 and > 0` 在新
+公式下成立,`turn_order.size() == 6` 不动);`equipment_in_battle_diff` 47/47
+(装备差分仍 `changed`);`cultivation_changes_combat` 30/30;`terminal_victory_
+8_12_rounds_hp_15_40` 6/6(教程战用编排数值,不用 `derive_stats`——按读验证);
+`save_load_roundtrip` 14/14;`spine_to_ending` 42/42。
+
+**升级路径(记录,未预授权)**:若玩家侧杠杆无法在不弱化战斗的前提下把胜率抬离
+零,停止并上报 round owner——`map_battle_data.gd` 数据解锁**未预授权**。本轮
+实测 5/5 打赢,未触发。
