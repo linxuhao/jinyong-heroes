@@ -2021,7 +2021,8 @@ def test_occlusion_watch_surface_contract() -> None:
     """Static contract pin for the jinyong-loop R2 occlusion_watch_gate task.
 
     Pins the structural occlusion gate (D6): the UiOcclusionWatch surface
-    block (violations / violations_text) is whitelisted on the
+    block (violations / violations_text plus the crash-proofing scan-health
+    observables scan_ok / scan_failed_frames) is whitelisted on the
     ``playtest/_common.yaml`` surface section, the scenario
     ``occlusion_no_button_over_text`` is in scenario_order AND in
     ROUND_SCENARIOS (two-place sync), the scenario file exists with
@@ -2044,7 +2045,7 @@ def test_occlusion_watch_surface_contract() -> None:
     assert "UiOcclusionWatch" in blocks, "surface has no UiOcclusionWatch block"
     watch_items = blocks["UiOcclusionWatch"]
     assert watch_items, "UiOcclusionWatch surface block parsed empty (vacuous pass guard)"
-    for var in ("violations", "violations_text"):
+    for var in ("violations", "violations_text", "scan_ok", "scan_failed_frames"):
         assert var in watch_items, (
             f"UiOcclusionWatch.{var} not whitelisted on the surface"
         )

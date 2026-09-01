@@ -15,7 +15,10 @@ extends Node
 ##
 ## RED pair = a visible Button B and a visible, non-empty-text Label or
 ## RichTextLabel L where ALL of:
-##   1. same effective CanvasLayer (cross-layer pairs are out of scope — the
+##   1. same effective CanvasLayer — compared by walking each node's parent
+##      chain to the NEAREST CanvasLayer ancestor (null-guarded, liveness-
+##      checked at every step; both null = both in the root viewport's default
+##      canvas = same layer). Cross-layer pairs are out of scope — the
 ##      tutorial/roster full-screen dims are this game's DESIGNED vocabulary
 ##      for covering inactive screens, not defects);
 ##   2. B is neither an ancestor nor a descendant of L (a label's own panel is
@@ -28,19 +31,44 @@ extends Node
 ##      under-labels to 0.12 — excluded; the defect labels sit at 1.0).
 ##   When B and L share no common ancestor within the same effective layer, the
 ##   pair is out of scope (no LCA => no draw-order comparison => never red).
+##
+## CRASH-PROOFING (fix_occlusion_watch_crashproof, 2026-09-01): the previous
+## build read `canvas_layer` directly on Controls (NOT a Control property) and
+## fired 44,660 "Invalid access to property or key 'canvas_layer'" runtime
+## errors — aborting _process BEFORE `violations` was assigned, so it stayed 0
+## and the nail's greens were FALSE greens from unscanned frames, and the
+## crash took down the whole suite's hard gate. GDScript has no try/catch, so
+## crash-impossibility holds BY CONSTRUCTION here: every typed access in the
+## scan is guarded (is_instance_valid + is_inside_tree + an `is <Type>` check
+## first); the only duck-typed property access ever performed is on nodes
+## type-confirmed as Control / CanvasLayer. The watch is read-only (zero RNG
+## draws, zero writes to any node) and publishes its own scan-health
+## observables so an unscanned frame can NEVER read as green:
+##
+##   scan_ok: bool          — true iff THIS frame's scan walked the tree and
+##                            evaluated every candidate pair to completion
+##   scan_failed_frames:int — cumulative incomplete-scan counter (evidence)
+##   On an unhonestly-scannable frame (e.g. the tree root vanished mid-frame):
+##   scan_ok = false, scan_failed_frames += 1, violations = -1 (UNTESTED
+##   sentinel), violations_text = "scan-incomplete" — never a green read.
 
 var violations: int = 0
 var violations_text: String = ""   # "Occluder>Label" pairs, semicolon-separated
+var scan_ok: bool = false
+var scan_failed_frames: int = 0
 
 const _MIN_OVERLAP_PX: int = 4
 const _MIN_RESIDUAL_VISIBILITY: float = 0.5
 
 
 func _process(_delta: float) -> void:
-	var root := get_tree().root
-	if root == null or not is_instance_valid(root):
-		violations = 0
-		violations_text = ""
+	var tree := get_tree()
+	if tree == null:
+		_mark_scan_incomplete()
+		return
+	var root := tree.root
+	if root == null or not is_instance_valid(root) or not root.is_inside_tree():
+		_mark_scan_incomplete()
 		return
 	var buttons: Array[Control] = []
 	var texts: Array[Control] = []
@@ -55,7 +83,7 @@ func _process(_delta: float) -> void:
 				continue
 			if b.is_ancestor_of(l) or l.is_ancestor_of(b):
 				continue
-			if b.canvas_layer != l.canvas_layer:
+			if not _same_effective_layer(b, l):
 				continue
 			var br: Rect2 = b.get_global_rect()
 			var lr: Rect2 = l.get_global_rect()
@@ -69,15 +97,45 @@ func _process(_delta: float) -> void:
 				continue
 			found += 1
 			parts.append("%s>%s" % [b.name, l.name])
+	scan_ok = true
 	violations = found
 	violations_text = ";".join(parts)
 
 
+## Sentinel for a frame the scan cannot complete honestly: UNTESTED, never green.
+func _mark_scan_incomplete() -> void:
+	scan_ok = false
+	scan_failed_frames += 1
+	violations = -1
+	violations_text = "scan-incomplete"
+
+
 func _valid_control(c: Control) -> bool:
-	return is_instance_valid(c) and c.is_inside_tree() and c.is_visible_in_tree()
+	return c != null and is_instance_valid(c) \
+			and c.is_inside_tree() and c.is_visible_in_tree()
+
+
+## Same effective layer ⟺ both nodes' NEAREST CanvasLayer ancestor is the same
+## instance (both null = both in the root viewport's default canvas = same
+## layer). Uses only get_parent() + `is CanvasLayer`; every step of the walk
+## is null-guarded and liveness-checked, so a parent freed mid-walk stops the
+## walk (treated as the root-viewport layer) instead of erroring.
+func _same_effective_layer(a: Node, b: Node) -> bool:
+	return _nearest_layer(a) == _nearest_layer(b)
+
+
+func _nearest_layer(n: Node) -> CanvasLayer:
+	var cur: Node = n
+	while cur != null and is_instance_valid(cur):
+		if cur is CanvasLayer:
+			return cur as CanvasLayer
+		cur = cur.get_parent()
+	return null
 
 
 func _collect(node: Node, buttons: Array[Control], texts: Array[Control]) -> void:
+	if node == null or not is_instance_valid(node) or not node.is_inside_tree():
+		return
 	if node is Control and node.is_visible_in_tree():
 		if node is Button:
 			buttons.append(node)
@@ -150,11 +208,13 @@ func _residual_visibility(l: Control, b: Control) -> float:
 
 
 func _collect_over(node: Node, l: Control, b: Control, out: Array[Control]) -> void:
+	if node == null or not is_instance_valid(node) or not node.is_inside_tree():
+		return
 	if node is Control and node != b and node != l \
 			and not b.is_ancestor_of(node) and not node.is_ancestor_of(b) \
 			and node.is_visible_in_tree():
 		var c := node as Control
-		if c.canvas_layer == l.canvas_layer \
+		if _same_effective_layer(c, l) \
 				and _draws_over(c, l) \
 				and c.get_global_rect().intersects(l.get_global_rect()):
 			out.append(c)

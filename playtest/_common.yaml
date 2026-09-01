@@ -1063,6 +1063,8 @@ surface:
   UiOcclusionWatch:
   - violations
   - violations_text
+  - scan_ok
+  - scan_failed_frames
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn

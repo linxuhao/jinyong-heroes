@@ -103,6 +103,7 @@ timeline:
   actions: []
   assert:
     UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
 - at: 165
   actions: []
   clicks:
@@ -169,6 +170,7 @@ timeline:
     GameManager.current_state: current_state == "SECT_SELECTION"
     SectButton0.visible: visible == true
     UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
 - at: 355
   actions: []
   clicks:
@@ -193,3 +195,4 @@ timeline:
   assert:
     RosterPanel.is_open: is_open == true
     UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
