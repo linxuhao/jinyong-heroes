@@ -85,8 +85,8 @@ consolidated in `final/delivery_notes_loop.md` §(a)):**
 |---|---|---|
 | `softlock_empty_practice_month_advances` | real-input boot (`debug_seed_save` seed + keyboard load + pure `ui_accept`, `debug_fast_forward` absent from the timeline) → `month == month_before_accept + 1`, `phase == "CARD_PICK"`, `status_text != ""` | f200 / month differential / observed `month == month_before_accept` / 9 |
 | `facility_use_cap_exhausted_zero_delta` | third press in one month: `silver == last_use_silver`, `attr_bone == last_use_attr_value`, `facility_use_count == 2`, receipt non-empty | f720 / `facility_use_count == 2` / observed 3 / 32 |
-| `map_node_event_revisit_no_resettle` | re-resolve of a settled pair: `attr_wisdom == last_apply_attr_value`, `last_effect_types` empty, count rung 3, receipt non-empty | f200 / `last_effect_types` empty / observed `["silver", "item"]` / 29 |
-| `event_option_refused_no_charge` | owned-item purchase refused whole: `silver == event_open_silver`, `map_status_text != ""`, count rung 1 (seeded via the whitelisted `debug_grant_equip` pipeline) | re-baselined; recorded in the scenario header |
+| `map_node_event_revisit_no_resettle` | re-resolve of a settled pair: `attr_wisdom == last_apply_attr_value`, `last_effect_types` empty, count rung 4 (resolve → transit → re-resolve ×2; the count tracks RESOLUTIONS, not settlements), receipt non-empty | f200 / `last_effect_types` empty / observed `["silver", "item"]` / 29 |
+| `event_option_refused_no_charge` | owned-item purchase refused whole: `silver == event_open_silver`, `map_status_text != ""`, `last_effect_types` empty, count rung 1 (seeded via the whitelisted `debug_grant_equip` pipeline) | corrected-boot red: f470 / `last_effect_types.is_empty() == true` / observed `["silver", "item"]` with silver dipped exactly 20 (1830→1810) and no receipt, 8 greens before red → green 11/11 after the scene-boot fix |
 | `occlusion_no_button_over_text` | `UiOcclusionWatch.violations == 0` at the tutorial / sect-select / roster frames | f158 / `violations == 0` / observed 1 (`Next>Body`) / 5 |
 
 The two soft-lock-era nails that pinned the old dead-end (`gongfa_pick_empty_keyboard_return`,
@@ -99,19 +99,23 @@ entries, 49/49), gate (b) `map_node_event_shaolin` (its effect-bearing legs f460
 first-time pairs `luoyang/merchant` and `shaolin/night_rain`; the repeat leg f630 asserts
 phase/count only — 32/32) and `map_battle_node_huashan` Leg F (41/41).
 
-**Verification status (honest, 2026-09-01):** implementation verified by direct read;
-per-scenario sidecar runs on the delivered tree are green (spine 42/42, gates (a)/(b) 49/49 /
-32/32 / 41/41, all five new nails green after their measured reds —
-`final/gate_run_notes_loop.md`). **One surfaced conflict must be ruled on before `5_test`:**
-`test_softlock_nail_contract` (`tests/test_playtest_contract_smoke.py:1222`) bans the literal
-`debug_fast_forward` in the WHOLE softlock yaml, but that file legitimately quotes the string
-in its documentation (comment lines 13/35-38 AND inside the `description:` scalar at line 67 —
-a comment-stripping guard re-scope would not clear the latter), so the guard reddens on exactly
-the scenario it protects; the timeline itself contains zero such actions. Both candidate
-resolutions (guard re-scope to timeline lines / prose reword) are recorded, not applied, in
-`final/delivery_notes_loop.md` §7. The consolidated 84-scenario run, `compile_report.json`,
+**Verification status (honest, 2026-09-01, refreshed by the R2-fix consolidated layer):**
+implementation verified by direct read; per-scenario sidecar runs on the delivered tree are
+green (spine 42/42, gates (a)/(b) 49/49 / 32/32 / 41/41, all five new nails green after their
+measured reds — `final/gate_run_notes_loop.md`). **The surfaced guard conflict is RESOLVED
+(ruling applied, option (i): the ban is scoped to the timeline's actions):**
+`test_softlock_nail_contract` now parses the timeline with `yaml.safe_load` and asserts zero
+`debug_fast_forward` actions (the file's prose that legitimately quotes the token stays
+verbatim); the three index guards were repaired from an unsatisfiable absolute-index equality
+to the relative-order sync comparison `[n for n in order_names if n in ROUND_SCENARIOS] ==
+ROUND_SCENARIOS`; the purchase nail was re-booted to the contract-default `main.tscn`
+(corrected-boot red-first re-measured 8/11 → green 11/11); the `UiOcclusionWatch` crash root
+cause (`canvas_layer` read on a Control → 44,660 runtime errors in the CRASHED run, since
+SUPERSEDED by the reviewer) is fixed in-tree with the `scan_ok` / `scan_failed_frames`
+observables, so an unscanned frame can never read green. In-step pytest after the repairs
+measured 56/56 green. The consolidated 84-scenario single run, `compile_report.json`,
 `test_report.json` and `vision_report.json` (incl. the seven before/after occlusion frame
-pairs) are downstream gate artifacts — pending, not counted as met.
+pairs) remain downstream gate artifacts — pending, not counted as met.
 
 ## Round: jinyong-theme — the UI finally looks designed (previous round, 2026-09-01)
 
@@ -1008,6 +1012,9 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   focus var the highlight follows; `GONGFA_PICK` with an empty unmastered list
   offers the single `CultOptionButton0` 「返回行动」 → the same
   `_on_accept` empty branch → `ACTION_PICK`; observables
+  *(exit behavior superseded 2026-09-01 by the jinyong-loop R2 soft-lock fix: the empty
+  exit is now 「度过本月」 → ATTR_PICK + `_after_action()`, the month advances — see the
+  R2 loop-rules bullet above.)*
   `cursor_markers_visible` (cultivation / map / sect_select), `option_focus` /
   `focused_option_text` (cultivation); scenarios
   `clicks_only_gongfa_empty_exit.yaml` (clicks-only, phase-diff nail) +
@@ -1133,7 +1140,9 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 ## Verification status (honest)
 
 **jinyong-loop R2 (this round, 2026-09-01) — implementation verified by direct read;
-per-scenario sidecar evidence green; consolidated gates + one guard conflict pending:**
+per-scenario sidecar evidence green; the surfaced guard conflict RULED ON and APPLIED
+(option (i), timeline-scoped ban; in-step pytest 56/56 after the repairs); consolidated
+gates pending:**
 
 - **Verified in the tree (verifier direct read):** the four rule fixes at their exact edit
   points (`cultivation.gd:297-300` empty-GONGFA exit → status + ATTR_PICK + `_after_action()`,
@@ -1153,10 +1162,17 @@ per-scenario sidecar evidence green; consolidated gates + one guard conflict pen
   `save_load_roundtrip` 14/14; `event_travel_effects` 19/19; zero runtime errors in every
   recorded run.
 - **Pending downstream (not counted as met):** the single consolidated 84-scenario harness run
-  and `compile_report.json` (`5_compile`); `test_report.json` (`5_test`) — which will surface
-  the softlock-guard documentation conflict unless ruled on first (see the round section);
-  `vision_report.json` (`5_vision`, incl. the seven before/after occlusion frame pairs). The
-  brief's `git log` theme-merge check was never executed (no shell anywhere in the round);
+  and `compile_report.json` (`5_compile` — the last `step:5_compile` product was the CRASHED
+  run, hard gate `passed: False`, 44,660 runtime errors, SUPERSEDED by the reviewer; none of
+  its numbers count as this round's verdict); `test_report.json` (`5_test` — the
+  softlock-guard documentation conflict WAS ruled on and applied (option (i): the ban is
+  scoped to the timeline's actions, and the three index guards were repaired to the
+  relative-order sync comparison); in-step pytest measured 56/56 after the repairs, but the
+  official re-run on the delivered tree is pending);
+  `vision_report.json` (`5_vision`, incl. the seven before/after occlusion frame pairs —
+  `blind / endpoint_unreachable` at verification time; the structural watch's
+  `violations == 0` + `scan_ok == true` is the machine gate in the interim). The brief's
+  `git log` theme-merge check was never executed (no shell anywhere in the round);
   in-tree `ThemeManager.option_style` consumption confirms the merge and the fix zones do not
   overlap the focus-style portion.
 
