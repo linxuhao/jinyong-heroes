@@ -104,10 +104,13 @@ is presented as this round's verdict.
   `scripts/autoload/ui_occlusion_watch.gd`); the crash-proofed watch introduces no
   parse error; `UiOcclusionWatch` stays in `[autoload]`, `SceneManager` still LAST.
 - **Official pytest + GDScript unit suite `test_report.json`** (56/56 pytest;
-  GDScript suite incl. `test_event_logic_refusal.gd` zero-mutation refusal pins +
-  `test_map_node_event.gd` cost-gate block + `test_facility_data.gd` raw effect
-  path): `pending host gate run (5_test)` (this step ran no test subprocess; the
-  read-audit above confirms the guards are present and repaired).
+  GDScript suite incl. `test_map_node_event.gd` cost-gate block — the zero-mutation
+  refusal pins, ~:562-577 — + `test_facility_data.gd` raw effect path; the
+  zero-delta refusal behavior is also pinned by the three playtest nails
+  `event_option_refused_no_charge`, `facility_use_cap_exhausted_zero_delta`,
+  `map_node_event_revisit_no_resettle`): `pending host gate run (5_test)` (this
+  step ran no test subprocess; the read-audit above confirms the guards are
+  present and repaired).
 - **Theme-round `git log` merge check:** `not executed + reason: no shell in this
   step` (in-tree `ThemeManager.option_style` consumption at
   `cultivation.gd`/`sect_select.gd` confirms the merge; see the R2-fix audit in
