@@ -2105,3 +2105,69 @@ def test_occlusion_watch_surface_contract() -> None:
         "final/delivery_notes_loop_occlusion_watch.md missing — the occlusion "
         "gate's threshold-rationale evidence record must not be dropped"
     )
+
+
+def test_event_option_refused_nail_contract() -> None:
+    """Static anti-weakening pins for the jinyong-loop all-or-nothing purchase nail.
+
+    The nail (``event_option_refused_no_charge``) pins design D4: ``apply_option_effects``
+    is validate-then-apply, so a purchase whose item is already owned (or whose silver
+    cost cannot be paid) is REFUSED as a whole option — zero profile mutation and an
+    on-screen receipt. The scenario grants the already-owned ``eq_sword_3`` through the
+    whitelisted ``debug_grant_equip`` action and pins the ZERO DELTA on silver. Hard pins:
+
+      1. the scenario name is present in ``scenario_order`` in ``playtest/_common.yaml``
+         AND ``ROUND_SCENARIOS`` here at the same index (two-place sync);
+      2. the file exists with ``name:`` == its basename;
+      3. every timeline ``at:`` is a single integer;
+      4. the file MUST carry the zero-delta line ``silver == event_open_silver`` (the
+         whole refused option changed silver by nothing), a ``phase == \"TRAVEL\"`` line
+         (refusal still resolves the encounter — no new soft-lock), an
+         ``events_resolved_count`` ladder rung, the on-screen receipt line
+         ``map_status_text != \"\"``, and the ``debug_grant_equip`` seeding line (the
+         owned item enters through the REAL item pipeline, then the pick is refused);
+      5. the surface whitelist contains ``event_open_silver`` and ``map_status_text``
+         under the ``MapScreen`` block — the differential anchors must be whitelisted.
+    """
+    name = "event_option_refused_no_charge"
+    order_text = COMMON.read_text(encoding="utf-8")
+    order_names = _items_under(order_text, "scenario_order")
+    assert name in order_names, f"{name} missing from scenario_order"
+    assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
+    assert order_names.index(name) == ROUND_SCENARIOS.index(name), (
+        f"{name} order mismatch between scenario_order and ROUND_SCENARIOS"
+    )
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\\s*{name}\\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        match = re.search(r"\\bat\\s*:\\s*([^,}\\s]+)", line)
+        if match and not match.group(1).isdigit():
+            assert False, (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {match.group(1)!r}"
+            )
+    for mandatory in (
+        "silver == event_open_silver",
+        'phase == "TRAVEL"',
+        "events_resolved_count",
+        'map_status_text != ""',
+        "debug_grant_equip",
+    ):
+        assert mandatory in ftext, (
+            f"{name}.yaml missing the mandatory differential/receipt/seeding line "
+            f"`{mandatory}`"
+        )
+    # The differential anchors must be whitelisted on the MapScreen surface block —
+    # the zero-delta proof cannot be asserted if harness cannot read either side.
+    blocks = _surface_blocks(COMMON.read_text(encoding="utf-8"))
+    assert "MapScreen" in blocks, "surface has no MapScreen block"
+    map_items = blocks["MapScreen"]
+    for var in ("event_open_silver", "map_status_text"):
+        assert var in map_items, (
+            f"MapScreen.{var} not whitelisted on the surface — the refusal nail's "
+            "zero-delta anchor is unreadable"
+        )
