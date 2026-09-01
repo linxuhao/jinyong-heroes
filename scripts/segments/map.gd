@@ -330,10 +330,12 @@ func _resolve_node_event() -> void:
 		return
 	var opt = def.option_a if event_focus == 0 else def.option_b
 	last_effect_types = []
-	if false:  # TEMPORARY RED-FIRST REVERT — DO NOT COMMIT
-		if GameManager.is_node_event_settled(current_node_id, event_id):
-			# SETTLED: nothing applies, the receipt says so.
-			map_status_text = tr("此事已有了结，不再重来")
+	if GameManager.is_node_event_settled(current_node_id, event_id):
+		# SETTLED (checked first): this (node, event) pair already applied its
+		# effects this session — the event re-APPEARS (re-fire is pinned by gates
+		# (b)) but its economy/attr effects must not re-settle. Nothing applies,
+		# the receipt says so; last_effect_types stays empty.
+		map_status_text = tr("此事已有了结，不再重来")
 	else:
 		# REFUSED path: consume validate_option's reason ("silver"/"owned").
 		# The purchase_all_or_nothing task owns EventLogic.validate_option;
