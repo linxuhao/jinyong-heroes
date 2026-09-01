@@ -175,3 +175,66 @@ only; 5_design appends it after confirming gate products:
 5_design: append exactly **one** line to `design/99_changelog.md` (do not touch existing rows),
 fill `00_roadmap.md` phase-4 numbers from gate artifacts only (no prediction), and resolve
 UX-21/UX-22 statuses strictly per results — including the honest residual above.
+
+---
+
+## 7. Fix-record: creation_layout_readability D6 fallback (2026-09-01)
+
+**Task:** `fix_creation_label_size_regression` — pin creation.tscn tight labels to 12px; restore `creation_layout_readability` after the D6-predicted cascade (global Label 12→14 / Button 12→15 made the 13 TraitToggles overflow the 480px MouseBox at frame 90).
+
+### 7.1 Red-first (本步实测, direct sidecar, 2026-09-01)
+
+| value | measured |
+|---|---|
+| failing_frame | **f90** |
+| first_failing_assert | `CreationScreen.creation_box_fits: creation_box_fits == true` |
+| exact_error / observed | `observed=false` (phase_box end.y exceeds mouse_box end.y − 8) |
+| green_asserts_before_red | **21** (21 of 22 pass; the 22nd is the failing one at f90) |
+
+Scenario result: `creation_layout_readability` **21/22 FAIL** (本步实测).
+
+### 7.2 Fix applied
+
+In `scenes/segments/creation.tscn` ONLY, added `theme_override_font_sizes/font_size = 12` to:
+- 13× `TraitToggle{i}` (i=0..12) — Button nodes in `MouseBox/TraitBox`, each with `custom_minimum_size = Vector2(0, 24)` and **no 44px row cap** (unlike ATTRS ± buttons)
+- 1× `TraitDescLabel` — Label in `MouseBox/TraitBox`, `autowrap_mode = 3`, no min size
+
+Total: **14 lines added**, zero geometry/offset/text/node changes. The D6 named fallback: per-node override, never shrink the hierarchy globally. `assets/themes/global_theme.tres` untouched (14px Label / 15px Button stays global).
+
+### 7.3 Green re-run (本步实测, same sidecar, 2026-09-01)
+
+Scenario result: `creation_layout_readability` **22/22 PASS** (本步实测).
+Frame 90 `creation_box_fits == true` — TraitBox height back within the 480−8=472px budget.
+
+**Before/after same-frame evidence:** frame 90, `CreationScreen.creation_box_fits` false → true.
+
+### 7.4 Full regression (本步实测, 2026-09-01, all 79 scenarios)
+
+All 79 scenarios PASS. Runtime errors: 0 (observed in all sidecar runs — `hard gate passed: True` every time).
+
+| batch | scenarios | result |
+|---|---|---|
+| Protected gates (5) | ui_geometry_readability 38/38, skill_button_visual_states 9/9, portrait_grid_alignment 30/30, spine_to_ending 42/42, equipment_in_battle_diff 47/47 | ALL PASS |
+| Creation (10) | creation_layout_readability 22/22, creation_budget_clamp_and_traits 11/11, creation_mouse_interaction 14/14, creation_traits_back_next_buttons 18/18, creation_back_to_menu_walk 15/15, creation_single_ui 16/16, creation_attr_effect_info 7/7, creation_hp_value_displayed 10/10, creation_confirm_summary 13/13, menu_to_creation_to_tutorial_order 19/19 | ALL PASS |
+| Battle core (13) | round_one_snapshot_and_turn_order 14/14, enemy_acts_only_after_player_ends_turn 9/9, each_unit_acts_once_per_round_initiative_order 25/25, cooldowns_decrement_by_round 6/6, skill_button_turn_overlay 6/6, dot_resolves_at_victim_turn_start 9/9, fahui_du_multiplies_damage 10/10, two_phase_skill_unlock_and_hp_gate 21/21, central_divine_innate_qi_fatal_guard 4/4, terminal_victory_8_12_rounds_hp_15_40 6/6, player_death_ends_battle 27/27, tutorial_win_routes_to_transition 8/8, tutorial_loss_restarts_tutorial 5/5 | ALL PASS |
+| Cultivation/menu (13) | lone_bane_sect_grants_external_only 8/8, cultivation_month_cycle_and_deck_bookkeeping 17/17, cultivation_year_end_stay 8/8, save_load_roundtrip 14/14, sect_switch_same_school_connects 8/8, cultivation_changes_combat 30/30, trait_combat_effects_and_twelve_slots 22/22, skill_hint_and_range_highlight 13/13, skill_rejection_reason_texts 3/3, skill_bar_waiting_state 8/8, main_menu_entries 33/33, menu_load_continues 14/14, settings_panel 14/14 | ALL PASS |
+| Click/move (13) | click_targeting_fixed 2/2, skill_description_visible 5/5, movement_range_highlight 12/12, battle_end_turn_attack_buttons 20/20, battle_focus_arrow_keys 9/9, click_move_to_tile 10/10, click_move_undo_right 10/10, click_move_undo_feet 7/7, click_move_commit_lock 9/9, portrait_visibility 9/9, move_target_affordance 18/18, event_travel_effects 19/19, skill_button_effect_info 5/5 | ALL PASS |
+| Map/health (13) | locked_slot_unlock_reason 8/8, health_bar_numbers 5/5, qi_cost_blocks_cast_no_energy 23/23, map_node_event_shaolin 32/32, map_node_event_mainline_east 23/23, map_node_event_mainline_return 20/20, map_hint_single 7/7, map_battle_node_huashan 41/41, input_click_differential 13/13, undo_button_retreat 18/18, click_portrait_body_targets_enemy 9/9, health_bar_above_portrait 14/14, trait_hover_preview 21/21 | ALL PASS |
+| Misc (12) | language_zh_default 5/5, camera_transform_follows_unit 9/9, facility_use_reusable 49/49, clicks_only_storyline 47/47, map_facility_buttons_click 38/38, clicks_only_gongfa_empty_exit 16/16, gongfa_pick_empty_keyboard_return 13/13, roster_panel_item_nail 36/36, roster_panel_cultivation_open_close 16/16, roster_equip_free_action 36/36, event_pool_new_event_resolved 15/15, theme_focus_marker_cultivation 14/14 | ALL PASS |
+
+**Total: 79/79 PASS. Zero runtime errors observed across all runs.**
+
+### 7.5 Vision Q6 re-check
+
+**未执行 + 原因:** vision endpoint is not reachable from this task step (no network access to the localqwen/qwen3 endpoint). The previously-bad Q6 answer from the official 5_vision run was on a creation-screen frame (correlating with the same tight-text overflow). The fix (font_size 12 pin) structurally resolves the overflow at its root, so the Q6 bad answer is expected to clear on the next official 5_vision run. If it does not clear, it will be a separate finding in the 5_review notes.
+
+### 7.6 Constraints honored
+
+- Zero gameplay/logic/value/text changes — only `theme_override_font_sizes/font_size` lines added.
+- Zero new art assets.
+- Zero i18n delta (no strings changed or added).
+- Six locked files byte-identical (not edited this step).
+- `design/99_changelog.md` and `design/00_roadmap.md` NOT touched (5_design's job).
+- `assets/themes/global_theme.tres` NOT edited (14px hierarchy stays global).
+- `playtest/creation_layout_readability.yaml` NOT edited (assertion byte-identical).
+- `creation.gd` `creation_box_fits` computation NOT edited.

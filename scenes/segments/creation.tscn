@@ -174,59 +174,73 @@ theme_override_constants/separation = 4
 visible = false
 
 [node name="TraitToggle0" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle1" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle2" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle3" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle4" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle5" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle6" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle7" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle8" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle9" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle10" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle11" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 [node name="TraitToggle12" type="Button" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 custom_minimum_size = Vector2(0, 24)
 focus_mode = 0
 size_flags_horizontal = 4
 
 [node name="TraitDescLabel" type="Label" parent="MouseBox/TraitBox"]
+theme_override_font_sizes/font_size = 12
 horizontal_alignment = 1
 visible = false
 text = ""
