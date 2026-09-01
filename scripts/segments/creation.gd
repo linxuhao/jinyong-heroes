@@ -18,7 +18,7 @@ const _ATTR_DESCS: Dictionary = {
 	"inner": "内力值 = 内力 × 2",
 	"agility": "移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法",
 	"wisdom": "决定学功法的速度(修习查表)",
-	"fortune": "影响事件与奇遇(游历事件可重掷)",
+	"fortune": "影响事件与奇遇（福缘越高，每年游历事件可重掷次数越多）",
 }
 
 ## Surface: "ATTRS" | "TRAITS" | "CONFIRM".

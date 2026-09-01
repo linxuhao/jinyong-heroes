@@ -254,6 +254,26 @@ func _unhandled_input(event: InputEvent) -> void:
 # Input: directional cycling per phase
 # ---------------------------------------------------------------------------
 
+## Travel-event reroll (fortune consumer, design D2): spend one of the
+## year-scoped rerolls to re-draw the current 游历 event. Player-initiated ONLY
+## (the event_reroll key / EventRerollButton) — old timelines that never press
+## it keep byte-identical RNG streams. Exactly ONE EventLogic.draw_unseen_id
+## draw per successful press (the same op the original travel draw used); the
+## exhausted branch performs ZERO RNG draws.
+func _on_event_reroll() -> void:
+	if phase != "EVENT":
+		return
+	if rerolls_left <= 0:
+		# Exhausted: inert — zero RNG, counters unchanged, receipt non-empty.
+		status_text = tr("今年已无重掷次数")
+		_render()
+		return
+	SaveManager.profile.deeds["rerolls_used_this_year"] = SaveManager.profile.get_deed("rerolls_used_this_year") + 1
+	event_id = EventLogic.draw_unseen_id(SaveManager.profile, SaveManager.rng)
+	_sync_surface()
+	status_text = tr("重掷：剩余 %d 次") % rerolls_left
+	_render()
+
 func _cycle_focus(dir: int) -> void:
 	_delete_armed = false
 	match phase:
@@ -526,6 +546,9 @@ func _advance_year() -> void:
 	month = 1
 	SaveManager.profile.cultivation["year"] = year
 	SaveManager.profile.cultivation["month"] = month
+	# Year-scoped reroll budget reset: the fortune reroll counter is per-year,
+	# so a new year restores the full budget (design D2).
+	SaveManager.profile.deeds["rerolls_used_this_year"] = 0
 	_grant_year_arts()
 	SaveManager.autosave()
 	_stage_next_month()
@@ -765,6 +788,24 @@ func _rebuild_options_box() -> void:
 		btn.pressed.connect(_on_option_pressed.bind(i))
 		box.add_child(btn)
 		pressed_connected["CultOptionButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
+	# Travel-event reroll affordance (fortune consumer, design D2): a code-built
+	# button rendered in the EVENT phase ONLY while rerolls_left > 0. Follows the
+	# sibling button conventions (FOCUS_NONE, option_style, 240x40, EXPAND_FILL)
+	# so it never overlaps the option rows or the body label (UiOcclusionWatch
+	# discipline). Its pressed path is the same _on_event_reroll the event_reroll
+	# key drives — one handler, two triggers.
+	if phase == "EVENT" and rerolls_left > 0:
+		var reroll_btn := Button.new()
+		reroll_btn.name = "EventRerollButton"
+		reroll_btn.text = tr("重掷事件（剩余 %d 次）") % rerolls_left
+		reroll_btn.focus_mode = Control.FOCUS_NONE
+		reroll_btn.add_theme_stylebox_override("normal", ThemeManager.option_style(false))
+		reroll_btn.add_theme_color_override("font_color", ThemeManager.OPTION_FONT_DIM)
+		reroll_btn.custom_minimum_size = Vector2(240, 40)
+		reroll_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		reroll_btn.pressed.connect(_on_event_reroll)
+		box.add_child(reroll_btn)
+		pressed_connected["EventRerollButton"] = reroll_btn.get_signal_connection_list("pressed").size() > 0
 	# The focused stylebox was applied to _focused_index_for_phase()'s row iff
 	# the box holds at least one button (labels non-empty). This is the same
 	# focused bool that selected the stylebox above, so the published flag is
@@ -983,6 +1024,16 @@ func _sync_surface() -> void:
 		gongfa_grades.append(str(entry.get("grade", "")))
 		gongfa_names.append(ProgressionGongfaData.display_name_of(id))
 	events_seen_count = (SaveManager.profile.flags.get("events_seen", []) as Array).size()
+	# Travel-event reroll budget remaining this year (year-scoped budget minus
+	# the used counter, clamped >= 0). The reroll affordance is visible ONLY
+	# while this is > 0. Pure arithmetic, zero RNG.
+	rerolls_left = maxi(
+		TraitEffects.fortune_reroll_budget(
+			SaveManager.profile.get_attr("fortune"),
+			SaveManager.profile.has_trait("deep_fortune")
+		) - SaveManager.profile.get_deed("rerolls_used_this_year"),
+		0
+	)
 	# Locale coupling: published as RAW zh (== zh-rendered build output); playtest
 	# pins exact zh literals. Do not tr() here — mirrors how event_id is published.
 	var d = EventData.def(event_id)
