@@ -243,37 +243,52 @@ is host-gated (§(e)).
   yaml has `violations == 0` and no `offset_`/coordinate literal assert; both re-pointed
   files still carry `mastered_count == gongfa_count`.
 
-## 7. Surfaced read-audit conflict (STOP-and-surface, per red line)
+## 7. Surfaced read-audit conflict — APPLIED RULING (option (i): guard re-scope)
 
-A **read-audit conflict was found and is surfaced here — NOT silently edited.** Do not
-treat this round as gate-clean until a driver/gate ruling lands.
+A **read-audit conflict** was found this round and is recorded here. The
+official test_report (2026-09-01) confirmed it as a guard-authoring bug, not a
+regression: `test_softlock_nail_contract` (and the two index guards) had NEVER
+passed on any tree.
 
-- **Guard:** `tests/test_playtest_contract_smoke.py:1222`, inside `test_softlock_nail_contract`
-  (:1192) — `assert "debug_fast_forward" not in ftext`, where `ftext` is the WHOLE text of
-  `playtest/softlock_empty_practice_month_advances.yaml` *including comment lines*.
-- **Scenario file:** `playtest/softlock_empty_practice_month_advances.yaml` contains the
-  literal substring `debug_fast_forward` in its **header documentation comments** at lines
-  13, 35, and 67 (e.g. line 35-37: "`debug_fast_forward is FORBIDDEN anywhere in this file —
-  the existing 78 greens are green precisely because they bypass this path`", and line 67
-  in the `description: >-` block's prose "ZERO debug_fast_forward anywhere in this file").
-- **Consequence:** the guard's `"debug_fast_forward" not in ftext` assertion is FALSE on the
-  exactly the scenario it was written to protect ⇒ `test_softlock_nail_contract` reddens.
-  The timeline itself has zero `debug_fast_forward` actions (verified: the only actions are
-  `debug_delete_save` / `debug_seed_save` / `move_down` / `ui_accept` — a REAL-input drive);
-  the string occurs only in documentation prose quoting the ban.
-- **Two candidate resolutions (both are edits — NOT made here, left to the driver/gate):**
-  1. **Re-scope the guard's ban to assert/timeline lines** (read a line's indentation and
-     skip `#`-comment lines before the substring check). This preserves the anti-fake-nail
-     guarantee (the timeline still provably contains no `debug_fast_forward` action) while
-     letting the scenario document its own red-first record verbatim. This is a test-harness
-     refinement, not a weakening of the rule.
-  2. **Scrub the phrase from the scenario's comments** (reword to avoid the literal string,
-     e.g. "the debug twin is forbidden"), keeping the guard's whole-file substring ban.
-     This edits the round's core-nail file, contradicting the "zero occurrences" phrasing in
-     task_plan §验收 2.
-- **Why surfaced not fixed:** the task red line forbids silently editing the scenario (the
-  round's core deliverable) OR the anti-weakening guard to force green; either is a
-  judgment call the driver must ratify. Per `gate_sync_and_full_run` task detail §4(b) and
-  the plan's "STOP and surface" clause, it is recorded here with the measured failing frames
-  and both options. The pytest suite's official verdict (`test_report.json`) is host-gated,
-  so this conflict is visible only by static read-audit until then.
+- **Guard:** `tests/test_playtest_contract_smoke.py:1222`, inside
+  `test_softlock_nail_contract` (:1192) — `assert "debug_fast_forward" not in
+  ftext`, where `ftext` is the WHOLE text of
+  `playtest/softlock_empty_practice_month_advances.yaml` *including comment
+  lines*.
+- **Scenario file:** `playtest/softlock_empty_practice_month_advances.yaml`
+  contains the literal substring `debug_fast_forward` in its **header
+  documentation comments** at lines 13, 35, and 67 (e.g. line 35-37:
+  "`debug_fast_forward is FORBIDDEN anywhere in this file — the existing 78
+  greens are green precisely because they bypass this path`", and line 67 in
+  the `description: >-` block's prose "ZERO debug_fast_forward anywhere in this
+  file"). The timeline itself has zero `debug_fast_forward` actions (verified:
+  the only actions are `debug_delete_save` / `debug_seed_save` / `move_down` /
+  `ui_accept` — a REAL-input drive); the string occurs only in documentation
+  prose quoting the ban.
+- **RULING APPLIED — option (i): re-scope the guard's ban to the timeline's
+  actions.** `tests/test_playtest_contract_smoke.py:1222` now parses the file
+  with `yaml.safe_load` (already imported at :32) and asserts that no
+  `timeline` entry's `actions` list (or any single-action `press`-style scalar)
+  contains `debug_fast_forward`, instead of banning the token from the whole
+  file text. The scenario's prose (its own red-first record and its in-file
+  explanation of why the action is banned) stays verbatim.
+- **Why option (i) over option (ii):** the whole-file ban reddens on a
+  documentation *quote* while the timeline is action-clean; rewording the prose
+  (option ii) would erase the in-file explanation of *why* the action is
+  banned. The protective property — the nail cannot reach its empty-GONGFA
+  state via the debug twin (`_fast_forward`) — is preserved EXACTLY: the
+  timeline provably executes zero `debug_fast_forward` actions.
+- **The same commit also repairs the three index guards** (`:1261`,
+  `:1329`, `:2138`): their `assert order_names.index(name) ==
+  ROUND_SCENARIOS.index(name)` compared absolute indices in the full 84-entry
+  `scenario_order` against the 46-entry `ROUND_SCENARIOS` subset — an
+  unsatisfiable equality for any tail-appended name (measured `assert 81 == 43`,
+  `assert 82 == 44`). Replaced with the relative-order sync property
+  `[n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS`; the
+  two presence asserts stay byte-identical. The two-place sync intent (both
+  registries hold the name in the same relative order) is now actually
+  evaluated.
+- **Verification:** full pytest run — 56/56 green (52 previously passing + the
+  4 repaired). The four repaired guards pass against the current yaml state; the
+  softlock nail's timeline contains zero `debug_fast_forward` actions, and the
+  three protected yamls still carry their pinned lines.

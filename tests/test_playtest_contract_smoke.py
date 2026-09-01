@@ -1199,7 +1199,7 @@ def test_softlock_nail_contract() -> None:
 
       1. the file MUST carry the differential line
          ``month == month_before_accept + 1`` (the month-advance proof);
-      2. the file MUST NOT contain ``debug_fast_forward`` anywhere — the
+      2. the timeline MUST NOT USE ``debug_fast_forward`` in any action — the
          existing 78 greens are green precisely because they bypass this path
          via the debug twin, so a nail that reaches the state by fast-forward
          would prove nothing;
@@ -1219,10 +1219,30 @@ def test_softlock_nail_contract() -> None:
         f"{name}.yaml missing the differential month-advance line "
         "`month == month_before_accept + 1`"
     )
-    assert "debug_fast_forward" not in ftext, (
-        f"{name}.yaml must NOT contain debug_fast_forward — the soft-lock "
-        "nail must be reached through real player input, never the debug twin"
-    )
+    # The ban is scoped to the TIMELINE's actions, not the file's prose: the
+    # file legitimately QUOTES the token in its header comments and description
+    # scalar (the in-file documentation of why the action is banned). The
+    # protective property is that no timeline step ever executes the debug
+    # twin, so we parse the timeline and check every action (list form and any
+    # single-action ``press`` scalar) for the token. yaml.safe_load is already
+    # imported; if parsing fails the assert fails loudly rather than passing.
+    parsed = yaml.safe_load(ftext)
+    timeline = parsed.get("timeline", []) if isinstance(parsed, dict) else []
+    for entry in timeline:
+        if not isinstance(entry, dict):
+            continue
+        for key in ("actions", "press"):
+            acts = entry.get(key)
+            if isinstance(acts, str):
+                acts = [acts]
+            if isinstance(acts, list):
+                for act in acts:
+                    if isinstance(act, str) and "debug_fast_forward" in act:
+                        assert False, (
+                            f"{name}.yaml uses debug_fast_forward in a timeline "
+                            "action — the soft-lock nail must be reached through "
+                            "real player input, never the debug twin"
+                        )
     for repointed in ("gongfa_pick_empty_keyboard_return", "clicks_only_gongfa_empty_exit"):
         rtext = (PLAYTEST_DIR / (repointed + ".yaml")).read_text(encoding="utf-8")
         assert "mastered_count == gongfa_count" in rtext, (
@@ -1258,8 +1278,9 @@ def test_facility_use_cap_nail_contract() -> None:
     order_names = _items_under(order_text, "scenario_order")
     assert name in order_names, f"{name} missing from scenario_order"
     assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
-    assert order_names.index(name) == ROUND_SCENARIOS.index(name), (
-        f"{name} order mismatch between scenario_order and ROUND_SCENARIOS"
+    assert [n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
+        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
+        "relative order"
     )
     path = PLAYTEST_DIR / (name + ".yaml")
     assert path.is_file(), f"{name}.yaml missing"
@@ -1308,7 +1329,7 @@ def test_map_node_event_revisit_no_resettle_nail_contract() -> None:
     re-settle. Hard pins:
 
     1. the scenario name is present in ``scenario_order`` AND
-       ``ROUND_SCENARIOS`` at the same index (two-place sync);
+       ``ROUND_SCENARIOS`` at the same relative order (two-place sync);
     2. the file exists with ``name:`` == its basename;
     3. every timeline ``at:`` is a single integer;
     4. the file MUST carry the zero-delta line
@@ -1326,8 +1347,9 @@ def test_map_node_event_revisit_no_resettle_nail_contract() -> None:
     order_names = _items_under(order_text, "scenario_order")
     assert name in order_names, f"{name} missing from scenario_order"
     assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
-    assert order_names.index(name) == ROUND_SCENARIOS.index(name), (
-        f"{name} order mismatch between scenario_order and ROUND_SCENARIOS"
+    assert [n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
+        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
+        "relative order"
     )
     path = PLAYTEST_DIR / (name + ".yaml")
     assert path.is_file(), f"{name}.yaml missing"
@@ -2118,7 +2140,7 @@ def test_event_option_refused_nail_contract() -> None:
     whitelisted ``debug_grant_equip`` action and pins the ZERO DELTA on silver. Hard pins:
 
       1. the scenario name is present in ``scenario_order`` in ``playtest/_common.yaml``
-         AND ``ROUND_SCENARIOS`` here at the same index (two-place sync);
+         AND ``ROUND_SCENARIOS`` here at the same relative order (two-place sync);
       2. the file exists with ``name:`` == its basename;
       3. every timeline ``at:`` is a single integer;
       4. the file MUST carry the zero-delta line ``silver == event_open_silver`` (the
@@ -2135,8 +2157,9 @@ def test_event_option_refused_nail_contract() -> None:
     order_names = _items_under(order_text, "scenario_order")
     assert name in order_names, f"{name} missing from scenario_order"
     assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
-    assert order_names.index(name) == ROUND_SCENARIOS.index(name), (
-        f"{name} order mismatch between scenario_order and ROUND_SCENARIOS"
+    assert [n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
+        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
+        "relative order"
     )
     path = PLAYTEST_DIR / (name + ".yaml")
     assert path.is_file(), f"{name}.yaml missing"
