@@ -442,7 +442,7 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 节点什么都不发生。本轮把「事件」这一种做通,其余两种只留声明位。本节与
 §5 的表**同一事实源**,两份文档必须一致。
 
-### 8.1 六节点进入内容声明表(镜像 `scripts/data/map_data.gd`)
+### 8.1 进入内容声明表(镜像 `scripts/data/map_data.gd` 的 `NODES`,7 节点)
 
 每节点声明三槽 `event` / `battle` / `facility`,槽形状
 `{"status": "active"|"declared", "<type>_id": String}`:`active` = 已实现且生效,
@@ -456,11 +456,15 @@ playtest 闸门实测 `terminal_victory_8_12_rounds_hp_15_40` **6/6 全 PASS**
 | `xiangyang` | 襄阳 | `active` / `dragon_scrap` | `declared` / `""` | `declared` / `""` |
 | `kunlun` | 昆仑 | `declared` / `""` | `declared` / `""` | `declared` / `""` |
 | `shaolin` | 少林 | `active` / `night_rain` | `declared` / `""` | `active` / `shaolin_wooden_men` |
+| `huashan` | 华山 | `declared` / `""` | `active` / `huashan_duel` | `declared` / `""` |
 
 (行序 = `map_data.gd` 的 `NODES` 顺序;`wuming_valley` 的 `tomb_bed` 是 `active`
 且诚实——它**只在经 return travel 到达时**触发,开机 / 读档不触发。2026-08-29
 `jinyong-nodes(主线事件)` 轮把主线 event 槽从「全部 `declared`」转为「4/5 live」,
-昆仑保持 `declared`(终点保证,见 §8.3 第 3 条);battle 槽六节点仍全 `declared`;
+昆仑保持 `declared`(终点保证,见 §8.3 第 3 条);battle 槽 2026-09-01
+`jinyong-huashan` 轮起在华山转 `active`(全图首个、也是目前唯一 active 的 battle 槽,
+绑定 `huashan_duel`——2026-08-28 由轮次所有者写入数据层,本轮把它真正消费成一场
+可打的战斗,见 §11),其余六节点仍 `declared`;
 facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点仍 `declared`。)可观测语义:`declared_gap_types(id)` =
 该节点所有 `status == "declared"` 的槽类型列表——「已声明未实现」因此是可断言
 的事实,不只是文档里的一句话;`active_event_id(id)` = 仅当 event 槽
@@ -539,8 +543,11 @@ facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点�
 
 ### 8.3 已声明未实现缺口(照 §5 的纪律:不许假装实现,也不许悄悄不提)
 
-1. **battle 槽:已声明、未实现。** 6 个节点的 battle 槽全部是 `declared`、
-   `battle_id` 保持空串;本轮没有任何「进节点触发战斗遭遇」的接线。
+1. **battle 槽:华山已 live(2026-09-01 `jinyong-huashan` 实装,§11),其余六节点仍
+   `declared`。** 华山绑定 `huashan_duel`(`map_data.gd:49`)已是可打的回合战——
+   对手阵容、出生位、回合真实开局与胜负回图全部由重写的 `map_battle_node_huashan`
+   场景实测承载;其余六个节点的 battle 槽仍是 `declared`、`battle_id` 空串——
+   「进节点触发战斗遭遇」的接线只存在于华山一条。
 2. **facility(门派设施)槽:少林 / 武当已实现,其余五节点仍 `declared`。**
    少林绑定 `shaolin_wooden_men`(木人巷)、武当绑定 `wudang_meditation`(紫霄静修),
    两槽本轮转 `active`;其余五节点(wuming_valley / luoyang / xiangyang / kunlun /
@@ -556,8 +563,9 @@ facility 槽本轮在少林 / 武当(两个门派)转 `active`,其余五节点�
    的「主线 5 槽位惰性以保护不可修改的 spine_to_ending 时间线」这一理由,本轮由轮次
    所有者**有条件解除**:`playtest/spine_to_ending.yaml` 允许重排按键/帧预算(断言只加
    不减、先写理由再动 yaml),使主线站点的 event 可开可解、结局仍然走得到。理由与
-   before/after 帧表见本节 2026-08-29 记录 (a)。battle 槽六节点仍全
-   `declared`(见本条前第 1 条);facility 槽少林 / 武当已 live(见第 2 条),「打听」行动仍**未实现**(见第 6 条)。
+   before/after 帧表见本节 2026-08-29 记录 (a)。battle 槽 2026-09-01
+   `jinyong-huashan` 轮在华山转 `active` 并实装(见本条前第 1 条与 §11),
+   其余六节点仍 `declared`;facility 槽少林 / 武当已 live(见第 2 条),「打听」行动仍**未实现**(见第 6 条)。
 4. **本轮不新编少林专属事件文案。** 「去的理由」用的是 §8.2 的既有池绑定。
    未来若要**新写**一段少林专属行(例如山门场景),那是**内容缺口**:
    必须先按本节风格记缺口,且新行只能写进 `event_data.gd` 的 `EventData.TABLE`
@@ -799,4 +807,62 @@ luoyang / xiangyang / kunlun / huashan)仍诚实保持 `declared` / `""`(见 §8
 (`judge_budget_exhausted`,judged_by human,69 场景 276 帧抽样)——与既往轮的
 `endpoint_unreachable` blind 不同源,同属「判官未裁决、人眼代判」立场,不作为上述
 数字断言的替代证据。
+
+## 11. 华山 battle 槽实装:`huashan_duel`(2026-09-01 `jinyong-huashan`)
+
+本节与 §8 / §10 同一事实源纪律,镜像 `scripts/data/map_battle_data.gd`(新,纯静态
+数据层)与 `scripts/data/map_data.gd:49`。§8.1 / §8.3 旧版写的「battle 槽六节点仍全
+`declared`」自此作废:华山槽 `status: "active"`、`battle_id: "huashan_duel"`
+(2026-08-28 由轮次所有者写入数据层)本轮被**真正消费**成一场可打的回合战。
+
+**绑定 → 对手阵容(`MapBattleData.ROSTERS`)。** `huashan_duel` → `East Heretic` /
+`West Poison` / `South Emperor` / `North Beggar` / `Central Divine`(五绝),角色数据
+与 AI 控制器全部取自既有教程角色工厂(`_create_all_character_data` 及五个
+`ai_*.gd`)——零新资产、零新技能、零新战斗系统;阵容构成是**数据行**而非代码:
+下一张地图 battle 槽 = 一行 `ROSTERS`/`POSITIONS` + 一处 `map_data.gd` 槽位翻转,
+入口路径零新代码。未知绑定读作惰性(`roster_ids` 返回空、`map.gd` 守卫
+`push_warning` 后返回),绑定写错永不崩。
+
+**出生位(`MapBattleData.POSITIONS`,新表自有,教程冻结的 positions/ai_map
+字典一个字节不读)。** 东邪 (3,2)、西毒 (1,4)、南帝 (1,9)、北丐 (2,7)、
+中神通 (11,2)——全部避开实测到的 HUD 遮挡列 12-13、Chebyshev ≥ 4 于玩家出生点
+(7,5)(到达帧可读性,实测表面见 `final/delivery_notes_huashan.md` §6)。玩家
+出生位沿用共享的 (7,5),不改任何共享函数。
+
+**进入路径(与 §8.1 表镜像)。** `map.gd::_maybe_start_entry_battle` 读
+`MapData.active_battle_id("huashan") == "huashan_duel"` → 阵容守卫 →
+`GameManager.start_map_battle(bid)`(`map_battle_id` 于任何 swap 触发**之前**写入)
+→ `battlefield._ready()` 按 `map_battle_id != ""` 走 `_setup_map_battle(bid)`——
+被钉住的 `_setup_encounter_battle` 的**兄弟函数**(裁定与被否方案见
+`90_decisions.md` 2026-09-01 条),尾序逐段一致:守卫(profile 空 / 阵容未知 ⇒
+`push_warning` 中止,不硬崩)→ `CombatManager.tutorial_battle = false`(教程开场
+遮罩永不重放)→ 清陈旧单位引用 → `BattleSetup.build_character(SaveManager.profile)`
+建人(属性 / 功法 / 装备全部生效)→ 自有 ai_map 实例化五绝 → 同步 HUD 接线 +
+deferred 兜底 → `begin_battle.call_deferred()` 开第一回合。教程战路径与
+`_setup_encounter_battle` 逐字节未动(`equipment_in_battle_diff` 47/47 本轮仍绿)。
+
+**闸门(本节数字全部实测自本轮 `5_compile` 产物)。** `playtest/
+map_battle_node_huashan.yaml` 原位重写(同场景名、78 场景注册表计数不变),旧断言
+只证「加载了」(`current_state == "BATTLE"` 就收工),新断言证「能打」:
+`map_battle_id == "huashan_duel"`(绑定被消费)、`tutorial_battle == false`、
+`max_health != 1000 and max_health > 0`(血量派生自 profile)、`current_round >= 1`、
+`turn_order.size() == 6`(ProgressionHero + 五绝)、`phase != "IDLE"`、
+`active_unit_name != ""`、`EndTurnButton.disabled == false`、一次真实点击移动的差分
+(`grid_pos` / `moves_left` changed)、胜负两条腿都回 MAP 且
+`events_resolved_count` 不丢(2 → 胜后 2 → 再访重开败后 3)、`map_battle_id` 胜负
+后清空。逐行断言变更表(19 行,旧断言全部保留、只加不减)在
+`final/delivery_notes_huashan.md` §2。**本轮官方实测**:playtest **78/78 场景全
+PASS**(`map_battle_node_huashan` **41/41**;硬闸门 `passed: true`、`spec_used: true`、
+零 runtime error);编译 **98/98** 零错误。养满三年的 profile 英雄实测
+`max_health = 135`——不是教程杨过的 1000;预授权的 §D3 降阵容预案(首回合全局伤害
+下限 62 压不住玩家血量时撤中神通)**未动用**,五绝阵容保留。先红后绿链完整:
+改前闸门在 f580 `map_battle_id == "huashan_duel"` 实测红(observed=`""`,红前绿
+11 条;`final/_red_first_4a.md`),单元钉对偶地在临时 `clear_battle()` 生命周期下
+实测红后逐字节还原(`final/_red_first_4b.md`)。
+
+**设计语义(与 §8 的 event / facility 三分)。** battle = 到达即触发(挂少林旁支,
+主线 spine 不动)、胜负皆回 MAP(`battle_return_state` 现在只承担「打完回哪」一个
+含义——「用谁建人」由 `map_battle_id` 单独决定)、可重复触发(重访再开,与 §8.3
+第 5 条 event 的重触发策略同款政策,由重写场景 Leg F 实测承载);阵容 / 难度的
+数值精调是第 5 阶段的事,本轮零数值改动。
 

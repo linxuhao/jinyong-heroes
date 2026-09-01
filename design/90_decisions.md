@@ -720,3 +720,64 @@ SPECIES ×13 三张 denylist(逐 token 命中报行)+ 4 处受保护字面量(#7
 **UX-19(OPEN,record-only)**:事件外人形散文清单(`final/human_prose_sweep_notes.md`,
 本轮只记不改)。
 
+## jinyong-huashan — 建人来源与返回目标解耦(2026-09-01)
+
+本条记 `jinyong-huashan` 轮的裁定。动因是实测(2026-08-31,78 场景当载具跑完两次
+完整三年、逐帧看图):到达华山后 `CombatManager.phase == "IDLE"`、
+`current_round == 0`、`turn_order == []`、`EndTurnButton.disabled`、
+`tutorial_battle == true`、玩家血量 1000、教程开场遮罩重放——大地图战斗落进了硬编码
+的教程杨过,而且根本不开局。根因是一个变量扛了两个语义:`battle_return_state`
+既决定「用谁建人」又决定「打完回哪」。
+
+**(a) `map_battle_id` 是建人来源信号;`battle_return_state` 只剩返回目标。**
+`GameManager` 新增 `map_battle_id`(getter/setter 同既有返回态对)。非空 ⇒ MAP
+战斗:经 `BattleSetup.build_character(SaveManager.profile)` 建人、按 id 从
+`MapBattleData` 解对手阵容;空 ⇒ 既有路径不变(养成遭遇走 CULTIVATION 分支、教程
+走教程分支)。分支读 id,绝不读返回态——被否:「按 `battle_return_state == "MAP"`
+分支」,那是把缺陷的耦合在下一层原样重演(未来任何为别的建人来源设返回 MAP 的
+调用方都会被误路由)。
+
+**(b) 生命周期 = 写在入口 + 走到即清;`clear_battle()` 刻意不碰。** 每个
+battlefield `_ready()` 的可能来路都在进场的同一次调用里写字段:`start_map_battle(bid)`
+在 `battle_started` / `state_changed` 发出**之前**写 id;`start_battle()` /
+`start_encounter()` / `restart_game()` 各加一行写 `""`(`restart_game()` 路由到
+TUTORIAL,而 TUTORIAL 的场景就是 battlefield——一条绕过所有 `start_*` 的
+`_ready()` 来路)。`request_continue()` / `request_retry()` 各加一行清空(胜负已定,
+无论回哪个段)。**`clear_battle()` 不清这个字段,这本身就是修复**:它在每次换景的
+swap 中段运行(五个调用点逐一走过:scene_manager 换景、request_continue、
+request_retry、menu_load_game、restart_game),清在这里恰好落在「入口写入与新战场
+`_ready()` 读取」之间,会把缺陷原样再造——`battle_return_state` 从来就没被它清过
+(这正是养成遭遇路径能活着穿过换景的原因),新字段照同一先例。被否:「consume 即
+清」(读完就清)——`_setup_map_battle` 在 `_ready()` 里跑,清完官方闸门 f580 对活 id
+的断言恒红,且杀掉下一轮按 id 挂开场遮罩 / BGM 的钩子;LOST→重开路径经核实由
+走到即清覆盖,无需 consume 清。被否:「把清挂在 `clear_battle()`」即上段的错误
+所有权。先红后绿链:单元钉驱动**真实 SceneManager 换景**(跨过 swap 中段的
+`clear_battle()`),在临时把清所有权改回 `clear_battle()` 的回退下实测红
+(`final/_red_first_4b.md`),修复后绿。
+
+**(c) 对手阵容 = 数据行,五绝,取自既有工厂;预授权降阵容预案实测未动用。**
+`huashan_duel` → 五绝(`MapBattleData.ROSTERS`),角色数据与 AI 全部复用教程角色
+工厂输出,零新资产、零新系统;`POSITIONS` 是新表自己的,教程 positions/ai_map
+冻结字典一个字节不读。预授权的一次性降阵容预案(首回合五绝全局伤害下限 62,若
+实测玩家血量压不住则撤中神通)经实测 `max_health = 135` **未动用**——预写在此,
+防止下一轮把「阵容变过」当既成事实。阵容 / 难度数值是第 5 阶段的事,本轮零改动。
+
+**(d) 兄弟函数,不改被钉住的函数。** `_setup_map_battle` 是
+`_setup_encounter_battle` 的兄弟(尾序逐段一致:守卫 → `tutorial_battle = false` →
+清陈旧引用 → profile 建人 → 敌方实例化 → 同步 HUD 接线 + deferred 兜底 →
+`begin_battle.call_deferred()`),不是参数化改写——后者被
+`equipment_in_battle_diff`(47/47,本轮仍绿)钉死,冻结的函数一行不碰。约 25 行
+复制的代价买被钉路径的零风险,是有意的。
+
+**(e) `events_resolved_count` 的会话镜像。** MapScreen 被 swap 重建,会话计数器
+随之丢失;持久之家 = `GameManager.map_events_resolved_count`(`_ready` 播种、每次
+结算写穿、`SaveManager.profile_created`(新信号)/ `loaded` 清零,deferred 连接防
+autoload 时序)。被否:落进 profile / 存档——改变「会话计数」语义、动存档管线,
+无必要。既有 `events_resolved_count` 阶梯钉全部不跨 MapScreen 重建,镜像对它们
+不可见。
+
+**(f) Open questions。** 战前选装(UX-14)与本轮无关,保持 OPEN;华山阵容数值与
+难度是第 5 阶段数值精调的事;下一张地图 battle 槽(如少林)只需一行
+`ROSTERS`/`POSITIONS` + 一处 `map_data.gd` 槽位翻转,入口已按 id 驱动、零新代码;
+按 id 挂 per-battle 开场 / BGM 是记录在案的地平线,本轮不建。
+

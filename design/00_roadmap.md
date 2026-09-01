@@ -36,7 +36,9 @@
   **facility** 本轮已在少林 / 武当实装(见 `20_content.md` §10),余五节点仍 `declared`;
   剩余内容活是逐个填实 battle / facility 已声明槽位;事件池已扩至 36 条(2026-08-31
   `jinyong-event-pool-36`,第 3 条转 ✅,见 `20_content.md` §4);华山的行为路径
-  (到达→开战→回图)尚无场景钉死,只验到数据层与编译。
+  (到达→开战→回图)已由 `jinyong-huashan`(2026-09-01)钉死——`map_battle_node_huashan`
+  重写为「能打」闸门并实测 **41/41**(到达→开战→回合推进→真实行动→胜负回图全链,
+  见 `20_content.md` §11)。
 - **大地图已可行**(2026-08-28):可见性归跟随相机后,棋盘不再受视口约束——后续内容轮
   不必设计到 15×11,可以上更大的地图(见 `90_decisions.md` 2026-08-28 条)。
 - **第 4 阶段(美术)**:六名角色已有 96×128 立绘,战场已有山水背景——**「美术仍是色块」
@@ -77,7 +79,7 @@
 | # | 条目 | 状态(2026-08-28) |
 |---|---|---|
 | 1 | 六段骨架可从头玩到结局 | ✅ 已达 |
-| 2 | 地图三类节点全部实装 | event ✅ / battle ✅(华山)/ facility ✅(少林 / 武当)——其余五节点 facility 槽仍 `declared`(见 `20_content.md` §10) |
+| 2 | 地图三类节点全部实装 | event ✅ / battle ✅(华山——2026-09-01 `jinyong-huashan` 轮实装为**可打的战斗**并由本轮官方闸门实测承载:`map_battle_node_huashan` **41/41**,本轮 playtest **78/78 全 PASS**、硬闸门 `passed: true`、零 runtime error,编译 **98/98** 零错误;`huashan_duel` 绑定被真消费、对手阵容由它决定,逐行断言变更表 `final/delivery_notes_huashan.md` §2,实装记录 `20_content.md` §11)/ facility ✅(少林 / 武当)——其余六节点 battle 槽仍 `declared`、其余五节点 facility 槽仍 `declared`(见 `20_content.md` §8.1) |
 | 3 | 事件池够撑一次完整旅程不重复 | ✅ 36 条(2026-08-31 `jinyong-event-pool-36` 扩池完成)——两道不重复闸门 `_test_no_repeat_full_journey`(单元,跑真实 `draw_unseen_id` 36 抽)与 `event_pool_new_event_resolved`(playtest,屏上结算一条新事件)承载该性质。**闸门实测已补记(2026-08-31 本轮 5_compile / 5_vision)**:编译 **95/95** 零错误;playtest **78 场景**硬闸门 `passed: true`、零 runtime error、**77 PASS / 1 红**——唯一红是本轮新场景 `event_pool_new_event_resolved` **13/15**:屏上抽中(`event_id == "cliff_herbs"`) / 选中(f210 `focused_option_text`) / 结算(f230 `events_seen_count == 36`,seen 阶梯 f140 35 → f230 36 无清空)全绿,红的是本轮**新增两个渲染观测面**(f200 `event_title` / `event_body` 实测空串)→ 如实记 `40_ux_backlog.md` **UX-18(OPEN)**,红不属「不重复」性质本身,本条 ✅ 维持;视觉闸门 passed(78 场景 312 帧,Q6 78 好 / 0 坏);单元闸门 `_test_no_repeat_full_journey` 的官方 PASS 待 5_test 产物(`test_report.json`,不在本步上下文,不预测)。**post-fix 收口(2026-08-31,5_design 补记)**:渲染观测面缺陷已修(`cultivation.gd` ACTION_PICK case 3 抽取后立即 `_sync_surface()` 发布,`90_decisions.md` (g)),本轮 `5_compile` 官方复跑实测 playtest **78/78 场景全 PASS**——`event_pool_new_event_resolved` **15/15**(f200 两观测面转绿,「抽到 / 渲染 / 选中 / 结算」四腿屏上全成立)、既有 77 场景零回归、零 runtime error;编译 **95/95** 零错误;视觉闸门 passed(78 场景 312 帧,Q6 78 好 / 0 坏);`40_ux_backlog.md` **UX-18 → CLOSED(jinyong-event-pool-36)**(详见 `20_content.md` §4) |
 | 4 | 玩家点得动:立绘几何四条缺口 | ✅ 已达 —— 四条(立绘高一格 / 名牌压腿 / 特质要点击才显示 / 手机无退回控件)已在既往轮次落地,本条此前标 ❌ 是**过期**记载(见下「第 4 条核对」) |
 | 5 | 全部角色为「武虾」形象 | ✅ 已达(2026-08-31,武虾轮)——六张立绘换为非人形真虾体(头卡通 + 身半写实),四个「待定虾种」按所有者裁定填入、六行 `art_status` → `completed`,守卫 `tests/test_shrimp_roster.py` 不改且绿;换图后立绘几何逐条重实测零红:`portrait_grid_alignment` **30/30**(24 条墨迹线 dx/dy 全 0.0,f40+f820)、六单位八层可见性全过、`camera_transform_follows_unit` **9/9**、`spine_to_ending` **42/42**;证据 `final/delivery_notes_wuxia.md` §3 + 本轮闸门产物,裁定见 `90_decisions.md` 2026-08-31 条 |
@@ -108,8 +110,10 @@ re-loop(2026-08-29)钉死(证据场景 `portrait_grid_alignment` /
 **下一步的顺序判断:** 第 2 阶段的四条交互缺口已全部落地,不再压着内容扩充;地图第
 三类进入内容(facility)本轮已在少林 / 武当实装(第 2 条转 ✅,见 `20_content.md`
 §10)。第 3 阶段余下的内容缺口是**逐个填实已声明的槽位**——battle 槽除华山外仍
-`declared`、其余五节点 facility 槽仍 `declared`——以及
-华山 battle 的行为路径尚无场景钉死(现只验到数据层与编译)。事件池已扩至 **36 条**,
+`declared`、其余五节点 facility 槽仍 `declared`(2026-09-01 更正:华山 battle 的
+行为路径**已**由本轮场景钉死——`map_battle_node_huashan.yaml` 重写为「能打」闸门并
+实测 **41/41**,到达→开战→回合推进→真实行动→胜负回图全链实测,见
+`20_content.md` §11,该缺口关闭)。事件池已扩至 **36 条**,
 第 3 条转 ✅(两道闸门 `_test_no_repeat_full_journey` / `event_pool_new_event_resolved`,
 见 `20_content.md` §4),不再属开放缺口。这些是「槽位还在,内容
 没填满」的常规内容活,不再有「某类节点内容根本不存在」的结构性空白。
