@@ -24,16 +24,33 @@ const ROSTERS: Dictionary = {
 ##   - NOT the player spawn (7,5) and not on the player's row 5 / column 7
 ##     (line-caster deny)
 ##   - pairwise distinct
+##   - Chebyshev distance from the player spawn (7,5) >= 4 (OUTSIDE the AI
+##     dist <= 3 damage band, preserving the §D3 round-1 damage floor)
+##   - HUD-column ban: no tile in the HUD-shielded columns. The HUD's right-side
+##     button cluster overlaps columns 12-13 (measured 2026-09-01 — Central
+##     Divine at (13,1) interpenetrated the End Turn button / health bars), so
+##     the rightmost column allowed is 11 (col 11 row 2 is tutorial-proven
+##     clear); left columns 1-3 are tutorial-proven clear.
 ## Player spawn is fixed at (7,5) for every battle path.
 const PLAYER_SPAWN: Vector2i = Vector2i(7, 5)
 
+## Layout rationale (preserved in data for future repositioning):
+##   - The two position-independent global casters take the tutorial-proven
+##     HUD-clear columns: East Heretic on col 3 (his own tutorial column) and
+##     Central Divine on col 11 (the tutorial West Poison spot), both at
+##     Chebyshev 4 from (7,5). Their round-1 casts (Tidal Melody, Primal Unity)
+##     are position-independent globals, so this does not change their behavior.
+##   - The three distance-gated damage units (West Poison, South Emperor, North
+##     Beggar) stay at Chebyshev >= 5 in columns 1-2, keeping their round-1
+##     behavior in the measured "0 dmg from far" branch — the §D3 round-1
+##     damage floor (62) is preserved with the unchanged five-great roster.
 const POSITIONS: Dictionary = {
 	"huashan_duel": {
-		"East Heretic":   Vector2i(1, 1),
+		"East Heretic":   Vector2i(3, 2),
 		"West Poison":    Vector2i(1, 4),
 		"South Emperor":  Vector2i(1, 9),
-		"North Beggar":   Vector2i(13, 9),
-		"Central Divine": Vector2i(13, 1),
+		"North Beggar":   Vector2i(2, 7),
+		"Central Divine": Vector2i(11, 2),
 	},
 }
 

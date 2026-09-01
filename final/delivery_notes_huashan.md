@@ -129,3 +129,94 @@ Four values to record (slot → harness-backfilled):
   `map_node_event_shaolin`, `click_move_to_tile`, `tutorial_win_routes_to_transition`,
   `tutorial_loss_restarts_tutorial`. The tutorial battle changes by not one byte.
 - This is a single leaf task with no subtasks manifest, so no `subtasks/*.json` is produced here.
+
+---
+
+## 6. fix_huashan_positions_under_hud — reposition spawns off the HUD button cluster (2026-09-01)
+
+> Follow-up data-only task. The rewritten gate (§1-5) was delivered and verified green; the
+> 2026-09-01 human frame-review then found a **readability blocker** in the arrival frame
+> (`s59_frame_0580`): `Central Divine` spawned at `scripts/data/map_battle_data.gd POSITIONS`
+> `Vector2i(13, 1)`, and column 13 sits **directly under the HUD's right-side button cluster** —
+> Wang Chongyang's health bar (130) and the End Turn button interpenetrated and both stayed
+> unreadable for the whole battle. This task fixes it by **data only** (move spawns, do not move
+> any HUD layer/coordinate — engine-wide impact, review-forbidden).
+
+### 6.1 What changed / what did not (data-only, surgical)
+
+- **Changed (the ONLY code file):** `scripts/data/map_battle_data.gd`.
+  - `POSITIONS["huashan_duel"]` re-layout (each tile HUD-clear, Chebyshev ≥ 4 from the player
+    spawn):
+    - `East Heretic` `(1,1) → (3,2)` — tutorial East Heretic's own column (col 3, proven
+      HUD-clear), Chebyshev 4; his round-1 move is the position-independent Tidal Melody global.
+    - `West Poison` `(1,4) → (1,4)` (unchanged) — Chebyshev 6, left column (proven clear).
+    - `South Emperor` `(1,9) → (1,9)` (unchanged) — Chebyshev 6.
+    - `North Beggar` `(13,9) → (2,7)` — Chebyshev 5, left side (moved off column 13).
+    - `Central Divine` `(13,1) → (11,2)` — the tutorial West Poison's exact spot (col 11, proven
+      HUD-clear); his Primal Unity is position-independent.
+  - Invariant doc-comment updated to the new rules: interior walkable / NOT (7,5) / NOT row 5 /
+    NOT col 7 / pairwise distinct / **Chebyshev ≥ 4** from (7,5) (outside the AI dist ≤ 3 damage
+    band, preserving the §D3 round-1 floor) / **HUD-column ban** (rightmost col ≤ 11; cols 12-13
+    forbidden as the measured overlap zone; left cols 1-3 tutorial-proven clear). Comment-only —
+    no code path change.
+- **Unchanged (frozen):** `ROSTERS` (still the five greats), `roster_ids()`, `position_for()`,
+  `PLAYER_SPAWN`; `battlefield.gd`, `game_manager.gd`, `hud.gd`, `scenes/ui/hud.tscn`,
+  `playtest/_common.yaml`, every other playtest yaml, `tests/test_map_battle_data.gd`,
+  `tests/test_map_battle_entry.gd`.
+- **Rationale preserved in the file comment:** the two position-independent global casters
+  (East Heretic, Central Divine) take the tutorial-proven columns 3/11 (Chebyshev 4); the three
+  distance-gated damage units (West Poison, South Emperor, North Beggar) stay at Chebyshev ≥ 5 in
+  columns 1-2 so their round-1 behavior stays in the measured "0 dmg from far" branch — the §D3
+  round-1 damage floor (62) is preserved with the unchanged five-great roster (measured hero
+  `max_health = 135 > 62`; the §D3 fallback was correctly NOT applied — not re-litigated).
+
+### 6.2 Arrival-frame evidence (measured, side-by-side with the blocker frame)
+
+Frame capture is not available in this loop, so per task §5 I record the **measured surface values**
+at the battle-arrival frame instead of fabricating frames. Measured via an inline probe forcing
+`grid_pos == Vector2i(-99,-99)` contradictions at f580 (the battle-arrival assertion frame — the
+swap settled, all six units on the board, round 1 in progress); the report prints `observed`:
+
+| Unit | s59_frame_0580 (blocker, old layout) | measured @ f580 (this fix) | HUD-clear? |
+|---|---|---|---|
+| East Heretic | col 1 | **(3, 2)** | ✓ (col 3, tutorial-proven) |
+| West Poison | col 1 | **(1, 4)** | ✓ (left col) |
+| South Emperor | col 1 | **(3, 9)** | ✓ (advanced left-side col 3 in round 1) |
+| North Beggar | col 13 | **(2, 7)** | ✓ (left col 2) |
+| Central Divine | **col 13 (overlapped End Turn button / health bar)** | **(11, 2)** | ✓ (col 11, tutorial-proven clear) |
+| Player | (7, 5) | **(7, 5)** | — (spawn fixed) |
+
+- `EndTurnButton.visible` = **true** (button present). `EndTurnButton.disabled` = **true** at f580
+  because the round-1 enemy turns are still in progress (not the player's turn yet); the gate's
+  Leg D proves `disabled == false` at f720 when the player's turn arrives.
+- **No unit occupies columns 12-13** at the arrival frame (the measured overlap zone) — observed
+  columns are 3 / 1 / 3 / 2 / 11 / 7. All six health bars (player 135 + five greats) sit in the
+  HUD-clear band and no bar interpenetrates the End Turn button cluster.
+- The arrival frame and every subsequent battle frame are now HUD-clear by construction (all
+  spawns ≤ col 11; the only distance-gated unit that moves, South Emperor, moves within the left
+  columns and never reaches cols 12-13).
+
+### 6.3 Frame timing: no drift — `playtest/map_battle_node_huashan.yaml` kept byte-identical
+
+The reposition changes enemy spawn distances (Central Divine col 13→11, East Heretic col 1→3,
+North Beggar col 13→2). Because the AI is zero-RNG and the round-1 pacing was measured before
+(§D3), I re-ran the full gate rather than predicting frame timing:
+
+- `godot_playtest_scenario(scenario="map_battle_node_huashan")` → **41/41 PASS** at the current
+  `at:` frames. **No frame drift observed → the yaml is NOT edited** (all 41 assertions verbatim,
+  same expressions, same order, none removed or relaxed). No re-baseline table is needed.
+
+### 6.4 Verification runs (all measured this task)
+
+| Check | Result |
+|---|---|
+| `map_battle_node_huashan` (full 41-assertion gate) | **41/41 PASS** (green at current frames) |
+| `equipment_in_battle_diff` (encounter path byte-frozen) | **47/47 PASS** |
+| `spine_to_ending` | **42/42 PASS** |
+| `click_move_to_tile` | **10/10 PASS** |
+| `tests/test_map_battle_data.gd` | unchanged; property pins (interior, pairwise-distinct, ≠ (7,5)) satisfied by all five new tiles — green |
+| `tests/test_map_battle_entry.gd` | unchanged; roster still six units (`turn_order.size() == 6`) — green |
+| Compile | clean (data-only edit; no signature/code-path change) |
+
+All checks ran against the sidecar with the staged edit applied (`scripts/data/map_battle_data.gd`
+listed in `staged_files_applied`), so the results reflect this reposition, not the old code.
