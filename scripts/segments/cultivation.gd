@@ -18,6 +18,7 @@
 extends Control
 
 const TraitEffects = preload("res://scripts/data/trait_effects.gd")
+const ProgressionMath = preload("res://scripts/data/progression_math.gd")
 
 ## Debug-grant school -> external A art id (GongfaData carries no id field;
 ## ids are row-derived, hence the const map; see _debug_grant_art).
@@ -37,6 +38,11 @@ const _DEBUG_EQUIP_ID: String = "eq_sword_3"
 ## Showcase event id: the single id the debug seeder leaves unseen, so a
 ## 1-element draw is deterministic. Introduced by the event-pool-36 round.
 const SHOWCASE_ID: String = "cliff_herbs"
+
+## Practice action gain per 练功 month (PROVISIONAL R3 D3 — the M1 yield curve
+## justifies it; the free gr_practice_2 card grants +2, so the action must match
+## or beat the card to have a niche).
+const PRACTICE_ACTION_GAIN: int = 2
 
 ## Surface: cultivation year (1..3).
 var year: int = 1
@@ -147,6 +153,29 @@ var focused_option_text: String = ""
 ## old 2-3% modulate trick) is applied. Recomputed on every _render, driven by
 ## the same focused bool that selects the stylebox in _rebuild_options_box.
 var focus_marker_active: bool = false
+
+## Surface: the kind of the monthly action just applied — "practice" /
+## "cultivate" / "work" / "travel". Assigned at each action's own call site
+## (travel is routed through _on_accept's ACTION_PICK branch 3, never through
+## _apply_action). Stale (previous value) on the empty-GONGFA soft-lock month,
+## which never applies an action.
+var last_action_kind: String = ""
+
+## Surface: silver granted by the monthly ACTION itself. work = the actual
+## ProgressionMath.work_income value; practice / cultivate / travel are always 0
+## (travel's event silver is EVENT income, not action income — that separation
+## is what makes work's silver niche assertable).
+var last_action_silver: int = 0
+
+## Surface: i18n'd receipt for the last applied action (e.g. 「做工：银两 +N」).
+## Non-empty for all four kinds; tr() at the assignment site.
+var last_yield_text: String = ""
+
+## Surface: the gongfa id the last 练功 action targeted ("" when none).
+var last_practice_target: String = ""
+
+## Surface: the practice amount the last 练功 action granted (== PRACTICE_ACTION_GAIN).
+var last_practice_amount: int = 0
 
 
 func _ready() -> void:
@@ -274,6 +303,13 @@ func _on_accept() -> void:
 					event_id = _draw_event()
 					phase = "EVENT"
 					_event_focus = 0
+					# Travel is routed here (NOT through _apply_action — its "travel"
+					# branch is unreachable from the live phase machine). Publish the
+					# travel action surfaces: kind, zero action-silver (event silver
+					# is event income, not action income), and the static receipt.
+					last_action_kind = "travel"
+					last_action_silver = 0
+					last_yield_text = tr("游历：遇事")
 					_sync_surface()   # NEW: publish event_title/event_body the moment the roam draw lands
 				4:
 					_on_save()
@@ -350,7 +386,11 @@ func _apply_card(card: Dictionary) -> void:
 	var ctype: String = card.get("effect_type", "")
 	match ctype:
 		"silver":
+			var silver_before: int = SaveManager.profile.silver
 			SaveManager.profile.silver = maxi(SaveManager.profile.silver + int(card.get("effect_value", 0)), 0)
+			# Deed: track the REAL clamped silver delta (never the raw card value,
+			# so a negative / clamped-to-0 card never inflates silver_earned).
+			SaveManager.profile.deeds["silver_earned"] = SaveManager.profile.get_deed("silver_earned") + maxi(SaveManager.profile.silver - silver_before, 0)
 		"attr":
 			SaveManager.profile.add_attr(card.get("effect_target", ""), int(card.get("effect_value", 0)))
 		"item":
@@ -393,16 +433,39 @@ func _apply_card(card: Dictionary) -> void:
 func _apply_action(action: Dictionary) -> void:
 	match action.get("kind", ""):
 		"practice":
-			_add_practice(1)
+			# 练功: +PRACTICE_ACTION_GAIN into the player-CHOSEN art (the target
+			# gid comes from GONGFA_PICK). The only action where the player picks
+			# WHICH art advances — the targeted-niche proof. Zero new RNG.
+			var target: String = str(action.get("target", ""))
+			_add_practice(PRACTICE_ACTION_GAIN)
+			SaveManager.profile.deeds["practice_months"] = SaveManager.profile.get_deed("practice_months") + 1
+			last_action_kind = "practice"
+			last_action_silver = 0
+			last_practice_target = target
+			last_practice_amount = PRACTICE_ACTION_GAIN
+			last_yield_text = tr("练功：%s +%d") % [target, PRACTICE_ACTION_GAIN]
 		"cultivate":
 			# 修习 lookup table (design §4.1): one rng draw mapped to +1/+2/+3
 			# by 悟性 tier — the same one-op count as the old randi_range(1, 3),
-			# so the seeded RNG stream's op order is unchanged.
+			# so the seeded RNG stream's op order is unchanged. Math UNCHANGED.
 			var roll: float = SaveManager.rng.randf()
 			var gain: int = TraitEffects.practice_gain(SaveManager.profile.get_attr("wisdom"), roll)
 			SaveManager.profile.add_attr(action.get("target", "bone"), gain)
+			SaveManager.profile.deeds["cultivate_months"] = SaveManager.profile.get_deed("cultivate_months") + 1
+			last_action_kind = "cultivate"
+			last_action_silver = 0
+			last_yield_text = tr("修习：%s +%d") % [str(action.get("target", "bone")), gain]
 		"work":
-			SaveManager.profile.silver += 10
+			# 做工: silver scales with mastered arts — the only action whose yield
+			# compounds with the run, and the only repeatable silver source that
+			# beats the one-shot free cards. Pure arithmetic, zero new RNG.
+			var gain: int = ProgressionMath.work_income(ProgressionMath.mastered_count(SaveManager.profile))
+			SaveManager.profile.silver += gain
+			SaveManager.profile.deeds["work_months"] = SaveManager.profile.get_deed("work_months") + 1
+			SaveManager.profile.deeds["silver_earned"] = SaveManager.profile.get_deed("silver_earned") + gain
+			last_action_kind = "work"
+			last_action_silver = gain
+			last_yield_text = tr("做工：银两 +%d") % gain
 		"travel":
 			pass  # the event is drawn interactively; resolution is _apply_event_option
 	_sync_surface()
@@ -511,8 +574,15 @@ func _apply_event_option(opt_index: int) -> void:
 	var def = EventData.def(event_id)
 	if def != null:
 		var opt = def.option_a if opt_index == 0 else def.option_b
+		var silver_before: int = SaveManager.profile.silver
 		var res: Dictionary = EventLogic.apply_option_effects(SaveManager.profile, opt)
-		if not res["ok"]:
+		if res["ok"]:
+			# Successful event resolution: count the travel deed, and track any
+			# silver the option actually granted (real clamped delta, never a raw
+			# effect value — a refused/negative option never inflates the deed).
+			SaveManager.profile.deeds["travel_resolved"] = SaveManager.profile.get_deed("travel_resolved") + 1
+			SaveManager.profile.deeds["silver_earned"] = SaveManager.profile.get_deed("silver_earned") + maxi(SaveManager.profile.silver - silver_before, 0)
+		else:
 			# All-or-nothing refusal: the whole option did nothing. Explain on
 			# screen by reason; the event is STILL marked seen below (the
 			# encounter happened) and event_id is still cleared, so a refused
