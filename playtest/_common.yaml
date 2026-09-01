@@ -782,6 +782,11 @@ surface:
   - focus_marker_active
   - month_before_accept
   - status_text
+  - last_action_kind
+  - last_action_silver
+  - last_yield_text
+  - last_practice_target
+  - last_practice_amount
   MapScreen:
   - current_node_id
   - focus_id
@@ -1150,3 +1155,4 @@ scenario_order:
 - map_node_event_revisit_no_resettle
 - event_option_refused_no_charge
 - occlusion_no_button_over_text
+- action_yield_differential

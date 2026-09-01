@@ -1,0 +1,175 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# ACTION YIELD DIFFERENTIAL NAIL (R3, 2026-09-01).
+#
+# Proves that the four monthly actions have UNIQUE silver niches:
+#   - work: the ONLY action whose own silver grant is > 0 (last_action_silver > 0)
+#   - practice / cultivate / travel: last_action_silver == 0 (zero-delta pin)
+#
+# The practice leg additionally proves the targeted-niche: last_practice_amount > 0
+# and last_practice_target changed (the player chose WHICH art).
+#
+# The travel leg proves it routes through _on_accept branch 3 (not _apply_action):
+# last_action_kind == "travel" and last_yield_text != "" (static receipt).
+#
+# ZERO balance literals: only sign pins (> 0, == 0) and "changed" differentials.
+#
+# BOOT: mirrors the softlock scenario's menu boot pattern — seed a fresh CULTIVATION
+# save via debug_seed_save, load it by keyboard, then drive with pure ui_accept.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
+#   pre-fix tree where the 5 new surfaces do NOT exist on CultivationScreen):
+#
+#   failing_frame:            f200
+#   first_failing_assert:     CultivationScreen.last_action_silver
+#   exact_error/observed:     "node property not found: CultivationScreen.last_action_silver"
+#                             (the surface was not yet published by the pre-fix script)
+#   green_asserts_before_red: 7 (f130 has 5 + f170 has 2 = 7)
+#
+#   Structural red (current tree, card_data.gd):
+#     work grants flat +10 silver; the free monthly card gr_silver_30 grants +30
+#     — the dominance fact motivating the rebalance (work_income formula now
+#     scales with mastery so it eventually beats the one-shot card).
+name: action_yield_differential
+description: >-
+  Four one-month legs (work / practice / cultivate / travel) from the same
+  seeded save. Asserts work's last_action_silver > 0 (unique silver niche),
+  practice/cultivate/travel last_action_silver == 0 (zero-delta proof),
+  practice last_practice_amount > 0 + last_practice_target changed (targeted
+  niche), travel last_action_kind == "travel" + last_yield_text non-empty
+  (routing proof). Every touched frame: UiOcclusionWatch clean.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh CULTIVATION save ─────────────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (fresh profile, month 1) ─────────────────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+# ── LEG 1: WORK (month 1) ────────────────────────────────────────────────────
+- at: 140
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 160
+  actions:
+  - move_down  # focus: 练功(0) -> 修习(1) -> 做工(2)
+- at: 165
+  actions:
+  - move_down
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.option_focus: option_focus == 2
+- at: 180
+  actions:
+  - ui_accept  # apply work
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "work"
+    CultivationScreen.last_action_silver: last_action_silver > 0
+    CultivationScreen.last_yield_text: last_yield_text != ""
+    CultivationScreen.silver: changed
+    CultivationScreen.phase: phase == "CARD_PICK"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG 2: PRACTICE (month 2) ───────────────────────────────────────────────
+- at: 220
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 240
+  actions:
+  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+- at: 260
+  actions:
+  - ui_accept  # GONGFA_PICK focus 0 -> apply practice
+- at: 280
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "practice"
+    CultivationScreen.last_action_silver: last_action_silver == 0
+    CultivationScreen.last_practice_amount: last_practice_amount > 0
+    CultivationScreen.last_practice_target: last_practice_target != ""
+    CultivationScreen.last_yield_text: last_yield_text != ""
+    CultivationScreen.phase: phase == "CARD_PICK"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG 3: CULTIVATE (month 3) ──────────────────────────────────────────────
+- at: 300
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 320
+  actions:
+  - move_down  # focus: 练功(0) -> 修习(1)
+- at: 330
+  actions:
+  - ui_accept  # ACTION_PICK focus 1 = 修习 -> ATTR_PICK
+- at: 350
+  actions:
+  - ui_accept  # ATTR_PICK focus 0 (bone) -> apply cultivate
+- at: 370
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "cultivate"
+    CultivationScreen.last_action_silver: last_action_silver == 0
+    CultivationScreen.last_yield_text: last_yield_text != ""
+    CultivationScreen.phase: phase == "CARD_PICK"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG 4: TRAVEL (month 4) ────────────────────────────────────────────────
+- at: 390
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 410
+  actions:
+  - move_down  # focus: 练功(0) -> 修习(1) -> 做工(2) -> 游历(3)
+- at: 415
+  actions:
+  - move_down
+- at: 420
+  actions:
+  - move_down
+- at: 425
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.option_focus: option_focus == 3
+- at: 440
+  actions:
+  - ui_accept  # ACTION_PICK focus 3 = 游历 -> EVENT phase
+- at: 460
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "travel"
+    CultivationScreen.last_action_silver: last_action_silver == 0
+    CultivationScreen.last_yield_text: last_yield_text != ""
+    CultivationScreen.phase: phase == "EVENT"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 480
+  actions:
+  - ui_accept  # EVENT -> resolve option 0 -> _after_action -> CARD_PICK
+- at: 500
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 5
