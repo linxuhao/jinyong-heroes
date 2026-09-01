@@ -1,194 +1,300 @@
-# Technical Architecture Design — jinyong-theme (2026-09-01)
+# 技术架构设计 — jinyong-loop R2 (rule short-circuits + sect-join occlusion)
 
-## 0. Round identity
+> Round: R2 bug-fix on the existing Godot 4 repo `/home/linxuhao/.AItelier/projects/jinyong-assets`.
+> Four rule short-circuits in the monthly/map loop + one UI occlusion regression.
+> **Zero balance-number changes. All numeric gates stay verbatim and green.**
+> All findings below were re-verified by direct code read on 2026-09-01 (event_logic.gd, cultivation.gd, map.gd, sect_select.tscn, the gate yamls, _common.yaml, game_manager.gd, player_profile.gd, event_data.gd).
 
-One lever: **the theme layer**. The round turns the 7-line placeholder `assets/themes/global_theme.tres` into a real ink-wash theme (Button four states + focus, Panel, Label, title/body hierarchy), fixes the three "text unreadable" spots (roster panel, tutorial page 1, battle hints + disabled state), and gives the cultivation option list a genuinely visible focus marker. Zero gameplay changes, zero new art assets, zero edits to the six locked files.
+## 概述
 
-Deliverable clusters:
-- **A** — `assets/themes/global_theme.tres` rewritten in place (the mandated entry, `project.godot:58` `gui/theme/custom`).
-- **B** — Readability fixes: `roster_panel.tscn` + `tutorial_overlay.tscn` (opaque panel + real dim), battle hints/disabled (theme + `hud.tscn` shadow pair copied from the skill_button precedent).
-- **C** — Focus marker: `ThemeManager` helper + `cultivation.gd:641` replacement, one new playtest nail.
-- **D** — Evidence: before/after same-frame pairs, red-first measured values, docs.
+Five fixes, one shared theme: **a rule that exists is being short-circuited** — the month-advance
+rule (soft-lock), the facility-use bound rule (unlimited redemption), the once-per-visit
+settlement rule (node events), the pay-what-you-get rule (purchases), and the
+no-control-overlaps-body rule (sect-join screen). Each fix restores the rule at the exact
+short-circuit point, reusing an in-repo pattern; none touches a balance number, a protected
+file, or one of the three verbatim-pinned gates.
 
-Hard constraints carried verbatim from the brief into every task: no new textures/images/icons; no copy/logic/value changes; locked files byte-identical (`scripts/battlefield.gd`, `scripts/autoload/game_manager.gd`, `scripts/autoload/scene_manager.gd`, `scripts/segments/map.gd`, `scripts/data/map_battle_data.gd`, `playtest/map_battle_node_huashan.yaml`); no HUD layer/coordinate changes; EN must not regress (this round adds **zero strings** — colors and shapes only, so no `i18n.gd` change is needed at all); 78/78 scenarios zero regression; gates pin properties, never form/color literals; every new nail measured red-first (two real runs), never predicted.
+Design decisions (the reviewer's Step-1 flags are each resolved explicitly):
 
-## 1. Verified current state (all anchors re-read today, 2026-09-01)
+| # | Decision | Chosen | Why (and which alternative was rejected) |
+|---|---|---|---|
+| D1 | Soft-lock exit shape | Empty-GONGFA accept → status message + `phase="ATTR_PICK"` + `_after_action()` (month advances through the single advance path); empty-branch button relabeled 返回行动 → 度过本月; **no** default attribute grant | Mirrors `_fast_forward:698-705`'s transition+advance. NOT calling `_apply_action({"kind":"cultivate"})` like the debug twin: that would inject a new reward (+1..3 attr) and one RNG op — a balance-behavior change, banned. The two soft-lock-era nails pin the dead-end and get re-pointed (change table in §5.1); they are NOT in the verbatim-protected trio |
+| D2 | Facility limit form | **Per-month cap = 2** (constant `FACILITY_MONTHLY_USE_CAP`), epoch pair in the GameManager session mirror | Surveyed every facility-bearing scenario: `facility_use_reusable` (2 uses, 2 entries, month 36) and `map_facility_buttons_click` (2 uses, 2 entries, month 36) — max 2 uses/month anywhere → cap 2 keeps all green and actually bounds the exploit (measured: 40 presses → +81 bone becomes ≤ 2 uses = +4/month). Per-entry-1 also survey-clean but only slows the farm 3× (leave→F re-enter per use); per-month-1 reds gate (a) outright. Reviewer's boundary-risk note answered by the survey table in §5.2 |
+| D3 | Re-settlement suppression key | Session mirror keyed by **`"<node_id>/<event_id>"`** per (node, event) pair | Reviewer flag resolved: an event-id-global flag would let a cultivation bag-draw of `night_rain` suppress the shaolin node binding — the two channels are documented independent (§8.2). Re-show stays unconditional; suppression hits only the effect application; `events_resolved_count` still increments (the count tracks RESOLUTIONS — gate (b) pins count==3 on re-fire legs) |
+| D4 | Purchase refusal semantics | Validate-then-apply inside `EventLogic.apply_option_effects` (returns a status); a refused option **resolves the encounter with nothing applied** + on-screen receipt (map: panel closes → TRAVEL; cultivation: month still advances; facility: unchanged — its own pre-check stays) | "Refusal keeps the panel open" (facility-shape verbatim) was rejected for the map EVENT phase: that phase has no leave key, so an all-refused event (e.g. a broke player at pool event `dali_market`, both options −18/−14) would be a NEW soft-lock, and every scripted pick's affordability would become load-bearing against a PROTECTED gate. Refusal-resolves is trap-proof and timeline-proof: count still increments, so gate ladders cannot shift even if some scripted pick turns out unaffordable |
+| D5 | Occlusion fix surface | `scenes/segments/sect_select.tscn` geometry only: BodyLabel `offset_right 320 → 110`, SectButton0..4 x `(-120..120) → (+130..+370)` | The brief protects `sect_select.gd` but NOT the `.tscn` (reviewer-verified). Narrowing the body is REQUIRED, not optional: the Tang-Men row's text extends past x=+120, so merely sliding the buttons right would still cover the tail. Autowrap at 430 px forces every row to wrap before x=+110; buttons at +130.. clear it. No font scale, no copy, no script change |
 
-| Anchor | Fact |
-|---|---|
-| `assets/themes/global_theme.tres` | 7 lines: `default_font` (NotoSansSC) + `default_font_size = 12`. No styleboxes, no colors, no sizes, no variations. |
-| `project.godot:58` | `theme/custom="res://assets/themes/global_theme.tres"` — global mount, restyles **every** Control incl. battle HUD. |
-| `project.godot:33` | `ThemeManager="*res://scripts/autoload/theme_manager.gd"` — autoload key confirmed `ThemeManager`. |
-| `scripts/autoload/theme_manager.gd` | 17 lines, font fallback only. Free to extend (not locked). |
-| `scenes/ui/roster_panel.tscn:34` | `RosterDim` ColorRect `Color(0,0,0,0.55)`. |
-| `scenes/ui/roster_panel.tscn:36` | `RosterBox` **bare Panel** — no `theme_override_styles/panel`; renders the engine default translucent panel → background text/buttons bleed through (fA/s4_frame_0052). |
-| `scenes/ui/tutorial_overlay.tscn:14` | `Dim` ColorRect `Color(0,0,0,0.5)` on CanvasLayer layer=100 — portraits bleed through (fA/s2_frame_0158). |
-| `scenes/ui/tutorial_overlay.tscn:17` | bare `Panel` (600×400) with Title Label / Body RichTextLabel / 2 Buttons. |
-| `scenes/ui/menu_panel.tscn:14-18`, `scenes/segments/cultivation.tscn:15-20` | Full-screen dark Backdrop Panels carry **local** `theme_override_styles/panel = StyleBoxFlat(0.07,0.07,0.1)` — per-node overrides beat the global theme, so these stay dark no matter what the theme says. Same pattern in the other segment scenes. |
-| `scripts/ui/skill_button.gd:508-526` | `_apply_state()` writes per-state StyleBoxFlat to `normal`+`disabled` **and** all five font-color overrides every frame → skill buttons are fully script-styled; the global Button theme cannot fight them (script overrides win). |
-| `scripts/ui/health_bar.gd:286-360`, `scripts/ui/round_indicator.gd:213-214`, `game_manager.gd:574-587` | Same: script-owned styleboxes/colors. Theme-invisible. |
-| Focus pattern | `modulate = 1.0 vs 0.72` at **four** sites: `cultivation.gd:641`, `creation.gd:730/:734`, `map.gd:502/:513/:524/:529`, `sect_select.gd:84`. `map.gd` is **locked**; `creation.gd` rows at :730 are plain Controls (not Buttons). |
-| `cultivation.gd:582-646` | `_rebuild_options_box()` builds `CultOptionButton{i}` (`FOCUS_NONE`), `custom_minimum_size (240,40)`; :641 is the modulate line. `_sync_surface()` is the published-observable sink (UX-18 precedent). |
-| `scripts/ui/skill_button.tscn:46-50, 95-102` | Precedents to copy: `font_shadow_color = Color(0,0,0,0.85)` + `shadow_offset_x/y = 1`; `SelectedMarker` gold ColorRect. |
-| `scenes/ui/hud.tscn:169-179` | `SkillDescLabel` (outline 3 / black 0.9) and `MoveHintLabel` (outline 4 / black 0.8) — outlines exist yet fB/s2_frame_0210 still reads poorly: no shadow, and the disabled「退回」sits on the engine-default semi-transparent button plate with grid lines showing through. |
-| Protected gate expressions (re-read, per Step-1 review suggestion) | `ui_geometry_readability`: `HealthBar.fill_color.g > 0.5 and > r`, `track_bg.get_luminance() > 0.30`, `HUD.top_strip_alpha >= 0.55`, `name_backing_alpha > 0.3`, `state_text == "phase_locked"/"ready"`, text `contains("…") == false`, geometry overlap pins — **all pinned on code/tscn-owned surfaces (HealthBar, HUD strip, skill button states), none on theme-owned styleboxes/colors**. `skill_button_visual_states`: state/tag/overlay observables — script-owned. `portrait_grid_alignment` / `spine_to_ending` / `equipment_in_battle_diff`: geometry/routing — untouched by theming. |
+## 设计变更 (for `5_design` to fold into `design/` after acceptance)
 
-**Consequence:** a theme that only adds `Button`/`Panel`/`Label` items cannot break any pinned surface numerically; the real cascade risks are (a) global font sizes/colors reaching the battle screen, and (b) `.tres` syntax errors blanking all 78 scenarios at once. Both are handled in §3-D2/§6.
+1. `20_content.md` §8.3 item 5 (repeat-re-fire policy) is amended: **re-appear yes, re-settle no** —
+   node events still fire on every travel arrival and every resolution still increments
+   `events_resolved_count`, but each `(node_id, event_id)` pair applies its effects at most once
+   per session.
+2. `90_decisions.md` ruling (e) ("facility reuse cap = PENDING for stage 5") is DECIDED this
+   round: per-month 2, framed as a **rule gate, not a balance number** (it bounds a rule
+   short-circuit; no facility cost/effect value moved).
+3. `EventLogic.apply_option_effects` contract changes `-> void` → `-> Dictionary`
+   (`{"ok": bool, "reason": ""|"silver"|"owned"}`); all three callers updated. The clamp-to-0
+   silver semantics are removed (insufficient balance now refuses the whole option) — this is a
+   rule repair, not a balance change; no cost value moved.
+4. Cultivation empty-practice exit: the dead-end return is replaced by month-advance + feedback;
+   the two nails that pinned the dead-end are re-pointed (§5.1 change table).
+5. `scenes/segments/sect_select.tscn` button column and body width geometry (numbers in D5).
 
-## 2. Architecture
+## 架构图
+
+No new systems — five surgical insertions into the existing data flow:
 
 ```
-project.godot:58  gui/theme/custom
-        │
-        ▼
-assets/themes/global_theme.tres   (REWRITTEN — single source of visual truth)
-  ├── Button: styles normal/hover/pressed/disabled + focus overlay; 5 font colors; font_size 15
-  ├── Panel: styles panel (opaque ink slab + hairline border + shadow)
-  ├── Label: font_color, font_size 14
-  ├── RichTextLabel: default_color
-  └── type variations: TitleLabel (base Label), HintLabel (base Label, outline)
-        │  cascades into ALL Controls
-        ├──────────────────────────► 7 non-battle scenes (menu/creation/cultivation/map/
-        │                              sect_select/transition/ending) — restyled for free;
-        │                              their dark Backdrops survive via local overrides (D1)
-        ├──► roster_panel.tscn / tutorial_overlay.tscn — bare Panels get the opaque slab;
-        │    Dim ColorRects raised in-scene (D3)
-        └──► battle screen — HUD buttons & hints restyle (D4); script-styled widgets
-             (skill buttons, health bars, round indicator) unaffected (they override)
+                       ┌─ i18n.gd EN dict  (7 new strings, Chinese-keyed)
+                       │
+ CultivationScreen ────┤ D1: _on_accept GONGFA_PICK empty branch
+ (cultivation.gd)      │     empty → status_text + ATTR_PICK + _after_action()   [month advances]
+                       │ D4: _apply_event_option → EventLogic status → receipt or apply
+                       │     (EVENT pick still consumes the month — no trap)
+                       │
+ MapScreen ────────────┤ D2: _use_facility → monthly-cap epoch check → refuse-with-receipt | apply
+ (map.gd)              │ D3: _resolve_node_event → settled?(node,event) → suppress-with-receipt
+                       │                                            → validate (D4) → refuse-with-receipt | apply+settle
+                       │
+ EventLogic ───────────┘ D4: apply_option_effects = validate-then-apply, returns status
+ (event_logic.gd)            (pure-static; ZERO new RNG ops — seeded streams untouched)
 
-scripts/autoload/theme_manager.gd   (EXTENDED — script-side theme home)
-  └── option_style(focused: bool) -> StyleBoxFlat  (two cached boxes, built once)
-        │
-        ▼
-scripts/segments/cultivation.gd:641   (ONE LINE replaced)
-  modulate 1.0/0.72  →  stylebox + font-color swap driven by _focused_index_for_phase()
-        └── publishes focus_marker_active via _sync_surface() → playtest surface
+ GameManager ─────── D2/D3 session mirrors (proven map_events_resolved_count pattern):
+ (game_manager.gd)     facility_use_month/facility_use_count_this_month, settled_node_events: Dictionary
+                       reset on SaveManager.profile_created / loaded (same site as map_events_resolved_count)
+
+ playtest harness ─── 4 new scenario files + 2 re-pointed nails + surface appends in
+ (playtest/*.yaml)     _common.yaml + ROUND_SCENARIOS sync in tests/test_playtest_contract_smoke.py
 ```
 
-Data flow for evidence: the four before/after frame pairs come from the existing 78-scenario playtest capture (same `at:` frames), judged by the vision gate or human frame review; the one new differential nail rides `playtest/_common.yaml`'s surface whitelist (append-only, two-place sync with `tests/test_playtest_contract_smoke.py`).
+Data flow invariants preserved: RNG op order unchanged everywhere (validation and suppression
+add zero RNG draws — the deterministic-stream lifeline that `event_travel_effects` 19/19 and
+`save_load_roundtrip` 14/14 depend on); save-schema untouched (mirrors are session-scoped,
+exactly like `map_events_resolved_count` at `game_manager.gd:131`).
 
-## 3. Design decisions
+## 组件列表
 
-### D1 — Palette register: dark ink, ONE text-color story (deviation from Step 1 recorded)
+### 1. `scripts/data/event_logic.gd` — all-or-nothing core (D4)
+- 职责: one shared validate-then-apply resolution path for map node events, cultivation 游历
+  events, and facilities.
+- 接口:
+  ```gdscript
+  static func validate_option(profile: PlayerProfile, opt: EventData.EventOption) -> String
+      # returns "" if deliverable, "silver" if net silver cost > balance, "owned" if any
+      # item effect targets an id already in profile.inventory. Pure arithmetic, no mutation,
+      # no RNG.
+  static func apply_option_effects(profile: PlayerProfile, opt: EventData.EventOption) -> Dictionary
+      # pass 1: validate_option; if refused return {"ok": false, "reason": <"silver"|"owned">}
+      #         with ZERO profile mutation.
+      # pass 2: apply all effects exactly as today (silver WITHOUT the maxi(...,0) clamp —
+      #         balance already proven sufficient; attr / item / practice as-is).
+      #         returns {"ok": true, "reason": ""}.
+  ```
+  `add_practice` / `draw_unseen_id` untouched byte-for-byte.
+- Caller contract: map `_resolve_node_event` and cultivation `_apply_event_option` compose the
+  receipt string from the returned reason via `tr()`; facility `_use_facility` keeps its own
+  pre-check (unchanged) and is behavior-preserving under the new validation (no item effects,
+  its silver pre-check already refuses first).
 
-Step 1 suggested rice-paper panels + ink-dark text for the non-battle screens. **Rejected on cascade grounds**, with reasoning for the record: every non-battle scene keeps a full-screen dark Backdrop via a *local* `theme_override_styles/panel` (verified §1), HUD text sits on the dark TopStrip, skill buttons are script-styled dark, and health-bar/round-indicator text is script-colored light. Flipping the global font to ink-dark would demand a large per-node light-color exception inventory across 7 scenes + HUD + script widgets — each missed node is an unreadable frame and a Q6 red. Instead the theme adopts the **battle screen's own vocabulary** (dark ink slab, warm paper text, hairline paper-tan borders, cinnabar + gold accents), giving one coherent light-on-dark story everywhere with **zero per-node font-color exceptions**.
+### 2. `scripts/segments/cultivation.gd` — soft-lock exit (D1) + cultivation receipt (D4)
+- 职责: the empty-practice branch must advance the month with visible feedback; event-option
+  refusals must explain themselves.
+- 接口 / exact edit points:
+  - `_on_accept()` first line: `month_before_accept = month` (new published var, int).
+  - `_on_accept()` GONGFA_PICK branch (`:272-280`): when `_unmastered_ids().is_empty()`:
+    `status_text = tr("无可修习的功法，本月照常过去")`; `phase = "ATTR_PICK"`; `_attr_focus = 0`;
+    `_after_action()` — then `return`. NO `_apply_action` call (no free gain, no RNG op).
+    `_after_action` inherits month-12 → YEAR_END and y3/m12 → finish-to-map for free.
+  - `_rebuild_options_box()` empty-GONGFA label construction (the single label line only —
+    the theme-owned stylebox swap at :582-646 is NOT touched): `tr("返回行动")` → `tr("度过本月")`.
+  - GONGFA_PICK render branch: when the unmastered list is empty, the body gains the line
+    `tr("功法均已大成，无可修习")`.
+  - `_apply_event_option()` (`:484-493`): capture the returned status; on refusal set
+    `status_text = tr("银两不足")` / `tr("此物已在行囊，无须再购")` by reason; skip effect
+    application; **still mark seen** (the encounter happened — keeps `events_seen_count`
+    ladders in `event_travel_effects` immune to any refused draw) and still let the caller's
+    `_after_action()` run (the pick IS the month's action — no trap).
+  - `status_text: String = ""` new var, rendered as an appended body line whenever non-empty,
+    cleared at the top of `_on_accept()`.
+  - `_fast_forward` / `_debug_step_month` empty branches (`:698-705`, `:752-756`) stay
+    byte-identical (debug twins are not the defect).
 
-This does **not** repeat the brief's worst failure ("black replaced by another black"): the differentiator is structure, not hue — opaque backed panels with borders, four genuinely distinct button states, a real focus marker, and a font-size hierarchy. The brief itself names the register to align with: 宣纸/墨/朱印 (paper-warm text, ink slabs, cinnabar seals).
+### 3. `scripts/segments/map.gd` — facility cap (D2) + settled split (D3) + refusal receipts (D4)
+- 职责: bound facility redemption per month; decouple event re-appearance from re-settlement;
+  render refusal/suppression receipts.
+- 接口 / exact edit points:
+  - New const `FACILITY_MONTHLY_USE_CAP := 2` (rule gate, not balance).
+  - `_use_facility()` (`:298-332`): after the existing silver pre-check (unchanged), insert the
+    epoch check — `if GameManager.facility_use_month != SaveManager.profile.cultivation["month"]:`
+    reset the pair; if `facility_use_count_this_month >= FACILITY_MONTHLY_USE_CAP`: reuse the
+    `_facility_refused` + `facility_result_text = tr("本月设施已用尽，下月再来")` refusal shape,
+    **no** count increment, **no** mutation. On success also publish the snapshot surfaces
+    `last_use_silver` / `last_use_attr_value` (profile.silver / the facility's target attr,
+    post-apply) — written ONLY on success, they are the zero-delta anchors.
+  - `_resolve_node_event()` (`:257-277`) becomes three paths, all ending
+    `event_id=""; phase="TRAVEL"; count+=1; mirror write-through; autosave; sync; render`:
+    1. **settled**: `GameManager.is_node_event_settled(current_node_id, event_id)` →
+       `last_effect_types = []`, receipt `map_status_text = tr("此事已有了结，不再重来")`,
+       nothing applied. (Gate (b) re-fire legs keep their exact phase/count asserts.)
+    2. **refused**: `validate_option(...)` returns a reason → receipt by reason
+       (`tr("银两不足")` / `tr("此物已在行囊，无须再购")`), nothing applied, `last_effect_types = []`.
+       Count still increments (the encounter was resolved; its effects were not delivered) —
+       this is what makes every existing timeline ladder immune to affordability.
+    3. **applied**: apply, mark settled via `GameManager.settle_node_event(current_node_id, event_id)`,
+       publish `last_apply_attr_value` (only when the option carries an `attr` effect) — the
+       revisit-nail zero-delta anchor.
+  - `_maybe_start_entry_event()` (`:219-227`): publish `event_open_silver = profile.silver` —
+    the purchase-nail zero-delta anchor (re-show stays unconditional; nothing else changes).
+  - `map_status_text: String = ""` new var, rendered by `_render()` when non-empty, cleared by
+    `_travel()` / `_enter_facility()`.
 
-### D2 — `assets/themes/global_theme.tres` content (the round's core artifact)
+### 4. `scripts/autoload/game_manager.gd` — session mirrors (D2/D3)
+- 职责: survive MapScreen rebuilds (battle return) and profile boundaries without touching the
+  save schema — the proven `map_events_resolved_count` pattern (`:125-131`).
+- 接口:
+  ```gdscript
+  var facility_use_month: int = -1
+  var facility_use_count_this_month: int = 0
+  var settled_node_events: Dictionary = {}          # keys "<node_id>/<event_id>" -> true
+  func is_node_event_settled(node_id: String, event_id: String) -> bool
+  func settle_node_event(node_id: String, event_id: String) -> void
+  ```
+  All three reset at the exact site where `map_events_resolved_count` resets
+  (SaveManager.profile_created / loaded). Session-scoped only, never persisted — documented
+  consequence: a loaded save may re-settle once per session, identical to the existing count
+  mirror's behavior.
 
-`StyleBoxFlat` sub-resources only (shapes/colors — the only legal material; `StyleBoxTexture` banned). Palette anchored to the battle screen's existing values (TopStrip ink `0.07,0.07,0.1`, gold accent `1,0.84,0`, skill-button text `0.92,0.92,0.92`):
+### 5. `scripts/autoload/i18n.gd` — 7 new EN-dict entries
+Chinese-keyed, appended to the existing EN dict (guarded by `tests/test_i18n_coverage.py`):
+`功法均已大成，无可修习` / `度过本月` / `无可修习的功法，本月照常过去` / `此物已在行囊，无须再购` /
+`此事已有了结，不再重来` / `本月设施已用尽，下月再来` (reuse the existing `银两不足` for the
+purchase-silver refusal — same wording the brief names as the reference). No U+2026 ellipsis
+characters (repo-wide rule).
 
-| Theme item | Value (intent, not gate-pinned) |
-|---|---|
-| `default_font` / `default_font_size` | unchanged (NotoSansSC / 12) — protects script-built 8–10 px labels |
-| `Button/styles/normal` | ink slab `≈Color(0.16,0.15,0.13)`, opaque, hairline paper-tan border 1px, corner radius 3, content margins l/r 12 t/b 4 |
-| `Button/styles/hover` | lighter ink + gold-tinged border |
-| `Button/styles/pressed` | darker ink + cinnabar border |
-| `Button/styles/disabled` | muted ink, **opaque** (kills grid-lines-showing-through), visibly distinct border; `font_disabled_color` warm gray ≈`0.55,0.52,0.47` — reads as *unavailable*, not *gone* |
-| `Button/styles/focus` | draw_center=false cinnabar 2px ring (overlay semantics, godot-proposals #8134) |
-| `Button/colors/font_color/hover/pressed/disabled/focus` | paper `≈0.93,0.90,0.83` family; hover near-white; focus gold |
-| `Button/font_sizes/font_size` | 15 |
-| `Panel/styles/panel` | **opaque** dark warm ink `≈Color(0.11,0.10,0.09,1)`, hairline tan border, radius 3, soft shadow, content margins 16/12 |
-| `Label/colors/font_color` | `≈Color(0.88,0.85,0.78)` |
-| `Label/font_sizes/font_size` | 14 |
-| `RichTextLabel/colors/default_color` | same paper tone (tutorial Body) |
-| `TitleLabel` variation (`base_type &"Label"`) | size 26, soft-gold tone — hierarchy top |
-| `HintLabel` variation (`base_type &"Label"`) | size 12, muted `≈0.72,0.69,0.62`, outline black 0.85 size 3 (hud.tscn pattern hoisted) |
+### 6. `scenes/segments/sect_select.tscn` — occlusion (D5)
+- 职责: presentation-only de-overlap; `sect_select.gd` untouched; global theme untouched.
+- 接口: BodyLabel `offset_right: 320 → 110`; SectButton0..4 `offset_left: -120 → 130`,
+  `offset_right: 120 → 370` (width 240 and all y offsets preserved). Result: body text wraps at
+  430 px (every row clear of x=+110), buttons occupy absolute x 610..850 inside the 960 viewport,
+  20 px gutter. All five body rows (incl. the Tang Men row) render fully.
 
-`.tres` mechanics: header `load_steps = sub_resource_count + 2` (1 ext font + N styleboxes + resource) — every stylebox added bumps it; wrong count = blank screens = all 78 red. Protocol: each theme edit followed immediately by headless import + compile, then the full suite once the theme lands. No `Label/colors/font_shadow_color` globally — it would fuzz the 8–10 px script labels (`InfoLabel`, `CostLabel`); shadows go only where art sits (D4).
+### 7. Playtest contract (repo's own harness — `playtest/_common.yaml` + per-scenario files)
+- 职责: pin the four repaired rules with differential nails; re-point the two soft-lock-era nails.
+- 契约 (all appends additive; two-place sync with `tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS`):
+  - New surfaces (append to `_common.yaml` `surface:`):
+    `MapScreen: [map_status_text, event_open_silver, last_apply_attr_value, last_use_silver, last_use_attr_value]`,
+    `CultivationScreen: [month_before_accept, status_text]`.
+  - No new actions (all needed tokens already whitelisted: `ui_accept`, `move_right`,
+    `use_facility`, `debug_seed_save`, `debug_grant_silver`, `debug_grant_equip`,
+    `debug_fast_forward`, `debug_win_tutorial`).
+  - Zero-delta grammar (no `== 8`-style literals): each nail compares a live value against a
+    success-only snapshot surface. Snapshot vars update ONLY on success, so `silver ==
+    last_use_silver` after a refused/exhausted press is true iff the press changed nothing.
+  - Scenario skeletons (frames are re-baselined from the red-first runs; asserts here are the
+    contract, frames are measured):
+    - `softlock_empty_practice_month_advances` — boots main flow, `debug_seed_save` seed
+      prefix (sanctioned seed action, same role as `debug_win_tutorial`; **`debug_fast_forward`
+      FORBIDDEN**), real `ui_accept` drive: CARD_PICK → 练功 → empty GONGFA_PICK → accept.
+      Asserts: `CultivationScreen.month == month_before_accept + 1` (true differential, zero
+      literals), `phase == "CARD_PICK"`, `status_text != ""`.
+    - `facility_use_cap_exhausted_zero_delta` — mirrors `facility_use_reusable`'s sanctioned
+      seed prefix; enter → use (count 1) → leave → re-enter → use (count 2) → leave → re-enter
+      → use (EXHAUSTED). Asserts: `facility_use_count == 2` (ladder rung, gate-(a) style),
+      `silver == last_use_silver`, `attr_bone == last_use_attr_value`,
+      `facility_result_text != ""`.
+    - `map_node_event_revisit_no_resettle` — resolve quanzhen_scripture at 武当 (apply:
+      wisdom +2), travel 洛阳↔武当 (transit merchant applies once — unaffected), re-fire at
+      武当, resolve again (suppressed). Asserts: `attr_wisdom == last_apply_attr_value`,
+      `last_effect_types == []`, `map_status_text != ""`, `events_resolved_count == 3` (rung).
+    - `event_option_refused_no_charge` — seed `eq_sword_3` via whitelisted
+      `debug_grant_equip` (CULTIVATION-scoped, `cultivation.gd:821`) → fast-forward to MAP →
+      travel to 洛阳 → merchant opens → assert `silver == event_open_silver` → pick
+      买下长剑 (owned → refused) → assert `phase == "TRAVEL"`,
+      `silver == event_open_silver`, `map_status_text != ""`, `events_resolved_count == 1`.
+  - Re-pointed nails (NOT in the verbatim-protected trio; full change table recorded in delivery
+    notes, huashan-round precedent):
+    - `gongfa_pick_empty_keyboard_return.yaml`: f77 text assert 返回行动 → 度过本月; f200 block
+      `phase == "ACTION_PICK"` → `phase == "CARD_PICK"` + `month == month_before_accept + 1` +
+      `status_text != ""`. All other asserts (f170 GONGFA_PICK/empty-state block incl.
+      `mastered_count == gongfa_count`, `pressed_connected`) preserved verbatim.
+    - `clicks_only_gongfa_empty_exit.yaml`: f125 text assert → 度过本月; f138 block re-pointed
+      identically. All other asserts preserved.
+  - Occlusion gate: PRIMARY = same-frame before/after pair (current-tree f210 sect frame vs
+    post-fix f210) recorded in the delivery notes — the brief's sanctioned evidence.
+    OPTIONAL additive geometry asserts (`BodyLabel: offset_right == 110`,
+    `SectButton0: offset_left == 130` — two single-node property asserts that together prove
+    non-overlap) appended additively to `spine_to_ending.yaml`'s f210 block ONLY after the
+    implementer verifies `impl.py` resolves node properties (in-repo asserts already read
+    `visible`/`text` properties; cross-node expressions remain unverified and are NOT relied on).
+    Do not lean on the vision gate — Q6 asks truncation, not occlusion.
 
-### D3 — Roster panel & tutorial overlay (压字 #1, #2)
+## 技术栈
 
-Two-layer structural fix, not an alpha twiddle:
-1. **Opaque backing via the global theme** — `RosterBox` and the tutorial `Panel` are bare Panels, so `Panel/styles/panel` gives them a real opaque ink slab + border for free. This is the fix that makes the panel an information layer (UX-22's actual defect).
-2. **Dim raised in-scene** — `roster_panel.tscn:34` `0.55 → ≈0.85`, `tutorial_overlay.tscn:14` `0.5 → ≈0.88`: one value each, presentational, no z-order/layer/coordinate change (CanvasLayer 100 stays). Exact values are chosen so the after-frames read cleanly; the judge is the frame, not the number.
+- Godot 4.4 / GDScript (existing repo; no engine, addon, or asset-tooling changes).
+- Existing playtest harness (`playtest/_common.yaml` + per-scenario yaml +
+  `aitelier/tools/godot_playtest/impl.py`); append-only discipline.
+- stdlib pytest static guards (`tests/test_playtest_contract_smoke.py` shape) + GDScript unit
+  suite for the EventLogic validate/apply contract (follow `tests/test_event_data.gd`'s harness;
+  pin: insufficient silver → zero mutation; owned item → zero mutation; deliverable → applied).
+- No new dependencies. `linter_manifest.json` covers the non-GDScript text files (`.gd` is
+  host-gated via `gdscript_check`).
 
-No node added, none removed, no geometry touched — `roster_panel_cultivation_open_close` / `roster_panel_item_nail` / tutorial scenarios keep every assertion. Tutorial Body is a RichTextLabel → gets `RichTextLabel/colors/default_color`; Title Label → `TitleLabel` variation (560×40 rect fits 26 px).
+## 红线与守护 (hard constraints carried into every task)
 
-### D4 — Battle hints & disabled state (压字 #3, fB/s2_frame_0210)
+1. **Verbatim-protected, byte-untouched**: `playtest/facility_use_reusable.yaml`,
+   `playtest/map_node_event_shaolin.yaml`, `playtest/map_battle_node_huashan.yaml`.
+2. **Protected files**: `assets/themes/global_theme.tres`, `scenes/ui/{roster_panel,tutorial_overlay,hud}.tscn`,
+   `scripts/autoload/theme_manager.gd`, `scripts/segments/sect_select.gd`, the focus-style
+   stylebox-swap portion of `cultivation.gd::_rebuild_options_box`, the six huashan-round files.
+3. **No balance numbers move**: `event_data.gd` / `facility_data.gd` / `card_data.gd` values,
+   `MapData.ENDING_TIERS`, Huashan difficulty. `FACILITY_MONTHLY_USE_CAP` is a rule gate.
+4. **Gate safety analysis (already done, re-verified at T6's full run)**: suppression legs change
+   only effects, never phase/count (gates (b) legs assert phase/count only — f460/f630 in the
+   shaolin gate; huashan Leg F). Refusal-resolves keeps every ladder immune to affordability.
+   The facility cap survey (D2) shows max 2 uses/month in every scenario. Mandatory T6 check:
+   if any non-protected scenario still reds on a new refusal path, add
+   `debug_grant_silver` funding to its seeding prefix (additive, asserts untouched); if a
+   PROTECTED scenario reds, STOP and surface to the driver.
+5. **Pre-landing**: run `git log` and confirm the jinyong-theme merge has landed before touching
+   `cultivation.gd` (in-tree evidence already shows `ThemeManager.option_style` consumption at
+   `cultivation.gd:649-651` / `sect_select.gd:88-89`; the brief requires the explicit check).
+6. **Red-first discipline**: each new nail carries four measured values (failing frame / first
+   failing assert / exact error / green asserts before red) from a temporary revert marked
+   `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`, restored byte-identically afterwards
+   (`repo_apply` is `git add -A` — no revert residue). The occlusion fix's before-state IS the
+   red measurement (current tree shows the occlusion at f210).
+7. **Rollback**: all edits are plain file edits in git — revert path is `git checkout -- <file>`;
+   no data migration, no irreversible operation anywhere in this round.
 
-- **Hints**: copy the skill_button.tscn:48-50 shadow pair verbatim onto `hud.tscn`'s two hint labels (SkillDescLabel ~:170, MoveHintLabel ~:178): `theme_override_colors/font_shadow_color = Color(0,0,0,0.85)` + `theme_override_constants/shadow_offset_x/y = 1`, alongside their existing outlines. Outline+shadow compound is exactly the brief's prescribed pattern for text over 皴笔; no hierarchy/coordinate change; no gate pins hint colors (`ui_geometry_readability` pins geometry/visibility only).
-- **Disabled**: the theme's opaque disabled stylebox + readable `font_disabled_color` (D2) fixes「退回」reading as *gone* (light-gray-on-translucent-plate with grid lines through it). This also de-fogs every HUD button's disabled state globally.
-- The implementer captures the same fB frame before/after; if the pre-frame already reads acceptably, the delivery note says so honestly and the shadow pair remains the low-risk hardening.
+## 扩展性考虑
 
-### D5 — Focus marker (cultivation.gd:641)
+- The settled-event mirror is the seam for a future save-persistent "visited" ledger (R3+):
+  swap the GameManager dictionary for a profile field; the map-side call sites do not change.
+- `validate_option` is the single choke-point if R3 adds cost types (the 5-type domain is
+  closed today).
+- The snapshot-surface zero-delta grammar generalizes to any future "must not change X" nail.
+- The per-month facility epoch pair naturally extends to per-month action budgets later.
+- Deliberately NOT designed now (out of scope, per brief/R3): ending thresholds, attribute
+  formulas, card rewards, Huashan difficulty, remaining declared battle/facility slots,
+  pool-event re-show policy (bag events never re-draw within 36 months).
 
-- `ThemeManager` gains `option_style(focused: bool) -> StyleBoxFlat` — two cached, never-mutated-after-build StyleBoxFlats (plain = the theme's own Button-normal geometry so min-size is byte-stable; focused = same margins + 3px cinnabar left bar + gold border, the `SelectedMarker`-sanctioned form family: border/backing). Plus the two font-color constants (focus paper / dim `≈0.62,0.60,0.55`).
-- `cultivation.gd:641` (inside `_rebuild_options_box`, the exact line the brief names) replaces the `modulate` ternary with the stylebox+font-color swap on `i == _focused_index_for_phase()`. Same sync points, same `FOCUS_NONE`, no behavior change; the 2–3 % brightness trick is gone.
-- New observable `focus_marker_active: bool` on `CultivationScreen`, published in `_sync_surface()` (true iff the focused row's focused variant is applied) — a real render state the script genuinely drives, enabling the sanctioned *differential* nail.
-- `sect_select.gd:84` (same Button pattern, editable) adopts the same helper so the language is coherent across the two list phases — no new nail, existing sect scenarios are the regression net.
-- **Explicitly out of scope**: `creation.gd:730/:734` (AttrRow is a plain Control — different mechanism, would be invention) and `map.gd` (locked, zero-change). Consequence recorded for 5_design: UX-21 may close only for the covered sites or stay OPEN with the map/creation residual noted — decided from this round's actual results, not predicted.
+## 给 PM 的任务分解建议 (dependency-ordered)
 
-### D6 — Title/body hierarchy without geometry risk
-
-Per-type sizes: Button 15, Label 14, hints 12 via `HintLabel`, titles 26 via `TitleLabel`; `Theme.default_font_size` stays 12. Application rule for scene edits (one line per node, `theme_type_variation = &"HintLabel"` / `&"TitleLabel"`): apply `TitleLabel` only to top-of-screen title Labels whose rect height ≥ 40 px (verified today: tutorial Title; menu Title keeps its own 52 px override and needs no variation); apply `HintLabel` to the segments' bottom HintLabels (menu, cultivation, map — map's `HintLabel.text` contract nail is text-only, unaffected). **Named fallback**: if any geometry/Q6 pin reddens from the 12→14 Label growth (HUD top labels are the only tight rects), the fallback is pinning those few nodes back to 12 via per-node size overrides — never shrinking the hierarchy globally.
-
-### D7 — What is intentionally NOT built
-
-No textures/images/icons (StyleBoxFlat only); no `ThemeDB`/runtime theme swapping; no new type variations beyond the two; no global Label shadow (D2); no font/copy/string changes anywhere (zero `i18n.gd` delta; EN cannot regress because nothing textual changes); no HUD restructure; no changes to `battlefield.gd`/`game_manager.gd`/`scene_manager.gd`/`map.gd`/`map_battle_data.gd`/`map_battle_node_huashan.yaml` (byte-identical, verified by the contract smoke test); no new art pipeline steps.
-
-### D8 — Cascade safety ledger (who escapes the global theme, by design)
-
-Script-owned (win over theme, unaffected): `skill_button.gd _apply_state` (per-state stylebox + 5 font colors), `health_bar.gd`, `round_indicator.gd`, `game_manager.gd` overlay panel/labels (locked file — its Buttons still gain the theme for free, its pinned panel style does not move), scene-local Backdrop overrides. Gate surfaces pinned today are all in this ledger or geometry-owned, which is why the five protected gates survive a palette change by construction — verified expression-by-expression in §1. The remaining risk is size growth (D6 fallback) and `.tres` syntax (§6 protocol).
-
-## 4. Component list & interfaces (repo-root-relative)
-
-| File | Change | Interface / contract |
-|---|---|---|
-| `assets/themes/global_theme.tres` | rewrite in place | Theme items per D2; `load_steps` arithmetic exact; ext_resource id `1` = NotoSansSC unchanged |
-| `scripts/autoload/theme_manager.gd` | additive | keep `_ready()` fallback byte-behavior; add `option_style(focused: bool) -> StyleBoxFlat` + `OPTION_FONT_FOCUS/OPTION_FONT_DIM` constants; no signals, no state |
-| `scripts/segments/cultivation.gd` | one line at :641 + publish | replace modulate ternary with `add_theme_stylebox_override("normal", ThemeManager.option_style(focused))` + font-color override; add `var focus_marker_active: bool` synced in `_sync_surface()`; phase logic/RNG untouched |
-| `scripts/segments/sect_select.gd` | one line at :84 | same helper swap on `SectButton{i}` |
-| `scenes/ui/roster_panel.tscn` | one value | `RosterDim.color.a ≈ 0.85`; everything else untouched |
-| `scenes/ui/tutorial_overlay.tscn` | one value + one variation line | `Dim.color.a ≈ 0.88`; `Title` gets `theme_type_variation = &"TitleLabel"` |
-| `scenes/ui/hud.tscn` | two lines | shadow pair (D4) on SkillDescLabel + MoveHintLabel; all other hud content untouched |
-| `scenes/ui/menu_panel.tscn`, `scenes/segments/*.tscn` | variation lines only | `HintLabel` on bottom hint labels; `TitleLabel` on verified ≥40 px title Labels (rule D6) |
-| `playtest/_common.yaml` | append-only surface | `CultivationScreen.focus_marker_active` (+ `scenario_order` tail append for the new scenario) — two-place sync with `tests/test_playtest_contract_smoke.py` |
-| `playtest/theme_focus_marker_cultivation.yaml` | new scenario | skeleton in §5; name == basename |
-| `final/delivery_notes_theme.md` | new | before/after same-frame table, red-first four values, ledger of untouched files |
-
-No other files change. `design/` docs are 5_design's job (changelog: exactly one appended line; roadmap phase-4 numbers only from gate artifacts; UX-21/UX-22 status only per results).
-
-## 5. Playtest contract (Architect-owned observables + skeleton)
-
-**Surface append (whitelist, append-only):** `CultivationScreen.focus_marker_active: bool`.
-
-**New scenario skeleton — `theme_focus_marker_cultivation`** (PM fills exact `at:` frames by mirroring `clicks_only_gongfa_empty_exit`'s boot/seed timing; keyboard twin of the existing focus ladder):
-- boot to menu → load the sanctioned fresh save (same seeds as existing cultivation scenarios, RNG stream untouched) → advance to `ACTION_PICK`.
-- assert at frame A: `CultivationScreen.phase == "ACTION_PICK"`, `focus_marker_active == true`, `focused_option_text` non-empty.
-- `move_down` → assert at frame B: `focused_option_text: changed` **and** `focus_marker_active == true` (the marker follows the cursor; differential proves the visual state moved with focus, not a stuck constant).
-- one real click on `CultOptionButton0` → phase advances (the marker never blocks clicking — clicks-only path intact).
-- No absolute style/color assertions anywhere (no `== Color(...)`, no alpha literals, no "stylebox exists" forms).
-
-**Red-first protocol** (mandatory, measured): temporary revert = restore the :641 modulate ternary / stub `option_style()` to return the plain box for both values, marked `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`; direct sidecar run (`godot_playtest_scenario`, same channel as prior rounds) → record failing frame / first failing assert / exact error / greens-before-red; restore byte-exact; re-run green; record both runs in the delivery note. Vision endpoint unreachable → human frame review is the accepted fallback (knowledge.md precedent), never a silent pass.
-
-**Before/after same-frame pairs (the round's primary acceptance):**
-
-| Frame | Shows | Judge |
-|---|---|---|
-| `fA/s4_frame_0052` | roster panel: 年月/属性 rows vs bleed-through card buttons | vision gate Q-contrast or human |
-| `fA/s2_frame_0158` | tutorial page 1: body vs HP bar, portraits through dim | same |
-| `fB/s2_frame_0210` | battle hints on 皴笔 + disabled 退回 | same |
-| menu / cultivation / ending frames (this round's run) | "someone designed this" — button states, panel backing, hierarchy | same |
-
-## 6. Test plan & safety
-
-1. **After every `.tres`/scene edit**: headless import + `godot --check-only` equivalent compile gate; a broken theme blanks all screens, so theme edits land in small verifiable steps (theme file → compile → scenes → compile).
-2. **Unit suite**: no new GDScript test files planned (the differential nail + frames carry the round; a stylebox-shape unit test would be a form pin). Compile count stays at the current 98-file baseline.
-3. **Full playtest suite**: 78/78 zero regression; five protected gates re-verified by name (`ui_geometry_readability`, `skill_button_visual_states`, `portrait_grid_alignment`, `spine_to_ending`, `equipment_in_battle_diff`).
-4. **Rollback**: all changes are single-commit text edits; the temporary-revert protocol for red-first requires byte-exact restore and a full-suite re-run afterward (repo_apply is `git add -A` — no revert residue may survive).
-5. **Contract smoke**: `_common.yaml` appends keep `tests/test_playtest_contract_smoke.py` in two-place sync (surface + `scenario_order`).
-
-## 7. Suggested task split for PM
-
-- **T1 Theme core**: D2 theme file + compile protocol + D8 cascade verification (menu/cultivation/ending frames already look themed).
-- **T2 Readability**: D3 (roster + tutorial) + D4 (hud shadow pair); before/after frames captured.
-- **T3 Focus marker**: D5 helper + cultivation/sect swap + surface append + new scenario, red-first measured.
-- **T4 Evidence & docs**: frame pairs, delivery notes, gate runs; 5_design handoff notes (UX-21/UX-22 disposition inputs, changelog line draft).
-
-T2/T3 are parallelizable after T1; T4 last. Every task's acceptance = its gate evidence, never "looks done".
-
-## 8. Design-doc alignment (for 5_design)
-
-No `design/` contradiction: this round is presentation-layer inside roadmap phase 4's scope (UI/主题), touching none of `10_`/`20_` systems or content. 5_design will: append one `99_changelog.md` line; fill phase-4 numbers from gate artifacts; resolve UX-21 (focus) / UX-22 (roster panel) statuses strictly per results — including the honest residual that `map.gd` (locked) and `creation.gd` (Control-row mechanism) keep the old modulate pattern this round. The Step-1 rice-paper recommendation is consciously superseded by D1; record the ruling in `90_decisions.md` via the normal evidence step.
+- **T1 Soft-lock**: cultivation.gd D1 edits + 2 i18n strings + re-point 2 nails + new
+  `softlock_empty_practice_month_advances` (red-first). Independent.
+- **T2 Facility cap**: game_manager epoch pair + map.gd D2 + 1 i18n string + new
+  `facility_use_cap_exhausted_zero_delta` (red-first). Independent.
+- **T3 Settled split**: game_manager settled set + map.gd D3 resolve paths + 1 i18n string +
+  new `map_node_event_revisit_no_resettle` (red-first). Touches `_resolve_node_event` — land
+  before/with T4.
+- **T4 All-or-nothing**: event_logic.gd contract + cultivation/map callers' receipts + 1 i18n
+  string + unit pin + new `event_option_refused_no_charge` (red-first). Depends on T3's
+  `_resolve_node_event` shape (same function).
+- **T5 Occlusion**: sect_select.tscn offsets + frame pair (+ optional additive geometry asserts
+  after impl.py verification). Independent; presentation-only.
+- **T6 Sync & verification**: `_common.yaml` (surfaces + scenario_order) ↔
+  `ROUND_SCENARIOS` two-place sync, new pytest anti-weakening guards (each nail must contain its
+  differential expression; the soft-lock nail must NOT contain `debug_fast_forward`), full
+  79+4-scenario gate run, blast-radius survey sign-off, delivery notes with the four red-first
+  records + the nail change table + the occlusion frame pair.
