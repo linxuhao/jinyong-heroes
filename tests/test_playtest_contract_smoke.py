@@ -2029,11 +2029,14 @@ def test_occlusion_watch_surface_contract() -> None:
     integer, and the file carries at least one
     ``UiOcclusionWatch.violations: violations == 0`` property assert.
 
-    COORDINATE-LITERAL FORBIDDEN ZONE: the file must contain NO ``offset_``
-    assert line at all. A legal layout re-tweak (e.g. moving the sect button
+    COORDINATE-LITERAL FORBIDDEN ZONE: no 4-space dotted ASSERT line may
+    contain ``offset_``. A legal layout re-tweak (e.g. moving the sect button
     column a few px further right) would otherwise falsely red a stale
     geometry pin; the gate asserts ONLY the published property
-    ``violations == 0`` — zero coordinate literals anywhere.
+    ``violations == 0`` — zero coordinate-literal asserts anywhere. The ban is
+    scoped to the dotted assert lines deliberately: the scenario's header
+    comments legitimately document the red-first revert-recipe offsets, and a
+    comment is not an assert.
     """
     name = "occlusion_no_button_over_text"
     text = COMMON.read_text(encoding="utf-8")
@@ -2074,14 +2077,17 @@ def test_occlusion_watch_surface_contract() -> None:
                 f"{name}.yaml line {lineno} assert missing comparison operator: "
                 f"{line.strip()}"
             )
+            # Coordinate-literal forbidden zone (R1 order): a layout re-tweak
+            # must not falsely red this gate; only the published property is
+            # asserted. Scoped to the 4-space dotted ASSERT lines only — the
+            # scenario's documentation comments legitimately mention the
+            # revert-recipe offsets, and a comment is not an assert.
+            assert "offset_" not in line, (
+                f"{name}.yaml line {lineno} carries a forbidden coordinate-literal "
+                f"assert (offset_): {line.strip()}"
+            )
             if "violations == 0" in line:
                 has_property = True
-        # Coordinate-literal forbidden zone (R1 order): a layout re-tweak must
-        # not falsely red this gate; only the published property is asserted.
-        assert "offset_" not in line, (
-            f"{name}.yaml line {lineno} carries a forbidden coordinate-literal "
-            f"assert (offset_): {line.strip()}"
-        )
     assert has_property, (
         f"{name}.yaml missing a `violations == 0` property assert"
     )
