@@ -681,6 +681,16 @@ grep 核实:只有这两条含 `current_state == "MAP"` / 会走地图,故无第
 _apply_hint_visibility()` 引用旧提示串的两处 docstring/注释;可见性切换逻辑不动
 (`phase != "EVENT"` 是按否定的白名单,天然适应任何未来相位)。
 
+> **`jinyong-loop` R2 修订(2026-09-01):** 本 (d) 的「option-A 效果每次到达重新施加」政策
+> 自本轮起**收窄为「可再出现、单次结算」**:节点事件仍在每次 travel 到达时触发(到达即触发
+> 不变,两条既有闸门逐字未动),但每个 `(node_id, event_id)` 对的**效果每会话只结算一次**
+> (`GameManager.settled_node_events` 会话镜像,存读档不保留——读档当次可再结算一次,与
+> `map_events_resolved_count` 镜像同款生命周期)。重访再解算时屏上回执「此事已有了结，不再重来」,
+> 属性/银两零变动;`events_resolved_count` 照常 +1——**计数计的是解算次数,不是结算次数**,
+> 这正是闸门 (b) 的 1→2→3 阶梯与 Leg F `count == 3` 能逐字保绿的原因。实测钉
+> `playtest/map_node_event_revisit_no_resettle.yaml` **33/33**(红先实测:重访曾把
+> `["silver","item"]` 再发一遍,f200)。下文为修订前原文,保留不改。
+
 **(d) 重复到访 re-fire 政策扩展到主线 4 节点。** 上轮 §8.3 第 5 条记录的「少林事件在
 每次经 travel 到达时触发、无 per-profile 一次性标记」政策,本轮原样适用于新转 `active`
 的无名谷 / 洛阳 / 武当 / 襄阳——它们是**可重复访问的内容点**,option-A 效果每次到达
@@ -761,7 +771,21 @@ luoyang / xiangyang / kunlun / huashan)仍诚实保持 `declared` / `""`(见 §8
 `PlayerProfile` 的 `silver` / `add_attr`——设施是既有系统的**一个新入口**,不是一套
 并行玩法。数值「够用即止」,非精调(第 5 阶段)。
 
-### 10.4 可重复但有界(复用上限 = 第 5 阶段待决数值)
+### 10.4 可重复但有界(复用上限已决:每档案月 2 次 — 2026-09-01 `jinyong-loop`)
+
+> **R2 裁定(2026-09-01,`jinyong-loop`):** 上一版标题里的「复用上限 = 第 5 阶段待决数值」
+> 自此裁定为**每月 2 次**:`map.gd` 常量 `FACILITY_MONTHLY_USE_CAP := 2`,计数住 GameManager
+> 会话镜像(`facility_use_month` / `facility_use_count_this_month`,日历月翻页即重置,
+> `profile_created` / `loaded` 时随 `map_events_resolved_count` 一并清零)。这是**规则闸,
+> 不是平衡数字**——设施费用与收益一个没动,本轮红线是只修「规则被短路」。取值依据:全
+> 84 场景实测单月最大用量恰为 2(`facility_use_reusable` 与 `map_facility_buttons_click`
+> 各两次、且两次分属两次进入),闸门 (a) 的「离开再回来还能再用一次」性质逐字保绿;每进入
+> 一次限 1 次同样合法,但只把实测的「40 连按」降速 3 倍,每月 1 次会直接撞红闸门 (a)。
+> 用尽后再按走既有回执通道「本月设施已用尽，下月再来」:零改动、计数不涨、快照不写。
+> 实测:`facility_use_cap_exhausted_zero_delta` **33/33**(红先实测 f720 观测计数 3),
+> 闸门 (a) `facility_use_reusable` **49/49** 逐字节未动。
+
+(以下为 2026-08-29 原文,选项枚举保留作历史记录;「第 5 阶段待决」一句已被上方 R2 裁定取代。)
 
 本轮以**既有银两**为唯一复用门槛(每次付费、付得起就能再用)——引入零新资源 / 新
 货币 / 新经济。但**复用的上界尚未定死**:每访一次(once-per-visit)/ 每周期一次
