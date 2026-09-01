@@ -68,6 +68,11 @@ const TESTS: Array[String] = [
 	# (GRADE_POINTS / mastered_count / mastery_points / work_income /
 	# deed_score / readiness_power) — monotonicity + differential asserts only.
 	"res://tests/test_progression_math.gd",
+	# R3 action rebalance M1 2026-09-01: the per-action yield-curve instrument
+	# (36 seeded months × 5 strategies) — prints the yield table and asserts
+	# structural facts only (finite/non-negative, mastered-heavy work income >
+	# fresh, travel <= 36 events). Never balance literals.
+	"res://tests/test_action_yield_curves.gd",
 ]
 
 
