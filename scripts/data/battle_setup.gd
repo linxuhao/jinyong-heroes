@@ -22,6 +22,8 @@ const CharacterData = preload("res://scripts/data/character_data.gd")
 const EquipmentData = preload("res://scripts/data/equipment_data.gd")
 const GongfaData = preload("res://scripts/data/gongfa_data.gd")
 const ProgressionGongfaData = preload("res://scripts/data/progression_gongfa_data.gd")
+const ProgressionMath = preload("res://scripts/data/progression_math.gd")
+const MapData = preload("res://scripts/data/map_data.gd")
 
 ## Melee weapon classes (mirror of CombatManager.MELEE_SCHOOLS; kept local so
 ## this data layer has no autoload dependency). Ranged = everything else —
@@ -33,19 +35,47 @@ const _MELEE_SCHOOLS: Array[String] = [
 
 ## Derive the battle stats for a PlayerProfile. Returns a Dictionary with
 ## max_health / energy / move_range / initiative / attack_damage / attack_range.
+##
+## R3 (r3_huashan_winnable) EXTENDS the formulas player-side only with a
+## cultivation term: mp = ProgressionMath.mastery_points(profile) (sum of
+## GRADE_POINTS over MASTERED gongfa rows). Three years of practice/cultivate
+## visibly cash out in the finale. attack_damage / move_range / attack_range are
+## UNCHANGED by mp (the fight's texture is preserved). EquipmentData.sum_bonuses
+## returns keys attack/health/initiative/move ONLY — there is NO energy field, so
+## energy = inner*2 + 4*mp (the gear energy bonus does not exist).
 static func derive_stats(profile) -> Dictionary:
 	var bone: int = _attr(profile, "bone")
 	var inner: int = _attr(profile, "inner")
 	var agility: int = _attr(profile, "agility")
+	var mp: int = ProgressionMath.mastery_points(profile)
 	var gear: Dictionary = EquipmentData.sum_bonuses(profile.get("equipped") if profile.get("equipped") != null else {})
 	return {
-		"max_health": bone * 5 + int(gear.get("health", 0)),
-		"energy": inner * 2,
+		"max_health": bone * 5 + 6 * mp + int(gear.get("health", 0)),
+		"energy": inner * 2 + 4 * mp,
 		"move_range": 2 + int(floor(float(agility) / 20.0)) + int(gear.get("move", 0)),
-		"initiative": agility + int(gear.get("initiative", 0)),
+		"initiative": agility + 3 * mp + int(gear.get("initiative", 0)),
 		"attack_damage": 10 + bone + int(gear.get("attack", 0)),
 		"attack_range": _attack_range_for(profile),
 	}
+
+
+## Huashan readiness verdict (R3 D4). Pure, zero RNG. Wraps derive_stats so the
+## warning can never drift from the numbers the duel actually uses (one formula
+## source). power = ProgressionMath.readiness_power(derive_stats(profile));
+## verdict_key against MapData.HUASHAN_BAR: power < E -> "huashan_weak";
+## E <= power < S -> "huashan_even"; power >= S -> "huashan_strong".
+static func readiness(profile) -> Dictionary:
+	var stats: Dictionary = derive_stats(profile)
+	var power: int = ProgressionMath.readiness_power(stats)
+	var bar: Dictionary = MapData.HUASHAN_BAR
+	var even: int = int(bar.get("even", 0))
+	var strong: int = int(bar.get("strong", 0))
+	var verdict_key: String = "huashan_strong"
+	if power < even:
+		verdict_key = "huashan_weak"
+	elif power < strong:
+		verdict_key = "huashan_even"
+	return {"power": power, "verdict_key": verdict_key}
 
 
 ## Build a CharacterData for an encounter battle from a PlayerProfile.

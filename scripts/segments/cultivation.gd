@@ -19,6 +19,7 @@ extends Control
 
 const TraitEffects = preload("res://scripts/data/trait_effects.gd")
 const ProgressionMath = preload("res://scripts/data/progression_math.gd")
+const BattleSetup = preload("res://scripts/data/battle_setup.gd")
 
 ## Debug-grant school -> external A art id (GongfaData carries no id field;
 ## ids are row-derived, hence the const map; see _debug_grant_art).
@@ -1066,6 +1067,19 @@ func _render() -> void:
 		silver, attr_bone, attr_inner, attr_agility, attr_wisdom, attr_fortune,
 	]
 	text += tr("武功 %d 门 · 大成 %d\n\n") % [gongfa_count, mastered_count]
+	# Huashan readiness warning (R3 D4): from year 3 month 1 onward the body
+	# carries the 华山评估 line so the warning exists for the ~30 months BEFORE
+	# the map opens. Same math as the roster panel (BattleSetup.readiness) — one
+	# formula source with the duel.
+	if year >= 3:
+		var verdict: Dictionary = BattleSetup.readiness(SaveManager.profile)
+		var key: String = str(verdict.get("verdict_key", "huashan_weak"))
+		var band: String = tr("战备不足")
+		if key == "huashan_even":
+			band = tr("势均力敌")
+		elif key == "huashan_strong":
+			band = tr("胜券在握")
+		text += tr("华山评估：%s\n\n") % band
 	match phase:
 		"YEAR_AUGMENT":
 			text += tr("【开年际遇】\n")

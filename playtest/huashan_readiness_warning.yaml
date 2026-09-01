@@ -1,0 +1,130 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# HUASHAN READINESS WARNING NAIL (R3, 2026-09-01, N-4a).
+#
+# Proves the advance warning exists and is a DIFFERENTIAL on the verdict STRING
+# (never a power literal):
+#   - a creation-fresh profile shows the weak verdict (战备不足) on the roster
+#     panel's readiness_text;
+#   - after cultivation via the seeded month loop, the verdict DIFFERS (the
+#     string changed — the warning tracks the player's growth).
+#
+# The warning surface is RosterPanel.readiness_text, computed by
+# BattleSetup.readiness(profile) — the SAME math the duel uses, so the warning
+# can never drift from the actual fight numbers (one formula source).
+#
+# Every touched frame asserts UiOcclusionWatch.violations == 0 and scan_ok ==
+# true (the new readiness line must not occlude anything).
+#
+# ZERO balance literals: only the verdict STRING differential and the
+# occlusion-clean pins.
+#
+# BOOT: mirrors the softlock scenario's menu boot pattern — seed a fresh
+# CULTIVATION save via debug_seed_save, load it by keyboard, then drive with
+# pure ui_accept.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
+#   pre-fix tree where the readiness_text surface does NOT exist on
+#   RosterPanel):
+#
+#   failing_frame:            f130
+#   first_failing_assert:     RosterPanel.readiness_text
+#   exact_error/observed:     "node property not found: RosterPanel.readiness_text"
+#                             (the surface was not yet published by the pre-fix script)
+#   green_asserts_before_red: 3 (f130 has 3 asserts before the readiness_text line)
+name: huashan_readiness_warning
+description: >-
+  The Huashan readiness warning (R3 D4). A creation-fresh profile shows the weak
+  verdict on RosterPanel.readiness_text; after cultivation via the seeded month
+  loop the verdict STRING differs (differential, never a power literal). Every
+  touched frame: UiOcclusionWatch clean.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh CULTIVATION save ─────────────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (fresh profile, month 1) ─────────────────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+    RosterPanel.readiness_text: readiness_text != ""
+    RosterPanel.readiness_text: readiness_text == "华山评估：战备不足"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── CULTIVATE via the seeded month loop (work months grow mastery) ───────────
+# Drive a few real months so the profile's mastery_points grow and the verdict
+# STRING changes. CARD_PICK -> ACTION_PICK -> 做工 (focus 2) -> apply.
+- at: 140
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 160
+  actions:
+  - move_down  # focus: 练功(0) -> 修习(1)
+- at: 165
+  actions:
+  - move_down  # focus 1 -> 做工(2)
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.option_focus: option_focus == 2
+- at: 180
+  actions:
+  - ui_accept  # apply work
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 2
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── PRACTICE a few months to grow mastery (the verdict-driving axis) ─────────
+- at: 220
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 240
+  actions:
+  - move_up  # focus 2 -> 1
+- at: 245
+  actions:
+  - move_up  # focus 1 -> 0 (练功)
+- at: 260
+  actions:
+  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+- at: 280
+  actions:
+  - ui_accept  # GONGFA_PICK focus 0 -> apply practice
+- at: 300
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 3
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── VERDICT DIFFERENTIAL: after growth the readiness_text STRING differs ─────
+# The fresh profile was 战备不足; after a few months of work + practice the
+# mastery_points grew, so the verdict string must have changed (differential on
+# the STRING, never a power literal).
+- at: 320
+  actions: []
+  assert:
+    RosterPanel.readiness_text: readiness_text != "华山评估：战备不足"
+    RosterPanel.readiness_text: readiness_text != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

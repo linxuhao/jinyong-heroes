@@ -585,6 +585,10 @@ const EN: Dictionary = {
 	"第 %d 年 %d 月": "Year %d, Month %d",
 	"装上": "Equip",
 	"卸下": "Unequip",
+	"华山评估：%s": "Huashan readiness: %s",
+	"战备不足": "Underprepared",
+	"势均力敌": "Even match",
+	"胜券在握": "Strong",
 }
 
 

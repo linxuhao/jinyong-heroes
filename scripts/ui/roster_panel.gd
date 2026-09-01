@@ -38,6 +38,12 @@ const _ATTR_LABELS := {
 
 var is_open: bool = false
 var body_text: String = ""
+## Huashan readiness verdict line (R3 D4). Recomputed each refresh() from the
+## LIVE profile via BattleSetup.readiness — the same math the duel uses, so the
+## warning can never drift from the actual fight numbers. Rendered as a 华山评估
+## line in _compose_character. Empty string when the profile is not yet ready to
+## judge (defensive; the panel never crashes on a null profile).
+var readiness_text: String = ""
 var cursor_markers_visible: bool = false   # recomputed each refresh: "▶" in body_text
 var pressed_connected: Dictionary = {}
 var item_count: int = 0
@@ -99,6 +105,7 @@ func close() -> void:
 ## refresh reads SaveManager.profile afresh.
 func refresh() -> void:
 	var p: PlayerProfile = SaveManager.profile
+	readiness_text = _compose_readiness(p)
 	body_text = _compose_body(p)
 	cursor_markers_visible = body_text.contains("▶")
 	item_count = p.inventory.size()
@@ -174,7 +181,29 @@ func _compose_character(p: PlayerProfile) -> String:
 	var month: int = int(p.cultivation.get("month", 1))
 	lines.append(tr("第 %d 年 %d 月") % [year, month])
 	lines.append("%s %s" % [tr("门派"), _sect_text(p)])
+	# Huashan readiness warning (R3 D4): visible on the roster panel on BOTH the
+	# map and cultivation segments (the panel is instanced into both scenes), so
+	# the warning exists for the ~30 months BEFORE the map opens.
+	if readiness_text != "":
+		lines.append(readiness_text)
 	return "\n".join(lines)
+
+
+## Compose the 华山评估 readiness line from the LIVE profile via
+## BattleSetup.readiness (one formula source with the duel). Returns "" when the
+## profile is null (defensive — the panel never crashes on a null profile).
+func _compose_readiness(p: PlayerProfile) -> String:
+	if p == null:
+		return ""
+	var verdict: Dictionary = BattleSetup.readiness(p)
+	var key: String = str(verdict.get("verdict_key", "huashan_weak"))
+	var wording: String = tr("华山评估：%s")
+	var band: String = tr("战备不足")
+	if key == "huashan_even":
+		band = tr("势均力敌")
+	elif key == "huashan_strong":
+		band = tr("胜券在握")
+	return wording % band
 
 
 func _compose_gongfa(p: PlayerProfile) -> String:

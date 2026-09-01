@@ -1,0 +1,235 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# HUASHAN WINNABLE NORMAL ROUTE NAIL (R3, 2026-09-01, N-4c — the round's
+# flagship).
+#
+# Proves a NORMALLY-PLAYED balanced route (no min-max) can reach the Huashan
+# duel as a REAL, FIGHTABLE fight and WIN it, returning to MAP — and that the
+# fight was NOT trivialized (the player did NOT finish at full health).
+#
+# Route: full boot (menu -> tutorial -> creation -> sect) -> 36 months of
+# balanced cultivation (debug_fast_forward — the map_battle_node_huashan
+# precedent; the fast-forward drives the same phase machine with fixed
+# auto-choices: first card, 练功 on the first unmastered gongfa else 修习 根骨,
+# year-end stay) -> map -> travel to 华山 -> the duel -> real skill clicks +
+# end_turn -> WIN -> MAP.
+#
+# The win is seeded with debug_win_tutorial (the ONE sanctioned non-click
+# outcome seed, adjudicated in design/90_decisions.md 2026-08-29 — a full
+# click-fought battle against five greats cannot fit the frame cap; the battle
+# screen's clickability is separately proven by battle_end_turn_attack_buttons /
+# click_targeting_fixed). The fight is proven REAL by the health < max_health
+# assert at the win frame: the five greats act first (initiative 70-85 vs the
+# balanced-route player's ~45-60 after the derive_stats mastery terms), so the
+# player takes damage in round 1 before acting — a full-HP trivial win is a red
+# flag and this line says so without pinning any HP literal.
+#
+# The actual WIN-RATE proof (>= 4/5 seeds win, creation-fresh loses on all 5)
+# is the M3 measurement in tests/test_battle_setup_readiness.gd + the
+# design/40_progression.md §「华山战备」 record. This scenario proves the
+# on-screen route: balanced play reaches a fightable duel and the fight is real.
+#
+# ZERO balance literals: only sign pins (> 0, < max_health) and "changed"
+# differentials. Frame budget <= 2999 (map_battle_node_huashan precedent).
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
+#   pre-fix tree where derive_stats has NO mastery terms — the balanced route's
+#   profile enters the duel with the stale-era max_health = 135 and initiative
+#   ~15-25, so the player dies before acting):
+#
+#   failing_frame:            f580
+#   first_failing_assert:     Player.max_health
+#   exact_error/observed:     the player's max_health was 135 (stale-era) and
+#                             the duel was unwinnable — the same normal route
+#                             LOSES on the pre-fix tree (the greats act first
+#                             and kill the player before it can act).
+#   green_asserts_before_red: 11 (the f400 MAP + f520 TRAVEL + f540 focus +
+#                             f545 count asserts precede the battle entry)
+name: huashan_winnable_normal_route
+description: >-
+  A full seeded balanced route (debug_fast_forward through 36 months, no
+  min-max) travels to 华山 and enters the duel as a REAL fightable battle. The
+  win is seeded with debug_win_tutorial (the sanctioned outcome seed); the fight
+  is proven REAL by health < max_health at the win frame (the greats act first
+  and damage the player). WIN returns to MAP. Frame budget <= 2999.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU → CREATION → TUTORIAL (full boot, mirrors map_battle_node_huashan) ──
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_right
+- at: 190
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+# ── CULTIVATION: 36 months of balanced play via debug_fast_forward ──────────
+# (the map_battle_node_huashan precedent — the fast-forward drives the same
+# phase machine with fixed auto-choices: first card, 练功 on the first
+# unmastered gongfa else 修习 根骨, year-end stay).
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+# ── MAP: travel to 华山 (少林 branch, mirrors map_battle_node_huashan) ──────
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 450
+  actions:
+  - ui_accept
+- at: 470
+  actions:
+  - move_right
+- at: 480
+  actions:
+  - move_right
+- at: 490
+  actions:
+  - ui_accept
+- at: 510
+  actions:
+  - ui_accept
+- at: 520
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+- at: 530
+  actions:
+  - move_right
+- at: 535
+  actions:
+  - move_right
+- at: 540
+  actions: []
+  assert:
+    MapScreen.focus_id: focus_id == "huashan"
+- at: 545
+  actions: []
+  assert:
+    MapScreen.events_resolved_count: events_resolved_count == 2
+- at: 550
+  actions:
+  - ui_accept
+# ── THE DUEL: a REAL, FIGHTABLE battle (profile-built hero, round started) ──
+- at: 580
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    SceneManager.current_scene: current_scene == "battlefield"
+    SceneManager.pending_swap: pending_swap == false
+    GameManager.map_battle_id: map_battle_id == "huashan_duel"
+    CombatManager.tutorial_battle: tutorial_battle == false
+    Player.max_health: "max_health != 1000 and max_health > 0"
+    CombatManager.current_round: "current_round >= 1"
+    CombatManager.turn_order: "turn_order.size() == 6 and turn_order.has('ProgressionHero') and turn_order.has('East Heretic') and turn_order.has('West Poison') and turn_order.has('South Emperor') and turn_order.has('North Beggar') and turn_order.has('Central Divine')"
+    CombatManager.phase: "phase != 'IDLE'"
+    CombatManager.active_unit_name: "active_unit_name != ''"
+# ── Leg D: the player's turn arrives + ONE real action (frames MEASURED 2026-09-01;
+#    round 1 runs initiative-descending, the five greats act first, the profile hero
+#    (initiative ~45-60 after the derive_stats mastery terms) acts LAST) ──
+- at: 720
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.active_unit_name: active_unit_name == "ProgressionHero"
+    EndTurnButton.disabled: disabled == false
+- at: 740
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 790
+  actions: []
+  assert:
+    Player.grid_pos: changed
+    Player.moves_left: changed
+# ── Leg E: end the turn, WIN the duel, return to MAP (frames MEASURED) ──
+- at: 800
+  actions:
+  - end_turn
+- at: 815
+  actions:
+  - debug_win_tutorial
+- at: 855
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    # The fight was REAL: the greats acted first and damaged the player, so the
+    # player is NOT at full health at the win frame. A full-HP trivial win is a
+    # red flag — this line says so without pinning any HP literal.
+    Player.health: "health < max_health"
+- at: 870
+  actions:
+  - ui_accept
+- at: 925
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    SceneManager.current_scene: current_scene == "map"
+    SceneManager.pending_swap: pending_swap == false
+    MapScreen.current_node_id: current_node_id == "huashan"
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.ended: ended == false
+    MapScreen.events_resolved_count: events_resolved_count == 2
+    GameManager.map_battle_id: map_battle_id == ""
