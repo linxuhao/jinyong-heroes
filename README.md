@@ -65,12 +65,36 @@ art assets, zero i18n delta):**
 
 Constraints honored: the six `jinyong-huashan` files stay untouched;
 script-styled battle widgets (skill buttons, health bars, round indicator)
-override the theme and keep every protected numeric surface; `40_ux_backlog`
-UX-21/UX-22 stay OPEN pending the official frame verdict. The frame-pair
+override the theme and keep every protected numeric surface. The frame-pair
 evidence table, alpha rationale and locked-file ledger are in
-`final/delivery_notes_theme.md`. Note: the official compile / 79-scenario
-regression / vision / unit reports are downstream gate products and had not
-run when this section was written — see "Verification status (honest)".
+`final/delivery_notes_theme.md`.
+
+**Official gate results + review fix (2026-09-01):** the official gates ran
+after implementation — compile **98/98 zero errors**; playtest hard gate
+`passed: true`, zero runtime errors, **78/79 PASS** with all five protected
+gates green (`ui_geometry_readability` 38/38, `skill_button_visual_states`
+9/9, `portrait_grid_alignment` 30/30, `spine_to_ending` 42/42,
+`equipment_in_battle_diff` 47/47) and the new differential nail
+`theme_focus_marker_cultivation` **14/14** (its red-first four-values are
+MEASURED: RED 12/14 at f110 `observed=false`, greens-before-red 7); the
+vision gate **passed** non-blind (79 scenarios / 316 frames, all six
+questions `failed: false`, Q6 78 good / 1 bad — the single bad answer on a
+non-theme battle frame). The one red, `creation_layout_readability` **21/22**
+(f90 `creation_box_fits` observed `false` — the D6-predicted global Label
+12→14 / Button 15 growth overflowing the fixed creation rect), was **fixed**
+by the review-prescribed fallback (`fix_creation_label_size_regression`):
+exactly 14 per-node `theme_override_font_sizes/font_size = 12` pins in
+`creation.tscn` (13 TraitToggles + TraitDescLabel; zero geometry, text, node
+or theme changes — the hierarchy is not shrunk globally), measured red-first
+**21/22 FAIL** → green **22/22** (same-frame pair: frame 90
+`creation_box_fits` false→true), then a full **79/79 PASS** re-run with zero
+runtime errors (`delivery_notes_theme.md` §7). Archive landed by 5_design
+from the gate artifacts: `40_ux_backlog` UX-22 → **CLOSED(jinyong-theme)**,
+UX-21 updated with its honest residual (`map.gd` locked + `creation.gd`
+Control rows), new **UX-31** tracks the regression and its fix;
+`99_changelog.md` carries exactly one appended jinyong-theme row. The
+post-fix official gate re-run (compile / playtest / vision / unit) is a
+downstream step product — see "Verification status (honest)".
 
 ## Round: jinyong-huashan — the Mount Hua summit duel is a real, fightable battle (previous round)
 
@@ -992,7 +1016,9 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 ## Verification status (honest)
 
 **jinyong-theme (this round, 2026-09-01) — implementation verified by direct
-read; recorded self-runs green; official downstream gates not yet run:**
+read; the official PRE-fix gates landed (archived by 5_design) and the review
+blocker (`creation_layout_readability` 21/22) is FIXED with measured
+evidence; post-fix OFFICIAL gate artifacts pending:**
 
 - **Landed and verified in the tree (verifier direct read):** the rewritten
   theme (`load_steps=8`; Button 4 states + focus ring + 5 font colors; opaque
@@ -1006,19 +1032,33 @@ read; recorded self-runs green; official downstream gates not yet run:**
   scenario; the MEASURED red-first four-values (f110 /
   `focus_marker_active == true` / `observed=false` / greens-before-red 7,
   second red f140, total FAIL 12/14; green 14/14 + 16/16 + 42/42 after
-  byte-exact restore); the UX-21/UX-22 record-only note in
-  `design/40_ux_backlog.md` (:101) without status changes; zero
+  byte-exact restore); the design-doc archive landed by 5_design from the gate
+  artifacts (`40_ux_backlog`: UX-22 → CLOSED(jinyong-theme), UX-21 updated
+  with its honest residual, UX-31 opened; the single `99_changelog.md`
+  jinyong-theme row; `32_theme.md` / `90_decisions.md` / `00_roadmap.md`
+  phase-4 numbers / `30_presentation.md` theme section); zero
   "TEMPORARY RED-FIRST REVERT" hits in scripts/ or scenes/.
-- **Not yet verifiable at this step (do not count as met):** the official
-  compile / 79-scenario regression / vision / unit-suite reports
-  (`compile_report.json` / `playtest_summary.md` / `vision_report.json` /
-  `test_report.json`) are downstream step products that did not exist at
-  verification time; the per-frame readability verdict on fA/s4_frame_0052,
-  fA/s2_frame_0158 and fB/s2_frame_0210 belongs to 5_vision (or the accepted
-  human frame-review fallback); locked-file byte-identity awaits the official
-  5_review repo diff; the `design/99_changelog.md` row and
-  `design/00_roadmap.md` phase-4 numbers belong to 5_design from gate
-  artifacts. Full detail in `final/verify_report.json`.
+- **Official PRE-fix gate results (recorded in the design docs by 5_design
+  from the landed gate products):** compile 98/98 zero errors; playtest hard
+  gate `passed: true`, zero runtime errors, 78/79 (all five protected gates
+  green; `theme_focus_marker_cultivation` 14/14); vision gate passed
+  non-blind (79 scenarios / 316 frames, six questions `failed: false`, Q6
+  78 good / 1 bad on a non-theme battle frame). The single red
+  (`creation_layout_readability` 21/22, UX-31) is fixed in the tree with
+  measured red-first (21/22 FAIL) + green (22/22) + a full 79/79 sidecar
+  re-run with zero runtime errors (`delivery_notes_theme.md` §7).
+- **Still pending downstream (do not count as met):** the OFFICIAL post-fix
+  gate artifacts (`compile_report.json` / `playtest_summary.md` /
+  `vision_report.json` / `test_report.json` from 5_compile / 5_vision /
+  5_test) do not exist at verification time — the 79/79 zero-regression on
+  the final tree rests on the repair task's measured sidecar runs until the
+  official gate re-runs; the post-fix vision Q6 re-check was NOT executed
+  (§7.5: endpoint unreachable — honest record); the per-frame readability
+  verdict on fA/s4_frame_0052, fA/s2_frame_0158 and fB/s2_frame_0210 belongs
+  to 5_vision (or the accepted human frame-review fallback); locked-file
+  byte-identity awaits the official 5_review repo diff; UX-31's final
+  disposition and the post-fix archive row belong to 5_design. Full detail
+  in `final/verify_report.json`.
 
 **jinyong-huashan (this round, 2026-09-01) — implementation verified by direct
 read; rewritten gate self-run green; official downstream gates not yet run:**
