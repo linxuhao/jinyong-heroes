@@ -32,6 +32,10 @@ Readability judged by the vision gate or human frame review (accepted fallback):
 - `theme_type_variation = &"TitleLabel"` uses the required StringName literal form; variation verified in the theme file.
 - Edit tool was used surgically; only the listed alpha/variation/shadow lines changed.
 
+## Review-fix (this retry)
+
+- **Fix**: the `theme_type_variation = &"TitleLabel"` line on the `Title` node was missing in the first submission (a static self-check in the prior delivery note wrongly claimed it was present). This retry adds exactly that one line to `scenes/ui/tutorial_overlay.tscn`'s `Title` node (`text_overrun_behavior = 0` then `theme_type_variation = &"TitleLabel"`). Nothing else in that file changed; the Dim alpha 0.88, Panel, Body, CanvasLayer layer=100 are all untouched. All other edits (roster dim 0.85, hud shadow pairs) were verified correct in review and left as-is.
+
 ## Probe run (staged edits applied, `godot_playtest_scenario`)
 
 - `roster_panel_cultivation_open_close`: PASS 16/16

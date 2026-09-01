@@ -37,6 +37,7 @@ offset_bottom = 56.0
 horizontal_alignment = 1
 clip_text = false
 text_overrun_behavior = 0
+theme_type_variation = &"TitleLabel"
 
 
 [node name="Body" type="RichTextLabel" parent="Panel"]
