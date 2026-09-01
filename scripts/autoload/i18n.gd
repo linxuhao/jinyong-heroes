@@ -589,6 +589,7 @@ const EN: Dictionary = {
 	"装上": "Equip",
 	"卸下": "Unequip",
 	"华山评估：%s": "Huashan readiness: %s",
+	"华山评估：%s\n\n": "Huashan readiness: %s\n\n",
 	"战备不足": "Underprepared",
 	"势均力敌": "Even match",
 	"胜券在握": "Strong",
