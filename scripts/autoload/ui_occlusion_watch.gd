@@ -170,9 +170,15 @@ func _draws_over(b: Control, l: Control) -> bool:
 	# find(lca)+1 would read one past the array end — guard it: there is no
 	# meaningful draw-order comparison across unrelated subtrees, so the pair
 	# is out of scope (never red).
-	var bi: int = bp.find(lca) + 1
-	var li: int = lp.find(lca) + 1
-	if bi >= bp.size() or li >= lp.size():
+	# _chain() orders nodes node->root (index 0 = the control itself, last =
+	# the tree root). The branch child DIRECTLY BENEATH lca on each side is
+	# therefore the element just BELOW lca in the chain: index find(lca) - 1
+	# (find(lca) + 1 would be lca's PARENT — the pre-crash-proof build used +1
+	# and never produced a branch child, so _draws_over always returned false
+	# and the gate was vacuous; fixed 2026-09-01, see delivery notes §8).
+	var bi: int = bp.find(lca) - 1
+	var li: int = lp.find(lca) - 1
+	if bi < 0 or li < 0 or bi >= bp.size() or li >= lp.size():
 		return false
 	var b_branch: Node = bp[bi]
 	var l_branch: Node = lp[li]
