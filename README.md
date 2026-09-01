@@ -17,7 +17,93 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-shrimpcopy2 — every person in the 36 journey events is now a shrimp (2026-08-31)
+## Latest round: jinyong-huashan — the Mount Hua summit duel is a real, fightable battle (2026-09-01)
+
+Until this round the payoff was broken. 华山's battle slot (`status: "active"`,
+`battle_id: "huashan_duel"`, `scripts/data/map_data.gd:49`) was reachable, but
+the battle it started fell through to the hard-coded **tutorial** Yang Guo
+fight and never began — measured frame-by-frame on 2026-08-31:
+`CombatManager.phase == "IDLE"`, `current_round == 0`, `turn_order == []`,
+`EndTurnButton` disabled forever, `tutorial_battle == true`, player
+`health == 1000`, and the tutorial intro overlay replayed. Root cause: one
+variable (`battle_return_state`) carried both *who builds the player
+character* and *where WON/LOST routes*, and only the CULTIVATION value built a
+profile character.
+
+**Decoupling (this round's architectural fix):** `GameManager.map_battle_id`
+is a new build-source signal — non-empty means a MAP battle that profile-builds
+via `BattleSetup.build_character(SaveManager.profile)` and resolves its
+opponent roster from the id; `battle_return_state` now decides ONLY the return
+target. Lifecycle is write-at-entry + clear-at-route: every route into a
+battlefield `_ready()` writes the field (`start_map_battle(bid)` writes the id
+before `battle_started`/`state_changed` fire; `start_battle()` /
+`start_encounter()` / `restart_game()` write `""`), `request_continue()` /
+`request_retry()` clear it, and `clear_battle()` deliberately does NOT touch it
+(it runs mid-swap on every scene change — a clear there would sit exactly
+between the entry write and the battlefield's read and re-create the defect).
+
+**The battle itself:**
+
+- New `scripts/data/map_battle_data.gd` (`MapBattleData`): `huashan_duel` →
+  the five greats (`East Heretic`, `West Poison`, `South Emperor`,
+  `North Beggar`, `Central Divine`), composed entirely from the existing
+  character/AI data — no new assets, no new combat system. Its OWN `POSITIONS`
+  table is used for spawns (never the tutorial's frozen positions/ai_map
+  dicts); unknown bindings read inert (fail-safe, never a crash).
+- `scripts/battlefield.gd` grows a branch NEXT TO the CULTIVATION branch (the
+  tutorial fallthrough stays byte-identical): `_setup_map_battle(bid)` is a
+  **sibling** of the pinned `_setup_encounter_battle` (never a rewrite) —
+  guards → `tutorial_battle = false` → `release_stale_units()` → profile build
+  → `_instantiate_map_enemies` (own ai_map preloads) → synchronous HUD wire
+  with deferred fallback → `begin_battle.call_deferred()` — so round 1
+  actually starts.
+- `scripts/segments/map.gd` passes the consumed id through:
+  `MapData.active_battle_id("huashan")` → roster guard (an unresolvable
+  binding is inert: push_warning, the map stays playable) →
+  `GameManager.start_map_battle(bid)`.
+- `events_resolved_count` survives the duel: a
+  `GameManager.map_events_resolved_count` session mirror (seeded in
+  `MapScreen._ready()`, written through on every resolve, reset on
+  `SaveManager.profile_created` — a new signal — and `SaveManager.loaded`).
+
+**Gate rewrite (the one sanctioned yaml change):**
+`playtest/map_battle_node_huashan.yaml` now gates **"can fight"**, not
+"loaded": same `name:` / scenario slot (the 78-scenario registry count is
+unchanged), all 7 pre-existing assertions kept verbatim, plus
+`map_battle_id == "huashan_duel"`, `tutorial_battle == false`, profile-derived
+HP (`max_health != 1000 and max_health > 0`), `current_round >= 1`,
+`turn_order.size() == 6` (hero + five greats), `phase != "IDLE"`,
+`active_unit_name != ""`, the player's turn with `EndTurnButton.disabled ==
+false`, a click-move differential (`grid_pos` / `moves_left` changed), and
+BOTH a win and a loss returning to MAP with `events_resolved_count` intact and
+the binding cleared. The 19-row line-by-line change table with per-row
+rationale is in `final/delivery_notes_huashan.md` §2. Measured on the
+delivered tree (2026-09-01, delivery notes §3/§4c): profile hero
+`max_health = 135` (the §D3 roster fallback was NOT applied — the five-great
+roster stays), and a self-run of the rewritten gate **41/41 PASS**.
+
+**Contract & tests (append-only elsewhere):** `playtest/_common.yaml` gains
+exactly two GameManager surface entries (`map_battle_id`,
+`map_events_resolved_count`); new `tests/test_map_battle_data.gd` (roster +
+position invariants), `tests/test_map_battle_entry.gd` (a real `SceneManager`
+swap pin: the id survives the mid-swap `clear_battle()`, the player is
+`ProgressionHero` — not Yang Guo — and round 1 opens with a 6-unit turn
+order), and `tests/test_map_battle_gate_pins.py` (an anti-weakening text door
+over the five load-bearing gate literals). The tutorial battle and the
+cultivation encounter path (`equipment_in_battle_diff`) change by not one
+byte.
+
+**Pending downstream (honest, see `final/verify_report.json`):** the official
+compile / 78-scenario regression / vision / unit-suite reports are produced by
+the steps after final verification and were not yet available; the five
+design-doc updates (20_content stale-line fix, 90_decisions decoupling ruling,
+99_changelog one-line append, 00_roadmap completeness table, 40_ux_backlog
+record-only findings) are not yet in the tree; and the yaml-gate / unit-pin
+pre-fix red-first four-values in `final/delivery_notes_huashan.md` §4a/§4b are
+still harness-backfill placeholders. None of these may be counted as met until
+their artifacts exist.
+
+## Round: jinyong-shrimpcopy2 — every person in the 36 journey events is now a shrimp (previous round)
 
 The 2026-08-28 ruling 「一切角色都是虾」 finally has its answer (owner ruling,
 2026-08-31), and the text a player reads most often — the 36 travel events —
@@ -692,6 +778,20 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Key interfaces
 
+- **Map-battle entry & decoupling** (jinyong-huashan round):
+  `GameManager.map_battle_id` (`get_map_battle_id()` / `set_map_battle_id()`) —
+  the build-source signal, decoupled from `battle_return_state` (which is now
+  the return target only); `GameManager.start_map_battle(battle_id)` writes the
+  id before any swap fires; `MapBattleData.roster_ids(battle_id)` /
+  `MapBattleData.position_for(battle_id, name_key)` resolve the opponent roster
+  and spawn tiles (`huashan_duel` → the five greats); `battlefield.
+  _setup_map_battle(bid)` is the profile-build sibling of
+  `_setup_encounter_battle` (guards → `tutorial_battle = false` →
+  `BattleSetup.build_character(SaveManager.profile)` → own-ai_map enemies →
+  sync HUD wire → deferred `begin_battle`); `GameManager.
+  map_events_resolved_count` mirrors MapScreen's session counter across the
+  battle swap (reset on `SaveManager.profile_created` / `loaded`); playtest
+  surface additions `map_battle_id` / `map_events_resolved_count`.
 - **Touch-single-surface controls & observables** (2026-08-30 round): buttons
   are the sole option surface in cultivation / map / sect_select — selection is
   the button's own `modulate` (bright focused / dim rest), arrow keys move the
@@ -820,6 +920,37 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   guards the §433 copy-location rule.
 
 ## Verification status (honest)
+
+**jinyong-huashan (this round, 2026-09-01) — implementation verified by direct
+read; rewritten gate self-run green; official downstream gates not yet run:**
+
+- **Landed and verified in the tree (verifier direct read):** the
+  build-source/return-target decoupling (`map_battle_id` write-at-entry at all
+  four battlefield `_ready()` routes — `start_map_battle(bid)`, `start_battle`,
+  `start_encounter`, `restart_game` — clear-at-route in
+  `request_continue`/`request_retry`, `clear_battle()` untouched);
+  `MapBattleData` (five-great roster from existing data, own positions,
+  fail-safe unknown binding); `_setup_map_battle` + `_instantiate_map_enemies`
+  (profile build via `BattleSetup.build_character(SaveManager.profile)`,
+  `tutorial_battle = false`, sync HUD wire with deferred fallback, deferred
+  `begin_battle` kick — the pinned `_setup_encounter_battle` and the tutorial
+  path untouched); `map.gd` roster guard + id pass-through +
+  `events_resolved_count` mirror (with `SaveManager.profile_created` reset);
+  the rewritten `map_battle_node_huashan.yaml` (all 7 old assertions kept
+  verbatim + the "can fight" assertions); `_common.yaml` two-surface append;
+  three new test files; the 19-row line-by-line gate-change table in
+  `final/delivery_notes_huashan.md` §2. Measured (2026-09-01, delivery notes
+  §3/§4c): profile hero `max_health = 135`; rewritten gate self-run **41/41
+  PASS**; §D3 roster fallback NOT applied (five greats kept).
+- **Not yet verifiable at this step (do not count as met):** the official
+  compile / 78-scenario regression / vision / unit-suite reports are downstream
+  step products (`compile_report.json` / `playtest_summary.md` /
+  `vision_report.json` / `test_report.json`) that did not exist at verification
+  time; the five design-doc updates (20_content / 90_decisions / 99_changelog /
+  00_roadmap / 40_ux_backlog) are not in the tree; and the yaml-gate /
+  unit-pin pre-fix red-first four-values are still harness-backfill
+  placeholders (`final/delivery_notes_huashan.md` §4a/§4b). Full detail in
+  `final/verify_report.json` issues.
 
 **jinyong-roster (this round, 2026-08-30; blockers fixed + both red-firsts
 measured 2026-08-31) — delivery verified by direct read; both new scenarios
