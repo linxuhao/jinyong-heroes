@@ -95,13 +95,16 @@ byte.
 
 **Pending downstream (honest, see `final/verify_report.json`):** the official
 compile / 78-scenario regression / vision / unit-suite reports are produced by
-the steps after final verification and were not yet available; the five
+the steps after final verification and were not yet available; and the five
 design-doc updates (20_content stale-line fix, 90_decisions decoupling ruling,
 99_changelog one-line append, 00_roadmap completeness table, 40_ux_backlog
-record-only findings) are not yet in the tree; and the yaml-gate / unit-pin
-pre-fix red-first four-values in `final/delivery_notes_huashan.md` §4a/§4b are
-still harness-backfill placeholders. None of these may be counted as met until
-their artifacts exist.
+record-only findings) are not yet in the tree. The yaml-gate / unit-pin
+pre-fix red-first four-values are now MEASURED (2026-09-01, full records
+`final/_red_first_4a.md` / `final/_red_first_4b.md`; delivery notes §4a/§4b:
+yaml gate red at f580 `map_battle_id == "huashan_duel"` observed="" with 11
+green asserts before red; unit-pin counterpart red under a temporary
+`clear_battle()`-owned revert, restored byte-exact). None of the pending items
+may be counted as met until their artifacts exist.
 
 ## Round: jinyong-shrimpcopy2 — every person in the 36 journey events is now a shrimp (previous round)
 
@@ -947,10 +950,10 @@ read; rewritten gate self-run green; official downstream gates not yet run:**
   step products (`compile_report.json` / `playtest_summary.md` /
   `vision_report.json` / `test_report.json`) that did not exist at verification
   time; the five design-doc updates (20_content / 90_decisions / 99_changelog /
-  00_roadmap / 40_ux_backlog) are not in the tree; and the yaml-gate /
-  unit-pin pre-fix red-first four-values are still harness-backfill
-  placeholders (`final/delivery_notes_huashan.md` §4a/§4b). Full detail in
-  `final/verify_report.json` issues.
+  00_roadmap / 40_ux_backlog) are not in the tree. The yaml-gate / unit-pin
+  pre-fix red-first four-values are MEASURED (2026-09-01,
+  `final/_red_first_4a.md` / `final/_red_first_4b.md`; delivery notes
+  §4a/§4b). Full detail in `final/verify_report.json` issues.
 
 **jinyong-roster (this round, 2026-08-30; blockers fixed + both red-firsts
 measured 2026-08-31) — delivery verified by direct read; both new scenarios
