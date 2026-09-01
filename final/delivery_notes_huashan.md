@@ -75,38 +75,86 @@ and the measurement harness executes it; measured values are recorded/backfilled
 
 ### 4a. Yaml-gate pre-fix red (rewritten yaml landed, code fix absent)
 
-Protocol: land the rewritten yaml FIRST with the §5 code fix absent (every reverted code line
-marked `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` and kept out of the build), then run
-`godot_playtest_scenario(scenario="map_battle_node_huashan")` directly against the sidecar.
+MEASURED 2026-09-01 (full record: `final/_red_first_4a.md`). Revert combination: ONE line —
+`map_battle_id = battle_id` in `start_map_battle()` commented out with the
+`# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` marker (the battlefield `_ready()` branch did not
+need a second revert; single-revert isolation — no §4b revert active during this run). Run via
+`godot_playtest_scenario(scenario="map_battle_node_huashan")` against the sidecar
+(`staged_files_applied: ["scripts/autoload/game_manager.gd"]`): `[FAIL] 11/41`.
 
-Four values to record (slot → harness-backfilled):
-- **Failing frame:** ⟨harness-backfill⟩
-- **First failing assertion:** ⟨harness-backfill — expected one of f580 `map_battle_id == "huashan_duel"` (field absent) or `tutorial_battle == false` (reads true); whichever fires first is the MEASURED value, not this expectation⟩
-- **Exact error string:** ⟨harness-backfill⟩
-- **Green asserts before red:** ⟨harness-backfill⟩
+Four values (all measured, not predicted):
+- **Failing frame:** `f580`
+- **First failing assertion:** `GameManager.map_battle_id: map_battle_id == "huashan_duel"`
+  (the id assert fires first; `tutorial_battle == false` observed=true is the second failing
+  assertion at the same frame)
+- **Exact error string (character-for-character):**
+  `FAIL f580 GameManager.map_battle_id: map_battle_id == "huashan_duel"` / `observed=""`
+- **Green asserts before red:** 11 (sidecar `ok: 11, total: 41`; all 11 precede the first failure)
 
-This run also records the pre-fix red of Leg C's `map_battle_id == "huashan_duel"` (the
-end-to-end guarantee for the real-swap property).
+The same red run observed the full pre-fix defect chain downstream (verbatim `observed=`):
+`tutorial_battle == true`, `Player.max_health == 1000`, `current_round == 0`, `turn_order == []`,
+`phase == "IDLE"`, `active_unit_name == ""`, `EndTurnButton.disabled == true`, and every WIN/LOST
+MAP-return assert red (`node not found: MapScreen` at f925/f985/f1165) — including Leg C's
+`map_battle_id == "huashan_duel"` pre-fix red, the end-to-end guarantee for the real-swap property.
+The reverted line was restored byte-exact after the run (line 215 re-read = original).
 
 ### 4b. Real-swap unit-pin pre-fix red (`tests/test_map_battle_entry.gd`)
 
-Protocol: temporarily re-introduce the round-1 `clear_battle()`-owned lifecycle (one-line revert:
-clear `map_battle_id` inside `clear_battle()`), run `tests/test_map_battle_entry.gd` through the
-unit-suite harness, record, then restore. The pin must be RED under the old ownership and GREEN
-only after the write-at-entry lifecycle is restored.
+MEASURED 2026-09-01 (full record: `final/_red_first_4b.md`). Revert: ONE line inserted as the
+first line of `GameManager.clear_battle()` — `map_battle_id = ""  # TEMPORARY RED-FIRST REVERT —
+DO NOT COMMIT` (the rejected round-1 lifecycle); restored byte-exact after the run.
 
-Four values to record (slot → harness-backfilled):
-- **Failing assertion / which leg:** ⟨harness-backfill — expected the profile-build assertions
-  (Leg 1) failing through the tutorial fallthrough⟩
-- **Exact error message:** ⟨harness-backfill⟩
-- **Which leg red:** ⟨harness-backfill⟩
-- **Green asserts before red:** ⟨harness-backfill⟩
+Measurement instrument note (honest): the intended invocation `godot --headless -s
+tests/test_map_battle_entry.gd` is **未执行** in this loop — the implementer has no shell, and the
+only executable sidecar instrument here (`godot_playtest_scenario`) drives playtest scenarios, not
+SceneTree unit scripts. Instead of leaving a placeholder or inventing a unit-harness value, the
+IDENTICAL revert was measured end-to-end through the sidecar on the production entry point:
+`godot_playtest_scenario(scenario="map_battle_node_huashan")` with the clear_battle revert live
+returned `[FAIL] 11/41`, first failing assertion — the exact property `test_map_battle_entry.gd`
+Leg 1 :187 guards:
+
+- **Failing assertion:** `GameManager.map_battle_id: map_battle_id == "huashan_duel"`
+  (unit-pin counterpart: Leg 1 :187)
+- **Exact error message:** `observed=""` — the id does NOT survive the mid-swap `clear_battle()`
+  under the round-1 lifecycle
+- **Which leg red:** Leg C f580 (the gate's end-to-end counterpart of unit Leg 1's real-
+  SceneManager-swap crossing the mid-swap teardown); downstream profile-build asserts all red in
+  the same run (`tutorial_battle == true`, `max_health == 1000`, `current_round == 0`,
+  `turn_order == []`, `phase == "IDLE"`) — Leg 1's assertion chain goes red through exactly the
+  tutorial fallthrough
+- **Green checks before red:** 11 (sidecar `ok: 11, total: 41`, all preceding the first failure)
 
 ### 4c. Post-fix green (this run, measured)
 
 - `godot_playtest_scenario(scenario="map_battle_node_huashan")` → **41/41 PASS** (hard gate
   passed: True).
 - Measured profile hero `max_health = 135` → §D3 fallback NOT applied (five greats kept).
+
+### 4d. Two-runs statement (2026-09-01)
+
+The red-first run and the delivery run are **TWO SEPARATE RUNS**. Each measured set above
+(§4a and §4b) consists of exactly one **reverted-red run** (temporary `TEMPORARY RED-FIRST REVERT`
+lines active, measured through the sidecar on 2026-09-01) followed by one **restored-green run**
+(the same instrument, same day, after the reverted lines were restored byte-exact). No value was
+predicted and no value was measured across a shared run — the red evidence and the green evidence
+come from different executions by construction.
+
+### 4e. Post-restore full-suite green record (2026-09-01)
+
+After both reverts were restored byte-exact (zero `TEMPORARY RED-FIRST REVERT` markers — grep
+across scripts/ and tests/ returns nothing):
+
+| Check | Result |
+|---|---|
+| Post-restore sidecar probe (same instrument as the red runs) | `map_battle_node_huashan` **41/41**, `equipment_in_battle_diff` **47/47**, `spine_to_ending` **42/42** — all green, hard gate passed: True, zero runtime errors |
+| Full 78-scenario hard gate (5_compile consolidation of this round) | **78/78 PASS**, `passed: true`, 0 runtime errors, compile zero errors — `map_battle_node_huashan 41/41`, `equipment_in_battle_diff 47/47`, `spine_to_ending 42/42`, `clicks_only_storyline 47/47`, `cultivation_changes_combat 30/30`, `save_load_roundtrip 14/14`, `tutorial_win_routes_to_transition 8/8`, `tutorial_loss_restarts_tutorial 5/5`, `map_node_event_shaolin 32/32`, `click_move_to_tile 10/10` all green |
+| Unit suite (run_tests.sh, same consolidation) | green — includes `tests/test_map_battle_entry.gd` (Leg 1 real-swap pin green under the restored write-at-entry lifecycle) |
+| Revert-marker sweep | `TEMPORARY RED-FIRST REVERT` in scripts/ + tests/: **zero matches** |
+
+The restored `game_manager.gd` line regions were re-read and confirmed byte-identical to baseline
+(`start_map_battle()` :215 `map_battle_id = battle_id`; `clear_battle()` containing only
+`enemies_alive.clear()` / `_player = null` / overlay free). No yaml, no frozen surface, and no
+assertion text was touched at any point in this task.
 
 ## 5. Contract / regression notes
 
