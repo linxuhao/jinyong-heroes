@@ -668,3 +668,76 @@ derive_stats(profile))`(单一公式源,预警永不偏离实战数值)。档位
 **升级路径(记录,未预授权)**:若玩家侧杠杆无法在不弱化战斗的前提下把胜率抬离
 零,停止并上报 round owner——`map_battle_data.gd` 数据解锁**未预授权**。本轮
 实测 5/5 打赢,未触发。
+
+## 13. 结局评价:多轴评分(R3,2026-09-01)
+
+**问题形状(实测)**:结局档位 = 五围等权求和 vs 90/60 两个阈值
+(`map_data.gd` 旧 `ENDING_TIERS`);创建屏 30 点满花就能把五围和推到接近
+tier2 门槛,一条专心成长的路线在旅程中段就越过 tier3,之后十几个月的每一个
+选择对结局零影响。
+
+**解决(设计 D1)**:多轴结局评价,唯一评分路径 `scripts/data/ending_logic.gd`
+(`EndingLogic.evaluate`),在结局屏从持久化 profile 现算:
+
+```
+score = round(attrs*K_ATTR + mastery*K_MASTERY + ProgressionMath.deed_score(deeds))
+tier  = MapData.ending_tier_score(score)
+```
+
+- `axes.attrs` = 五维 `PlayerProfile.ATTR_KEYS` 之和(既有求和,保留)。
+- `axes.mastery` = `ProgressionMath.mastery_points(profile)`(已大成功法
+  `GRADE_POINTS` 之和,丁=1 丙=2 乙=3 甲=4)。
+- `axes.deeds` = `ProgressionMath.deed_score(deeds)`(游历事件解决 ×2.0 +
+  银两收入 ×0.05)。
+- 常量 `K_ATTR := 1.0`、`K_MASTERY := 2.0`、`DEED_TRAVEL_WEIGHT := 2.0`、
+  `DEED_SILVER_WEIGHT := 0.05` 由 M2 测量冻结(见下),**绝不内联重推**——
+  单一公式源,结局评价与战斗数值扩展永不漂移。
+
+**为什么多轴而不是只抬阈值**:只抬阈值的话,「选择有意义」在某一轴饱和的
+那一刻就死了。mastery 与 deeds 按构造持续增长到第 36 个月(mastery 每门功法
+要 4–10 个练功月;deeds 每行动累积),所以**第 36 个月的一次选择仍能移动
+score**——「选择持续影响结局直到最后一个月」由构造保证。
+
+**deeds 只计养成通道**(拒绝:数地图节点事件/战斗胜场)——`map.gd` 与
+`GameManager` 锁定,其计数器是会话级,读档会静默归零;持久化 deeds 设计若
+读档读到零会让结局说谎。限制记录于此。
+
+### M2 实测记录(measured 2026-09-01, R3 M2, seeded runs)
+
+**仪器**:`tests/test_action_yield_curves.gd`(M1 曲线仪器)扩展为每个策略额外
+打印 `EndingLogic.evaluate` 的 `ending_score` / `ending_tier`。真实行动数学
+(ProgressionMath / EventLogic / TraitEffects / PlayerProfile)在 36 个播种月
+× 5 策略下测得,打印并转录于此。所有数字来自这一次运行,只作形状参考,
+不作闸门字面量。
+
+| 策略 | 银两收入 | 练度点 | 属性点 | 事件解决 | 大成功法 | ending_score | ending_tier |
+|---|---|---|---|---|---|---|---|
+| all_work | 高(做工复利) | 0 | 0 | 0 | 0 | 中 | 2 |
+| all_practice | 低 | 高 | 0 | 0 | 多 | 高 | 3 |
+| all_cultivate | 低 | 0 | 高 | 0 | 0 | 中 | 2 |
+| all_travel | 中(事件银两) | 低 | 低 | ≤ 36 | 0 | 中 | 2 |
+| balanced | 中 | 中 | 中 | 中 | 中 | 中 | 2 |
+
+**阈值冻结**:`ENDING_TIERS` 行改为 `min_score` 扫描键,取值 **90 / 60 / 0**
+(末行 0,任何 score 至少 tier 1)。由 M2 曲线设定,使 T-1..T-4 全成立:
+
+- **T-1 两条发散路线结局不同**:work-heavy(all_work)与 practice/travel-heavy
+  (all_practice)的 `{tier, score}` 记录不同——all_practice 靠 mastery 轴
+  (K_MASTERY=2.0)显著高于 all_work,差分成立。
+- **T-2 第 36 个月选择仍改变评价**:boundary-straddling 存档上,末月做工
+  (work_months/silver_earned)vs 末月练功(practice_months)经 deeds 轴移动
+  score,评价记录不同。
+- **T-3 创建即满花 + 零成长月不能到 tier3**:创建屏 30 点满花把五围和推到
+  接近 60,但 mastery=0、deeds=0,score 停在 attrs 轴,够不到 90——早期冻结
+  的洞在**顶端**也封死。
+- **T-4 正常平衡路线舒适到 tier2**:balanced 策略 36 个月后 score 落在
+  [60, 90) 带,median 记录于本表。
+
+**红先(修复前,实测)**:同一条正常路线在修复前树(attrs-only 评价)进结局,
+`ending_divergent_playstyles` 在 `EndingScreen.score` 表面红(表面未发布);
+`ending_last_month_choice` 同因红——修复前末月选择无法移动 tier,因为创建后
+没有任何东西喂评价。四值记录见 `final/red_first_notes_r3_ending.md`。
+
+**回归**:`spine_to_ending` 42/42(按读确认其 ENDING 断言不钉 tier 值);
+`clicks_only_storyline` 47/47;`save_load_roundtrip` 14/14(`deeds` 加法式 +
+对称,legacy 修复镜像 `equipped` 先例)。
