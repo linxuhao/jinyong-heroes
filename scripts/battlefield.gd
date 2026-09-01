@@ -70,6 +70,17 @@ func _ready() -> void:
 		_setup_encounter_battle()
 		return
 
+	# Map-battle entry (jinyong-huashan): a battle whose build source is the
+	# consumed map battle id (GameManager.map_battle_id, set by
+	# start_map_battle at entry and cleared at route). Non-empty id ⇒ the
+	# profile-built hero + the MapBattleData roster; the tutorial fallthrough
+	# below is NEVER reached from a map battle. Write-at-entry means the id
+	# survives the mid-swap clear_battle() (which does not own this field).
+	var bid: String = GameManager.get_map_battle_id()
+	if bid != "":
+		_setup_map_battle(bid)
+		return
+
 	# 5. Create all skill data (referenced by character data).
 	var all_skills: Dictionary = _create_all_skill_data()
 
@@ -675,6 +686,135 @@ func _setup_encounter_battle() -> void:
 	# profile-null early return and any stray scene load can never reach the
 	# empty-round stall guard.
 	CombatManager.begin_battle.call_deferred()
+
+
+## Map-battle mode entry (GameManager.map_battle_id != "", set by
+## start_map_battle and cleared at WON/LOST routing): mirrors the encounter
+## tail EXACTLY in ordering (guards → tutorial_battle = false → stale-ref
+## cleanup → profile build → enemies → synchronous HUD wire with deferred
+## fallback → begin_battle.call_deferred). The encounter path itself is the
+## pinned green path (equipment_in_battle_diff) — this sibling shares its
+## behaviour without rewriting it. The opponent roster is resolved from the
+## battle id via MapBattleData (existing enemy/character data only).
+func _setup_map_battle(battle_id: String) -> void:
+	# Guard exactly like the encounter path: a stray scene load (null profile)
+	# or an unresolvable binding must push a warning and abort, never crash.
+	if SaveManager.profile == null:
+		push_warning("Battlefield: map battle '%s' requested without a profile — aborting map setup" % battle_id)
+		return
+	if MapBattleData.roster_ids(battle_id).is_empty():
+		push_warning("Battlefield: map battle '%s' has no resolvable roster — aborting map setup" % battle_id)
+		return
+
+	# Map battles never phase-lock / gate input: re-assert non-tutorial before
+	# anything else, so no tutorial intro overlay can start and the profile
+	# hero has all equipped-arts skills from round 1.
+	CombatManager.tutorial_battle = false
+
+	# Guarded stale-ref cleanup BEFORE registering the fresh units: a previous
+	# battle's freed nodes may still be registered here (set_player is
+	# first-call-wins — a stale _player would silently swallow this fresh one).
+	GameManager.release_stale_units()
+
+	# Player: derived from the live profile through the shared battle-setup
+	# path (stats, arts mirrored with mastered flags, traits copied, equipped
+	# gear bonuses). Spawn (7,5) comes from the shared _instantiate_player.
+	var player_cd = BattleSetup.build_character(SaveManager.profile)
+	var player_node: Node = _instantiate_player(player_cd)
+
+	# Opponents: roster resolved from the battle id via its OWN helper (NOT the
+	# tutorial positions dict / ai_map — the tutorial enemy layout is frozen).
+	var enemies: Array[Node] = _instantiate_map_enemies(battle_id, _create_all_character_data(_create_all_skill_data()))
+
+	# Wire the HUD SYNCHRONOUSLY with the same deferred fallback as the
+	# encounter path: HUD.setup() creates SkillButtons + bars BEFORE
+	# begin_battle's deferred flush below.
+	var wired: bool = _wire_hud(player_node, enemies)
+	if not wired:
+		_wire_hud.call_deferred(player_node, enemies)
+
+	# Kick off round 1 deferred AFTER the wiring (the ONLY kick — begin_battle
+	# self-guards: phase IDLE + live player + >=1 enemy, so a stray load can
+	# never trip the empty-round stall guard).
+	CombatManager.begin_battle.call_deferred()
+
+
+## Instantiate the map-battle opponents for a battle id. Per-enemy flow copied
+## from the tutorial's _instantiate_enemies pattern (instantiate → setup →
+## guarded field wires → reserve_tile → surface name BEFORE add_child →
+## register_enemy), but positions come ONLY from MapBattleData.position_for
+## and AI controllers resolve through THIS helper's own ai_map const — the
+## tutorial's positions/ai_map dictionaries are never read here. Node names
+## are the underscored form ("East_Heretic"); character_data.character_name
+## keeps the factory spelling with spaces ("East Heretic" — what turn_order
+## holds).
+func _instantiate_map_enemies(battle_id: String, all_data: Dictionary) -> Array[Node]:
+	var enemies: Array[Node] = []
+
+	# AI class name → script mapping, OWNED here (independent of the tutorial's
+	# ai_map; same five preloads).
+	var ai_map: Dictionary = {
+		"AIControllerEastHeretic":   preload("res://scripts/ai/ai_east_heretic.gd"),
+		"AIControllerWestPoison":    preload("res://scripts/ai/ai_west_poison.gd"),
+		"AIControllerSouthEmperor":  preload("res://scripts/ai/ai_south_emperor.gd"),
+		"AIControllerNorthBeggar":   preload("res://scripts/ai/ai_north_beggar.gd"),
+		"AIControllerCentralDivine": preload("res://scripts/ai/ai_central_divine.gd"),
+	}
+
+	var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
+
+	for name_key in MapBattleData.roster_ids(battle_id):
+		var data = all_data.get(name_key)
+		if data == null:
+			continue
+
+		var enemy: Node = enemy_scene.instantiate()
+		var grid_pos: Vector2i = MapBattleData.position_for(battle_id, name_key)
+
+		enemy.grid_pos = grid_pos
+		enemy.position = GridManager.grid_to_world(grid_pos)
+
+		# Create the AI controller instance from the unit's ai_class.
+		var ai_class_name: String = data.ai_class
+		var ai_controller = null
+		if ai_map.has(ai_class_name):
+			var ai_script: GDScript = ai_map[ai_class_name] as GDScript
+			if ai_script != null:
+				ai_controller = ai_script.new()
+
+		# Call setup with character data and AI controller.
+		enemy.setup(data, ai_controller)
+
+		# Wire the CharacterData fields onto the node (guarded with `in`
+		# checks, same as the tutorial / encounter flows).
+		if "initiative" in enemy:
+			enemy.initiative = data.initiative
+		if "energy" in enemy:
+			enemy.energy = data.energy
+		if "team" in enemy:
+			enemy.team = data.team
+		if "passive_id" in enemy:
+			enemy.passive_id = data.passive_id
+		if "traits" in enemy:
+			enemy.traits = data.traits
+
+		# Register tile occupancy.
+		GridManager.reserve_tile(grid_pos, enemy)
+
+		# Unique, surface-addressable node name for the playtest contract
+		# (e.g. "East Heretic" → "East_Heretic"). Set before add_child so
+		# the node enters the tree already named.
+		enemy.name = data.character_name.replace(" ", "_")
+
+		# Add to scene tree.
+		_characters_container.add_child(enemy)
+
+		# Register with GameManager.
+		GameManager.register_enemy(enemy)
+
+		enemies.append(enemy)
+
+	return enemies
 
 
 ## Instantiate the sparring partner (EncounterData.sparring_partner) at its
