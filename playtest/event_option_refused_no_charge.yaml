@@ -1,0 +1,172 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# ALL-OR-NOTHING PURCHASE REFUSAL NAIL (2026-09-01, jinyong-loop R2, D4).
+#
+# The defect: EventLogic.apply_option_effects charged silver unconditionally
+# (only a maxi(..., 0) clamp) and appended the item only when absent — so
+# re-buying 买下长剑 (merchant option_a: silver -20 + item eq_sword_3) deducted
+# 20 silver while the profile already owned the sword, delivered nothing, and
+# said nothing on screen (measured: 2160 -> 2050, inventory stayed one 青锋剑).
+#
+# The fix is validate-then-apply: validate_option() returns "owned"/"silver" and
+# a refused option does ZERO profile mutation, with an on-screen receipt
+# (map_status_text). This nail pins the OWNED refusal differentially.
+#
+# ROUTE: boot the proven menu -> creation -> tutorial -> cultivation sequence
+# (facility_use_cap_exhausted_zero_delta's boot). While in CULTIVATION,
+# `debug_grant_equip` injects eq_sword_3 through the REAL item pipeline
+# (EventLogic.apply_option_effects, cultivation.gd:_debug_grant_equip) — the
+# same handler every event/card item effect takes (merchant option_a included),
+# never a bare profile write. Then debug_fast_forward to MAP, travel to 洛阳,
+# the merchant event opens (snapshot surface event_open_silver published), and
+# picking option A 买下长剑 is REFUSED because the sword is already owned.
+# Asserts are DIFFERENTIAL, zero tuned literals:
+#   - MapScreen.silver: silver == event_open_silver at OPEN (this pins the
+#     event_open_silver snapshot surface the settled task published — it is
+#     already false-consistent here) and again AFTER the refused pick (ZERO
+#     delta — the whole option did nothing);
+#   - MapScreen.phase: phase == "TRAVEL" (the refused resolution still returns
+#     to travel — no new soft-lock);
+#   - MapScreen.map_status_text: map_status_text != "" (the refusal receipt is
+#     on screen);
+#   - MapScreen.events_resolved_count: events_resolved_count == 1 (ladder rung:
+#     the REFUSED resolution still counts — the count tracks RESOLUTIONS, not
+#     settlements, keeping every existing ladder immune to affordability);
+#   - MapScreen.last_effect_types: empty (nothing applied).
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario direct
+#   sidecar run WITH the TEMPORARY RED-FIRST REVERT applied to the owned branch
+#   of scripts/data/event_logic.gd::apply_option_effects — the revert restored
+#   the old unconditional-charge shape: silver applies regardless, item appends
+#   only when absent, NO refusal receipt).
+#
+#   failing_frame:            <re-baselined from the measured run below>
+#   first_failing_assert:     MapScreen.silver — silver == event_open_silver
+#                             (observed silver dipped by 20: event_open_silver)
+#                             and MapScreen.map_status_text == "" (no receipt)
+#   exact_error/observed:     see per-frame `observed` values recorded after the
+#                             run below
+#   green_asserts_before_red: <counted from the measured run below>
+#
+#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` on the
+#   apply_option_effects owned branch in scripts/data/event_logic.gd):
+#     replace the validate-then-apply pass-1 early-return with a pass-1 that
+#     never returns refuse (so the old silver-charge/item-dedup path runs with
+#     the maxi(..., 0) clamp restored) — the owned pick then nets -20 silver and
+#     the asserts above red.
+#   Restore byte-identically (search scripts/ for "TEMPORARY RED-FIRST REVERT"
+#   -> zero hits) and re-run GREEN.
+name: event_option_refused_no_charge
+description: >-
+  The all-or-nothing purchase-refusal nail (D4). Boots menu.tscn, drives to
+  CULTIVATION, injects eq_sword_3 via debug_grant_equip (REAL item pipeline),
+  fast-forwards to MAP, travels to 洛阳 where the merchant fires, and picks
+  option A 买下长剑 which is REFUSED (already owned): silver == event_open_silver
+  (ZERO delta), phase == TRAVEL, map_status_text != "" (the on-screen receipt),
+  events_resolved_count == 1, and last_effect_types empty.
+scene: res://scenes/menu.tscn
+timeline:
+# ── Boot: menu -> creation -> tutorial -> cultivation (facility_use_cap boot) ──
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - move_right
+- at: 180
+  actions:
+  - ui_accept
+# ── CULTIVATION: grant eq_sword_3 through the REAL item pipeline ────────────
+- at: 220
+  actions:
+  - ui_accept
+# Grant the already-owned item so option A is refused (owned), never charged.
+# (debug_grant_equip is CULTIVATION-scoped and routes through EventLogic.)
+- at: 260
+  actions:
+  - debug_grant_equip
+- at: 280
+  actions:
+  - debug_fast_forward
+# ── MAP: travel to 洛阳, merchant opens, refused pick ───────────────────────
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.visible: visible == true
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 440
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+    # Pins the event_open_silver snapshot surface: at open, before any pick,
+    # the current silver equals the published open-snapshot anchor.
+    MapScreen.silver: silver == event_open_silver
+# Pick option A 买下长剑 — already owned => REFUSED, zero delta.
+- at: 450
+  actions:
+  - ui_accept
+- at: 470
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+    MapScreen.last_effect_types: 'last_effect_types.is_empty() == true'
+    # Zero delta on silver — the whole option did nothing (owned refusal).
+    MapScreen.silver: silver == event_open_silver
+    # The refusal receipt is on screen.
+    MapScreen.map_status_text: 'map_status_text != ""'
