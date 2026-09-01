@@ -21,30 +21,49 @@
 # the node it actually focused instead of failing later with an unexplained
 # state, which is the difference between a diagnosis and a mystery.
 #
-# NOTHING about MapScreen is asserted after the travel accept, and that is a
-# deliberate refusal rather than an oversight. Starting the battle makes
-# SceneManager swap the map segment away, so MapScreen stops existing within
-# ~10 frames of the accept — measured: asserted at 580 and then at 560, both
-# came back 'node not found: MapScreen', which was the FEATURE WORKING. A
-# window that narrow could only be hit by guessing a frame, and a pin that
-# passes on timing luck is worse than an honest gap: it goes red one day for
-# a reason nobody can reproduce. `entry_battle_id` is therefore left to the
-# unit pin (MapData.active_battle_id("huashan") == "huashan_duel" in
-# tests/test_map_node_event.gd), and the chain here is closed from both ends
-# instead: focus_id is 华山 BEFORE the accept, and after it the game is in
-# BATTLE on the battlefield scene with no swap still pending. Nothing else in
-# this timeline can start a battle.
+# THIS FILE WAS REWRITTEN 2026-09-01 (jinyong-huashan round) as a documentation
+# EXTENSION of the same scenario — same name:, same scenario_order slot, the
+# 78-scenario registry count unchanged. It gates "can fight", not "loaded".
 #
-# What is NOT asserted here: the return leg (win/lose back onto the map). That
-# path needs no new code — request_continue/request_retry already route to
-# battle_return_state whenever it names a segment state, and MAP is one — but
-# "needs no new code" is not the same as "verified", and driving a battle to a
-# win inside this scenario is a different scenario's job. Recorded as an open
-# gap rather than quietly assumed.
+# The OLD gate proved only that a battle SCENE loads: travel onto 华山 ->
+# current_state == "BATTLE" on the battlefield scene with no swap pending.
+# That is exactly the class of green-on-absence the project keeps tripping on —
+# the observed defect (2026-08-31, frame-by-frame) was a battle that LOADED but
+# never BEGAN: CombatManager.phase == "IDLE", current_round == 0,
+# turn_order == [], EndTurnButton disabled forever, tutorial_battle == true,
+# and the hard-coded tutorial Yang Guo (HP 1000) standing in for the player's
+# profile-built hero, with the tutorial intro overlay replayed. "A battle
+# begins" was never asserted, because the map swap freed MapScreen ~10 frames
+# after the accept and the scenario stopped short of the battlefield's turn
+# loop — a pass that told us nothing about fightability.
+#
+# The rewritten gate therefore proves the battle is REAL and FIGHTABLE:
+#   * profile-derived hero: tutorial_battle == false, and max_health != 1000
+#     (the tutorial Yang Guo's HP) — so HP comes from
+#     BattleSetup.build_character(SaveManager.profile), not a hard-coded unit;
+#   * the round actually starts: current_round >= 1, a non-empty turn_order
+#     holding the profile hero + the five greats, phase != "IDLE",
+#     active_unit_name != "";
+#   * the player's turn arrives and the end-turn button is enabled
+#     (phase == "PLAYER_TURN", active_unit_name == "ProgressionHero",
+#     EndTurnButton.disabled == false) and one real action changes state
+#     (click-move -> Player.grid_pos / moves_left changed) — the differential
+#     after one real action;
+#   * BOTH a WIN and a LOSE return to MAP with map state and
+#     events_resolved_count intact and map_battle_id cleared.
+#
+# `huashan_duel` is consumed end-to-end: map.gd reads
+# MapData.active_battle_id("huashan"), start_map_battle(bid) writes
+# GameManager.map_battle_id, and battlefield._setup_map_battle(bid) resolves
+# the opponent roster from MapBattleData. That binding is asserted at f580
+# (map_battle_id == "huashan_duel") — the old gate never asserted it, because
+# the id was written nowhere.
 name: map_battle_node_huashan
-description: '华山 is the first map node whose battle slot is live. Arriving there by travel starts a real
-  battle: MapScreen records the battle_id and GameManager leaves MAP for BATTLE. Before this node existed
-  the tactical system could be entered exactly once, from the tutorial.'
+description: '华山 is the first map node whose battle slot is live and consumable. Traveling there starts a real,
+  FIGHTABLE duel: the profile-built hero (tutorial_battle == false, max_health != 1000) faces the five greats
+  with the round actually started (current_round >= 1, non-empty turn_order, phase != IDLE, active_unit_name
+  != ""), the player''s turn arrives with EndTurnButton enabled and one real click-move changes state, and BOTH
+  a win and a loss return to MAP with map state and events_resolved_count intact and map_battle_id cleared.'
 timeline:
 - at: 3
   actions:
@@ -155,6 +174,10 @@ timeline:
   actions: []
   assert:
     MapScreen.focus_id: focus_id == "huashan"
+- at: 545
+  actions: []
+  assert:
+    MapScreen.events_resolved_count: events_resolved_count == 2
 - at: 550
   actions:
   - ui_accept
@@ -164,3 +187,105 @@ timeline:
     GameManager.current_state: current_state == "BATTLE"
     SceneManager.current_scene: current_scene == "battlefield"
     SceneManager.pending_swap: pending_swap == false
+    GameManager.map_battle_id: map_battle_id == "huashan_duel"
+    CombatManager.tutorial_battle: tutorial_battle == false
+    Player.max_health: "max_health != 1000 and max_health > 0"
+    CombatManager.current_round: "current_round >= 1"
+    CombatManager.turn_order: "turn_order.size() == 6 and turn_order.has('ProgressionHero') and turn_order.has('East Heretic') and turn_order.has('West Poison') and turn_order.has('South Emperor') and turn_order.has('North Beggar') and turn_order.has('Central Divine')"
+    CombatManager.phase: "phase != 'IDLE'"
+    CombatManager.active_unit_name: "active_unit_name != ''"
+# ── Leg D: the player's turn arrives + ONE real action (frames MEASURED 2026-09-01;
+#    round 1 runs initiative-descending, the five greats act first, the profile hero
+#    (initiative ~10-20) acts LAST) ──
+- at: 720
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.active_unit_name: active_unit_name == "ProgressionHero"
+    EndTurnButton.disabled: disabled == false
+- at: 740
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 790
+  actions: []
+  assert:
+    Player.grid_pos: changed
+    Player.moves_left: changed
+# ── Leg E: end the turn, WIN the duel, return to MAP (frames MEASURED) ──
+- at: 800
+  actions:
+  - end_turn
+- at: 815
+  actions:
+  - debug_win_tutorial
+- at: 855
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 870
+  actions:
+  - ui_accept
+- at: 925
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    SceneManager.current_scene: current_scene == "map"
+    SceneManager.pending_swap: pending_swap == false
+    MapScreen.current_node_id: current_node_id == "huashan"
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.ended: ended == false
+    MapScreen.events_resolved_count: events_resolved_count == 2
+    GameManager.map_battle_id: map_battle_id == ""
+# ── Leg F: re-fire the battle and LOSE, return to MAP again (frames MEASURED) ──
+- at: 935
+  actions:
+  - move_right
+- at: 945
+  actions:
+  - move_right
+- at: 955
+  actions:
+  - ui_accept
+- at: 975
+  actions:
+  - ui_accept
+- at: 985
+  actions: []
+  assert:
+    MapScreen.current_node_id: current_node_id == "shaolin"
+    MapScreen.events_resolved_count: events_resolved_count == 3
+- at: 990
+  actions:
+  - move_right
+- at: 1000
+  actions:
+  - move_right
+- at: 1010
+  actions:
+  - ui_accept
+- at: 1045
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    GameManager.map_battle_id: map_battle_id == "huashan_duel"
+    CombatManager.current_round: "current_round >= 1"
+    CombatManager.tutorial_battle: tutorial_battle == false
+- at: 1060
+  actions:
+  - debug_lose_tutorial
+- at: 1100
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "LOST"
+- at: 1115
+  actions:
+  - ui_accept
+- at: 1165
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    SceneManager.current_scene: current_scene == "map"
+    MapScreen.current_node_id: current_node_id == "huashan"
+    MapScreen.events_resolved_count: events_resolved_count == 3
+    MapScreen.ended: ended == false

@@ -207,6 +207,8 @@ surface:
   - creation_done
   - creation_entry
   - end_overlay_pressed_connected
+  - map_battle_id
+  - map_events_resolved_count
   Camera:
   - camera_position
   - camera_x_lo
