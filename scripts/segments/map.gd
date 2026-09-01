@@ -340,7 +340,7 @@ func _resolve_node_event() -> void:
 		# REFUSED path: consume validate_option's reason ("silver"/"owned").
 		# The purchase_all_or_nothing task owns EventLogic.validate_option;
 		# until it lands this is a no-op (reason "") and the APPLIED path runs.
-		var reason: String = ""
+		var reason: String = EventLogic.validate_option(SaveManager.profile, opt)
 		if reason == "silver":
 			map_status_text = tr("银两不足")
 		elif reason == "owned":
@@ -421,7 +421,11 @@ func _use_facility() -> void:
 	# the runtime type check ("Invalid assignment ... of type 'Array'"). assign()
 	# coerces element-by-element into the typed array.
 	opt.effects.assign(fdef.effects.duplicate(true))
-	EventLogic.apply_option_effects(SaveManager.profile, opt)
+	# Mechanical signature adaptation: apply_option_effects now returns a status
+	# Dictionary. The facility channel keeps its OWN silver pre-check above
+	# (byte-identical) and its option rows carry no item effects, so the status
+	# is always ok:true here — ignore it. Semantics unchanged.
+	var _res: Dictionary = EventLogic.apply_option_effects(SaveManager.profile, opt)
 	last_facility_effect_types = []
 	for eff in fdef.effects:
 		last_facility_effect_types.append(eff.get("type", "none") as String)

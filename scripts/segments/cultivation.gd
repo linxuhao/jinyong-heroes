@@ -511,7 +511,16 @@ func _apply_event_option(opt_index: int) -> void:
 	var def = EventData.def(event_id)
 	if def != null:
 		var opt = def.option_a if opt_index == 0 else def.option_b
-		EventLogic.apply_option_effects(SaveManager.profile, opt)
+		var res: Dictionary = EventLogic.apply_option_effects(SaveManager.profile, opt)
+		if not res["ok"]:
+			# All-or-nothing refusal: the whole option did nothing. Explain on
+			# screen by reason; the event is STILL marked seen below (the
+			# encounter happened) and event_id is still cleared, so a refused
+			# draw can never create a new soft-lock or shift a seen-count ladder.
+			if res["reason"] == "silver":
+				status_text = tr("银两不足")
+			else:
+				status_text = tr("此物已在行囊，无须再购")
 	var seen: Array = SaveManager.profile.flags.get("events_seen", [])
 	if event_id != "" and not seen.has(event_id):
 		seen.append(event_id)
