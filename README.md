@@ -17,7 +17,62 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-huashan — the Mount Hua summit duel is a real, fightable battle (2026-09-01)
+## Latest round: jinyong-theme — the UI finally looks designed (2026-09-01)
+
+The theme layer existed only as a 7-line placeholder (`global_theme.tres`:
+default font + size 12) mounted globally at `project.godot:58`, so every screen
+outside the battle rendered engine-default buttons and left-aligned small text;
+three spots were measurably unreadable (roster panel fA/s4_frame_0052, tutorial
+page 1 fA/s2_frame_0158, battle hints + disabled 退回 fB/s2_frame_0210); and
+list focus was expressed only as a 2–3% brightness difference
+(`cultivation.gd:641`, modulate 1.0 vs 0.72).
+
+**What landed (presentation only — zero gameplay/copy/value changes, zero new
+art assets, zero i18n delta):**
+
+- **A real theme** (`assets/themes/global_theme.tres`, 124 lines,
+  `load_steps=8`): Button with four visually distinct StyleBoxFlat states plus
+  a cinnabar `draw_center=false` focus ring, all five font colors and size 15;
+  an **opaque** ink `Panel/styles/panel` (hairline paper-tan border, radius 3,
+  soft shadow, content margins) — which instantly gives the previously bare
+  `RosterBox` and tutorial `Panel` a real backing; Label color/size 14;
+  `RichTextLabel` default color; and two type variations for the hierarchy:
+  `TitleLabel` (26px warm gold) and `HintLabel` (12px muted + black outline,
+  the `hud.tscn` pattern hoisted into the theme). Every non-battle scene's
+  hint label now wears `HintLabel`; the tutorial title wears `TitleLabel`.
+- **压字 #1/#2 fixed structurally, not by alpha twiddling**: the opaque theme
+  panel is the information layer, and the scene dims were raised
+  (`roster_panel.tscn` RosterDim 0.55→0.85; `tutorial_overlay.tscn` Dim
+  0.5→0.88) so card buttons, blood bars and portraits stop bleeding through.
+  No z-order, layer, or coordinate changes anywhere.
+- **压字 #3**: `hud.tscn`'s two hint labels gained the `skill_button.tscn:48`
+  shadow pair verbatim (`font_shadow_color Color(0,0,0,0.85)` + offsets 1/1)
+  on top of their existing outlines; the theme's **opaque** disabled stylebox
+  plus a readable `font_disabled_color` make a disabled button read as
+  "unavailable", not "gone".
+- **A focus marker you can see**: `ThemeManager.option_style(focused)` returns
+  one of two cached, min-size-stable StyleBoxFlats (plain = the theme's
+  Button-normal geometry; focused = 3px cinnabar left bar + cinnabar border),
+  paired with `OPTION_FONT_FOCUS` / `OPTION_FONT_DIM`. The modulate ternary at
+  `cultivation.gd:641` is replaced by a stylebox+font-color swap in
+  `_rebuild_options_box`, and `sect_select.gd:84` adopts the same helper. New
+  published surface `CultivationScreen.focus_marker_active` + new differential
+  scenario `playtest/theme_focus_marker_cultivation.yaml` (the marker follows
+  the cursor; clicks still advance the phase; zero style/color literals), with
+  the measured red-first record (RED 12/14 at f110 `observed=false`,
+  greens-before-red 7; green 14/14 after byte-exact restore) in the scenario
+  header and `final/delivery_notes_theme.md` §2.
+
+Constraints honored: the six `jinyong-huashan` files stay untouched;
+script-styled battle widgets (skill buttons, health bars, round indicator)
+override the theme and keep every protected numeric surface; `40_ux_backlog`
+UX-21/UX-22 stay OPEN pending the official frame verdict. The frame-pair
+evidence table, alpha rationale and locked-file ledger are in
+`final/delivery_notes_theme.md`. Note: the official compile / 79-scenario
+regression / vision / unit reports are downstream gate products and had not
+run when this section was written — see "Verification status (honest)".
+
+## Round: jinyong-huashan — the Mount Hua summit duel is a real, fightable battle (previous round)
 
 Until this round the payoff was broken. 华山's battle slot (`status: "active"`,
 `battle_id: "huashan_duel"`, `scripts/data/map_data.gd:49`) was reachable, but
@@ -781,6 +836,18 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Key interfaces
 
+- **Theme layer & focus marker** (jinyong-theme round): the global theme
+  `assets/themes/global_theme.tres` (mounted at `project.godot:58`) defines
+  Button (normal/hover/pressed/disabled + focus overlay, 5 font colors),
+  Panel, Label, RichTextLabel, and the `TitleLabel`/`HintLabel` type
+  variations; `ThemeManager.option_style(focused: bool) -> StyleBoxFlat`
+  (two cached, never-mutated boxes with identical geometry so min-size is
+  stable) + `OPTION_FONT_FOCUS` / `OPTION_FONT_DIM` drive the script-cursor
+  marker in `cultivation.gd _rebuild_options_box` and `sect_select.gd`; new
+  observable `CultivationScreen.focus_marker_active` (true iff the focused row
+  wears the focused stylebox) in `playtest/_common.yaml`, exercised by the
+  differential scenario `theme_focus_marker_cultivation.yaml` and pinned in
+  `tests/test_playtest_contract_smoke.py`.
 - **Map-battle entry & decoupling** (jinyong-huashan round):
   `GameManager.map_battle_id` (`get_map_battle_id()` / `set_map_battle_id()`) —
   the build-source signal, decoupled from `battle_return_state` (which is now
@@ -923,6 +990,35 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   guards the §433 copy-location rule.
 
 ## Verification status (honest)
+
+**jinyong-theme (this round, 2026-09-01) — implementation verified by direct
+read; recorded self-runs green; official downstream gates not yet run:**
+
+- **Landed and verified in the tree (verifier direct read):** the rewritten
+  theme (`load_steps=8`; Button 4 states + focus ring + 5 font colors; opaque
+  Panel; Label/RichTextLabel colors; TitleLabel/HintLabel variations applied
+  across menu_panel + all 6 segment scenes + the tutorial title); roster and
+  tutorial opaque backing + raised dims (0.85 / 0.88) with no geometry or
+  z-order changes; the hud.tscn shadow pair on both hint labels;
+  `ThemeManager.option_style` + the `cultivation.gd:641` / `sect_select.gd:84`
+  swap (no `modulate` assignment remains in either file); the `_common.yaml`
+  surface append with two-place contract-smoke sync; the new differential
+  scenario; the MEASURED red-first four-values (f110 /
+  `focus_marker_active == true` / `observed=false` / greens-before-red 7,
+  second red f140, total FAIL 12/14; green 14/14 + 16/16 + 42/42 after
+  byte-exact restore); the UX-21/UX-22 record-only note in
+  `design/40_ux_backlog.md` (:101) without status changes; zero
+  "TEMPORARY RED-FIRST REVERT" hits in scripts/ or scenes/.
+- **Not yet verifiable at this step (do not count as met):** the official
+  compile / 79-scenario regression / vision / unit-suite reports
+  (`compile_report.json` / `playtest_summary.md` / `vision_report.json` /
+  `test_report.json`) are downstream step products that did not exist at
+  verification time; the per-frame readability verdict on fA/s4_frame_0052,
+  fA/s2_frame_0158 and fB/s2_frame_0210 belongs to 5_vision (or the accepted
+  human frame-review fallback); locked-file byte-identity awaits the official
+  5_review repo diff; the `design/99_changelog.md` row and
+  `design/00_roadmap.md` phase-4 numbers belong to 5_design from gate
+  artifacts. Full detail in `final/verify_report.json`.
 
 **jinyong-huashan (this round, 2026-09-01) — implementation verified by direct
 read; rewritten gate self-run green; official downstream gates not yet run:**
