@@ -1,0 +1,119 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# SOFT-LOCK EMPTY-PRACTICE MONTH-ADVANCE NAIL (2026-09-01, jinyong-loop R2).
+#
+# THIS IS THE ROUND'S CORE DELIVERABLE. The cultivation soft-lock: with no
+# unmastered art, the GONGFA_PICK empty branch used to set phase = "ACTION_PICK"
+# and never call _after_action(), so the month never advanced and Enter looped
+# forever (f482 and f1130 byte-identical after ~80 Enters). The escape hatch
+# existed ONLY on the debug path (_fast_forward does ATTR_PICK + _after_action),
+# which is why all 78 prior scenarios were green — they reach late states via
+# debug_fast_forward. This nail reaches the empty-GONGFA state through REAL
+# player input and asserts the month advances.
+#
+# The nail is a DIFFERENTIAL, zero literals:
+#   f200 — after the empty-branch accept, CultivationScreen.month ==
+#          month_before_accept + 1 (the month really advanced), phase ==
+#          "CARD_PICK" (the next month's card draw landed), and status_text != ""
+#          (the player SAW what happened — never a silent jump).
+#
+# BOOT: mirrors gongfa_pick_empty_keyboard_return verbatim — a direct
+# cultivation.tscn boot leaves SaveManager.decks == {} (only new_profile()
+# initializes decks) so the month-card draw would runtime-error. Instead we boot
+# menu.tscn and seed a FRESH no-sect CULTIVATION save through the real atomic
+# pipeline via `debug_seed_save` (year 1 month 1, sect_id "", zero arts —
+# _grant_year_arts grants nothing, so _unmastered_ids() is empty; decks
+# initialized by new_profile). Then LOAD the save by keyboard (move_down to
+# entry 1, ui_accept) to route DIRECTLY into CULTIVATION via menu_load_game
+# (bypassing SEGMENT_PREDECESSORS). From CARD_PICK everything is pure real
+# ui_accept: card -> ACTION_PICK, 练功 (index 0) -> empty GONGFA_PICK, accept ->
+# month advances.
+#
+# debug_seed_save is a sanctioned SEED action (the same role debug_win_tutorial
+# plays in the clicks-only scenarios), NOT a state skip. debug_fast_forward is
+# FORBIDDEN anywhere in this file — the existing 78 greens are green precisely
+# because they bypass this path, so a nail that reached the state by
+# fast-forward would prove nothing.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario sidecar
+#   run WITH the TEMPORARY RED-FIRST REVERT applied to scripts/segments/
+#   cultivation.gd).
+#
+#   failing_frame:            f200
+#   first_failing_assert:     CultivationScreen.month
+#                             (month == month_before_accept + 1)
+#   exact_error/observed:     observed month == month_before_accept (the revert
+#                             restored the dead-end: phase -> ACTION_PICK, no
+#                             _after_action, month frozen)
+#   green_asserts_before_red: 9 (f130 has 6 + f170 has 3 = 9)
+#
+#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`):
+#     scripts/segments/cultivation.gd _on_accept() GONGFA_PICK empty branch:
+#       replace the status_text/ATTR_PICK/_after_action block with the old
+#       `phase = "ACTION_PICK"` dead-end (no _after_action call).
+#   Restore byte-identically (grep scripts/ for "TEMPORARY RED-FIRST REVERT"
+#   -> zero hits) and re-run GREEN.
+name: softlock_empty_practice_month_advances
+description: >-
+  The round's core deliverable: the cultivation soft-lock nail. Boots menu.tscn,
+  seeds a fresh no-sect CULTIVATION save via debug_seed_save (the one sanctioned
+  seed action, same role as debug_win_tutorial), loads it by keyboard (move_down
+  to entry 1, ui_accept), then drives with pure real ui_accept: CARD_PICK ->
+  ACTION_PICK -> empty GONGFA_PICK -> accept. Asserts the month advances
+  differentially (month == month_before_accept + 1), the phase returns to
+  CARD_PICK, and status_text is non-empty (the player saw the notice). ZERO
+  debug_fast_forward anywhere in this file.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (no-sect fresh profile, month 1) ────────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 140
+  actions:
+  - ui_accept
+# ── CARD_PICK -> ACTION_PICK ────────────────────────────────────────────────
+- at: 150
+  actions:
+  - ui_accept
+# ── ACTION_PICK -> GONGFA_PICK (empty list, single 度过本月 button) ────────
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultOptionButton0.visible: visible == true
+    CultOptionButton0.text: text == "度过本月"
+    CultivationScreen.mastered_count: mastered_count == gongfa_count
+    CultivationScreen.pressed_connected: pressed_connected["CultOptionButton0"] == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 180
+  actions:
+  - ui_accept
+# ── GONGFA_PICK empty-branch accept -> month advances (differential nail) ──
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == month_before_accept + 1
+    CultivationScreen.status_text: status_text != ""
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false

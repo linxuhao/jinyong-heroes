@@ -77,6 +77,7 @@ ROUND_SCENARIOS: list[str] = [
     "equipment_in_battle_diff",
     "event_pool_new_event_resolved",
     "theme_focus_marker_cultivation",
+    "softlock_empty_practice_month_advances",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1182,6 +1183,48 @@ def test_focus_marker_surface_contract() -> None:
         f"{name}.yaml missing a line ending `: changed` "
         f"(mandatory differential on focused_option_text)"
     )
+
+
+def test_softlock_nail_contract() -> None:
+    """Static anti-weakening pins for the jinyong-loop soft-lock nail.
+
+    The soft-lock nail (``softlock_empty_practice_month_advances``) is this
+    round's core deliverable: it must reach the empty-GONGFA state through
+    REAL player input (``debug_seed_save`` seed + ``ui_accept`` drive) and
+    assert the month advances differentially. Three hard pins:
+
+      1. the file MUST carry the differential line
+         ``month == month_before_accept + 1`` (the month-advance proof);
+      2. the file MUST NOT contain ``debug_fast_forward`` anywhere — the
+         existing 78 greens are green precisely because they bypass this path
+         via the debug twin, so a nail that reaches the state by fast-forward
+         would prove nothing;
+      3. each re-pointed soft-lock-era nail (``gongfa_pick_empty_keyboard_return``
+         and ``clicks_only_gongfa_empty_exit``) must still carry its preserved
+         empty-state assert ``mastered_count == gongfa_count`` — the re-point
+         changed only the exit-frame asserts, never the empty-state proof.
+    """
+    name = "softlock_empty_practice_month_advances"
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    assert "month == month_before_accept + 1" in ftext, (
+        f"{name}.yaml missing the differential month-advance line "
+        "`month == month_before_accept + 1`"
+    )
+    assert "debug_fast_forward" not in ftext, (
+        f"{name}.yaml must NOT contain debug_fast_forward — the soft-lock "
+        "nail must be reached through real player input, never the debug twin"
+    )
+    for repointed in ("gongfa_pick_empty_keyboard_return", "clicks_only_gongfa_empty_exit"):
+        rtext = (PLAYTEST_DIR / (repointed + ".yaml")).read_text(encoding="utf-8")
+        assert "mastered_count == gongfa_count" in rtext, (
+            f"{repointed}.yaml lost its preserved empty-state assert "
+            "`mastered_count == gongfa_count` during the re-point"
+        )
 
 
 def _normalize_assert(s: str) -> str:
