@@ -31,15 +31,44 @@ static func draw_unseen_id(profile: PlayerProfile, rng: RandomNumberGenerator) -
 	return pool[idx]
 
 
-## Apply one event option's effects (the 5 sanctioned types).
-## (verbatim from the effect loop in cultivation._apply_event_option).
-## Does NOT touch profile.flags, clear any id, or sync any surface — the
-## seen-mark / event_id / _sync_surface bookkeeping stays with the caller.
-static func apply_option_effects(profile: PlayerProfile, opt: EventData.EventOption) -> void:
+## Validate one event option's deliverability (purchase all-or-nothing, R2 D4).
+## Returns "" when the WHOLE option is deliverable; "silver" when the option's
+## NET silver cost exceeds profile.silver; "owned" when any item effect targets
+## an id already in profile.inventory. Pure arithmetic over the option's own
+## effects — NO mutation, NO RNG (the deterministic-stream lifeline).
+## Priority: payment capacity is checked first, then ownership.
+static func validate_option(profile: PlayerProfile, opt: EventData.EventOption) -> String:
+	var net_cost: int = 0
 	for eff in opt.effects:
 		match eff.get("type", "none"):
 			"silver":
-				profile.silver = maxi(profile.silver + int(eff.get("value", 0)), 0)
+				net_cost += -int(eff.get("value", 0))
+			"item":
+				var target: String = eff.get("target", "")
+				if target != "" and profile.inventory.has(target):
+					return "owned"
+	if net_cost > profile.silver:
+		return "silver"
+	return ""
+
+
+## Apply one event option's effects — validate-then-apply (the 5 sanctioned
+## types). On refusal the ENTIRE option does nothing: {"ok": false, "reason":
+## "silver"|"owned"} with ZERO profile mutation (no charge without delivery,
+## no delivery without charge). On success every effect applies exactly as
+## before, EXCEPT the silver line loses the old maxi(..., 0) clamp — the
+## balance is proven sufficient by the validation. Returns {"ok": true,
+## "reason": ""}.
+## Does NOT touch profile.flags, clear any id, or sync any surface — the
+## seen-mark / event_id / _sync_surface bookkeeping stays with the caller.
+static func apply_option_effects(profile: PlayerProfile, opt: EventData.EventOption) -> Dictionary:
+	var reason: String = validate_option(profile, opt)
+	if reason != "":
+		return {"ok": false, "reason": reason}
+	for eff in opt.effects:
+		match eff.get("type", "none"):
+			"silver":
+				profile.silver = profile.silver + int(eff.get("value", 0))
 			"attr":
 				profile.add_attr(eff.get("target", ""), int(eff.get("value", 0)))
 			"item":
@@ -48,6 +77,7 @@ static func apply_option_effects(profile: PlayerProfile, opt: EventData.EventOpt
 					profile.inventory.append(target)
 			"practice":
 				add_practice(profile, int(eff.get("value", 0)))
+	return {"ok": true, "reason": ""}
 
 
 ## Add practice to the first unmastered gongfa; masters it on reaching the
