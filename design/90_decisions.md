@@ -829,3 +829,17 @@ False;该场景此前每轮全绿,系本轮引入)——零断言放松、零阈
 (未诊断,先观察再定性);UX-21 残余(map.gd / creation.gd)何时收;捏人屏字号
 回钉(UX-31)的落点与验收。
 
+**post-fix 收口(2026-09-01,5_design 证据步骤):**(e) 所记回归与上面 Open question
+第三项「捏人屏字号回钉(UX-31)」已收——修复按 (e) 预写的回退路执行:`creation.tscn`
+恰 14 处逐节点 `theme_override_font_sizes/font_size = 12`(13 个 TraitToggle0..12 +
+TraitDescLabel;零几何/文本/节点/主题改动,**绝不**全局缩字号、分级未动),先红后绿实测
+21/22 FAIL(f90 `creation_box_fits` observed=false,红前绿 21)→ **22/22 绿**(同帧对照:
+frame 90 False→True,`final/delivery_notes_theme.md` §7);官方 post-fix 复跑 playtest
+**79/79 场景全 PASS**(硬闸门过、零 runtime error、`creation_layout_readability` 22/22、
+五条保护闸门全绿、`theme_focus_marker_cultivation` 14/14)、编译 **98/98** 零错误;
+`40_ux_backlog.md` **UX-31 → CLOSED(jinyong-theme)**。Open question 前两项不变:
+Q6 坏答的官方产物仍是 pre-fix 那次(post-fix Q6 复检未执行,端点不可达,如实记录,
+仍待下轮闸门复跑看是否复现);UX-21 残余(map.gd 锁定文件 / creation.gd 裸 Control 行)
+保持 OPEN。pytest 契约冒烟与 GDScript 单元套件以 5_test 产物(`test_report.json`)为准,
+不在本步上下文,不冒充实测。
+

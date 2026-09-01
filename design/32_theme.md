@@ -95,3 +95,27 @@ stays OPEN with that residual recorded.
   screen edge"), not a themed screen. Every roster / tutorial / themed-screen
   scenario answered Q6 good, which is the official frame verdict that the
   three 压字 spots read cleanly on the delivered build.
+
+### Post-fix closure (2026-09-01, 5_design)
+
+The one advisory FAIL above (`creation_layout_readability` 21/22, UX-31) was
+fixed by the review round with the D6-named fallback: `creation.tscn` now
+carries exactly 14 per-node `theme_override_font_sizes/font_size = 12` pins
+(13 TraitToggles + TraitDescLabel) — zero geometry/text/node/theme changes,
+the hierarchy is NOT shrunk globally. Measured red-first: **21/22 FAIL**
+(f90 `creation_box_fits` observed `false`, 21 greens before red) → **22/22**
+green (same-frame pair: frame 90 `creation_box_fits` false→true;
+`final/delivery_notes_theme.md` §7).
+
+Official post-fix gate artifacts (this step's `5_compile` products): playtest
+**79/79 scenarios PASS** (hard gate `passed: true`, `spec_used: true`, 180
+frames, 0 runtime errors) with `creation_layout_readability` **22/22**, the
+five protected gates green and `theme_focus_marker_cultivation` 14/14;
+compile **98/98**, 0 errors, 0 warnings. `40_ux_backlog.md` **UX-31 →
+CLOSED(jinyong-theme)**. Honest boundary: the vision artifact in §6 above is
+still the pre-fix official run; the post-fix Q6 re-check was NOT executed
+(endpoint unreachable, recorded in `final/delivery_notes_theme.md` §7.5) —
+UX-31's closure rests on playtest assertions and the measured red-first pair,
+not on an unexecuted vision verdict. pytest / GDScript unit-suite official
+results belong to the `5_test` product (`test_report.json`) and are not
+claimed here.

@@ -1091,4 +1091,11 @@ MAP(华山)战斗复用教程战场、从不调 `build_character(profile)`,差�
 - **实测(2026-09-01 官方闸门)**:编译 98/98 零错误;playtest 78/79(唯一红
   `creation_layout_readability` 21/22,主题字号增长引入,UX-31);视觉闸门 passed
   (316 帧,Q6 78 好 / 1 坏,坏答在非主题战斗帧);五条保护闸门全绿。
+- **post-fix 收口(2026-09-01,5_design 补记)**:上述唯一红已修——`creation.tscn`
+  恰 14 处逐节点 `theme_override_font_sizes/font_size = 12`(13 TraitToggles +
+  TraitDescLabel,D6 预写回退路,零几何/文本/节点/主题改动,分级未全局缩),同帧对照
+  f90 `creation_box_fits` False→True(先红 21/22 后绿 22/22,`delivery_notes_theme.md`
+  §7);官方复跑 playtest **79/79 场景全 PASS**、硬闸门过、零 runtime error,编译
+  **98/98** 零错误;视觉闸门官方产物仍是 pre-fix 那次,post-fix Q6 复检未执行
+  (端点不可达,如实记录)。`40_ux_backlog.md` **UX-31 → CLOSED(jinyong-theme)**。
 
