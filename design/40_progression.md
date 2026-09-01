@@ -561,3 +561,39 @@ initiative/move_bonus`(遭遇战入口 `battlefield.gd:651 build_character(SaveM
 
 音功偏**大范围、低伤害、带增益/减益**(碧海潮生:全场 18 + 全体先攻 −20)。
 本阶段不产出新的乐器内容,规则方向先记在这里,免得后续 run 各自发明。
+
+## 11. 福缘:游历事件重掷(R3,2026-09-01)
+
+**福缘的消费者(设计 D2,兑现创建屏承诺)。** 创建屏 `_ATTR_DESCS["fortune"]`
+原写「影响事件与奇遇(游历事件可重掷)」——代码里零消费者。本轮按屏上那句话
+**逐字实现**:福缘决定**每年游历事件可重掷的次数**。
+
+**预算公式**(`TraitEffects.fortune_reroll_budget`,纯静态,零 RNG):
+
+```
+budget = 1 + maxi(0, (fortune - 10) / 10) + (1 if 福缘深厚 else 0)
+```
+
+整数除法(GDScript `/` 对 int 截断),所以:
+
+| fortune | 无 trait | 福缘深厚 |
+|---|---|---|
+| 0 / 5 | 1 | 2 |
+| 10 | 1 | 2 |
+| 20 | 2 | 3 |
+| 30 | 3 | 4 |
+
+**作用面**:游历事件(EVENT 阶段)出现一个代码构建的 `EventRerollButton`
+(仅当 `rerolls_left > 0` 可见),键盘动作 `event_reroll`(R 键)同路径。按一次
+成功重掷:消耗 1 次年度预算(`deeds.rerolls_used_this_year` +1),用
+`EventLogic.draw_unseen_id` **恰好一次 draw** 重抽当前事件(与原始游历 draw
+同一 op),经 `_sync_surface` 重新发布 `event_title`/`event_body`。预算耗尽后
+再按:**惰性**——零 RNG、计数器不变、显示 i18n 的「今年已无重掷次数」。
+`_advance_year()` 将 `rerolls_used_this_year` 归零(年度重置)。
+
+**RNG 纪律**:重掷的 draw 只在玩家主动按 `event_reroll` 时执行;旧路径(不按)
+字节级不变。绝不按 fortune 加权事件池(会改 `draw_unseen_id` 的 op 顺序)。
+
+**未兑现承诺残差(记录,本轮不修)**:`map_inquire`(江湖阅历,`trait_data.gd:28`)
+仍全仓零引用——创建屏 TRAIT 列表本轮不动,该承诺保持未兑现并记录于此,留给
+后续 run 决定实现或下架。

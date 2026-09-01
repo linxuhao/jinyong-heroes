@@ -205,6 +205,10 @@ const EN: Dictionary = {
 	"移动力 = 2 + 身法 ÷ 20(向下取整);先攻 = 身法": "Movement = 2 + Agility ÷ 20 (rounded down); Initiative = Agility",
 	"决定学功法的速度(修习查表)": "Sets how fast you learn arts (study table)",
 	"影响事件与奇遇(游历事件可重掷)": "Affects events and rare finds (travel events can reroll)",
+	"影响事件与奇遇（福缘越高，每年游历事件可重掷次数越多）": "Affects events and rare finds (the higher your fortune, the more travel-event rerolls you get each year)",
+	"重掷事件（剩余 %d 次）": "Reroll event (%d left)",
+	"重掷：剩余 %d 次": "Rerolled: %d left this year",
+	"今年已无重掷次数": "No rerolls left this year",
 
 	# --- Traits -----------------------------------------------------------
 	"左右互搏": "Ambidexterity",

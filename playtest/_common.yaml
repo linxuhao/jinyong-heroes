@@ -179,6 +179,7 @@ actions:
 - use_facility
 - debug_grant_silver
 - debug_seed_events_seen
+- event_reroll
 surface:
   CombatManager:
   - current_round
@@ -787,6 +788,7 @@ surface:
   - last_yield_text
   - last_practice_target
   - last_practice_amount
+  - rerolls_left
   MapScreen:
   - current_node_id
   - focus_id
@@ -1156,3 +1158,4 @@ scenario_order:
 - event_option_refused_no_charge
 - occlusion_no_button_over_text
 - action_yield_differential
+- fortune_reroll_budget

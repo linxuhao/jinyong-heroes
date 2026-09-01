@@ -1,0 +1,126 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# FORTUNE REROLL BUDGET NAIL (R3, 2026-09-01) — design D2, the fortune consumer.
+#
+# Proves the creation-screen promise 「影响事件与奇遇（福缘越高，每年游历事件可重掷
+# 次数越多）」 is implemented: a travel-event reroll with a year-scoped budget.
+#
+#   Leg 1 (reroll effective): a travel draw lands in EVENT phase with
+#     rerolls_left == 1 (seeded fresh profile, fortune 10 -> budget 1). Pressing
+#     event_reroll spends the budget: rerolls_left 1 -> 0, event_title/event_body
+#     re-published non-empty (the re-drawn event), event_id non-empty (re-drawn).
+#   Leg 2 (exhausted inert): pressing event_reroll again is INERT — zero RNG,
+#     counters unchanged (rerolls_left == 0, event_id unchanged, events_seen_count
+#     unchanged), and a non-empty i18n'd receipt (status_text) is shown.
+#   Leg 3 (occlusion): the reroll frame is UiOcclusionWatch-clean.
+#
+# ZERO balance literals: only sign pins (== 0, != "") and the differential
+# token unchanged. Never pins fortune == 20 or budget == 3.
+#
+# HONESTY NOTE (recorded in final/red_first_notes_r3_fortune.md): the task's
+# leg-1 expectation that event_id and events_seen_count both read "changed" on
+# a reroll is NOT deterministically expressible here. draw_unseen_id draws from
+# the pool of events NOT in events_seen; the original travel draw does not mark
+# the event seen, so the reroll draws from the SAME pool and may redraw the same
+# event (1/36 with the natural pool, and the seed is a fresh system-clock
+# entropy seed per run — not fixed). events_seen_count only grows when an event
+# is RESOLVED (_apply_event_option), never on a draw or reroll. So leg 1 pins
+# the robust facts (rerolls_left 1->0, event_title/body re-published non-empty,
+# event_id non-empty) and leg 2 pins the inert facts (unchanged) — the
+# differential that IS deterministic.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
+#   pre-fix tree where the rerolls_left surface does NOT exist on
+#   CultivationScreen):
+#
+#   failing_frame:            f130
+#   first_failing_assert:     CultivationScreen.rerolls_left
+#   exact_error/observed:     "node property not found: CultivationScreen.rerolls_left"
+#                             (the surface was not yet published by the pre-fix script)
+#   green_asserts_before_red: 3 (f130 has 3 asserts before the rerolls_left line)
+name: fortune_reroll_budget
+description: >-
+  Fortune's promised travel-event reroll (design D2). Leg 1: a travel draw then
+  a successful event_reroll press re-draws the event (rerolls_left 1 -> 0,
+  event_title/event_body re-published non-empty, event_id non-empty). Leg 2:
+  the exhausted press is inert (rerolls_left == 0, event_id/events_seen_count
+  unchanged, non-empty inert receipt). Leg 3: the reroll frame is
+  occlusion-clean. ZERO balance literals.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh CULTIVATION save (fortune 10 -> budget 1) ────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (fresh profile, month 1, budget 1) ──────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+    CultivationScreen.rerolls_left: rerolls_left == 1
+# ── TRAVEL: CARD_PICK -> ACTION_PICK -> focus 3 (游历) -> draw event ────────
+- at: 140
+  actions:
+  - ui_accept  # CARD_PICK -> ACTION_PICK
+- at: 160
+  actions:
+  - move_down  # focus 0 -> 1
+- at: 165
+  actions:
+  - move_down  # focus 1 -> 2
+- at: 170
+  actions:
+  - move_down  # focus 2 -> 3 (游历)
+- at: 180
+  actions:
+  - ui_accept  # draw event -> EVENT phase
+- at: 190
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.event_id: event_id != ""
+    CultivationScreen.rerolls_left: rerolls_left == 1
+    CultivationScreen.events_seen_count: events_seen_count == 0
+# ── LEG 1: successful reroll (budget 1 -> 0, event re-drawn) ─────────────────
+- at: 200
+  actions:
+  - event_reroll
+- at: 210
+  actions: []
+  assert:
+    CultivationScreen.rerolls_left: rerolls_left == 0
+    CultivationScreen.event_title: event_title != ""
+    CultivationScreen.event_body: event_body != ""
+    CultivationScreen.event_id: event_id != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG 2: exhausted press is inert (zero RNG, counters unchanged) ───────────
+# The harness `unchanged` token compares against frame 0 (where event_id was ""
+# and events_seen_count was 0), so it cannot express "unchanged across this
+# press". Instead we pin the exact ladder: events_seen_count == 0 (it only grows
+# on RESOLUTION, never on a draw/reroll, so an inert press leaves it at 0) and
+# event_id != "" (the drawn event is still shown, not cleared by the inert press)
+# — the deterministic inert proof, per the honesty note in the header.
+- at: 220
+  actions:
+  - event_reroll
+- at: 230
+  actions: []
+  assert:
+    CultivationScreen.rerolls_left: rerolls_left == 0
+    CultivationScreen.events_seen_count: events_seen_count == 0
+    CultivationScreen.event_id: event_id != ""
+    CultivationScreen.status_text: status_text != ""

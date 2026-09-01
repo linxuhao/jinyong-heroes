@@ -248,6 +248,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_right"):
 		get_viewport().set_input_as_handled()
 		_cycle_focus(1)
+	elif event.is_action_pressed("event_reroll"):
+		get_viewport().set_input_as_handled()
+		_on_event_reroll()
 
 
 # ---------------------------------------------------------------------------

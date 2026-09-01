@@ -83,6 +83,7 @@ ROUND_SCENARIOS: list[str] = [
     "event_option_refused_no_charge",
     "occlusion_no_button_over_text",
     "action_yield_differential",
+    "fortune_reroll_budget",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen

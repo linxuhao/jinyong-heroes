@@ -73,6 +73,9 @@ const TESTS: Array[String] = [
 	# structural facts only (finite/non-negative, mastered-heavy work income >
 	# fresh, travel <= 36 events). Never balance literals.
 	"res://tests/test_action_yield_curves.gd",
+	# R3 fortune reroll 2026-09-01: the pure-static budget curve
+	# (fortune 0/5 -> 1, 10 -> 1, 20 -> 2, 30 -> 3; deep_fortune adds exactly 1).
+	"res://tests/test_fortune_budget.gd",
 ]
 
 
