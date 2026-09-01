@@ -97,6 +97,19 @@ var event_body: String = ""
 ## Surface: true once the DEBUG fast-forward has run.
 var fast_forward_used: bool = false
 
+## Surface: the month captured at the very top of _on_accept() BEFORE any phase
+## match — the pre-advance month for the differential nail. Assigned ONLY in
+## _on_accept (never re-assigned, and never written by _sync_surface, which
+## re-reads the profile's month on every call and would clobber the snapshot).
+var month_before_accept: int = 1
+
+## Surface: an on-screen notice for the current accept ("", nothing to say).
+## Rendered by _render() as an appended body line whenever non-empty. Cleared at
+## the top of _on_accept() and written by the branches that need to explain
+## themselves (e.g. the empty-practice exit). Same facility_result_text shape:
+## tr() at the composition site; nails assert shape-only (!= "").
+var status_text: String = ""
+
 var _monthly_cards: Array = []
 var _yearly_cards: Array = []
 var _card_focus: int = 0
@@ -232,6 +245,8 @@ func _cycle_focus(dir: int) -> void:
 
 
 func _on_accept() -> void:
+	month_before_accept = month
+	status_text = ""
 	_delete_armed = false
 	match phase:
 		"YEAR_AUGMENT":
@@ -272,7 +287,18 @@ func _on_accept() -> void:
 		"GONGFA_PICK":
 			var ids: Array[String] = _unmastered_ids()
 			if ids.is_empty():
-				phase = "ACTION_PICK"
+				# Soft-lock exit: no unmastered arts — burn the month and move
+				# on. Mirrors _fast_forward's transition (ATTR_PICK + advance)
+				# WITHOUT its free reward: NO _apply_action here (zero RNG ops,
+				# zero attribute gain — the seeded RNG stream's op order is the
+				# lifeline of event_travel_effects 19/19 and save_load_roundtrip
+				# 14/14). _after_action is the single month-advance path; month
+				# 12 -> YEAR_END and y3/m12 -> _finish_to_map inherit for free.
+				status_text = tr("无可修习的功法，本月照常过去")
+				phase = "ATTR_PICK"
+				_attr_focus = 0
+				_after_action()
+				return
 			else:
 				var gid: String = ids[_gongfa_focus % ids.size()]
 				_apply_action({"kind": "practice", "target": gid})
