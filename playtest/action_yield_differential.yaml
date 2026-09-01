@@ -95,11 +95,17 @@ timeline:
 # ── LEG 2: PRACTICE (month 2) ───────────────────────────────────────────────
 - at: 220
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
+  - ui_accept  # CARD_PICK -> ACTION_PICK (focus persists at 2 = 做工 from leg 1)
 - at: 240
   actions:
-  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+  - move_up  # focus 2 -> 1
+- at: 245
+  actions:
+  - move_up  # focus 1 -> 0 (练功)
 - at: 260
+  actions:
+  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+- at: 280
   actions:
   - ui_accept  # GONGFA_PICK focus 0 -> apply practice
 - at: 280
@@ -138,16 +144,13 @@ timeline:
 # ── LEG 4: TRAVEL (month 4) ────────────────────────────────────────────────
 - at: 390
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
+  - ui_accept  # CARD_PICK -> ACTION_PICK (focus persists at 1 = 修习 from leg 3)
 - at: 410
   actions:
-  - move_down  # focus: 练功(0) -> 修习(1) -> 做工(2) -> 游历(3)
+  - move_down  # focus 1 -> 2 (做工)
 - at: 415
   actions:
-  - move_down
-- at: 420
-  actions:
-  - move_down
+  - move_down  # focus 2 -> 3 (游历)
 - at: 425
   actions: []
   assert:

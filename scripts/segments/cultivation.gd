@@ -707,7 +707,7 @@ func _rebuild_options_box() -> void:
 			for c in _monthly_cards:
 				labels.append(_card_button_label(c))
 		"ACTION_PICK":
-			var action_labels: Array[String] = ["练功", "修习", "做工", "游历", "存盘", "读档", "删档"]
+			var action_labels: Array[String] = ["练功（+2 所选功法）", "修习（属性 +1~3）", "做工（银两随大成数）", "游历（事件与物品）", "存盘", "读档", "删档"]
 			for label in action_labels:
 				labels.append(tr(label))
 		"GONGFA_PICK":
