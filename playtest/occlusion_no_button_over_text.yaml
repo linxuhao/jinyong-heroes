@@ -1,0 +1,195 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# OCCLUSION STRUCTURAL GATE NAIL (2026-09-01, jinyong-loop R2, task D6).
+#
+# Vision gate Q6 asks about TRUNCATION, not OCCLUSION — which is exactly how
+# 79/79 vision-good coexisted with three button-over-text overlaps. This nail
+# walks REAL player input down the mainline spine to the three measured defect
+# screens and, at each, asserts the STRUCTURAL PROPERTY published by the
+# UiOcclusionWatch autoload:
+#
+#     UiOcclusionWatch.violations: violations == 0
+#
+# Three frames, three property asserts, ZERO coordinate literals (R1 order: a
+# legal layout re-tweak must never falsely red a stale `offset_right == 110`
+# style pin — only the published property is asserted):
+#   f158 — tutorial overlay WELCOME page (the new player's first screen; the
+#          theme round's Buttons HBox used to render as a 400x440 column
+#          straight through the Body RichTextLabel);
+#   f345 — sect-select screen (the 「唐门」 body row used to be covered by the
+#          「少林」..「唐门」 button column);
+#   f425 — roster panel open in CULTIVATION (the 装上/卸下 pool used to sit
+#          INSIDE the body rect, covering the 悟性 attribute cell).
+#
+# The walk mirrors clicks_only_storyline's proven front half verbatim (menu →
+# creation → 7 tutorial-intro Next clicks → tutorial battle → WON overlay →
+# transition → sect select → cultivation), then opens the roster panel by its
+# real click entry. Every input is real (clicks / debug_win_tutorial seed —
+# the same adjudicated seed role clicks_only_storyline documents).
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario sidecar
+#   run with the TEMPORARY RED-FIRST REVERT applied to the three scene files:
+#   tutorial_overlay.tscn Buttons anchors/offsets, sect_select.tscn
+#   BodyLabel/SectButton0..4/HintLabel offsets, roster_panel.tscn
+#   RosterBodyLabel/EquipButton offsets — all restored byte-identically after
+#   the red run; zero revert residue in the delivered tree).
+#
+#   failing_frame:            f158
+#   first_failing_assert:     UiOcclusionWatch.violations (violations == 0)
+#   exact_error/observed:     observed violations == 1 with violations_text
+#                             "Next>Body" (the occluder>label pair the gate
+#                             names: the tutorial Next button drawn over the
+#                             WELCOME body text — the measured defect pair)
+#   green_asserts_before_red: 5 (f60: 2 + f90: 1 + f120: 1 + f150: 1)
+#
+#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` in the
+#   three .tscn files): restore the PRE-fix geometry per
+#   final/delivery_notes_loop_occlusion.md §2 — tutorial Buttons anchors
+#   (0,0,0,1) + offsets (100,-56,500,-16); sect BodyLabel offset_right 320 +
+#   SectButton0..4 x -120..120 + HintLabel -200..200; roster RosterBodyLabel
+#   offset_right -16 + EquipButton x 165/211/257..209/255/301.
+#   Restore byte-identically (grep the three files for "TEMPORARY RED-FIRST
+#   REVERT" -> zero hits) and re-run GREEN (three frames, violations == 0).
+name: occlusion_no_button_over_text
+description: >-
+  The structural occlusion gate nail (D6). Walks real input down the mainline
+  spine (menu -> creation -> tutorial intro -> battle seed -> WON overlay ->
+  transition -> sect select -> cultivation) and asserts the UiOcclusionWatch
+  published property violations == 0 at the three historically-defective
+  screens: the tutorial overlay WELCOME page, the sect-select screen, and the
+  open roster panel in CULTIVATION. Zero coordinate literals — only the
+  property gate, so a legal layout re-tweak can never falsely red it.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU → CREATION ────────────────────────────────────────────────────────
+- at: 40
+  actions: []
+  clicks:
+  - MenuEntry0
+- at: 60
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    CreationScreen.visible: visible == true
+- at: 70
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "TRAITS"
+- at: 100
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 120
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "CONFIRM"
+- at: 130
+  actions: []
+  clicks:
+  - ConfirmButton
+# ── TUTORIAL INTRO — the WELCOME page is step 0, visible before the first
+#    Next click. The occlusion gate reads 0 here after the geometry fix.
+- at: 150
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+- at: 158
+  actions: []
+  assert:
+    UiOcclusionWatch.violations: violations == 0
+- at: 165
+  actions: []
+  clicks:
+  - Next
+- at: 175
+  actions: []
+  clicks:
+  - Next
+- at: 185
+  actions: []
+  clicks:
+  - Next
+- at: 195
+  actions: []
+  clicks:
+  - Next
+- at: 205
+  actions: []
+  clicks:
+  - Next
+- at: 215
+  actions: []
+  clicks:
+  - Next
+- at: 225
+  actions: []
+  clicks:
+  - Next
+# ── TUTORIAL BATTLE → WON overlay (documented outcome seed, no attack needed) ─
+- at: 235
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 245
+  actions:
+  - debug_win_tutorial
+- at: 265
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    ContinueButton.visible: visible == true
+- at: 275
+  actions: []
+  clicks:
+  - ContinueButton
+# ── TRANSITION (2 pages) ───────────────────────────────────────────────────
+- at: 295
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+    NextButton.visible: visible == true
+- at: 305
+  actions: []
+  clicks:
+  - NextButton
+- at: 325
+  actions: []
+  clicks:
+  - NextButton
+# ── SECT SELECT — the second property frame ────────────────────────────────
+- at: 345
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+    SectButton0.visible: visible == true
+    UiOcclusionWatch.violations: violations == 0
+- at: 355
+  actions: []
+  clicks:
+  - SectButton0
+# ── CULTIVATION — open the roster panel by its real click entry ────────────
+- at: 395
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultOptionButton0.visible: visible == true
+- at: 400
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 410
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 425
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    UiOcclusionWatch.violations: violations == 0

@@ -81,6 +81,7 @@ ROUND_SCENARIOS: list[str] = [
     "facility_use_cap_exhausted_zero_delta",
     "map_node_event_revisit_no_resettle",
     "event_option_refused_no_charge",
+    "occlusion_no_button_over_text",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -2014,3 +2015,73 @@ def test_equipment_surface_contract() -> None:
             assert not target.endswith("_ClickTarget"), (
                 f"{name}.yaml uses forbidden *_ClickTarget: {target}"
             )
+
+
+def test_occlusion_watch_surface_contract() -> None:
+    """Static contract pin for the jinyong-loop R2 occlusion_watch_gate task.
+
+    Pins the structural occlusion gate (D6): the UiOcclusionWatch surface
+    block (violations / violations_text) is whitelisted on the
+    ``playtest/_common.yaml`` surface section, the scenario
+    ``occlusion_no_button_over_text`` is in scenario_order AND in
+    ROUND_SCENARIOS (two-place sync), the scenario file exists with
+    ``name:`` equal to its basename, every timeline ``at:`` is a single
+    integer, and the file carries at least one
+    ``UiOcclusionWatch.violations: violations == 0`` property assert.
+
+    COORDINATE-LITERAL FORBIDDEN ZONE: the file must contain NO ``offset_``
+    assert line at all. A legal layout re-tweak (e.g. moving the sect button
+    column a few px further right) would otherwise falsely red a stale
+    geometry pin; the gate asserts ONLY the published property
+    ``violations == 0`` — zero coordinate literals anywhere.
+    """
+    name = "occlusion_no_button_over_text"
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "UiOcclusionWatch" in blocks, "surface has no UiOcclusionWatch block"
+    watch_items = blocks["UiOcclusionWatch"]
+    assert watch_items, "UiOcclusionWatch surface block parsed empty (vacuous pass guard)"
+    for var in ("violations", "violations_text"):
+        assert var in watch_items, (
+            f"UiOcclusionWatch.{var} not whitelisted on the surface"
+        )
+
+    # Two-place sync: scenario_order AND ROUND_SCENARIOS.
+    order = _items_under(text, "scenario_order")
+    assert name in order, f"{name} not in _common.yaml scenario_order (two-place sync)"
+    assert name in ROUND_SCENARIOS, f"{name} not in ROUND_SCENARIOS (two-place sync)"
+
+    # Scenario file static checks.
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    has_property = False
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            has_op = any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            )
+            assert has_op, (
+                f"{name}.yaml line {lineno} assert missing comparison operator: "
+                f"{line.strip()}"
+            )
+            if "violations == 0" in line:
+                has_property = True
+        # Coordinate-literal forbidden zone (R1 order): a layout re-tweak must
+        # not falsely red this gate; only the published property is asserted.
+        assert "offset_" not in line, (
+            f"{name}.yaml line {lineno} carries a forbidden coordinate-literal "
+            f"assert (offset_): {line.strip()}"
+        )
+    assert has_property, (
+        f"{name}.yaml missing a `violations == 0` property assert"
+    )

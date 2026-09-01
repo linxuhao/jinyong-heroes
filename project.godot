@@ -32,6 +32,7 @@ TutorialManager="*res://scripts/autoload/tutorial_manager.gd"
 AudioManager="*res://scripts/autoload/audio_manager.gd"
 ThemeManager="*res://scripts/autoload/theme_manager.gd"
 InputGate="*res://scripts/autoload/input_gate.gd"
+UiOcclusionWatch="*res://scripts/autoload/ui_occlusion_watch.gd"
 ; SceneManager must stay the LAST autoload entry: its _teardown_battle_refs
 ; references GameManager/CombatManager/GridManager by name (compile ordering).
 SettingsManager="*res://scripts/autoload/settings_manager.gd"

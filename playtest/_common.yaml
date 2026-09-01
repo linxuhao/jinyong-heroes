@@ -1060,6 +1060,9 @@ surface:
   - mouse_filter
   - text
   - focus_mode
+  UiOcclusionWatch:
+  - violations
+  - violations_text
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
@@ -1144,3 +1147,4 @@ scenario_order:
 - facility_use_cap_exhausted_zero_delta
 - map_node_event_revisit_no_resettle
 - event_option_refused_no_charge
+- occlusion_no_button_over_text
