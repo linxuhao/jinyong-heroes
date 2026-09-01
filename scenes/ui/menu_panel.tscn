@@ -64,6 +64,7 @@ focus_mode = 0
 text = "退出"
 
 [node name="HintLabel" type="Label" parent="."]
+theme_type_variation = &"HintLabel"
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0

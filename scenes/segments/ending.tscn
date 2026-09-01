@@ -34,6 +34,7 @@ text_overrun_behavior = 0
 text = ""
 
 [node name="HintLabel" type="Label" parent="."]
+theme_type_variation = &"HintLabel"
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
