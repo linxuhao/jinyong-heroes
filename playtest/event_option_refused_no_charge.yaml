@@ -37,36 +37,53 @@
 #   - MapScreen.last_effect_types: empty (nothing applied).
 #
 # RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario direct
-#   sidecar run WITH the TEMPORARY RED-FIRST REVERT applied to the owned branch
-#   of scripts/data/event_logic.gd::apply_option_effects — the revert restored
-#   the old unconditional-charge shape: silver applies regardless, item appends
-#   only when absent, NO refusal receipt).
+#   sidecar run under the CORRECTED main.tscn boot, WITH the TEMPORARY
+#   RED-FIRST REVERT applied to scripts/data/event_logic.gd — BOTH
+#   validate_option() (returned "" unconditionally, so map.gd's
+#   _resolve_node_event REFUSED path never fired) AND apply_option_effects()
+#   (restored the old unconditional-charge shape: silver applies regardless
+#   with the maxi(..., 0) clamp, item appends only when absent, NO refusal
+#   receipt). The owned pick then netted -20 silver with no receipt.
 #
-#   failing_frame:            <re-baselined from the measured run below>
-#   first_failing_assert:     MapScreen.silver — silver == event_open_silver
-#                             (observed silver dipped by 20: event_open_silver)
-#                             and MapScreen.map_status_text == "" (no receipt)
-#   exact_error/observed:     see per-frame `observed` values recorded after the
-#                             run below
-#   green_asserts_before_red: <counted from the measured run below>
+#   failing_frame:            470
+#   first_failing_assert:     MapScreen.last_effect_types —
+#                             last_effect_types.is_empty() == true
+#                             (observed ["silver", "item"] — the effects were
+#                             applied, not refused)
+#   exact_error/observed:     at f470, three asserts red:
+#                               last_effect_types.is_empty() == true
+#                                 observed ["silver", "item"]
+#                               silver == event_open_silver
+#                                 observed 1810 (event_open_silver 1830 —
+#                                 dipped by exactly 20, the old unconditional
+#                                 charge)
+#                               map_status_text != ""
+#                                 observed "" (no refusal receipt)
+#   green_asserts_before_red: 8 (f400 current_state == "MAP" + visible == true;
+#                             f440 phase == "EVENT" + event_id == "merchant" +
+#                             current_node_id == "luoyang" + silver ==
+#                             event_open_silver; f470 phase == "TRAVEL" +
+#                             events_resolved_count == 1)
 #
-#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` on the
-#   apply_option_effects owned branch in scripts/data/event_logic.gd):
-#     replace the validate-then-apply pass-1 early-return with a pass-1 that
-#     never returns refuse (so the old silver-charge/item-dedup path runs with
-#     the maxi(..., 0) clamp restored) — the owned pick then nets -20 silver and
-#     the asserts above red.
+#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` on BOTH
+#   functions in scripts/data/event_logic.gd):
+#     validate_option(): replace the body with `return ""` (so map.gd's
+#       _resolve_node_event REFUSED path never fires and the APPLIED path runs);
+#     apply_option_effects(): replace the validate-then-apply pass-1 early-return
+#       with a pass-1 that never returns refuse (so the old silver-charge /
+#       item-dedup path runs with the maxi(..., 0) clamp restored) — the owned
+#       pick then nets -20 silver and the asserts above red.
 #   Restore byte-identically (search scripts/ for "TEMPORARY RED-FIRST REVERT"
 #   -> zero hits) and re-run GREEN.
 name: event_option_refused_no_charge
 description: >-
-  The all-or-nothing purchase-refusal nail (D4). Boots menu.tscn, drives to
-  CULTIVATION, injects eq_sword_3 via debug_grant_equip (REAL item pipeline),
+  The all-or-nothing purchase-refusal nail (D4). Boots the contract-default
+  main.tscn, drives to CULTIVATION, injects eq_sword_3 via debug_grant_equip
+  (REAL item pipeline),
   fast-forwards to MAP, travels to 洛阳 where the merchant fires, and picks
   option A 买下长剑 which is REFUSED (already owned): silver == event_open_silver
   (ZERO delta), phase == TRAVEL, map_status_text != "" (the on-screen receipt),
   events_resolved_count == 1, and last_effect_types empty.
-scene: res://scenes/menu.tscn
 timeline:
 # ── Boot: menu -> creation -> tutorial -> cultivation (facility_use_cap boot) ──
 - at: 3
