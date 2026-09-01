@@ -78,6 +78,7 @@ ROUND_SCENARIOS: list[str] = [
     "event_pool_new_event_resolved",
     "theme_focus_marker_cultivation",
     "softlock_empty_practice_month_advances",
+    "facility_use_cap_exhausted_zero_delta",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1225,6 +1226,74 @@ def test_softlock_nail_contract() -> None:
             f"{repointed}.yaml lost its preserved empty-state assert "
             "`mastered_count == gongfa_count` during the re-point"
         )
+
+
+def test_facility_use_cap_nail_contract() -> None:
+    """Static anti-weakening pins for the jinyong-loop facility-cap nail.
+
+    The nail (``facility_use_cap_exhausted_zero_delta``) pins the per-month
+    facility cap (RULE GATE: 2 uses per profile month). The exhausted press
+    must be proven by DIFFERENTIAL comparisons against the success-only
+    snapshot surfaces (never by tuned literals like ``== 8``). Hard pins:
+
+      1. the scenario is in BOTH registries — ``scenario_order`` in
+         ``playtest/_common.yaml`` AND ``ROUND_SCENARIOS`` here (two-place
+         sync, both tails, same relative order);
+      2. the file exists with ``name:`` == its basename;
+      3. every timeline ``at:`` is a single integer;
+      4. the file MUST carry the two zero-delta lines
+         ``silver == last_use_silver`` and ``attr_bone == last_use_attr_value``
+         (the exhausted press changed nothing on either value), plus the
+         on-screen exhausted-receipt line ``facility_result_text != ""``;
+      5. the protected gate (a) file ``facility_use_reusable.yaml`` still
+         carries its pinned ``phase != "FACILITY"`` and
+         ``facility_use_count == 0`` arrival-half lines — the cap fix must
+         never weaken them.
+    """
+    name = "facility_use_cap_exhausted_zero_delta"
+    order_text = COMMON.read_text(encoding="utf-8")
+    order_names = _items_under(order_text, "scenario_order")
+    assert name in order_names, f"{name} missing from scenario_order"
+    assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
+    assert order_names.index(name) == ROUND_SCENARIOS.index(name), (
+        f"{name} order mismatch between scenario_order and ROUND_SCENARIOS"
+    )
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(
+        ftext.splitlines(), start=1
+    ):
+        match = re.search(r"\bat\s*:\s*([^,}\s]+)", line)
+        if match and not match.group(1).isdigit():
+            assert False, (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {match.group(1)!r}"
+            )
+    for mandatory in (
+        "silver == last_use_silver",
+        "attr_bone == last_use_attr_value",
+        'facility_result_text != ""',
+    ):
+        assert mandatory in ftext, (
+            f"{name}.yaml missing the mandatory differential/receipt line "
+            f"`{mandatory}`"
+        )
+    # The protected arrival-half pins of gate (a) must survive the cap fix
+    # byte-untouched (anti-weakening, per the verbatim-protected trio rule).
+    gate_text = (PLAYTEST_DIR / "facility_use_reusable.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert 'phase != "FACILITY"' in gate_text, (
+        "facility_use_reusable.yaml lost its pinned `phase != \"FACILITY\"` line"
+    )
+    assert "facility_use_count == 0" in gate_text, (
+        "facility_use_reusable.yaml lost its pinned "
+        "`facility_use_count == 0` line"
+    )
 
 
 def _normalize_assert(s: str) -> str:

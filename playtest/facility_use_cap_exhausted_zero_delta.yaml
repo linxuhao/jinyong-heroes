@@ -167,14 +167,14 @@ timeline:
   assert:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.facility_use_count: facility_use_count == 1
-# --- Entry #2: enter, use, leave ---
+# --- Entry #2: enter, use, leave (same spacing as entry #1) ---
 - at: 630
   actions:
   - use_facility
-- at: 640
+- at: 650
   actions:
   - ui_accept
-- at: 660
+- at: 670
   actions: []
   assert:
     MapScreen.facility_use_count: facility_use_count == 2
@@ -183,19 +183,19 @@ timeline:
     MapScreen.facility_result_text: facility_result_text != ""
     MapScreen.silver: silver == last_use_silver
     MapScreen.attr_bone: attr_bone == last_use_attr_value
-- at: 670
+- at: 680
   actions:
   - move_down
-- at: 680
+- at: 690
   actions: []
   assert:
     MapScreen.phase: phase == "TRAVEL"
     MapScreen.facility_use_count: facility_use_count == 2
 # --- Entry #3: enter, EXHAUSTED press (refused, zero delta) ---
-- at: 690
+- at: 700
   actions:
   - use_facility
-- at: 700
+- at: 710
   actions:
   - ui_accept
 - at: 720
