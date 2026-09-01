@@ -64,6 +64,10 @@ const TESTS: Array[String] = [
 	# R3 deeds schema 2026-09-01: PlayerProfile.deeds choice ledger (default
 	# zeros, round-trip, legacy repair, corrupted/negative coercion, JSON).
 	"res://tests/test_deeds_persistence.gd",
+	# R3 progression math 2026-09-01: the pure-static single numeric source
+	# (GRADE_POINTS / mastered_count / mastery_points / work_income /
+	# deed_score / readiness_power) — monotonicity + differential asserts only.
+	"res://tests/test_progression_math.gd",
 ]
 
 
