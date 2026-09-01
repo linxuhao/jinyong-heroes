@@ -2165,10 +2165,10 @@ def test_event_option_refused_nail_contract() -> None:
     assert path.is_file(), f"{name}.yaml missing"
     ftext = path.read_text(encoding="utf-8")
     assert re.search(
-        rf"^name:\\s*{name}\\s*$", ftext, re.MULTILINE
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
     ), f"{name}.yaml name: does not equal its basename"
     for lineno, line in enumerate(ftext.splitlines(), start=1):
-        match = re.search(r"\\bat\\s*:\\s*([^,}\\s]+)", line)
+        match = re.search(r"\bat\s*:\s*([^,}\s]+)", line)
         if match and not match.group(1).isdigit():
             assert False, (
                 f"{name}.yaml line {lineno}: non-integer timeline "
