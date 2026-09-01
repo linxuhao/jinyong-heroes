@@ -1040,6 +1040,7 @@ surface:
   - equipped_boots
   - equip_button_count
   - equip_pressed_connected
+  - readiness_text
   RosterOpenButton:
   - visible
   - size
@@ -1159,3 +1160,5 @@ scenario_order:
 - occlusion_no_button_over_text
 - action_yield_differential
 - fortune_reroll_budget
+- huashan_readiness_warning
+- huashan_winnable_normal_route

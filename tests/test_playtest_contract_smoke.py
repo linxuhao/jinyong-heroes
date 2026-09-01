@@ -84,6 +84,8 @@ ROUND_SCENARIOS: list[str] = [
     "occlusion_no_button_over_text",
     "action_yield_differential",
     "fortune_reroll_budget",
+    "huashan_readiness_warning",
+    "huashan_winnable_normal_route",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen

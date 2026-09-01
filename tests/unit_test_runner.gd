@@ -76,6 +76,10 @@ const TESTS: Array[String] = [
 	# R3 fortune reroll 2026-09-01: the pure-static budget curve
 	# (fortune 0/5 -> 1, 10 -> 1, 20 -> 2, 30 -> 3; deep_fortune adds exactly 1).
 	"res://tests/test_fortune_budget.gd",
+	# R3 huashan winnable 2026-09-01: derive_stats mastery terms (mp==0 legacy,
+	# strict increase, texture preserved, gear additivity) + readiness verdict
+	# (single-source power, weak<even<strong band ordering).
+	"res://tests/test_battle_setup_readiness.gd",
 ]
 
 
