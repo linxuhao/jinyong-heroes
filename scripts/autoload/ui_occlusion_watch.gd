@@ -55,7 +55,7 @@ func _process(_delta: float) -> void:
 				continue
 			if b.is_ancestor_of(l) or l.is_ancestor_of(b):
 				continue
-			if b.get_canvas_layer() != l.get_canvas_layer():
+			if b.canvas_layer != l.canvas_layer:
 				continue
 			var br: Rect2 = b.get_global_rect()
 			var lr: Rect2 = l.get_global_rect()
@@ -107,8 +107,17 @@ func _draws_over(b: Control, l: Control) -> bool:
 			break
 	if lca == null:
 		return false
-	var b_branch: Node = bp[bp.find(lca) + 1]
-	var l_branch: Node = lp[lp.find(lca) + 1]
+	# If the LCA is the LAST element of either chain (the tree root, e.g. two
+	# controls from unrelated top-level subtrees), then the child-branch index
+	# find(lca)+1 would read one past the array end — guard it: there is no
+	# meaningful draw-order comparison across unrelated subtrees, so the pair
+	# is out of scope (never red).
+	var bi: int = bp.find(lca) + 1
+	var li: int = lp.find(lca) + 1
+	if bi >= bp.size() or li >= lp.size():
+		return false
+	var b_branch: Node = bp[bi]
+	var l_branch: Node = lp[li]
 	if b_branch.get_parent() != lca or l_branch.get_parent() != lca:
 		return false
 	return b_branch.get_index() > l_branch.get_index()
@@ -145,7 +154,7 @@ func _collect_over(node: Node, l: Control, b: Control, out: Array[Control]) -> v
 			and not b.is_ancestor_of(node) and not node.is_ancestor_of(b) \
 			and node.is_visible_in_tree():
 		var c := node as Control
-		if c.get_canvas_layer() == l.get_canvas_layer() \
+		if c.canvas_layer == l.canvas_layer \
 				and _draws_over(c, l) \
 				and c.get_global_rect().intersects(l.get_global_rect()):
 			out.append(c)

@@ -2085,3 +2085,17 @@ def test_occlusion_watch_surface_contract() -> None:
     assert has_property, (
         f"{name}.yaml missing a `violations == 0` property assert"
     )
+
+    # Evidence-record pin (reviewer feedback): the threshold-rationale + tutorial
+    # other-6-pages measurement record cannot be silently dropped in a future
+    # round. The gate's >=4px / >=0.5 thresholds are justified only by the
+    # measured per-axis intersections and residual visibilities recorded there.
+    delivery = (
+        Path(__file__).resolve().parents[1]
+        / "final"
+        / "delivery_notes_loop_occlusion_watch.md"
+    )
+    assert delivery.is_file(), (
+        "final/delivery_notes_loop_occlusion_watch.md missing — the occlusion "
+        "gate's threshold-rationale evidence record must not be dropped"
+    )
