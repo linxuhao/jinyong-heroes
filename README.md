@@ -1140,9 +1140,12 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 ## Verification status (honest)
 
 **jinyong-loop R2 (this round, 2026-09-01) — implementation verified by direct read;
-per-scenario sidecar evidence green; the surfaced guard conflict RULED ON and APPLIED
-(option (i), timeline-scoped ban; in-step pytest 56/56 after the repairs); consolidated
-gates pending:**
+per-scenario sidecar evidence green; the 5_review cycle's consolidated gate products
+LANDED (compile 99/99 scripts / 0 errors; 84/84 scenarios PASS, hard gate `passed: True`,
+0 runtime errors; vision passed, Q6 84 good / 0 bad) with the three protected gates green
+verbatim; its single pytest blocker (the purchase-nail name==basename pin) is FIXED in
+the tree; the official 5_test re-run on the fixed tree is the one remaining pending
+artifact:**
 
 - **Verified in the tree (verifier direct read):** the four rule fixes at their exact edit
   points (`cultivation.gd:297-300` empty-GONGFA exit → status + ATTR_PICK + `_after_action()`,
@@ -1161,20 +1164,37 @@ gates pending:**
   green; protected gates 49/49 / 32/32 / 41/41; `spine_to_ending` 42/42;
   `save_load_roundtrip` 14/14; `event_travel_effects` 19/19; zero runtime errors in every
   recorded run.
-- **Pending downstream (not counted as met):** the single consolidated 84-scenario harness run
-  and `compile_report.json` (`5_compile` — the last `step:5_compile` product was the CRASHED
-  run, hard gate `passed: False`, 44,660 runtime errors, SUPERSEDED by the reviewer; none of
-  its numbers count as this round's verdict); `test_report.json` (`5_test` — the
-  softlock-guard documentation conflict WAS ruled on and applied (option (i): the ban is
-  scoped to the timeline's actions, and the three index guards were repaired to the
-  relative-order sync comparison); in-step pytest measured 56/56 after the repairs, but the
-  official re-run on the delivered tree is pending);
-  `vision_report.json` (`5_vision`, incl. the seven before/after occlusion frame pairs —
-  `blind / endpoint_unreachable` at verification time; the structural watch's
-  `violations == 0` + `scan_ok == true` is the machine gate in the interim). The brief's
-  `git log` theme-merge check was never executed (no shell anywhere in the round);
-  in-tree `ThemeManager.option_style` consumption confirms the merge and the fix zones do not
-  overlap the focus-style portion.
+- **Landed gate products (per the 5_review cycle's verdict on the delivered tree):**
+  `compile_report.json` — 99/99 GDScript scripts parsed, 0 errors, 0 warnings;
+  consolidated playtest run — hard gate `passed: True`, 180 frames, 0 runtime errors,
+  **84/84 scenarios PASS**, the three protected gates green verbatim
+  (`facility_use_reusable` 49/49, `map_node_event_shaolin` 32/32,
+  `map_battle_node_huashan` 41/41) and all five new R2 nails green (15/15, 33/33,
+  33/33, 11/11, 22/22) plus the two re-pointed empty-exit nails (18/18, 15/15);
+  `vision_report.json` — passed non-blind (84 scenarios / 336 frames), all six
+  questions `failed: false`, Q6 84 good / 0 bad, backing the seven before/after
+  occlusion frame pairs together with the structural `UiOcclusionWatch` asserts.
+- **5_review blocker FIXED (verified in-repo, 2026-09-01):** the review's pytest run
+  showed 55 passed / 1 failed — `test_event_option_refused_nail_contract`'s
+  name==basename regex did not match the scenario's `name:` line. Fixed at
+  `playtest/event_option_refused_no_charge.yaml:78` (the line is now byte-equal to its
+  basename); the guard itself is NOT weakened
+  (`tests/test_playtest_contract_smoke.py:2133-2197` unchanged — the name==basename
+  pin is the point of the guard); the post-fix pytest cache records zero failures
+  (`.pytest_cache/v/cache/lastfailed == {}`). The review's record correction is also
+  landed: `final/gate_run_notes_loop.md` no longer cites the nonexistent
+  `tests/test_event_logic_refusal.gd` — it points at `tests/test_map_node_event.gd`'s
+  cost-gate block (~:562-577, the zero-mutation refusal pins) plus the three playtest
+  nails.
+- **Pending downstream (the only unmet standard, not counted as met):** the OFFICIAL
+  `test_report.json` (`5_test`) re-run on the fixed tree. Every other gate artifact for
+  this round has landed (see above); the blocker fix's resolution is measured in-repo
+  (byte-equal name line, guard intact, zero pytest-cache failures), but the owning
+  gate's official artifact is produced after this step.
+- **Documented constraint record:** the brief's `git log` theme-merge check was never
+  executed (no shell anywhere in the round); in-tree `ThemeManager.option_style`
+  consumption confirms the merge and the fix zones do not overlap the focus-style
+  portion.
 
 **jinyong-theme (previous round, 2026-09-01) — implementation verified by direct
 read; the official PRE-fix gates landed (archived by 5_design) and the review
