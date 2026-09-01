@@ -130,6 +130,17 @@ var map_battle_id: String = ""
 ## Session-scoped only — never persisted.
 var map_events_resolved_count: int = 0
 
+## Session mirror of the facility monthly-use epoch (jinyong-loop R2). The
+## MapScreen is rebuilt on return from a map battle, so its own per-month counter
+## would reset to 0; this mirror carries the (month, count) pair across the swap.
+## `facility_use_month` is the profile month of the last facility use (-1 = never
+## used this session); `facility_use_count_this_month` counts uses within that
+## month. Both reset when a run begins (SaveManager.profile_created) or a save is
+## loaded (SaveManager.loaded) — the same lifecycle as map_events_resolved_count.
+## Session-scoped only — never persisted (no save-schema change).
+var facility_use_month: int = -1
+var facility_use_count_this_month: int = 0
+
 ## Observable: the end-game overlay's rendered text, written unconditionally
 ## inside _show_end_game_overlay() whenever the overlay shows (WON -> text
 ## containing 胜利, LOST -> text containing 战败). Never contains the ellipsis
@@ -279,6 +290,9 @@ func _connect_save_signals() -> void:
 ## Zero the events-resolved mirror when a run begins or a save is loaded.
 func _reset_map_events_resolved_count(_a: Variant = null) -> void:
 	map_events_resolved_count = 0
+	# The facility monthly-use mirror shares the same run-boundary lifecycle.
+	facility_use_month = -1
+	facility_use_count_this_month = 0
 
 
 ## Drop every per-battle reference owned by this autoload so a scene swap never

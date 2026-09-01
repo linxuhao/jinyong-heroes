@@ -95,6 +95,27 @@ var _facility_refused: bool = false
 ## (a RELATIVE expression, enough for at least two uses; deliberately NOT a tuned number).
 const DEBUG_SILVER_GRANT_MULT := 4
 
+## RULE GATE (jinyong-loop R2), NOT a balance number: the maximum number of
+## facility uses allowed per profile month. Bounds the "silver -> ending score"
+## redemption machine (measured: 40 presses in ~10s -> bone 10->91, ending jumps
+## lowest -> highest tier). A per-month cap of 2 keeps gate (a)
+## (facility_use_reusable.yaml: 2 uses in month 36, two separate entries) and
+## map_facility_buttons_click (2 uses in one month) green verbatim. No facility
+## cost/effect value moves.
+const FACILITY_MONTHLY_USE_CAP := 2
+
+## Surface: success-only snapshot of the profile silver right after the last
+## successful facility use. Written ONLY on success (never on a refused/exhausted
+## press), so `silver == last_use_silver` after a refused press is a zero-delta
+## proof. Deliberately NOT mirrored in _sync_surface() (same precedent as
+## facility_result_text — mirroring there would wipe the exhausted-frame value).
+var last_use_silver: int = 0
+
+## Surface: success-only snapshot of the facility's target attr right after the
+## last successful facility use (shaolin -> bone, wudang -> inner). Same
+## zero-delta contract as last_use_silver.
+var last_use_attr_value: int = 0
+
 
 func _ready() -> void:
 	# Save-integrity fallback: a hand-edited or legacy save may carry an empty /
