@@ -55,3 +55,16 @@ static func sha_heal_amount(loss: int, max_hp: int, healed_this_round: int) -> i
 	if cap <= 0:
 		return 0
 	return min(int(round(loss * 0.2)), cap)
+
+
+## 福缘 reroll budget (design D2 / §「福缘」): the number of travel-event
+## rerolls the player may spend per year. Pure arithmetic, zero RNG.
+##   budget = 1 + maxi(0, (fortune - 10) / 10) + (1 if deep_fortune else 0)
+## Integer division (GDScript `/` on ints truncates toward zero), so:
+##   fortune 0/5  -> 1;  10 -> 1;  20 -> 2;  30 -> 3;  deep_fortune adds exactly 1.
+## This is the reader for the repo-wide-unreferenced trait hook
+## `yearly_event_reroll` (trait_data.gd:29 deep_fortune) — the caller passes
+## `profile.has_trait("deep_fortune")`. The caller subtracts the year-scoped
+## `deeds.rerolls_used_this_year` counter and clamps >= 0.
+static func fortune_reroll_budget(fortune: int, has_deep_fortune: bool) -> int:
+	return 1 + maxi(0, (fortune - 10) / 10) + (1 if has_deep_fortune else 0)

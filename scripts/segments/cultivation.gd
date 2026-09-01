@@ -177,6 +177,12 @@ var last_practice_target: String = ""
 ## Surface: the practice amount the last 练功 action granted (== PRACTICE_ACTION_GAIN).
 var last_practice_amount: int = 0
 
+## Surface: travel-event rerolls remaining this year (year-scoped budget minus
+## profile.deeds.rerolls_used_this_year, clamped >= 0). Published by
+## _sync_surface(). The reroll affordance (EventRerollButton + event_reroll key)
+## is visible ONLY while this is > 0.
+var rerolls_left: int = 0
+
 
 func _ready() -> void:
 	# Refresh the surface whenever a load succeeds while this scene is already
