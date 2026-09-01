@@ -292,3 +292,251 @@ passed on any tree.
   4 repaired). The four repaired guards pass against the current yaml state; the
   softlock nail's timeline contains zero `debug_fast_forward` actions, and the
   three protected yamls still carry their pinned lines.
+
+---
+
+# 2026-09-01 jinyong-loop R2-fix (consolidated re-verification on the repaired tree)
+
+**Task:** `fix_loop_round_gate_rerun` — the round's consolidated evidence and
+sign-off layer, run LAST after the three fix tasks landed
+(`fix_occlusion_watch_crashproof`, `fix_purchase_nail_scene_boot`,
+`fix_nail_contract_guards`). **Consumes:** the three fix tasks' landed artifacts
+plus all five landed round fixes. **Produces:** this refreshed evidence section,
+the repaired tree's full gate-run record (`final/gate_run_notes_loop.md`), and
+one append-only backlog row.
+
+## ⚠️ SUPERSEDED — the crashed 5_compile run is NOT this round's verdict
+
+The last official gate product the pipeline produced (`step:5_compile`
+`playtest_summary.md`) was the **CRASHED** run: hard gate `passed: False`,
+`spec_used: True`, `frames: 180`, **runtime errors: 44,660**. All 84 scenarios
+were FAIL-marked — but 83/84 had FULLY PASSING assertion counts (e.g.
+`spine_to_ending 42/42`, `facility_use_reusable 49/49`,
+`map_node_event_shaolin 32/32`, `map_battle_node_huashan 41/41`,
+`softlock_empty_practice_month_advances 15/15`,
+`facility_use_cap_exhausted_zero_delta 33/33`,
+`map_node_event_revisit_no_resettle 33/33`,
+`occlusion_no_button_over_text 19/19`); the only assertion-red was
+`event_option_refused_no_charge 0/11` (wrong boot, since re-booted by
+`fix_purchase_nail_scene_boot`).
+
+**Per the reviewer's verdict, NONE of that crashed-run data may be presented as
+this round's verdict.** The consolidated run verdict is therefore recorded as
+`pending host gate run (5_compile)` in this section and in
+`final/gate_run_notes_loop.md`; every read-verifiable audit below is completed
+in-step. The crashed run's numbers appear ONLY inside this SUPERSEDED marker.
+
+## (a) Crash root cause + fix (UiOcclusionWatch)
+
+- **Root cause (measured, 44,660 errors):** the watch read `.canvas_layer`
+  directly off a Control at the old line 58 —
+  `"Invalid access to property or key 'canvas_layer' on a base object of type
+  'Button (skill_button.gd)'."` — `canvas_layer` is NOT a Control property (only
+  `CanvasItem`-derived `CanvasLayer` nodes have it). The crash aborted `_process`
+  BEFORE `violations` was assigned, so it stayed at its initial `0` — that is the
+  **false-green mechanism**: scenarios passed their assertions while the scan
+  silently did nothing, and the hard gate still red on the error flood.
+- **Fix (landed by `fix_occlusion_watch_crashproof`, verified in-tree):** the
+  `canvas_layer`-on-Control access is gone, replaced by a defensive same-layer
+  walk via a null-guarded nearest-CanvasLayer-ancestor comparison
+  (`_nearest_layer` walks `get_parent()` with `is CanvasLayer` + liveness checks
+  at every step; both null = both in the root viewport's default canvas = same
+  layer). New observables `scan_ok: bool` and `scan_failed_frames: int` are
+  published; on an unhonestly-scannable frame the watch sets `scan_ok = false`,
+  `scan_failed_frames += 1`, `violations = -1` ("scan-incomplete" sentinel), and
+  `violations_text = "scan-incomplete"` — never a green read. The occlusion nail
+  now carries `scan_ok == true` asserts alongside `violations == 0` at all three
+  frames (f158 / f345 / f425). `UiOcclusionWatch` stays registered in
+  `project.godot` `[autoload]`; `SceneManager` remains the LAST autoload entry.
+
+## (b) Purchase nail wrong-boot root cause + fix
+
+- **Root cause (measured 0/11 in the crashed run):** `event_option_refused_no_charge`
+  carried a `scene: res://scenes/menu.tscn` override while its timeline was copied
+  verbatim from the facility-cap nail's proven boot authored for the
+  CONTRACT-DEFAULT `main.tscn`. Booting `menu.tscn` desynchronized the whole
+  timeline (the ui_accepts walked the menu/creation screens instead of the
+  tutorial intro pages) and the run stranded in TUTORIAL forever — at f400
+  `GameManager.current_state` observed `TUTORIAL` (expected MAP) and every
+  MapScreen assert failed `node not found: MapScreen`.
+- **Fix (landed by `fix_purchase_nail_scene_boot`, verified in-tree):** the
+  `scene:` override line is deleted — the file now inherits the contract default
+  `res://scenes/main.tscn`, exactly like the green facility nail whose boot it
+  mirrors. The timeline is byte-identical to that proven boot up to f220; the
+  only insertions are `debug_grant_equip` at f260 (kept). The description prose
+  was corrected ("Boots menu.tscn" → "Boots the contract-default main.tscn").
+  Frames re-baselined from the measured green run: the corrected boot reaches MAP
+  at f400 exactly as the facility nail does, so the existing `at:` frames
+  (f400/f440/f470) needed no change — verified by the 11/11 green run.
+
+## (c) The four pytest guard repairs + the APPLIED guard-conflict ruling
+
+- **Guard-conflict ruling (APPLIED — option (i): timeline-scoped ban):**
+  `test_softlock_nail_contract` had asserted `"debug_fast_forward" not in ftext`
+  over the WHOLE softlock scenario file, but that file's header comments
+  legitimately QUOTE the literal (its own red-first record and its in-file
+  explanation of why the action is banned). The guard reddened on the scenario it
+  was written to protect. The applied ruling re-scopes the ban to the TIMELINE's
+  actions: the guard now parses the file with `yaml.safe_load` and asserts no
+  `timeline` entry's `actions` list (or single-action `press` scalar) contains
+  `debug_fast_forward`. The protective property — the nail cannot reach its
+  empty-GONGFA state via the debug twin (`_fast_forward`) — is preserved EXACTLY:
+  the timeline provably executes zero `debug_fast_forward` actions. The scenario's
+  prose stays verbatim.
+- **The three index guards repaired:** `test_facility_use_cap_nail_contract`,
+  `test_map_node_event_revisit_no_resettle_nail_contract`, and
+  `test_occlusion_watch_surface_contract` compared absolute indices in the full
+  84-entry `scenario_order` against the 46-entry `ROUND_SCENARIOS` subset — an
+  unsatisfiable equality for any tail-appended name (measured `assert 81 == 43`,
+  `assert 82 == 44`). Replaced with the **relative-order sync comparison**
+  `[n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS`; the two
+  presence asserts stay byte-identical. The two-place sync intent is now actually
+  evaluated.
+- **`test_occlusion_watch_surface_contract` extended pin:** the UiOcclusionWatch
+  surface block is whitelisted over `violations / violations_text / scan_ok /
+  scan_failed_frames`; the scenario is in scenario_order AND ROUND_SCENARIOS; the
+  file carries at least one `violations == 0` property assert; the
+  coordinate-literal forbidden zone (`offset_` on dotted assert lines) is pinned;
+  and the evidence record `final/delivery_notes_loop_occlusion_watch.md` is pinned
+  so the threshold-rationale + tutorial-pages record cannot be silently dropped.
+- **`test_event_option_refused_nail_contract`** (the round's one gap, added by the
+  prior evidence task): pins `name:` == basename, both registries in order,
+  integer `at:` timeline, the `silver == event_open_silver` zero-delta line,
+  `phase == "TRAVEL"`, `events_resolved_count` rung, `map_status_text != ""`
+  receipt, the `debug_grant_equip` seeding line, and the `event_open_silver` /
+  `map_status_text` surface whitelist under `MapScreen`.
+
+## (d) REDONE measured red-first four values (each from a single consistent run on corrected code)
+
+Both pairs below were re-measured by the fix tasks on CORRECTED code — never from
+the 44,660-error build. Each is quoted verbatim from its source note.
+
+### Occlusion nail — `occlusion_no_button_over_text` (source: `final/delivery_notes_loop_occlusion_watch.md` §2)
+
+| # | Value | Measured |
+|---|---|---|
+| failing_frame | f158 | first red frame |
+| first_failing_assert | `UiOcclusionWatch.violations` (`violations == 0`) | — |
+| exact_error/observed | observed `violations == 1`, `violations_text == "Next>Body"` (the tutorial Next button drawn over the WELCOME body RichTextLabel — the measured defect pair) | — |
+| green_asserts_before_red | 5 | f60 ×2, f90 ×1, f120 ×1, f150 ×1 |
+
+The red run stops at the first red frame (f158); the sect-select (f345) and
+roster (f425) frames' red values are recorded separately in
+`delivery_notes_loop_occlusion_watch.md` §2/§3 (pair math from
+`delivery_notes_loop_occlusion.md` §2/§3) and are green on the fixed tree (§4
+there). Post-fix GREEN at f158 / f345 / f425 (`violations == 0`, `violations_text`
+empty, `scan_ok == true`).
+
+### Purchase nail — `event_option_refused_no_charge` (source: `final/delivery_notes_loop_purchase.md` §3)
+
+Measured red run (corrected boot, revert applied): **8/11**.
+
+| # | Value | Measured |
+|---|---|---|
+| failing_frame | 470 | first failing assert at f470 |
+| first_failing_assert | `MapScreen.last_effect_types` — `last_effect_types.is_empty() == true` | observed `["silver", "item"]` (effects applied, not refused) |
+| exact_error/observed | at f470, three asserts red | `last_effect_types.is_empty() == true` → observed `["silver", "item"]`; `silver == event_open_silver` → observed `1810` (event_open_silver `1830` — dipped by exactly 20, the old unconditional charge); `map_status_text != ""` → observed `""` (no refusal receipt) |
+| green_asserts_before_red | 8 | f400 `current_state == "MAP"` + `visible == true`; f440 `phase == "EVENT"` + `event_id == "merchant"` + `current_node_id == "luoyang"` + `silver == event_open_silver`; f470 `phase == "TRAVEL"` + `events_resolved_count == 1` |
+
+Restore: `event_logic.gd` restored byte-identically; `grep scripts/ "TEMPORARY
+RED-FIRST REVERT"` → zero hits (verified). Re-run GREEN: **11/11**. The receipt
+is the OWNED wording `此物已在行囊，无须再购` (probed via an inline scenario); the
+red-run evidence independently confirms balance ≥ 20 (silver dipped by exactly 20
+from 1830 → 1810), so no `debug_grant_silver` funding was needed.
+
+## (e) R1 amendment flag — tutorial_overlay.tscn and roster_panel.tscn unlocked
+
+**Flagged prominently for the driver/reviewer:** the brief's literal theme-round
+protected list names `scenes/ui/tutorial_overlay.tscn` and
+`scenes/ui/roster_panel.tscn`. Reviewer R1 (2026-09-01) explicitly **unlocked both
+scenes for THIS round's presentation-only geometry repairs** — a DOCUMENTED
+deviation from the brief's literal protected list. The unlock is scoped strictly:
+only container anchor/offset/width lines changed (no colors, no fonts, no dim
+values, no node adds/removes, no copy, no script edits). `assets/themes/global_theme.tres`
+and `scenes/ui/hud.tscn` stayed **byte-untouched**; `scripts/segments/sect_select.gd`
+stayed **fully protected** (the sect-select fix is in `scenes/segments/sect_select.tscn`,
+which the brief does NOT protect). Verified in-tree: tutorial Buttons HBox now has
+the completed anchor pair (`anchor_top = 1.0`, `anchor_right = 1.0`) + `offset_right
+= -100.0` (400×40 bottom strip); roster RosterBodyLabel `offset_right = -190.0` +
+EquipButton0..11 shifted to x 462/508/554..506/552/598.
+
+## (f) New consolidated numbers (items 1–3 of the task card)
+
+- **Full playtest gate run (84 scenarios):** `pending host gate run (5_compile)` —
+  the single consolidated harness run is a host-gated `5_compile` artifact; this
+  step has no shell. The `step:5_compile` product in context still shows the
+  CRASHED run (SUPERSEDED, §above) — no number from it is presented as this
+  round's verdict. Per-scenario PASS counts are attributed to the fix tasks'
+  sidecar runs in `final/gate_run_notes_loop.md` (never presented as the
+  consolidated 84/84 single-run verdict).
+- **Compile check (99 scripts):** `pending host gate run (5_compile)` — the
+  official `compile_report.json` is a downstream artifact. Read-verifiable count:
+  `scripts/**/*.gd` = **99** (98 pre-round + `scripts/autoload/ui_occlusion_watch.gd`),
+  confirmed by `list` this step. The crash-proofed watch introduces no parse error
+  (read-audit of `ui_occlusion_watch.gd` shows only guarded typed accesses);
+  `UiOcclusionWatch` stays registered in `[autoload]`, `SceneManager` still LAST.
+- **Static + unit suites:** `pending host gate run (5_test)` — the official
+  `test_report.json` is a downstream artifact. Read-verifiable: the four repaired
+  guards + `test_occlusion_watch_surface_contract`'s extended pin are present in
+  `tests/test_playtest_contract_smoke.py` (verified by read this step); the
+  GDScript unit suite includes the zero-mutation refusal pins in
+  `tests/test_map_node_event.gd` (the cost-gate block asserts an unaffordable use
+  leaves count/effects/silver/attr unchanged) and `tests/test_facility_data.gd`
+  (the raw effect path). The pytest 56/56 total and the GDScript suite's official
+  PASS are recorded as `pending host gate run (5_test)` — not claimed as measured.
+
+## (g) Runnable deliverable statement
+
+Open-and-play: the project is a Godot 4.4 project (`project.godot` sets the main
+scene; `UiOcclusionWatch` is the only new autoload, `SceneManager` still LAST).
+The five fix tasks' sidecar runs drive the real spine (menu → tutorial →
+cultivation → map → events → facility → roster) with real input and pass, which
+structurally demonstrates the deliverable opens and plays out of the box with no
+manual setup, placeholder art accepted. The full single-run gate verdict is
+host-gated (§(f)).
+
+## Protected-surface + red-line audit (read-evidence; byte-diff and git-log not executable)
+
+- **Verbatim-protected yamls** byte-untouched and confirmed by read:
+  - `facility_use_reusable.yaml` → `phase != "FACILITY"` (lines 11, 135) +
+    `facility_use_count == 0` (lines 122/139/148/164) + the 0→1→2 ladder
+    (`== 1` at 171/184/205/221/229/241, `== 2` at 248/259).
+  - `map_node_event_shaolin.yaml` → `events_resolved_count == 3` (line 166).
+  - `map_battle_node_huashan.yaml` → `events_resolved_count == 3` (lines 257, 290).
+  None of the fix notes lists any of these in its file table — no round task
+  touched them.
+- **Protected files** structurally intact: `assets/themes/global_theme.tres`,
+  `scenes/ui/hud.tscn`, `scripts/autoload/theme_manager.gd`,
+  `scripts/segments/sect_select.gd` — never opened for edit. The theme-owned
+  focus-style portion of `cultivation.gd::_rebuild_options_box` (stylebox swap,
+  `ThemeManager.option_style` consumption at `:685`) is untouched; the R2
+  soft-lock edits live at `:287-301` (empty-GONGFA exit) and `_after_action`
+  (`:413`). The six jinyong-huashan files: not touched by any fix note's file
+  table.
+- **Theme-round merge (brief's pre-landing `git log` check):** the shell check is
+  **not executed + reason: no shell in this step**. In-tree evidence confirms the
+  merge landed: `ThemeManager.option_style` is consumed at
+  `scripts/segments/cultivation.gd:685` and `scripts/segments/sect_select.gd:88`,
+  and the fix zones do not overlap it.
+- **No balance numbers moved:** `scripts/data/event_data.gd` /
+  `facility_data.gd` / `card_data.gd` rows and `MapData.ENDING_TIERS` are
+  byte-untouched (the fix notes' file tables list zero data-file edits; the
+  merchant `买下长剑` row `silver -20 + item eq_sword_3` and the facility rows
+  `-8 silver → +2 attr` are read-verified unchanged). `FACILITY_MONTHLY_USE_CAP := 2`
+  in `scripts/segments/map.gd:105` remains the declared **RULE GATE** — the only
+  new constant, unchanged.
+- **Zero `TEMPORARY RED-FIRST REVERT` residue:** `search` for the literal across
+  `scripts/**` returns **zero hits** (the marker appears only in historical
+  delivery notes / scenario headers that legitimately quote the revert recipe —
+  never in the working code tree; `repo_apply` is `git add -A` so none may remain).
+
+## Frame evidence for the human verdict
+
+The playtest frame product captures the occlusion nail's frames (tutorial WELCOME
+page f158, sect-select f345, open roster f425) and the seven before/after
+same-frame pairs remain recorded in the delivery notes (§(d) of the pre-fix
+section and `final/delivery_notes_loop_occlusion.md` §2). The vision verdict stays
+with 5_vision / human frame review: **`blind / endpoint_unreachable`** — no vision
+product is present in this step's context, so no Q6 count is invented. The
+structural watch asserts `violations == 0` + `scan_ok == true` on every captured
+frame and is the machine gate in the interim.
