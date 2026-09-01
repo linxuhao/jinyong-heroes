@@ -17,7 +17,103 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-theme — the UI finally looks designed (2026-09-01)
+## Latest round: jinyong-loop R2 — the monthly loop cannot stop, redemption cannot be infinite (2026-09-01)
+
+Bug-fix round on the loop's rule short-circuits: four rules existed but were short-circuited
+(the cultivation soft-lock, unlimited facility redemption, node-event effects re-settling on
+every revisit, purchases charging silver without delivering), plus one occlusion regression the
+theme round introduced on the sect-join screen. Zero balance numbers moved; the three
+verbatim-protected gates stayed byte-untouched and green.
+
+**The five fixes (all verified in the tree by direct read):**
+
+1. **Soft-lock eliminated** (`scripts/segments/cultivation.gd`): the empty-GONGFA accept no
+   longer dead-ends at ACTION_PICK — it sets `status_text` to 「无可修习的功法，本月照常过去」,
+   moves to ATTR_PICK and calls `_after_action()` (the single month-advance path, so
+   month-12 → YEAR_END and y3/m12 → the map inherit for free, exactly like `_fast_forward`).
+   The empty state renders 「功法均已大成，无可修习」 and its single button is relabeled
+   返回行动 → **度过本月** (it advances the month through the same
+   `_on_option_pressed → _on_accept` chain every option uses). New published surfaces
+   `CultivationScreen.month_before_accept` / `status_text`. The debug twin `_fast_forward`
+   is untouched — the escape hatch now exists on the player path too.
+2. **Facility monthly cap** (`scripts/segments/map.gd`): `FACILITY_MONTHLY_USE_CAP := 2` — a
+   RULE gate, not a balance number (no facility cost/effect value moved). The counter lives in
+   a GameManager session mirror (`facility_use_month` / `facility_use_count_this_month`, reset
+   on `profile_created`/`loaded`), so it survives the MapScreen rebuild on battle return. The
+   exhausted press refuses through the existing receipt channel — 「本月设施已用尽，下月再来」
+   — with no mutation, no count increment, no snapshot write. The gate-(a) property
+   (leave → return → use again) stays green because two uses per month are allowed.
+3. **Re-appear yes, re-settle no** (`map.gd` + `scripts/autoload/game_manager.gd`): every node
+   event still fires on every arrival (pinned by the two protected gates), but each
+   `(node_id, event_id)` pair applies its effects at most once per session
+   (`GameManager.settled_node_events`, same session-mirror lifecycle as
+   `map_events_resolved_count`). A re-resolve shows 「此事已有了结，不再重来」, applies
+   nothing, and STILL increments `events_resolved_count` (the count tracks RESOLUTIONS, not
+   settlements) — which is why both protected gates' 1→2→3 ladders stay byte-identical.
+4. **All-or-nothing purchases** (`scripts/data/event_logic.gd`): new pure-static
+   `validate_option(profile, opt)` (net silver capacity first, then item ownership; no
+   mutation, no RNG draw) and `apply_option_effects` is validate-then-apply returning
+   `{"ok": bool, "reason": ""|"silver"|"owned"}` — a refused option mutates NOTHING (the old
+   `maxi(..., 0)` clamp is gone: insufficient silver no longer buys "all you can afford").
+   Callers render the receipt — 「银两不足」 / 「此物已在行囊，无须再购」 — on both the map
+   TRAVEL and cultivation channels; the encounter still resolves and the month still advances,
+   so a refusal can never trap anyone.
+5. **Occlusion fixed presentation-only** (`scenes/segments/sect_select.tscn`,
+   `scenes/ui/tutorial_overlay.tscn`, `scenes/ui/roster_panel.tscn`): the theme round's taller
+   buttons (font 15 + content margins) had grown over fixed body text on three screens. The
+   sect body now wraps at 430 px (`offset_right` 320 → 110) with the button column moved right
+   (−120..120 → 130..370) — the Tang-Men row 「唐门 —— 内功 唐门心法(柔)· 外功 满天花雨(柔)」
+   renders fully again; the tutorial overlay's `Buttons` HBox had a broken anchor pair that
+   stretched 继续 into a 400×440 column over the body — completed to an honest 400×40 bottom
+   strip; the roster panel's 12 equip buttons moved into their own right-hand column clear of
+   the body label. Zero copy changes, zero font-scale changes, zero `.gd` changes in the fix
+   (`sect_select.gd` stayed byte-untouched).
+
+**The structural occlusion gate (new autoload):** `scripts/autoload/ui_occlusion_watch.gd`
+(registered as `UiOcclusionWatch` before the SceneManager-last entry) recomputes
+`violations` / `violations_text` every frame over the live tree: a visible Button drawn over a
+visible non-empty Label/RichTextLabel, same effective CanvasLayer, not ancestor/descendant,
+≥ 4 px overlap on both axes, residual visibility ≥ 0.5. The new scenario
+`occlusion_no_button_over_text.yaml` asserts `violations == 0` at the three
+historically-defective frames (red-first MEASURED: f158 `violations == 1`,
+`violations_text == "Next>Body"`, 5 greens).
+
+**Five new nails (differential, never tuned literals; all with MEASURED red-first four values
+consolidated in `final/delivery_notes_loop.md` §(a)):**
+
+| Nail | Pins | Red-first (frame / first assert / observed / greens before red) |
+|---|---|---|
+| `softlock_empty_practice_month_advances` | real-input boot (`debug_seed_save` seed + keyboard load + pure `ui_accept`, `debug_fast_forward` absent from the timeline) → `month == month_before_accept + 1`, `phase == "CARD_PICK"`, `status_text != ""` | f200 / month differential / observed `month == month_before_accept` / 9 |
+| `facility_use_cap_exhausted_zero_delta` | third press in one month: `silver == last_use_silver`, `attr_bone == last_use_attr_value`, `facility_use_count == 2`, receipt non-empty | f720 / `facility_use_count == 2` / observed 3 / 32 |
+| `map_node_event_revisit_no_resettle` | re-resolve of a settled pair: `attr_wisdom == last_apply_attr_value`, `last_effect_types` empty, count rung 3, receipt non-empty | f200 / `last_effect_types` empty / observed `["silver", "item"]` / 29 |
+| `event_option_refused_no_charge` | owned-item purchase refused whole: `silver == event_open_silver`, `map_status_text != ""`, count rung 1 (seeded via the whitelisted `debug_grant_equip` pipeline) | re-baselined; recorded in the scenario header |
+| `occlusion_no_button_over_text` | `UiOcclusionWatch.violations == 0` at the tutorial / sect-select / roster frames | f158 / `violations == 0` / observed 1 (`Next>Body`) / 5 |
+
+The two soft-lock-era nails that pinned the old dead-end (`gongfa_pick_empty_keyboard_return`,
+`clicks_only_gongfa_empty_exit` — not in the protected trio) were re-pointed with a documented
+change table (`final/delivery_notes_loop.md` §(b)): exit-frame asserts now expect CARD_PICK +
+the month differential + non-empty `status_text`; every other assert (incl. the empty-state
+proof `mastered_count == gongfa_count`) preserved verbatim. **No gate was weakened; the three
+protected yamls are byte-untouched** — gate (a) `facility_use_reusable` (0→1→2 across two
+entries, 49/49), gate (b) `map_node_event_shaolin` (its effect-bearing legs f460/f560 are
+first-time pairs `luoyang/merchant` and `shaolin/night_rain`; the repeat leg f630 asserts
+phase/count only — 32/32) and `map_battle_node_huashan` Leg F (41/41).
+
+**Verification status (honest, 2026-09-01):** implementation verified by direct read;
+per-scenario sidecar runs on the delivered tree are green (spine 42/42, gates (a)/(b) 49/49 /
+32/32 / 41/41, all five new nails green after their measured reds —
+`final/gate_run_notes_loop.md`). **One surfaced conflict must be ruled on before `5_test`:**
+`test_softlock_nail_contract` (`tests/test_playtest_contract_smoke.py:1222`) bans the literal
+`debug_fast_forward` in the WHOLE softlock yaml, but that file legitimately quotes the string
+in its documentation (comment lines 13/35-38 AND inside the `description:` scalar at line 67 —
+a comment-stripping guard re-scope would not clear the latter), so the guard reddens on exactly
+the scenario it protects; the timeline itself contains zero such actions. Both candidate
+resolutions (guard re-scope to timeline lines / prose reword) are recorded, not applied, in
+`final/delivery_notes_loop.md` §7. The consolidated 84-scenario run, `compile_report.json`,
+`test_report.json` and `vision_report.json` (incl. the seven before/after occlusion frame
+pairs) are downstream gate artifacts — pending, not counted as met.
+
+## Round: jinyong-theme — the UI finally looks designed (previous round, 2026-09-01)
 
 The theme layer existed only as a 7-line placeholder (`global_theme.tres`:
 default font + size 12) mounted globally at `project.godot:58`, so every screen
@@ -833,10 +929,16 @@ its inner-qi cost (内力: N in the top strip; a too-expensive move greys into
 左右/上下 cycle the adjacent nodes and 回车 travels (or tap `TravelButton{i}`);
 every mainline stop opens its node event on arrival (洛阳 车马过路 / 武当 全真抄经 /
 襄阳 降龙残谱; 无名谷 fires on the return trip; 少林 off the 洛阳 branch fires
-破庙夜雨) — resolve with 上下选择，回车定夺 or by tapping the option buttons.
+破庙夜雨) — resolve with 上下选择，回车定夺 or by tapping the option buttons. An event you
+have already resolved still re-appears on a return visit, but its effects settle once per
+session (the screen says 「此事已有了结，不再重来」); an option you cannot pay for, or whose
+item you already own, is refused whole — no silver moves and the screen explains why
+(「银两不足」 / 「此物已在行囊，无须再购」).
 **At 少林 and 武当 (the two sect nodes), press F — or tap the 进入设施 button — to
 enter the sect facility** (木人巷 / 紫霄静修): 回车 or the facility button uses it
-once (pays silver, gains an attribute — reusable as long as you can pay),
+up to **2 uses per profile month** (pays silver, gains an attribute — the monthly
+counter resets with the calendar month; an exhausted attempt is refused on screen with
+「本月设施已用尽，下月再来」 and changes nothing),
 上下/离开 leaves. The travel hint shows a `门派设施：…（F 使用）` line when a
 facility is available at the current node. Entering 昆仑 routes straight to the
 tiered ending (end-node routing runs before entry content, so nothing can block
@@ -852,7 +954,7 @@ unverified, which is the intended behavior.
 
 ```bash
 GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
-python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard with tr() call-site detection, keyboard-free pins incl. the gongfa empty-exit nail, touch surface contracts)
+python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard with tr() call-site detection, keyboard-free pins incl. the gongfa empty-exit nail, touch surface contracts, loop-round nail contracts)
 godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (28 files)
 godot --headless --path . -s res://tests/test_touch_option_surface_gate.gd  # property-based touch-coverage gate (traverses the cultivation/map/sect_select phase machines)
 godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-style suites
@@ -860,6 +962,20 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Key interfaces
 
+- **R2 loop rules** (jinyong-loop round): `EventLogic.validate_option(profile, opt) -> String`
+  (`""` deliverable / `"silver"` / `"owned"` — pure arithmetic, no mutation, no RNG draw) and
+  `EventLogic.apply_option_effects(...) -> Dictionary` (`{"ok", "reason"}`, validate-then-apply:
+  a refused option mutates nothing); `map.gd FACILITY_MONTHLY_USE_CAP = 2` with the GameManager
+  session mirrors `facility_use_month` / `facility_use_count_this_month` /
+  `settled_node_events` (plus `is_node_event_settled` / `settle_node_event`, reset on
+  `SaveManager.profile_created` / `loaded`); new observables
+  `CultivationScreen.month_before_accept` / `status_text`,
+  `MapScreen.map_status_text` / `event_open_silver` / `last_use_silver` /
+  `last_use_attr_value` / `last_apply_attr_value`, and `UiOcclusionWatch.violations` /
+  `violations_text`; the five new differential scenarios (`softlock_empty_practice_month_advances`,
+  `facility_use_cap_exhausted_zero_delta`, `map_node_event_revisit_no_resettle`,
+  `event_option_refused_no_charge`, `occlusion_no_button_over_text`) plus the two re-pointed
+  empty-exit nails; new strings keyed in the i18n EN dictionary.
 - **Theme layer & focus marker** (jinyong-theme round): the global theme
   `assets/themes/global_theme.tres` (mounted at `project.godot:58`) defines
   Button (normal/hover/pressed/disabled + focus overlay, 5 font colors),
@@ -997,7 +1113,8 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
   or changed/unchanged token on every assert line). `clicks:` entries are
   `<Node>[ +dx,dy][ left|right|middle]` — a **true GUI hit test** (aim at the
   control/unit body, never a `*_ClickTarget`); `hovers:` are motion-only.
-  78 scenarios, including the keyboard spine `spine_to_ending.yaml`, the
+  84 scenarios (the theme round's 79 + this round's five loop nails), including the keyboard
+  spine `spine_to_ending.yaml`, the
   clicks-only storyline spine `clicks_only_storyline.yaml`, the facility
   click companion `map_facility_buttons_click.yaml`, and the no-repeat
   proof `event_pool_new_event_resolved.yaml` (a NEW travel event drawn,
@@ -1015,7 +1132,35 @@ godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-s
 
 ## Verification status (honest)
 
-**jinyong-theme (this round, 2026-09-01) — implementation verified by direct
+**jinyong-loop R2 (this round, 2026-09-01) — implementation verified by direct read;
+per-scenario sidecar evidence green; consolidated gates + one guard conflict pending:**
+
+- **Verified in the tree (verifier direct read):** the four rule fixes at their exact edit
+  points (`cultivation.gd:297-300` empty-GONGFA exit → status + ATTR_PICK + `_after_action()`,
+  度过本月 relabel, the 功法均已大成 body line; `map.gd` FACILITY_MONTHLY_USE_CAP = 2 + epoch
+  reset + exhausted refusal + three-path `_resolve_node_event` with all-paths count increment;
+  `event_logic.gd` validate_option + validate-then-apply with the clamp removed;
+  `game_manager.gd` session mirrors + run-boundary resets); the three presentation-only scene
+  fixes (sect_select / tutorial_overlay / roster_panel, zero `.gd` changes in the fix); the
+  `UiOcclusionWatch` autoload + registration; the six new i18n EN entries; the five new nails
+  + two re-pointed nails with differential asserts; `_common.yaml` surface/scenario_order
+  appends; `ROUND_SCENARIOS` two-place sync; the new anti-weakening guards; zero
+  `TEMPORARY RED-FIRST REVERT` residue in any `.gd`; gate (a)/(b) byte-identity confirmed by
+  read (ladders + pinned lines present).
+- **Measured this round (sidecar runs, per `final/gate_run_notes_loop.md` and the fix notes):
+  all five nails red-first four-values recorded (`final/delivery_notes_loop.md` §(a)) then
+  green; protected gates 49/49 / 32/32 / 41/41; `spine_to_ending` 42/42;
+  `save_load_roundtrip` 14/14; `event_travel_effects` 19/19; zero runtime errors in every
+  recorded run.
+- **Pending downstream (not counted as met):** the single consolidated 84-scenario harness run
+  and `compile_report.json` (`5_compile`); `test_report.json` (`5_test`) — which will surface
+  the softlock-guard documentation conflict unless ruled on first (see the round section);
+  `vision_report.json` (`5_vision`, incl. the seven before/after occlusion frame pairs). The
+  brief's `git log` theme-merge check was never executed (no shell anywhere in the round);
+  in-tree `ThemeManager.option_style` consumption confirms the merge and the fix zones do not
+  overlap the focus-style portion.
+
+**jinyong-theme (previous round, 2026-09-01) — implementation verified by direct
 read; the official PRE-fix gates landed (archived by 5_design) and the review
 blocker (`creation_layout_readability` 21/22) is FIXED with measured
 evidence; post-fix OFFICIAL gate artifacts pending:**
@@ -1284,8 +1429,8 @@ results are transcribed into the design archive (`design/00_roadmap.md`,
 - `scenes/` — Godot scenes: `ui/` (hud, health_bar), `segments/`
   (creation, map, transition, sect_select, cultivation, ending),
   `battlefield.tscn`, `main.tscn` / `menu.tscn`
-- `playtest/` — 78 headless playtest scenarios + the `_common.yaml` contract
-  (79 yaml files); incl. the clicks-only storyline spine and the facility
+- `playtest/` — 84 headless playtest scenarios + the `_common.yaml` contract
+  (85 yaml files); incl. the clicks-only storyline spine and the facility
   click companion; frozen yamls are append-only (authorized edits stay
   machine-pinned by the superset fixture)
 - `tests/` — GDScript unit suites (28 files in the TESTS registry),
