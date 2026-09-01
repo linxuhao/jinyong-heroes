@@ -129,6 +129,12 @@ var option_focus: int = 0
 ## on every _render.
 var focused_option_text: String = ""
 
+## Surface: true iff the current options box actually wears the focused
+## stylebox on a row — the runtime proof the script-driven focus marker (not the
+## old 2-3% modulate trick) is applied. Recomputed on every _render, driven by
+## the same focused bool that selects the stylebox in _rebuild_options_box.
+var focus_marker_active: bool = false
+
 
 func _ready() -> void:
 	# Refresh the surface whenever a load succeeds while this scene is already
@@ -582,6 +588,7 @@ func _on_option_pressed(index: int) -> void:
 func _rebuild_options_box() -> void:
 	var box: VBoxContainer = get_node_or_null("OptionsBox") as VBoxContainer
 	if box == null:
+		focus_marker_active = false
 		return
 	for child in box.get_children():
 		box.remove_child(child)
@@ -636,14 +643,22 @@ func _rebuild_options_box() -> void:
 		btn.name = "CultOptionButton%d" % i
 		btn.text = labels[i]
 		btn.focus_mode = Control.FOCUS_NONE
-		# Keyboard focus is expressed ON the button (creation.gd precedent):
-		# the focused row full-brightness, the rest dimmed.
-		btn.modulate = Color(1, 1, 1, 1) if i == _focused_index_for_phase() else Color(0.72, 0.72, 0.72, 1)
+		# Keyboard focus is expressed ON the button via a real visual marker
+		# (ThemeManager.option_style: cinnabar left bar + border + font color),
+		# replacing the old 2-3% brightness (modulate 1.0 vs 0.72) cue.
+		var focused: bool = i == _focused_index_for_phase()
+		btn.add_theme_stylebox_override("normal", ThemeManager.option_style(focused))
+		btn.add_theme_color_override("font_color", ThemeManager.OPTION_FONT_FOCUS if focused else ThemeManager.OPTION_FONT_DIM)
 		btn.custom_minimum_size = Vector2(240, 40)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_option_pressed.bind(i))
 		box.add_child(btn)
 		pressed_connected["CultOptionButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
+	# The focused stylebox was applied to _focused_index_for_phase()'s row iff
+	# the box holds at least one button (labels non-empty). This is the same
+	# focused bool that selected the stylebox above, so the published flag is
+	# sourced from the state the button actually wears.
+	focus_marker_active = not labels.is_empty()
 
 
 ## Button label for a drawn card: name + category — the button is the only
@@ -928,6 +943,12 @@ func _render() -> void:
 	cursor_markers_visible = body.text.contains("▶")
 	option_focus = _focused_index_for_phase()
 	focused_option_text = _focused_option_text()
+	# Published here (alongside option_focus / focused_option_text) because the
+	# keyboard nav path (_cycle_focus -> _render) never calls _sync_surface.
+	# _rebuild_options_box() (called above) owns the authoritative value,
+	# including the box==null / empty-box paths, so this mirror stays in sync
+	# with the stylebox the focused row actually wears.
+	focus_marker_active = focused_option_text != ""
 
 
 ## The active phase's focus index — the button row that is highlighted. A pure

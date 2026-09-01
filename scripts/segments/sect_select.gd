@@ -81,5 +81,10 @@ func _render() -> void:
 		var btn: Button = get_node_or_null("SectButton%d" % i) as Button
 		if btn != null:
 			btn.text = tr(str(rows[i]["display_name"]))
-			btn.modulate = Color(1, 1, 1, 1) if i == focus_index else Color(0.72, 0.72, 0.72, 1)
+			# Focus expressed via the same script-driven marker as the
+			# cultivation option list (ThemeManager.option_style + font color),
+			# replacing the old 2-3% brightness modulate cue.
+			var focused: bool = i == focus_index
+			btn.add_theme_stylebox_override("normal", ThemeManager.option_style(focused))
+			btn.add_theme_color_override("font_color", ThemeManager.OPTION_FONT_FOCUS if focused else ThemeManager.OPTION_FONT_DIM)
 	cursor_markers_visible = body.text.contains("▶")
