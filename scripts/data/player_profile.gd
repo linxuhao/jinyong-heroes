@@ -27,6 +27,13 @@ var inventory: Array[String] = []
 # non-String keys). Equipped ids are always a subset of inventory (see equip()
 # and the from_dict repair).
 var equipped: Dictionary = {"weapon": "", "armor": "", "boots": ""}
+# Choice ledger (R3): per-run deed counters that feed the ending evaluation and
+# the fortune reroll budget. String keys ONLY (JSON-lossless, mirrors the equipped
+# precedent), int values, and every mutator clamps >= 0 (see get_deed / from_dict
+# repair). These are first-class fields, NOT flags entries — flags.from_dict drops
+# unknown keys, so a flags-stored deed would silently zero on load and make the
+# ending lie.
+var deeds: Dictionary = {"work_months": 0, "cultivate_months": 0, "practice_months": 0, "travel_resolved": 0, "silver_earned": 0, "rerolls_used_this_year": 0}
 var companions: Array[String] = []   # empty this round; schema reserved (step2_design C2)
 var cultivation: Dictionary = {"year": 1, "month": 1, "sect_id": ""}
 var map_node: String = "wuming_valley"   # design/40_progression.md §5 start node 无名谷
@@ -107,6 +114,7 @@ func to_dict() -> Dictionary:
 		"flags": flags.duplicate(true),
 		"main_external_id": main_external_id,
 		"equipped": _equipped_snapshot(),
+		"deeds": deeds.duplicate(),
 	}
 
 
@@ -190,6 +198,21 @@ static func from_dict(d: Variant) -> PlayerProfile:
 				p.equipped[slot] = v as String
 			else:
 				p.equipped[slot] = ""
+
+	# deeds — six known String keys, int values clamped >= 0. A non-Dictionary
+	# src_deeds (null / String / Array — or a LEGACY save with no "deeds" key,
+	# which .get defaults to {}) keeps all six at 0: no crash, nothing wiped.
+	# Each known key: int-or-float -> maxi(int(v), 0); anything else (missing key,
+	# String / bool / null / Array) -> 0. Unknown extra keys are naturally dropped.
+	var src_deeds: Variant = src.get("deeds", {})
+	if src_deeds is Dictionary:
+		var dd: Dictionary = src_deeds
+		for key in p.deeds.keys():
+			var v: Variant = dd.get(key, 0)
+			if v is int or v is float:
+				p.deeds[key] = maxi(int(v), 0)
+			else:
+				p.deeds[key] = 0
 
 	# cultivation — year 1..3, month 1..12, sect_id a String.
 	var src_cult: Variant = src.get("cultivation", {})
@@ -278,6 +301,15 @@ func _equipped_snapshot() -> Dictionary:
 		"armor": equipped_id("armor"),
 		"boots": equipped_id("boots"),
 	}
+
+
+## Read-only deed accessor (unified entry for downstream consumers). Defensive:
+## a missing or wrong-typed value coerces to 0, never crashes.
+func get_deed(key: String) -> int:
+	var v: Variant = deeds.get(key, 0)
+	if v is int or v is float:
+		return maxi(int(v), 0)
+	return 0
 
 
 ## Appends every non-empty String of `src` (a Variant that may not even be an

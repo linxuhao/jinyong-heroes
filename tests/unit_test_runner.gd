@@ -61,6 +61,9 @@ const TESTS: Array[String] = [
 	# map battle 2026-08-31: the huashan_duel roster module (MapBattleData) —
 	# exact five-greats roster, unknown-id fail-safe, position invariants.
 	"res://tests/test_map_battle_data.gd",
+	# R3 deeds schema 2026-09-01: PlayerProfile.deeds choice ledger (default
+	# zeros, round-trip, legacy repair, corrupted/negative coercion, JSON).
+	"res://tests/test_deeds_persistence.gd",
 ]
 
 
