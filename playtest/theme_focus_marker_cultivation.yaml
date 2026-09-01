@@ -1,0 +1,134 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# DIFFERENTIAL FOCUS-MARKER NAIL (2026-09-01, jinyong-theme round).
+#
+# The cultivation option list expresses keyboard focus ON the button via a
+# real visual marker (ThemeManager.option_style: cinnabar left bar + border +
+# font color) replacing the old 2-3% brightness (modulate 1.0 vs 0.72) cue.
+# The nail is a DIFFERENTIAL on a real published surface, never a form pin:
+#   f110 — in ACTION_PICK the focused row (index 0) publishes
+#          focus_marker_active == true with a non-empty focused_option_text;
+#   f120 — move_down moves the cursor to index 1;
+#   f140 — option_focus == 1 (the cursor actually moved),
+#          focused_option_text: changed (the focused text followed the cursor),
+#          focus_marker_active == true (the marker FOLLOWS the cursor — a real
+#          render state, never a stuck constant);
+#   f150/f170 — a real click on CultOptionButton0 (练功, index 0) still advances
+#          the phase ACTION_PICK -> GONGFA_PICK (the marker never blocks
+#          clicking; the zero-art fresh save makes GONGFA_PICK the empty list,
+#          exactly like the clicks_only_gongfa_empty_exit mirror).
+# No absolute style/color/alpha assertions anywhere (no == Color(...), no
+# stylebox-existence pins).
+#
+# BOOT: mirrors clicks_only_gongfa_empty_exit verbatim — a direct
+# cultivation.tscn boot leaves SaveManager.decks == {} (only new_profile()
+# initializes decks) so the month-card draw would runtime-error. Instead we
+# boot menu.tscn and seed a FRESH no-sect CULTIVATION save through the real
+# atomic pipeline via `debug_seed_save` (year 1 month 1, sect_id "", zero arts
+# — decks initialized by new_profile). Then CLICK the menu's 读取存档 entry
+# (MenuEntry1) to route DIRECTLY into CULTIVATION via menu_load_game (bypassing
+# SEGMENT_PREDECESSORS). The ONE keyboard action (move_down) is sanctioned
+# here because the focus marker is a KEYBOARD-cursor property — this is the
+# keyboard twin of the clicks-only mirror, which proves the finger path.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario sidecar
+#   run WITH the TEMPORARY RED-FIRST REVERT applied to scripts/).
+#
+#   failing_frame:            f110
+#   first_failing_assert:     CultivationScreen.focus_marker_active
+#                             (focus_marker_active == true)
+#   exact_error/observed:     observed=false — focus_marker_active was false
+#                             (the revert neutralized its publication)
+#   green_asserts_before_red: 7 (f80 has 6 + f110 phase==ACTION_PICK = 7)
+#
+#   [second red, same root cause] f140 focus_marker_active: observed=false —
+#     both the f110 and f140 marker asserts red because the revert made
+#     focus_marker_active always false; total 12/14.
+#
+#   Green re-runs on the byte-exact-restored tree (this step):
+#     theme_focus_marker_cultivation   14/14
+#     clicks_only_gongfa_empty_exit    16/16   (revert-residue proof)
+#     spine_to_ending                  42/42   (revert-residue proof)
+#   Restore verification: grep scripts/ for "TEMPORARY RED-FIRST REVERT" -> 0 hits.
+#
+#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`):
+#     scripts/segments/cultivation.gd _rebuild_options_box: replace the
+#       option_style/focus font-color swap (the `var focused:` line + the two
+#       add_theme_*_override lines) with the old modulate 1.0/0.72 ternary, AND
+#       set BOTH focus_marker_active publications (end of _rebuild_options_box
+#       and end of _render) to false — focus_marker_active is published
+#       independently of the stylebox, so the modulate-only swap alone would
+#       leave it reading true and the f110 `== true` assert would NOT red.
+#     scripts/autoload/theme_manager.gd option_style(): stub to return the
+#       plain box for both true/false.
+#   Restore byte-identically (grep scripts/ for "TEMPORARY RED-FIRST REVERT"
+#   -> zero hits) and re-run GREEN.
+name: theme_focus_marker_cultivation
+description: >-
+  Differential nail for the cultivation focus marker. Boots menu.tscn, seeds a
+  fresh no-sect CULTIVATION save via debug_seed_save (the one sanctioned
+  non-keyboard debug action, like the clicks_only_gongfa_empty_exit mirror),
+  CLICKS the 读取存档 entry (MenuEntry1) to load into CULTIVATION, clicks
+  CultOptionButton0 (CARD_PICK -> ACTION_PICK), then asserts in ACTION_PICK that
+  the focused row (index 0) publishes focus_marker_active == true with a
+  non-empty focused_option_text; move_down moves the cursor to index 1 and the
+  scenario asserts option_focus == 1 AND focused_option_text: changed AND
+  focus_marker_active == true (the marker follows the cursor — a differential
+  on a real published surface); a final real click on CultOptionButton0 (练功)
+  advances the phase ACTION_PICK -> GONGFA_PICK (the marker never blocks
+  clicking). ZERO style/color/alpha pins.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save (the one non-click action) ──
+- at: 30
+  actions:
+  - debug_seed_save
+# ── MENU -> CULTIVATION via the 读取存档 click (routes bypassing predecessors) ─
+- at: 50
+  actions: []
+  clicks:
+  - MenuEntry1
+- at: 80
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SceneManager.current_scene: current_scene == "cultivation"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.visible: visible == true
+    CultOptionButton0.visible: visible == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+- at: 90
+  actions: []
+  clicks:
+  - CultOptionButton0
+# ── CARD_PICK -> ACTION_PICK; focused row (index 0) wears the marker ────────
+- at: 110
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.focus_marker_active: focus_marker_active == true
+    CultivationScreen.focused_option_text: focused_option_text != ""
+    CultOptionButton0.visible: visible == true
+# ── move_down: the cursor moves 0 -> 1 ───────────────────────────────────────
+- at: 120
+  actions:
+  - move_down
+# ── the marker FOLLOWS the cursor (differential on a real published surface) ─
+- at: 140
+  actions: []
+  assert:
+    CultivationScreen.option_focus: option_focus == 1
+    CultivationScreen.focused_option_text: changed
+    CultivationScreen.focus_marker_active: focus_marker_active == true
+# ── a real click still advances the phase (the marker never blocks clicking) ─
+- at: 150
+  actions: []
+  clicks:
+  - CultOptionButton0
+# ── ACTION_PICK -> GONGFA_PICK (empty list, exactly like the mirror) ─────────
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"

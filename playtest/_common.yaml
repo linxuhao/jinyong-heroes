@@ -779,6 +779,7 @@ surface:
   - cursor_markers_visible
   - option_focus
   - focused_option_text
+  - focus_marker_active
   MapScreen:
   - current_node_id
   - focus_id
@@ -1131,3 +1132,4 @@ scenario_order:
 - roster_equip_free_action
 - equipment_in_battle_diff
 - event_pool_new_event_resolved
+- theme_focus_marker_cultivation

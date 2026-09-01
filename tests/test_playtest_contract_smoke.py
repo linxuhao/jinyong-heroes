@@ -76,6 +76,7 @@ ROUND_SCENARIOS: list[str] = [
     "roster_equip_free_action",
     "equipment_in_battle_diff",
     "event_pool_new_event_resolved",
+    "theme_focus_marker_cultivation",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -95,6 +96,13 @@ FACILITY_SURFACE_VARS: tuple[str, ...] = (
 
 # The 2 actions the jinyong-facility round appends to the actions list.
 FACILITY_ACTIONS: tuple[str, ...] = ("use_facility", "debug_grant_silver")
+
+# The 1 observable the jinyong-theme focus-marker round appends to the
+# CultivationScreen surface block (in playtest/_common.yaml), in the same order
+# it is appended. This is the runtime proof the script-driven focus marker (not
+# the old 2-3% modulate trick) is applied — see the focus_marker_active var in
+# scripts/segments/cultivation.gd.
+FOCUS_MARKER_SURFACE_VARS: tuple[str, ...] = ("focus_marker_active",)
 
 
 def _items_under(text: str, header: str) -> list[str]:
@@ -1108,6 +1116,71 @@ def test_facility_use_reusable_surface_contract() -> None:
     ), (
         f"{name}.yaml must contain a `facility_result_text != \"\"` line "
         "(the visible-result differential nail)" + _escape
+    )
+
+
+def test_focus_marker_surface_contract() -> None:
+    """Static contract pin for the jinyong-theme focus-marker nail.
+
+    Pins ``theme_focus_marker_cultivation`` against ``playtest/_common.yaml``
+    and ``ROUND_SCENARIOS`` (two-place sync): the new CultivationScreen
+    observable (focus_marker_active) is whitelisted on the surface, the scenario
+    name appears in scenario_order AND in ROUND_SCENARIOS, the file exists with
+    ``name:`` equal to its basename, every timeline ``at:`` is a single integer,
+    and the file carries the mandatory differential ``: changed`` line
+    (focused_option_text) — the no-bare-scalar-silent-false rule. The focus
+    marker is a DIFFERENTIAL on a real published surface (focus_marker_active),
+    so this pin never asserts a style/color literal.
+    """
+    name = "theme_focus_marker_cultivation"
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "CultivationScreen" in blocks, "surface has no CultivationScreen block"
+    cult_items = blocks["CultivationScreen"]
+    assert cult_items, "CultivationScreen surface block parsed empty (vacuous pass guard)"
+    for var in FOCUS_MARKER_SURFACE_VARS:
+        assert var in cult_items, (
+            f"CultivationScreen.{var} not whitelisted on the surface"
+        )
+
+    # Two-place sync: the scenario is in scenario_order AND in ROUND_SCENARIOS.
+    order = _items_under(text, "scenario_order")
+    assert name in order, (
+        f"{name} not in _common.yaml scenario_order (two-place sync)"
+    )
+    assert name in ROUND_SCENARIOS, (
+        f"{name} not in ROUND_SCENARIOS (two-place sync)"
+    )
+
+    # Scenario file static checks (same shape as test_facility_use_reusable_surface_contract).
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    has_diff_line = False
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            has_op = any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            )
+            has_diff = "changed" in line or "unchanged" in line
+            assert has_op or has_diff, (
+                f"{name}.yaml line {lineno} assert missing "
+                f"comparison operator: {line.strip()}"
+            )
+            if line.rstrip().endswith(": changed"):
+                has_diff_line = True
+    assert has_diff_line, (
+        f"{name}.yaml missing a line ending `: changed` "
+        f"(mandatory differential on focused_option_text)"
     )
 
 
