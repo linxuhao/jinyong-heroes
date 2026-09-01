@@ -781,3 +781,51 @@ autoload 时序)。被否:落进 profile / 存档——改变「会话计数」�
 `ROSTERS`/`POSITIONS` + 一处 `map_data.gd` 槽位翻转,入口已按 id 驱动、零新代码;
 按 id 挂 per-battle 开场 / BGM 是记录在案的地平线,本轮不建。
 
+## jinyong-theme — 水墨主题调色登记与焦点标记裁定(2026-09-01)
+
+本条记 `jinyong-theme` 轮五项裁定。主题清单与视觉语言见 `32_theme.md`(新);
+呈现层规矩同步 `30_presentation.md`「UI 主题」节。
+
+**(a) 调色登记:深墨底 + 纸色字的一套 light-on-dark,对齐战斗屏;Step-1 研究建议的
+「宣纸浅面板 + 墨色深字」被有意识取代。** 理由:七个非战斗场景各自带场景局部的深色
+Backdrop `theme_override_styles/panel`、HUD 顶栏字与脚本配色部件(技能按钮 / 血条 /
+回合指示)都是浅字——全局翻成墨深字要在 7 个场景 + HUD + 脚本部件上逐节点补浅字例外,
+漏一个就是一帧不可读;采用战斗屏既有词汇(墨底 / 纸字 / 纸色发丝边 / 朱印 / 金)则
+零例外、一处事实源。这**不是**「黑底换成另一种黑底」:本轮的区分度来自结构——不透明
+带边框底板、四态按钮两两可辨、真焦点标记、字号分级——不是色相。
+
+**(b) 压字修复是结构性的,不是 alpha 微调。** 裸 `RosterBox` / 教程 `Panel` 由全局
+不透明 `Panel/styles/panel` 兜底(信息层第一次有真底),dim 抬到 0.85 / 0.88 当 scrim;
+压在美术上的提示字照 hud.tscn / skill_button.tscn 既有描边 / 投影做法;HUD 层级、坐标、
+z-order、battlefield 一律未动(约束照守)。
+
+**(c) 焦点标记范围:cultivation + sect_select 两处,残余如实保留。**
+`cultivation.gd:641` 的 modulate 1.0/0.72 换成 `ThemeManager.option_style(focused)`
+stylebox + 字色换装(两枚缓存、几何与未选中态逐字一致 ⇒ 最小尺寸稳定;focused =
+朱红 3px 左条 + 边框,brief 认可的边框 / 底色家族),`sect_select.gd` 同款换装。
+**map.gd 是 jinyong-huashan 轮锁定文件(本轮零改动)、creation.gd 的 AttrRow 是裸
+Control(非 Button,机制不同,强套属发明)**——两处残余保留 modulate,UX-21 保持
+OPEN,其关闭范围(仅覆盖点 or 连残余)由后续轮凭证据裁定。
+
+**(d) 零字符串、零美术资产。** 主题与三处修复只动颜色 / 形状 / 字号 / 遮罩,
+`i18n.gd` 零改动(EN 不可能因本轮退化);全部新增样式是 `StyleBoxFlat`
+(形状 + 颜色),零贴图零图标——「不新增美术资产」照守。
+
+**(e) 回归如实入档,不藏不放松。** 主题字号增长(全局 Label 12→14、Button 15)令
+既有场景 `creation_layout_readability` **21/22** 红(f90 `creation_box_fits` 实测
+False;该场景此前每轮全绿,系本轮引入)——零断言放松、零阈值放宽、零场景改动,
+记 `40_ux_backlog.md` **UX-31(OPEN)**;修法 = 字号分级设计(D6)预写的回退路:
+对捏人屏过紧的少数节点逐节点 `theme_override_font_sizes` 钉回 12,**绝不**全局缩字号
+(那会拆掉分级)。另:视觉闸门 Q6 唯一坏答在 `tutorial_loss_restarts_tutorial`
+战斗帧(「文字被屏幕边缘切掉」),成因未诊断,记入下文 Open questions——下轮闸门
+复跑时看它是否复现再定性。
+
+**Out of scope(被否,防止回潮):** `StyleBoxTexture` / 任何贴图图标(本轮禁新增
+美术);运行时换主题 / ThemeDB;`TitleLabel`、`HintLabel` 之外的更多 type variation;
+全局 Label 投影(会糊掉脚本自建 8–10px 小字);把「删档」移出主玩法列(brief 明言
+后续轮);map.gd / creation.gd 的 modulate 改动(见 (c))。
+
+**Open questions:** `tutorial_loss_restarts_tutorial` 战斗帧的 Q6 坏答是否复现
+(未诊断,先观察再定性);UX-21 残余(map.gd / creation.gd)何时收;捏人屏字号
+回钉(UX-31)的落点与验收。
+

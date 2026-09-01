@@ -1069,3 +1069,26 @@ MAP(华山)战斗复用教程战场、从不调 `build_character(profile)`,差�
 零 runtime error,`40_ux_backlog.md` UX-16 据此 CLOSED(jinyong-equipment-battle),
 零断言放松、零阈值放宽)。
 
+## UI 主题(2026-09-01,jinyong-theme 轮)
+
+完整视觉语言与主题清单在 **`design/32_theme.md`**(新增档案),此处只记玩家可见的规矩:
+
+- **主题是全局视觉权威**:`assets/themes/global_theme.tres`(`project.godot:58` 挂载)
+  管一切 Control 的默认样式——Button 四态(不透明墨底、四种边框区分:纸色常规 /
+  金 hover / 朱红 pressed / 灰暗 disabled)+ 朱红 `draw_center=false` 焦点环、
+  **不透明**墨底 Panel(垫着信息的面板不许透底)、Label / RichTextLabel 纸色、
+  `TitleLabel`(26px)/ `HintLabel`(12px + 黑描边)两个 type variation;
+  `default_font_size` 保持 12(保护脚本自建的 8–10px 小字)。
+- **字号分级**:标题 26 > 按钮 15 > 正文 14 > 提示 12;场景侧只挂
+  `theme_type_variation`,不逐节点散布字号。
+- **压字规矩(结构性)**:垫着信息的面板必须不透明;文本压在美术上(皴笔 / 血条 /
+  立绘)必须描边 + 投影(hud.tscn / skill_button.tscn 既有做法,已上收进 HintLabel
+  与逐节点投影);遮罩层是 scrim(角色面板 dim 0.85、教程浮层 0.88)。
+- **焦点标记**:列表焦点 = `ThemeManager.option_style(focused)` 的朱红左条 + 边框 +
+  字色换装(几何与未选中态一致,最小尺寸稳定),不再是 modulate 亮度差。
+- **例外清单(呈现层明知并接受)**:脚本自绘的战斗部件(技能按钮 / 血条 / 回合指示)
+  与场景局部深色 Backdrop override 主题并获胜——战斗屏照旧,是主题对齐的锚。
+- **实测(2026-09-01 官方闸门)**:编译 98/98 零错误;playtest 78/79(唯一红
+  `creation_layout_readability` 21/22,主题字号增长引入,UX-31);视觉闸门 passed
+  (316 帧,Q6 78 好 / 1 坏,坏答在非主题战斗帧);五条保护闸门全绿。
+

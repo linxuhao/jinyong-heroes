@@ -55,6 +55,16 @@
   **30/30**、`camera_transform_follows_unit` **9/9**、六单位八层可见性全过、
   `spine_to_ending` **42/42** 零 runtime error;证据 `final/delivery_notes_wuxia.md` §3,
   裁定见 `90_decisions.md` 2026-08-31 条)。武虾形象自此屏上可见,上表第 5 条转 ✅。
+  **UI 主题已落地(2026-09-01,jinyong-theme 轮;数字凭本轮官方闸门产物填)**:
+  `assets/themes/global_theme.tres` 由 7 行占位扩为完整水墨主题(Button 四态不透明墨底 +
+  朱红焦点环 + 五字色、不透明墨底 Panel、Label 14 / RichTextLabel 纸色、
+  `TitleLabel` 26 / `HintLabel` 12 分级)——第 4 阶段的「界面有人设计过」自此有实装;
+  压字三处修复(角色面板 dim 0.85 + 主题不透明底板、教程浮层 dim 0.88、战场提示加投影)
+  与焦点标记(`ThemeManager.option_style`,取代 modulate 亮度差)同轮落地。
+  实测:编译 **98/98** 零错误;playtest 硬闸门过、零 runtime error、**78/79 PASS**
+  (五条保护闸门全绿;唯一红 `creation_layout_readability` **21/22**,主题字号增长引入、
+  记 `40_ux_backlog.md` UX-31);视觉闸门 **passed**(79 场景 316 帧,Q6 78 好 / 1 坏,
+  坏答在非主题的战斗帧)。详见 `32_theme.md` 与 `90_decisions.md` 2026-09-01 条。
 - **第 5 阶段(数值)** 未开始,按原则留在最后。
 
 ## 地平线(2026-08-28 裁定)
