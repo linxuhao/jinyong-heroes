@@ -116,6 +116,27 @@ var last_use_silver: int = 0
 ## zero-delta contract as last_use_silver.
 var last_use_attr_value: int = 0
 
+## Surface: on-screen status receipt for the TRAVEL arm (event suppressed /
+## option refused messages). Written by _resolve_node_event()'s settled/refused
+## paths, rendered by _render()'s TRAVEL arm when non-empty, cleared by
+## _travel() and _enter_facility() so a stale receipt never outlives its context.
+## Deliberately NOT mirrored in _sync_surface() (same precedent as
+## facility_result_text).
+var map_status_text: String = ""
+
+## Surface: success-only snapshot of the profile silver at the moment the node
+## entry event OPENED (written in _maybe_start_entry_event()). The purchase
+## zero-delta anchor: after a refused option, `silver == event_open_silver`
+## proves nothing was charged. Deliberately NOT mirrored in _sync_surface().
+var event_open_silver: int = 0
+
+## Surface: success-only snapshot of the attr target's value right after the
+## last event option that carried an `attr` effect was APPLIED. Written ONLY on
+## the applied path, so `attr_wisdom == last_apply_attr_value` after a
+## suppressed revisit-resolve is the zero-delta proof that the effects did not
+## re-settle. Deliberately NOT mirrored in _sync_surface().
+var last_apply_attr_value: int = 0
+
 
 func _ready() -> void:
 	# Save-integrity fallback: a hand-edited or legacy save may carry an empty /
@@ -220,6 +241,7 @@ func _travel() -> void:
 	current_node_id = focus_id
 	SaveManager.profile.map_node = current_node_id
 	SaveManager.autosave()
+	map_status_text = ""
 	_sync_surface()
 	if MapData.is_end_node(current_node_id):
 		ended = true
@@ -244,6 +266,10 @@ func _maybe_start_entry_event() -> void:
 	phase = "EVENT"
 	event_id = eid
 	event_focus = 0
+	# Zero-delta anchor for the purchase nail: the profile silver at the moment
+	# the event panel OPENED (before any option is picked). Re-appearance stays
+	# unconditional; this line adds no behavior of its own.
+	event_open_silver = SaveManager.profile.silver
 	_sync_surface()
 	_render()
 
@@ -275,6 +301,26 @@ func _maybe_start_entry_battle() -> void:
 ## Resolve the modal node-event: pick the option by event_focus, apply its effects
 ## through the shared EventLogic path, and return to TRAVEL. Deterministic binding
 ## channel — does NOT read/write flags["events_seen"] (bag independence).
+##
+## Three paths, ALL ending with the same shared tail (event_id = ""; phase =
+## "TRAVEL"; count += 1; write-through to GameManager.map_events_resolved_count;
+## autosave; _sync_surface(); _render()). The count tracks RESOLUTIONS, not
+## settlements — the settled and refused paths resolve the encounter (count
+## increments, gate-(b) ladders stay byte-identical) but deliver NO effects.
+## 1. SETTLED (checked first): this (node, event) pair already applied its
+##    effects this session — the event re-APPEARS (re-fire is pinned by gates
+##    (b)) but its economy/attr effects must not re-settle.
+## 2. REFUSED: EventLogic.validate_option() returned a reason (the purchase
+##    all-or-nothing task owns validate_option; until it lands, validation is
+##    a no-op returning "") — the option's cost cannot be paid or its item is
+##    already owned, so NOTHING applies and the receipt explains why.
+## 3. APPLIED: effects land via the shared path, the (node, event) pair is
+##    marked settled, and the attr-target snapshot is published.
+##
+## Suppression key is the (node_id, event_id) PAIR (not an event-id-global
+## flag): the cultivation bag channel is documented independent of the map
+## node channel, and a bag-drawn night_rain must never suppress the shaolin
+## node binding.
 func _resolve_node_event() -> void:
 	var def = EventData.def(event_id)
 	if def == null:
@@ -284,9 +330,31 @@ func _resolve_node_event() -> void:
 		return
 	var opt = def.option_a if event_focus == 0 else def.option_b
 	last_effect_types = []
-	for eff in opt.effects:
-		last_effect_types.append(eff.get("type", "none") as String)
-	EventLogic.apply_option_effects(SaveManager.profile, opt)
+	if false:  # TEMPORARY RED-FIRST REVERT — DO NOT COMMIT
+		if GameManager.is_node_event_settled(current_node_id, event_id):
+			# SETTLED: nothing applies, the receipt says so.
+			map_status_text = tr("此事已有了结，不再重来")
+	else:
+		# REFUSED path: consume validate_option's reason ("silver"/"owned").
+		# The purchase_all_or_nothing task owns EventLogic.validate_option;
+		# until it lands this is a no-op (reason "") and the APPLIED path runs.
+		var reason: String = ""
+		if reason == "silver":
+			map_status_text = tr("银两不足")
+		elif reason == "owned":
+			map_status_text = tr("此物已在行囊，无须再购")
+		else:
+			# APPLIED: apply first, then settle, then snapshot the attr value
+			# POST-apply (the reviewer's zero-delta anchor must equal the true
+			# post-settlement value, not the pre-apply one).
+			for eff in opt.effects:
+				last_effect_types.append(eff.get("type", "none") as String)
+			EventLogic.apply_option_effects(SaveManager.profile, opt)
+			for eff in opt.effects:
+				if (eff.get("type", "none") as String) == "attr":
+					last_apply_attr_value = SaveManager.profile.get_attr(
+						eff.get("target", "") as String)
+			GameManager.settle_node_event(current_node_id, event_id)
 	events_resolved_count += 1
 	# Write through to the GameManager session mirror so the count survives the
 	# MapScreen rebuild on return from a map battle.
@@ -305,6 +373,7 @@ func _enter_facility() -> void:
 	facility_id = MapData.active_facility_id(current_node_id)
 	phase = "FACILITY"
 	_facility_refused = false
+	map_status_text = ""
 	# Entering is not using: the panel must read empty until the first use — including
 	# on a RE-ENTRY after an earlier visit, where facility_use_count persists but the
 	# previous visit's result text must not still be on screen.
@@ -623,6 +692,10 @@ func _render() -> void:
 		var fdef = FacilityData.def(fid)
 		if fdef != null:
 			text += tr("\n\n门派设施：%s（F 使用）") % tr(fdef.title)
+	# The status receipt (settled / refused message) lives ONLY in the TRAVEL
+	# arm — EVENT and FACILITY return above with their own result channels.
+	if map_status_text != "":
+		text += "\n" + map_status_text
 	body.text = text
 	cursor_markers_visible = "▶" in body.text
 

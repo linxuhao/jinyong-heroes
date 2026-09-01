@@ -141,6 +141,30 @@ var map_events_resolved_count: int = 0
 var facility_use_month: int = -1
 var facility_use_count_this_month: int = 0
 
+## Session mirror of the settled node-event set (jinyong-loop R2). Keys are the
+## (node_id, event_id) PAIR "<node_id>/<event_id>" -> true — never an
+## event-id-global flag: the cultivation bag channel is documented independent
+## of the map node channel, so a bag-drawn night_rain must not suppress the
+## shaolin node binding. Written by MapScreen on every APPLIED node-event
+## resolution; read by _resolve_node_event()'s settled path so a revisit
+## re-SHOWS the event (re-fire is pinned by gates (b)) but never re-settles its
+## economy/attr effects. Survives the MapScreen rebuild on return from a map
+## battle; reset (clear) in the SAME handler as map_events_resolved_count when a
+## run begins or a save is loaded. Session-scoped only — never persisted (no
+## save-schema change; documented consequence: a loaded save may re-settle once
+## per session, identical to the map_events_resolved_count mirror's behavior).
+var settled_node_events: Dictionary = {}
+
+
+## Whether this (node, event) pair has already applied its effects this session.
+func is_node_event_settled(node_id: String, event_id: String) -> bool:
+	return settled_node_events.get(node_id + "/" + event_id, false)
+
+
+## Mark a (node, event) pair as settled (its effects applied this session).
+func settle_node_event(node_id: String, event_id: String) -> void:
+	settled_node_events[node_id + "/" + event_id] = true
+
 ## Observable: the end-game overlay's rendered text, written unconditionally
 ## inside _show_end_game_overlay() whenever the overlay shows (WON -> text
 ## containing 胜利, LOST -> text containing 战败). Never contains the ellipsis
@@ -293,6 +317,9 @@ func _reset_map_events_resolved_count(_a: Variant = null) -> void:
 	# The facility monthly-use mirror shares the same run-boundary lifecycle.
 	facility_use_month = -1
 	facility_use_count_this_month = 0
+	# The settled node-event set shares the same run-boundary lifecycle: a fresh
+	# run (or a loaded save) starts with every (node, event) pair unsettled.
+	settled_node_events.clear()
 
 
 ## Drop every per-battle reference owned by this autoload so a scene swap never

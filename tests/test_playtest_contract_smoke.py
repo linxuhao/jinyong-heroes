@@ -79,6 +79,7 @@ ROUND_SCENARIOS: list[str] = [
     "theme_focus_marker_cultivation",
     "softlock_empty_practice_month_advances",
     "facility_use_cap_exhausted_zero_delta",
+    "map_node_event_revisit_no_resettle",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1293,6 +1294,78 @@ def test_facility_use_cap_nail_contract() -> None:
     assert "facility_use_count == 0" in gate_text, (
         "facility_use_reusable.yaml lost its pinned "
         "`facility_use_count == 0` line"
+    )
+
+
+def test_map_node_event_revisit_no_resettle_nail_contract() -> None:
+    """Static anti-weakening pins for the jinyong-loop revisit nail.
+
+    The nail (``map_node_event_revisit_no_resettle``) pins the settled-split
+    rule: a node event may RE-APPEAR on revisit (gates (b) pin re-fire, and the
+    fix must NOT remove re-appearance), but its economy/attr effects must NOT
+    re-settle. Hard pins:
+
+    1. the scenario name is present in ``scenario_order`` AND
+       ``ROUND_SCENARIOS`` at the same index (two-place sync);
+    2. the file exists with ``name:`` == its basename;
+    3. every timeline ``at:`` is a single integer;
+    4. the file MUST carry the zero-delta line
+       ``attr_wisdom == last_apply_attr_value`` (the suppressed re-resolve
+       changed nothing on wisdom), the empty-effect line
+       ``last_effect_types.is_empty()``, and the on-screen receipt line
+       ``map_status_text != \"\"``;
+    5. the file MUST keep a re-fire leg asserting ``phase == \"EVENT\"`` — the
+       fix cannot be "landed" by also suppressing re-appearance;
+    6. the two gate-(b) protected files keep their pinned ladder lines
+       byte-untouched (anti-weakening, per the verbatim-protected trio rule).
+    """
+    name = "map_node_event_revisit_no_resettle"
+    order_text = COMMON.read_text(encoding="utf-8")
+    order_names = _items_under(order_text, "scenario_order")
+    assert name in order_names, f"{name} missing from scenario_order"
+    assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
+    assert order_names.index(name) == ROUND_SCENARIOS.index(name), (
+        f"{name} order mismatch between scenario_order and ROUND_SCENARIOS"
+    )
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(
+        ftext.splitlines(), start=1
+    ):
+        match = re.search(r"\bat\s*:\s*([^,}\s]+)", line)
+        if match and not match.group(1).isdigit():
+            assert False, (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {match.group(1)!r}"
+            )
+    for mandatory in (
+        "attr_wisdom == last_apply_attr_value",
+        "last_effect_types.is_empty()",
+        'map_status_text != ""',
+        'phase == "EVENT"',
+    ):
+        assert mandatory in ftext, (
+            f"{name}.yaml missing the mandatory differential/receipt line "
+            f"`{mandatory}`"
+        )
+    # The two gate-(b) protected files' pinned ladder lines survive byte-untouched.
+    shaolin = (PLAYTEST_DIR / "map_node_event_shaolin.yaml").read_text(
+        encoding="utf-8"
+    )
+    huashan = (PLAYTEST_DIR / "map_battle_node_huashan.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "events_resolved_count == 3" in shaolin, (
+        "map_node_event_shaolin.yaml lost its pinned "
+        "`events_resolved_count == 3` ladder line"
+    )
+    assert "events_resolved_count == 3" in huashan, (
+        "map_battle_node_huashan.yaml lost its pinned "
+        "`events_resolved_count == 3` Leg-F ladder line"
     )
 
 

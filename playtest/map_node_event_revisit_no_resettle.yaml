@@ -1,0 +1,136 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# Direct boot of map.tscn (the same boot pattern as map_node_event_mainline_return).
+# Pins the settled-split rule: the wudang quanzhen_scripture event (随他抄经,
+# +2 wisdom, ZERO silver cost) resolves ONCE with its effect applied, then on a
+# revisit (wudang -> luoyang -> wudang, the luoyang transit merchant being a
+# DIFFERENT (node, event) pair that settles normally) the event RE-APPEARS
+# (gates (b) pin re-fire) but its effects do NOT re-settle. All asserts are
+# DIFFERENTIAL (zero tuned literals like "== 8"): after the second resolve,
+# attr_wisdom == last_apply_attr_value (the success-only post-first-apply
+# snapshot — true iff the re-resolve changed nothing), last_effect_types
+# is empty, and map_status_text carries the suppressed receipt.
+# Ladder rungs (events_resolved_count) are re-baselined from the measured run:
+# 1 merchant (transit, first arrival) -> 2 quanzhen (first resolve, APPLIED)
+# -> 3 merchant (revisit, SUPPRESSED) -> 4 quanzhen (revisit, SUPPRESSED).
+name: map_node_event_revisit_no_resettle
+description: >-
+  Revisit probe: quanzhen_scripture at wudang resolves once (wisdom applied,
+  last_apply_attr_value published as the zero-delta anchor), then the same
+  (node, event) pair re-fires after wudang -> luoyang (transit merchant, a
+  different pair, settles normally) -> wudang and re-resolves SUPPRESSED:
+  attr_wisdom zero-delta vs last_apply_attr_value, last_effect_types empty,
+  map_status_text receipt on screen, events_resolved_count still climbing
+  (4) because the count tracks RESOLUTIONS, not settlements — keeping both
+  gate-(b) ladders byte-identical.
+scene: res://scenes/segments/map.tscn
+timeline:
+# Boot: wuming_valley, TRAVEL, no entry event fires at boot.
+- at: 30
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+    MapScreen.events_resolved_count: events_resolved_count == 0
+# wuming_valley -> luoyang: the transit merchant fires on FIRST arrival.
+- at: 40
+  actions:
+  - move_right
+- at: 50
+  actions:
+  - ui_accept
+- at: 70
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.event_open_silver: silver == event_open_silver
+- at: 80
+  actions:
+  - ui_accept
+- at: 100
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 1
+# luoyang -> wudang: quanzhen_scripture fires; resolve it ONCE (APPLIED).
+- at: 110
+  actions:
+  - move_right
+- at: 120
+  actions:
+  - ui_accept
+- at: 140
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "quanzhen_scripture"
+    MapScreen.event_open_silver: silver == event_open_silver
+- at: 150
+  actions:
+  - ui_accept
+- at: 170
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 2
+    # The FIRST resolve DID apply: wisdom moved vs the boot baseline.
+    MapScreen.attr_wisdom: changed
+- at: 175
+  actions: []
+  assert:
+    # The zero-delta anchor is SET and equals the post-apply wisdom value
+    # (the nail pins "settled once", not "never settled").
+    MapScreen.attr_wisdom: attr_wisdom == last_apply_attr_value
+    MapScreen.map_status_text: map_status_text == ""
+# wudang -> luoyang: the merchant is a DIFFERENT (node, event) pair; it
+# re-fires and its SECOND resolution is SUPPRESSED (settled) — count climbs.
+- at: 180
+  actions:
+  - move_left
+- at: 190
+  actions:
+  - ui_accept
+- at: 210
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+- at: 220
+  actions:
+  - ui_accept
+- at: 240
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 3
+    MapScreen.last_effect_types: 'last_effect_types.is_empty()'
+    MapScreen.map_status_text: 'map_status_text != ""'
+# luoyang -> wudang: quanzhen_scripture RE-APPEARS (gates (b) pin re-fire)...
+- at: 250
+  actions:
+  - move_right
+- at: 260
+  actions:
+  - ui_accept
+- at: 280
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "quanzhen_scripture"
+    MapScreen.current_node_id: current_node_id == "wudang"
+# ...and the re-resolve is SUPPRESSED: zero wisdom delta, empty effect list,
+# on-screen receipt, count still climbing (the ladder rung gate-(b) style).
+- at: 290
+  actions:
+  - ui_accept
+- at: 310
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.events_resolved_count: events_resolved_count == 4
+    MapScreen.attr_wisdom: attr_wisdom == last_apply_attr_value
+    MapScreen.last_effect_types: 'last_effect_types.is_empty()'
+    MapScreen.map_status_text: 'map_status_text != ""'

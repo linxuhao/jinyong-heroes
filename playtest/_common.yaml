@@ -809,6 +809,9 @@ surface:
   - cursor_markers_visible
   - last_use_silver
   - last_use_attr_value
+  - map_status_text
+  - event_open_silver
+  - last_apply_attr_value
   EndingScreen:
   - tier
   - done
@@ -1139,3 +1142,4 @@ scenario_order:
 - theme_focus_marker_cultivation
 - softlock_empty_practice_month_advances
 - facility_use_cap_exhausted_zero_delta
+- map_node_event_revisit_no_resettle
