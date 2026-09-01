@@ -329,6 +329,22 @@ func _use_facility() -> void:
 		_sync_surface()
 		_render()
 		return
+	# Per-month epoch check (RULE GATE, not a balance number): if the profile
+	# month has changed since the last use, start a fresh monthly counter. The
+	# mirror is session-scoped in GameManager so it survives the MapScreen rebuild
+	# on return from a map battle, exactly like map_events_resolved_count.
+	if GameManager.facility_use_month != SaveManager.profile.cultivation["month"]:
+		GameManager.facility_use_month = SaveManager.profile.cultivation["month"]
+		GameManager.facility_use_count_this_month = 0
+	if GameManager.facility_use_count_this_month >= FACILITY_MONTHLY_USE_CAP:
+		# Exhausted: no effect application, no count increment, no profile mutation,
+		# no snapshot write. Reuses the same refusal display channel as the silver
+		# shortfall (the panel prints facility_result_text).
+		_facility_refused = true
+		facility_result_text = tr("本月设施已用尽，下月再来")
+		_sync_surface()
+		_render()
+		return
 	var opt = EventData.EventOption.new()
 	# opt.effects is typed Array[Dictionary]; a plain Array duplicate() would fail
 	# the runtime type check ("Invalid assignment ... of type 'Array'"). assign()
@@ -339,7 +355,17 @@ func _use_facility() -> void:
 	for eff in fdef.effects:
 		last_facility_effect_types.append(eff.get("type", "none") as String)
 	facility_use_count += 1
+	# Write the monthly epoch pair through to the GameManager session mirror so the
+	# per-month cap survives the MapScreen rebuild (same pattern as
+	# map_events_resolved_count). The month epoch was already written by the reset
+	# branch above; this increments the count within that month.
+	GameManager.facility_use_count_this_month += 1
 	_facility_refused = false
+	# Success-only snapshots: the profile silver and the facility's target attr,
+	# post-apply. Written ONLY on success — never on a refused/exhausted press —
+	# so `silver == last_use_silver` after a refused press is a zero-delta proof.
+	last_use_silver = SaveManager.profile.silver
+	last_use_attr_value = SaveManager.profile.get_attr(_facility_target_attr(fdef))
 	# The visible result. Composed from the def's own effects (no literals) and
 	# carrying the SESSION USE COUNT, so use #1 reads differently from use #2 —
 	# that is what makes "it worked again" observable rather than a repeat of the
@@ -621,3 +647,13 @@ func _facility_effect_summary(fdef) -> String:
 			else:
 				parts.append("+%d" % value)
 	return " · ".join(parts)
+
+
+## The attr target of a facility's single attr effect ("" when none). Facilities
+## each carry one `attr` effect (shaolin -> "bone", wudang -> "inner"); the target
+## is read off the def's effects so the snapshot surface stays literal-free.
+func _facility_target_attr(fdef) -> String:
+	for eff in fdef.effects:
+		if eff.get("type", "none") as String == "attr":
+			return eff.get("target", "") as String
+	return ""

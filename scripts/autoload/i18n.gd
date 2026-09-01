@@ -461,6 +461,7 @@ const EN: Dictionary = {
 	"根骨 +%d": "Bone +%d",
 	"内力 +%d": "Qi +%d",
 	"修炼有得（第 %d 次）：%s": "Cultivation gained (use #%d): %s",
+		"本月设施已用尽，下月再来": "Facility uses exhausted this month, come back next month",
 
 	# --- Cultivation ------------------------------------------------------
 	"方向键选择 · 回车执行": "Arrow keys to choose · Enter to act",

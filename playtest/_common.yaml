@@ -807,6 +807,8 @@ surface:
   - facility_result_text
   - pressed_connected
   - cursor_markers_visible
+  - last_use_silver
+  - last_use_attr_value
   EndingScreen:
   - tier
   - done
@@ -1136,3 +1138,4 @@ scenario_order:
 - event_pool_new_event_resolved
 - theme_focus_marker_cultivation
 - softlock_empty_practice_month_advances
+- facility_use_cap_exhausted_zero_delta

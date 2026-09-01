@@ -1,0 +1,207 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+name: facility_use_cap_exhausted_zero_delta
+description: >-
+  The facility monthly-use cap (RULE GATE: 2 uses per profile month). Reuses
+  facility_use_reusable's sanctioned seed prefix to reach shaolin TRAVEL at
+  month 36 (boot -> tutorial win -> debug_fast_forward -> travel luoyang ->
+  shaolin, resolving the intermediate merchant / night_rain events), then funds
+  with debug_grant_silver BEFORE any use so the silver pre-check never masks the
+  cap. The player then enters the facility THREE times at the same node
+  (use_facility enter / ui_accept use / move_down leave — _leave_facility only
+  switches phase, and the session-scoped GameManager mirror is not reset on
+  entry, so three entries in one month prove cross-entry persistence of the cap
+  without re-exercising the travel/event legs that gate (a) already covers):
+  use #1 (facility_use_count 1, silver/attr_bone changed, success snapshots
+  published), use #2 (facility_use_count 2, silver/attr_bone changed, snapshots
+  re-published post-apply), then the EXHAUSTED press (use_facility re-enter +
+  ui_accept) which is REFUSED: no count increment, no profile mutation, and the
+  zero-delta proof that nothing moved. The exhausted receipt is on screen via
+  facility_result_text. All asserts are differential (zero tuned literals like
+  "== 8"): after the exhausted press, silver == last_use_silver (the success-only
+  post-use-2 snapshot), attr_bone == last_use_attr_value, facility_use_count == 2
+  (unchanged), facility_result_text != "" (the exhausted receipt is visible).
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 50
+  actions:
+  - ui_accept
+- at: 80
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - move_right
+- at: 180
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - ui_accept
+- at: 280
+  actions:
+  - debug_fast_forward
+- at: 400
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+    MapScreen.visible: visible == true
+- at: 420
+  actions:
+  - move_right
+- at: 430
+  actions:
+  - ui_accept
+- at: 440
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "merchant"
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 470
+  actions:
+  - move_right
+- at: 480
+  actions:
+  - move_right
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions: []
+  assert:
+    MapScreen.phase: phase == "EVENT"
+    MapScreen.event_id: event_id == "night_rain"
+    MapScreen.current_node_id: current_node_id == "shaolin"
+- at: 510
+  actions:
+  - ui_accept
+- at: 530
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_id: facility_id == ""
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 540
+  actions:
+  - debug_grant_silver
+- at: 550
+  actions: []
+  assert:
+    MapScreen.silver: changed
+# --- Entry #1: enter, use, leave ---
+- at: 560
+  actions:
+  - use_facility
+- at: 570
+  actions: []
+  assert:
+    MapScreen.phase: phase == "FACILITY"
+    MapScreen.facility_id: facility_id == "shaolin_wooden_men"
+    MapScreen.facility_use_count: facility_use_count == 0
+- at: 580
+  actions:
+  - ui_accept
+- at: 600
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 1
+    MapScreen.silver: silver == last_use_silver
+    MapScreen.attr_bone: changed
+    MapScreen.facility_result_text: facility_result_text != ""
+- at: 610
+  actions:
+  - move_down
+- at: 620
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_use_count: facility_use_count == 1
+# --- Entry #2: enter, use, leave ---
+- at: 630
+  actions:
+  - use_facility
+- at: 640
+  actions:
+  - ui_accept
+- at: 660
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 2
+    MapScreen.silver: changed
+    MapScreen.attr_bone: changed
+    MapScreen.facility_result_text: facility_result_text != ""
+    MapScreen.silver: silver == last_use_silver
+    MapScreen.attr_bone: attr_bone == last_use_attr_value
+- at: 670
+  actions:
+  - move_down
+- at: 680
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.facility_use_count: facility_use_count == 2
+# --- Entry #3: enter, EXHAUSTED press (refused, zero delta) ---
+- at: 690
+  actions:
+  - use_facility
+- at: 700
+  actions:
+  - ui_accept
+- at: 720
+  actions: []
+  assert:
+    MapScreen.facility_use_count: facility_use_count == 2
+    MapScreen.silver: silver == last_use_silver
+    MapScreen.attr_bone: attr_bone == last_use_attr_value
+    MapScreen.facility_result_text: facility_result_text != ""
