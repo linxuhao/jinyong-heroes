@@ -17,7 +17,82 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: jinyong-loop R2 — the monthly loop cannot stop, redemption cannot be infinite (2026-09-01)
+## Latest round: R3 Meaningful Numbers — choices must shape the ending (2026-09-01)
+
+Progression/economy overhaul: the three-year loop now actually decides the ending.
+Before this round the ending tier was the flat sum of five attrs vs two thresholds
+(a growth route saturated tier 3 mid-journey and nothing after that mattered),
+`fortune` had zero consumers while the creation screen promised effects, `work` was
+a flat +10 silver dominated by a free monthly card, and the Huashan finale killed a
+normally-played hero before his first turn with no warning anywhere. All four are
+fixed and pinned by **choice-differential nails** (never balance literals), each with
+a measured red-first run recorded under `final/red_first_notes_r3_*.md` and the
+consolidated ledger `final/delivery_notes_r3_numbers.md`.
+
+**The four fixes (all verified in the tree by direct read):**
+
+1. **Multi-axis ending evaluation** (`scripts/data/ending_logic.gd` NEW + `map_data.gd`):
+   `score = round(attrs×1.0 + mastery×2.0 + deeds)` where mastery = GRADE_POINTS over
+   mastered arts (丁1 丙2 乙3 甲4, `ProgressionMath`) and deeds = persisted in-run
+   choices (`travel_resolved×2.0 + silver_earned×0.05`). `ENDING_TIERS` scans
+   `min_score` 90/60/0 (values set by measurement M2, run "measured 2026-09-01, R3 M2").
+   The ending screen (`ending.gd`) evaluates fresh from the persisted profile and shows
+   the per-axis summary (属性/武学/历练). Because mastery and deeds keep growing by
+   construction, a month-36 choice still moves the score.
+2. **Fortune implemented, promise kept** (`trait_effects.gd::fortune_reroll_budget`,
+   `cultivation.gd`): the creation screen's promise is now literal — fortune sets the
+   yearly travel-event reroll budget (`1 + (fortune−10)/10 + 1 with 福缘深厚`). During a
+   travel event the new `EventRerollButton` (or the **R** key, action `event_reroll`)
+   re-draws the event; the exhausted press is inert (zero RNG, non-empty receipt).
+   The previously unreferenced `yearly_event_reroll` trait hook now has its reader.
+   The adjacent unimplemented `map_inquire` (江湖阅历) trait promise is honestly
+   recorded as a residual in `design/40_progression.md` §11 (out of scope this round).
+3. **Four monthly actions, four measured niches** (`cultivation.gd::_apply_action`,
+   `ProgressionMath.work_income`): 练功 practice = +2 into the player-CHOSEN art (the
+   only targeted advancement); 修习 cultivate = the only repeatable attribute source;
+   做工 work = `10 + 2 × mastered_count` silver — the only repeatable silver source that
+   compounds with the run (eventually beats the one-shot +30 card); 游历 travel = the
+   only item/event source and the only channel fortune acts on. Each action row shows
+   its effect on screen; per-action 36-month yield curves measured by
+   `tests/test_action_yield_curves.gd` (M1, run "measured 2026-09-01, R3 M1").
+4. **Huashan winnable and pre-warned, fight not nerfed** (`battle_setup.gd`): the five
+   greats' numbers are untouched (enemy side untouched — the six locked files stayed
+   byte-identical); instead the sanctioned player-side `derive_stats` gains a mastery
+   term (`max_health += 6×mp`, `energy += 4×mp`, `initiative += 3×mp`), so three years of
+   practice cash out in the finale. `BattleSetup.readiness()` warns in advance on the
+   roster panel (visible on map AND cultivation) with the 华山评估 verdict (战备不足 /
+   势均力敌 / 胜券在握) computed from the same formula the duel uses. Measurement M3
+   (seeds s1..s5, run "measured 2026-09-01, R3 M3"): a balanced normal route wins 5/5
+   while a creation-fresh profile loses 5/5; the winnable scenario also asserts
+   `health < max_health` at the win frame, so the fight stays real.
+
+**Key surfaces / integration points (new this round):**
+
+- Persisted deeds: `PlayerProfile.deeds` (work_months / cultivate_months /
+  practice_months / travel_resolved / silver_earned / rerolls_used_this_year),
+  additive save schema with legacy-default repair (`save_load_roundtrip` stays green).
+- Observables: `CultivationScreen.{rerolls_left, last_action_kind, last_action_silver,
+  last_yield_text, last_practice_target, last_practice_amount}`, `EndingScreen.{score,
+  evaluation_text, diverged_from_first}`, `RosterPanel.readiness_text`.
+- Input: `event_reroll` (R key) added to `project.godot [input]`; all new UI strings
+  live in the EN dictionary of `scripts/autoload/i18n.gd`.
+- Six new differential scenarios registered in `playtest/_common.yaml` +
+  `tests/test_playtest_contract_smoke.py` (two-place sync): `ending_divergent_playstyles`,
+  `ending_last_month_choice`, `fortune_reroll_budget`, `action_yield_differential`,
+  `huashan_readiness_warning`, `huashan_winnable_normal_route` — with a stdlib
+  anti-weakening door `tests/test_ending_gate_pins.py` guarding their load-bearing lines.
+- Design docs: `design/40_progression.md` §11 (fortune), §12 (Huashan readiness),
+  §13 (multi-axis ending) record the formulas and the M1/M2/M3 measured curves.
+
+**Verification status (honest, 2026-09-01):** implementation verified by direct read;
+six red-first nails measured on the pre-fix tree (failing frame / first failing assert /
+observed error / greens before red) and green sidecar runs recorded per task; M1/M2/M3
+measurement tables recorded with their run labels. The official consolidated gate
+products (`compile_report.json` / `playtest_report.json` / `vision_report.json` /
+`test_report.json`) are downstream pipeline artifacts and do not exist at verification
+time — see `final/verify_report.json` for the itemized verdict.
+
+## Round: jinyong-loop R2 — the monthly loop cannot stop, redemption cannot be infinite (previous round, 2026-09-01)
 
 Bug-fix round on the loop's rule short-circuits: four rules existed but were short-circuited
 (the cultivation soft-lock, unlimited facility redemption, node-event effects re-settling on
