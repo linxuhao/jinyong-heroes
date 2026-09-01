@@ -637,7 +637,7 @@ func _rebuild_options_box() -> void:
 				# Empty unmastered list: the single tappable exit. Its pressed
 				# path is the same _on_option_pressed -> _on_accept chain every
 				# other option uses — no forked phase logic.
-				labels.append(tr("返回行动"))
+				labels.append(tr("度过本月"))
 			for i in range(ids.size()):
 				var gid: String = ids[i]
 				var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
@@ -942,7 +942,7 @@ func _render() -> void:
 		"GONGFA_PICK":
 			text += tr("【练功】\n")
 			if _unmastered_ids().is_empty():
-				text += tr("暂无未大成武功。点击「返回行动」回到本月行动。")
+				text += tr("功法均已大成，无可修习")
 			# The keyboard hint shows even when the list is empty: the
 			# 返回行动 button is the tappable exit, and the hint names the
 			# confirm key for desktop players.
@@ -962,6 +962,10 @@ func _render() -> void:
 		"SECT_SWITCH":
 			text += tr("【另投他派】\n")
 			text += tr("\n上下选择，回车拜入")
+	# On-screen feedback: any branch that set status_text this accept appends
+	# its notice here so the player SEES what happened (never a silent jump).
+	if status_text != "":
+		text += "\n" + status_text + "\n"
 	body.text = text
 	_rebuild_options_box()
 	# Observables recomputed on every render. cursor_markers_visible is the

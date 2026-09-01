@@ -74,16 +74,18 @@ timeline:
   assert:
     CultivationScreen.phase: phase == "GONGFA_PICK"
     CultOptionButton0.visible: visible == true
-    CultOptionButton0.text: text == "返回行动"
+    CultOptionButton0.text: text == "度过本月"
     CultivationScreen.mastered_count: mastered_count == gongfa_count
     CultivationScreen.pressed_connected: pressed_connected["CultOptionButton0"] == true
     CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
 - at: 180
   actions:
   - ui_accept
-# ── GONGFA_PICK -> ACTION_PICK (keyboard empty-branch return) ───────────────
+# ── GONGFA_PICK empty-branch accept -> CARD_PICK (month advances) ───────────
 - at: 200
   actions: []
   assert:
-    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == month_before_accept + 1
+    CultivationScreen.status_text: status_text != ""
     CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
