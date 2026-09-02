@@ -581,6 +581,6 @@ timeline:
     EndingScreen.score: score >= 1
     EndingScreen.evaluation_text: evaluation_text != ""
     SaveManager.first_ending_evaluation: first_ending_evaluation != ""
-    SaveManager.first_ending_evaluation: first_ending_evaluation != evaluation_text
+    EndingScreen.diverged_from_first: diverged_from_first == true
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true

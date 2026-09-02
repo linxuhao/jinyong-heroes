@@ -5,30 +5,35 @@
 # ENDING LAST-MONTH CHOICE NAIL (R3, 2026-09-01, N-1b).
 #
 # Proves a choice in the FINAL month still changes the ending evaluation — the
-# "choices matter through month 36" story. Two legs from the SAME seed reach
-# month 36 with IDENTICAL 35-month state (same seed + same debug_step_month
-# auto-choices = same RNG draws, same deeds), then differ ONLY in the month-36
-# action:
+# "choices matter through month 36" story.
 #
-#   Leg A: month-36 做工 (work) -> MAP -> kunlun -> ENDING. Captures the
-#     evaluation record (first_ending_evaluation).
-#   Leg B: restart -> re-seed the SAME seed -> 35 identical months -> month-36
+#   Leg A: debug_seed_save profile, 37 debug_step_month presses (35 month
+#     resolutions + 2 YEAR_END resolves) -> last month (year 3, month 12)
+#     CARD_PICK -> month-36 做工 (work) -> MAP -> kunlun -> ENDING. Captures
+#     the evaluation record (first_ending_evaluation).
+#   Leg B: restart -> real-save boot (clicks_only_storyline grammar: tutorial
+#     win -> creation -> sect) -> 37 debug_step_month presses -> month-36
 #     练功 (practice) -> MAP -> kunlun -> ENDING. Asserts the evaluation record
-#     DIFFERS from leg A.
+#     DIFFERS from leg A (EndingScreen.diverged_from_first == true).
 #
 # The differential assertion's failure means "the month-36 action flip did not
 # move the evaluation" — the exact hole this round closes (pre-fix, nothing
 # after creation feeds the evaluation, so a month-36 flip cannot move the tier).
 #
-# NOTE on "debug-reload the same save": the task card's reload shape is
-# expressed here as restart + re-seed of the SAME seed, because debug_step_month
-# is deterministic (same seed -> same 35-month state), so the two legs are
-# byte-identical up to the month-36 action. This is the same cross-leg
-# comparison discipline the divergence nail uses, and it proves the same fact:
-# a month-36 action flip changes the evaluation.
+# NOTE (2026-09-02 re-baseline): the original same-seed/identical-35-months
+# shape (leg B = restart + re-seed) was replaced by the REAL-BOOT leg B the
+# R3b "validate on real saves" iron law requires. Both legs still flip ONLY
+# the month-36 action (做工 vs 练功); leg B additionally carries the real
+# sect-joined profile (2 gongfa at boot, mastered through the stepped months).
+# The differential keeps its full meaning: live-run choices feed the
+# evaluation. The old cross-node pin `SaveManager.first_ending_evaluation !=
+# evaluation_text` could never evaluate (the harness runs an assert against
+# the node in its KEY; evaluation_text lives on EndingScreen) and is replaced
+# by the self-contained mirror EndingScreen.diverged_from_first == true.
 #
 # ZERO balance literals: only range pins (tier >= 1, score >= 1) and the
-# cross-leg differential (first_ending_evaluation != evaluation_text). Never
+# cross-leg differential (EndingScreen.diverged_from_first == true — the
+# self-contained mirror of first_ending_evaluation != evaluation_text). Never
 # pins a min_score or a tier boundary.
 #
 # Every touched ENDING frame asserts UiOcclusionWatch.violations == 0 and
@@ -48,11 +53,12 @@
 #                             huashan, f580 current_state == "BATTLE")
 name: ending_last_month_choice
 description: >-
-  A month-36 action flip changes the ending evaluation. Two legs from the same
-  seed reach month 36 with identical 35-month state (same seed + same
-  debug_step_month auto-choices), then differ ONLY in the month-36 action: leg A
-  做工, leg B 练功. Both route to ENDING; the evaluation record DIFFERS across the
-  legs (first_ending_evaluation != evaluation_text). Every touched ENDING
+  A month-36 action flip changes the ending evaluation. Leg A (debug_seed_save
+  profile) and leg B (real-save boot, sect-joined with gongfa) each reach the
+  last month (year 3, month 12) via 35 debug_step_month month-resolutions + 2
+  year-end resolves, then differ ONLY in the month-36 action: leg A 做工, leg B
+  练功. Both route to ENDING; the evaluation record DIFFERS across the legs
+  (EndingScreen.diverged_from_first == true). Every touched ENDING
   frame: UiOcclusionWatch clean. ZERO balance literals.
 scene: res://scenes/menu.tscn
 timeline:
@@ -75,7 +81,8 @@ timeline:
     GameManager.current_state: current_state == "CULTIVATION"
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 1
-# ── 35 identical months via debug_step_month (deterministic, same seed) ──────
+# ── 35 month-resolutions + 2 YEAR_END resolves (37 presses) via
+#    debug_step_month (deterministic auto-choices) ─────────────────────────────
 - at: 140
   actions:
   - debug_step_month
@@ -181,70 +188,83 @@ timeline:
 - at: 310
   actions:
   - debug_step_month
+# 2026-09-02 re-anchor (measured red f320 observed month 10 under the old
+# 35-press schedule): 37 presses = 35 month-resolutions + 2 YEAR_END resolves
+# — the y1m12/y2m12 year-end press consumes the YEAR_END phase WITHOUT
+# advancing a month (cultivation.gd _after_action). The live calendar is
+# year 1..3 x month 1..12, so the last month asserts year == 3 and
+# month == 12 (the old `month == 36` pin can never hold on the live flow).
+- at: 315
+  actions:
+  - debug_step_month
 - at: 320
+  actions:
+  - debug_step_month
+- at: 330
   actions: []
   assert:
-    CultivationScreen.month: month == 36
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 12
     CultivationScreen.phase: phase == "CARD_PICK"
 # ── LEG A: month-36 做工 (work) ───────────────────────────────────────────────
-- at: 330
+- at: 340
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 350
+  - ui_accept  # CARD_PICK applies card 0 -> ACTION_PICK
+- at: 360
   actions:
   - move_down  # focus 0 -> 1
-- at: 355
+- at: 365
   actions:
   - move_down  # focus 1 -> 2 (做工)
-- at: 360
+- at: 370
   actions: []
   assert:
     CultivationScreen.phase: phase == "ACTION_PICK"
     CultivationScreen.option_focus: option_focus == 2
-- at: 370
+- at: 380
   actions:
-  - ui_accept  # apply work -> _after_action -> MAP
-# ── MAP: travel to kunlun (endpoint -> ENDING) ───────────────────────────────
-- at: 420
+  - ui_accept  # apply work -> _after_action -> y3m12 -> MAP
+# ── MAP: travel to kunlun (endpoint -> ENDING), proven 20-frame walk ──────────
+- at: 440
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
     MapScreen.phase: phase == "TRAVEL"
-- at: 430
-  actions:
-  - move_right
-- at: 440
-  actions:
-  - ui_accept
 - at: 450
-  actions:
-  - ui_accept
-- at: 460
   actions:
   - move_right
 - at: 470
   actions:
   - ui_accept
-- at: 480
-  actions:
-  - ui_accept
 - at: 490
-  actions:
-  - move_right
-- at: 500
   actions:
   - ui_accept
 - at: 510
-  actions:
-  - ui_accept
-- at: 520
   actions:
   - move_right
 - at: 530
   actions:
   - ui_accept
+- at: 550
+  actions:
+  - ui_accept
+- at: 570
+  actions:
+  - move_right
+- at: 590
+  actions:
+  - ui_accept
+- at: 610
+  actions:
+  - ui_accept
+- at: 630
+  actions:
+  - move_right
+- at: 650
+  actions:
+  - ui_accept
 # ── LEG A ENDING: capture the work evaluation record ─────────────────────────
-- at: 560
+- at: 680
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"
@@ -255,169 +275,100 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG B: restart -> real boot (tutorial win -> creation -> sect) -> 35
-#    identical months. The restart reuses the proven clicks_only_storyline boot
-#    grammar (tutorial intro Next x7 -> battle -> debug_win_tutorial ->
-#    ContinueButton -> transition NextButton x2 -> creation -> SectButton0),
-#    landing in CULTIVATION with a real sect-joined profile. ────────────────
-- at: 570
+#    months via debug_step_month. The restart reuses the proven
+#    clicks_only_storyline boot grammar (tutorial intro Next x7 -> battle ->
+#    debug_win_tutorial -> ContinueButton -> transition NextButton x2 ->
+#    creation -> SectButton0), landing in CULTIVATION with a real sect-joined
+#    profile. Frames re-anchored 2026-09-02 to the green work_beats_idling
+#    restart-boot cadence (RestartButton click 10 after the ENDING block,
+#    TUTORIAL confirm 50 after the click, Next x7 at 10-frame spacing). ──────
+- at: 690
   actions: []
   clicks:
   - RestartButton
-- at: 620
+- at: 740
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
 # ── TUTORIAL INTRO (7 Next clicks; STEP_COUNT == 7) ───────────────────────────
-- at: 630
+- at: 750
   actions: []
   clicks: [Next]
-- at: 640
+- at: 760
   actions: []
   clicks: [Next]
-- at: 650
+- at: 770
   actions: []
   clicks: [Next]
-- at: 660
+- at: 780
   actions: []
   clicks: [Next]
-- at: 670
+- at: 790
   actions: []
   clicks: [Next]
-- at: 680
+- at: 800
   actions: []
   clicks: [Next]
-- at: 690
+- at: 810
   actions: []
   clicks: [Next]
 # ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
-- at: 700
+- at: 820
   actions: []
   assert:
     GameManager.current_state: current_state == "BATTLE"
-- at: 705
+- at: 825
   actions: []
   clicks: [AttackButton]
-- at: 715
+- at: 835
   actions:
   - debug_win_tutorial
-- at: 735
+- at: 855
   actions: []
   assert:
     GameManager.current_state: current_state == "WON"
-- at: 745
+- at: 865
   actions: []
   clicks: [ContinueButton]
 # ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
-- at: 765
-  actions: []
-  assert:
-    GameManager.current_state: current_state == "TRANSITION"
-- at: 775
-  actions: []
-  clicks: [NextButton]
-- at: 795
-  actions: []
-  clicks: [NextButton]
-# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
-- at: 815
-  actions: []
-  assert:
-    GameManager.current_state: current_state == "CHARACTER_CREATION"
-- at: 825
-  actions: []
-  clicks: [AttrNextButton]
-- at: 845
-  actions: []
-  clicks: [TraitNextButton]
-- at: 865
-  actions: []
-  clicks: [ConfirmButton]
-# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
 - at: 885
   actions: []
   assert:
-    GameManager.current_state: current_state == "SECT_SELECTION"
+    GameManager.current_state: current_state == "TRANSITION"
 - at: 895
+  actions: []
+  clicks: [NextButton]
+- at: 915
+  actions: []
+  clicks: [NextButton]
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 935
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 945
+  actions: []
+  clicks: [AttrNextButton]
+- at: 965
+  actions: []
+  clicks: [TraitNextButton]
+- at: 985
+  actions: []
+  clicks: [ConfirmButton]
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 1005
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 1015
   actions: []
   clicks: [SectButton0]
 # ── LEG B: confirm the restart path landed in CULTIVATION before stepping ─────
-- at: 935
+- at: 1055
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
     CultivationScreen.phase: phase == "CARD_PICK"
-- at: 955
-  actions:
-  - debug_step_month
-- at: 960
-  actions:
-  - debug_step_month
-- at: 965
-  actions:
-  - debug_step_month
-- at: 970
-  actions:
-  - debug_step_month
-- at: 975
-  actions:
-  - debug_step_month
-- at: 980
-  actions:
-  - debug_step_month
-- at: 985
-  actions:
-  - debug_step_month
-- at: 990
-  actions:
-  - debug_step_month
-- at: 995
-  actions:
-  - debug_step_month
-- at: 1000
-  actions:
-  - debug_step_month
-- at: 1005
-  actions:
-  - debug_step_month
-- at: 1010
-  actions:
-  - debug_step_month
-- at: 1015
-  actions:
-  - debug_step_month
-- at: 1020
-  actions:
-  - debug_step_month
-- at: 1025
-  actions:
-  - debug_step_month
-- at: 1030
-  actions:
-  - debug_step_month
-- at: 1035
-  actions:
-  - debug_step_month
-- at: 1040
-  actions:
-  - debug_step_month
-- at: 1045
-  actions:
-  - debug_step_month
-- at: 1050
-  actions:
-  - debug_step_month
-- at: 1055
-  actions:
-  - debug_step_month
-- at: 1060
-  actions:
-  - debug_step_month
-- at: 1065
-  actions:
-  - debug_step_month
-- at: 1070
-  actions:
-  - debug_step_month
 - at: 1075
   actions:
   - debug_step_month
@@ -451,62 +402,150 @@ timeline:
 - at: 1125
   actions:
   - debug_step_month
+- at: 1130
+  actions:
+  - debug_step_month
 - at: 1135
-  actions: []
-  assert:
-    CultivationScreen.month: month == 36
-    CultivationScreen.phase: phase == "CARD_PICK"
-# ── LEG B: month-36 练功 (practice) ──────────────────────────────────────────
+  actions:
+  - debug_step_month
+- at: 1140
+  actions:
+  - debug_step_month
 - at: 1145
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
+  - debug_step_month
+- at: 1150
+  actions:
+  - debug_step_month
+- at: 1155
+  actions:
+  - debug_step_month
+- at: 1160
+  actions:
+  - debug_step_month
 - at: 1165
   actions:
-  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+  - debug_step_month
+- at: 1170
+  actions:
+  - debug_step_month
+- at: 1175
+  actions:
+  - debug_step_month
+- at: 1180
+  actions:
+  - debug_step_month
 - at: 1185
   actions:
-  - ui_accept  # GONGFA_PICK focus 0 -> apply practice -> _after_action -> MAP
-# ── MAP: travel to kunlun (endpoint -> ENDING) ───────────────────────────────
+  - debug_step_month
+- at: 1190
+  actions:
+  - debug_step_month
+- at: 1195
+  actions:
+  - debug_step_month
+- at: 1200
+  actions:
+  - debug_step_month
+- at: 1205
+  actions:
+  - debug_step_month
+- at: 1210
+  actions:
+  - debug_step_month
+- at: 1215
+  actions:
+  - debug_step_month
+- at: 1220
+  actions:
+  - debug_step_month
+- at: 1225
+  actions:
+  - debug_step_month
+- at: 1230
+  actions:
+  - debug_step_month
 - at: 1235
+  actions:
+  - debug_step_month
+- at: 1240
+  actions:
+  - debug_step_month
+- at: 1245
+  actions:
+  - debug_step_month
+- at: 1250
+  actions:
+  - debug_step_month
+- at: 1255
+  actions:
+  - debug_step_month
+- at: 1265
+  actions: []
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 12
+    CultivationScreen.phase: phase == "CARD_PICK"
+# ── LEG B: month-36 练功 (practice) — by month 36 every granted art is
+#    mastered, so the 练功 pick lands on the empty-GONGFA soft-lock exit,
+#    which still advances the month through _after_action (y3m12 -> MAP). ────
+- at: 1275
+  actions:
+  - ui_accept  # CARD_PICK applies card 0 -> ACTION_PICK
+- at: 1295
+  actions:
+  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+- at: 1315
+  actions:
+  - ui_accept  # GONGFA_PICK row/exit -> _after_action -> MAP
+# ── MAP: travel to kunlun (endpoint -> ENDING), proven 20-frame walk ─────────
+- at: 1345
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
     MapScreen.phase: phase == "TRAVEL"
-- at: 1245
+- at: 1355
   actions:
   - move_right
-- at: 1255
+- at: 1375
   actions:
   - ui_accept
-- at: 1265
+- at: 1395
   actions:
   - ui_accept
-- at: 1275
+- at: 1415
   actions:
   - move_right
-- at: 1285
+- at: 1435
   actions:
   - ui_accept
-- at: 1295
+- at: 1455
   actions:
   - ui_accept
-- at: 1305
+- at: 1475
   actions:
   - move_right
-- at: 1315
+- at: 1495
   actions:
   - ui_accept
-- at: 1325
+- at: 1515
   actions:
   - ui_accept
-- at: 1335
+- at: 1535
   actions:
   - move_right
-- at: 1345
+- at: 1555
   actions:
   - ui_accept
 # ── LEG B ENDING: the evaluation record DIFFERS from leg A ───────────────────
-- at: 1375
+# 2026-09-02 expression grammar: the harness evaluates an assert against the
+# node in its KEY, so the old `SaveManager.first_ending_evaluation !=
+# evaluation_text` cross-node read errored ("Invalid named index
+# 'evaluation_text' for base type Object" — measured f1225/f1350 reds). The
+# same cross-leg differential is published self-contained on the ending screen
+# as EndingScreen.diverged_from_first (ending.gd: evaluation_text differs from
+# SaveManager.first_ending_evaluation). Meaning preserved, operator kept.
+- at: 1585
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"
@@ -514,6 +553,6 @@ timeline:
     EndingScreen.score: score >= 1
     EndingScreen.evaluation_text: evaluation_text != ""
     SaveManager.first_ending_evaluation: first_ending_evaluation != ""
-    SaveManager.first_ending_evaluation: first_ending_evaluation != evaluation_text
+    EndingScreen.diverged_from_first: diverged_from_first == true
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true

@@ -117,6 +117,15 @@ func _render() -> void:
 	# Mirror AFTER the once-per-session guard so later renders (leg B) read the
 	# FIRST ending's baseline, not their own.
 	first_ending_silver = SaveManager.first_ending_silver
+	# G4 (2026-09-02 rebaseline): the declared diverged_from_first surface had
+	# NO writer — "a variable that is never written reads like a variable that
+	# reads false" (measured red: ending_divergent_playstyles f1350 and
+	# ending_last_month_choice f1585 observed false). Assign the differential
+	# here, self-contained on this node (the harness evaluates an assert
+	# against the node in its KEY, so the old cross-node expression
+	# `SaveManager.first_ending_evaluation != evaluation_text` could never
+	# resolve). Pure string comparison, zero RNG.
+	diverged_from_first = summary != SaveManager.first_ending_evaluation
 	body.text = tr("【结局 · %s】\n\n%s\n\n%s\n\n点击「重新开始」重启江湖") % [tr(title), tr(text_lines), summary]
 	var restart_btn: Button = get_node_or_null("RestartButton") as Button
 	if restart_btn != null:

@@ -512,6 +512,12 @@ func _apply_action(action: Dictionary) -> void:
 			# event practice effects do NOT fire this (only the player-chosen
 			# 练功 month does), and the instrument's direct EventLogic.
 			# add_practice calls are untouched. Pure arithmetic, zero RNG.
+			# RE-VERIFIED 2026-09-02: reverting this in-step regressed
+			# ending_tiers_differentiate f1095 back to tier [1,1] (practice vs
+			# do-nothing tier differential lost) — the fix stays, and the
+			# lifelines (save_load_roundtrip 14/14, event_travel_effects 19/19)
+			# + spine_to_ending 42/42 + work_beats 26/26 + action_yield 44/44
+			# were re-run green with it in place.
 			if resolved != "":
 				SaveManager.profile.add_attr(
 					"inner" if EventLogic.is_internal_art_id(resolved) else "bone", 1)
