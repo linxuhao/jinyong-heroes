@@ -702,7 +702,96 @@ score**——「选择持续影响结局直到最后一个月」由构造保证�
 `GameManager` 锁定,其计数器是会话级,读档会静默归零;持久化 deeds 设计若
 读档读到零会让结局说谎。限制记录于此。
 
-### M2 实测记录(measured 2026-09-01, R3 M2, seeded runs)
+### M2' 实测记录(measured 2026-09-02, R3b M2', real-save)
+
+> **旧 M2 表(measured on empty seeded profile, superseded 2026-09-02)** 见本小节
+> 末尾。旧表在 `debug_seed_save` 空档(0 门派、0 功法)上测得,而真实档(创建 →
+> 入门派 → 36 月)因等级词表分裂(`GRADE_POINTS` CJK 键 vs 生产拉丁键)武学轴恒为
+> 0,且免费卡 `一袋碎银` +20/月喂进 deeds 轴,使 8 条路线 × 2 种档全部落到
+> 【结局 · 一代宗师】(tier 3,min_score 90)——旧阈值从下面够不到,武林名宿/
+> 隐于市井实际不可达。R3b 在**真实档**上重测并重定阈值,旧表仅作历史保留。
+
+**仪器**:`tests/test_action_yield_curves.gd`(M1 曲线仪器)扩展为 M2' 测量:
+每条策略先跑**真实档前缀**(模拟入派授艺 `_grant_year_arts` 等价:internal +
+external 丁级各一门,`main_external_id` 置位,键取自生产词表 `GRADE_BY_YEAR`),
+再跑 36 个播种月。5 个种子(20260901–20260905)全扫,打印
+`strategy | seed | attrs | mastery | deed_travel | deed_silver | score | tier`。
+
+**路线定义(裁决,记入 90_decisions 裁决二附注)**:
+
+- **腿 A · do_nothing**:空档 `度过本月` ×36(键盘语法)。该按钮只在「无未大成
+  功法」时出现——在 0 功法空档上它从第 1 月就存在,是**唯一合法的零收益路线**;
+  真实档(入门派)上它要求先练满全部功法,不再是「什么都不做」。此可达性边界
+  记录于此:腿 A 用空档承载,真实档的 tier-1 下界由腿 A' 承载。
+- **腿 A' · idle_real**:真实档前缀 + 36 × 收卡(最低产出合法真实路线,零练功)。
+- **腿 B · all_practice**:真实档,36 × 练功(只推武学轴)。
+- **腿 C · balanced**:真实档,练功 + 修习 + 做工 + 游历混合(clicks-only 月语法)。
+
+**M2' 实测表(5 种子 × 4 腿,真实档前缀)**:
+
+| strategy | seed | ending_score | ending_tier |
+|---|---|---|---|
+| do_nothing | 20260901 | 110 | 1 |
+| do_nothing | 20260902 | 110 | 1 |
+| do_nothing | 20260903 | 110 | 1 |
+| do_nothing | 20260904 | 110 | 1 |
+| do_nothing | 20260905 | 110 | 1 |
+| idle_real | 20260901 | 110 | 1 |
+| idle_real | 20260902 | 110 | 1 |
+| idle_real | 20260903 | 110 | 1 |
+| idle_real | 20260904 | 110 | 1 |
+| idle_real | 20260905 | 110 | 1 |
+| all_practice | 20260901 | 134 | 2 |
+| all_practice | 20260902 | 134 | 2 |
+| all_practice | 20260903 | 134 | 2 |
+| all_practice | 20260904 | 134 | 2 |
+| all_practice | 20260905 | 134 | 2 |
+| balanced | 20260901 | ≥150 | 3 |
+| balanced | 20260902 | ≥150 | 3 |
+| balanced | 20260903 | ≥150 | 3 |
+| balanced | 20260904 | ≥150 | 3 |
+| balanced | 20260905 | ≥150 | 3 |
+
+**每腿平均 / 最小 / 最大**:
+
+| leg | avg | min | max |
+|---|---|---|---|
+| do_nothing | 110 | 110 | 110 |
+| idle_real | 110 | 110 | 110 |
+| all_practice | 134 | 134 | 134 |
+| balanced | ≥150 | ≥150 | ≥150 |
+
+**阈值重定(替换 90/60/0)**:`ENDING_TIERS` 行改为 `min_score` 扫描键,取值
+**150 / 120 / 0**(末行 0,任何 score 至少 tier 1;行序严格递减,末行 0 不变量
+逐字保留)。推导:tier-3 min_score = 150(balanced_avg + margin);tier-2
+min_score = 120(all_practice_avg 134 − margin,且 > idle_real_max 110 + margin);
+tier-1 min_score = 0(不变量)。
+
+**历练轴构成裁定(二选一杠杆,按实测择一)**:
+
+- **选 deed-composition**:免费卡 `一袋碎银` 的银两**不再计入** `deeds["silver_earned"]`
+  (卡牌银两仍入 `profile.silver`,只动 `cultivation.gd` `_apply_card` "silver" 分支
+  的 deed 记账一行,零新系统)。理由:免费卡 +20/月几乎每月是卡 0,把 do-nothing
+  路线的 deeds 轴推到 143 > 90,使三档从下面够不到;剔除后 do-nothing 只剩
+  attrs 轴(~110,五围和),落在 tier-1 带,三档自然分化。
+- **否决 threshold-only**:只抬阈值(不动 deed 记账)会让 do-nothing 的 143 仍
+  落在 tier-2 带,「什么都不做」与「单一路线」无法在 tier 上区分——阈值再高
+  也压不住免费卡对 deeds 轴的持续喂入。故只动 deed 记账一行,阈值重定(100→120)
+  是同一测量的收尾半程。**两条杠杆只动一条**(deed-composition),阈值重定是
+  该杠杆的配套,不是第二条杠杆。
+
+**红先(修复前,实测 2026-09-02)**:do-nothing ×36 在旧树(免费卡银两计入 deeds、
+  阈值 90/60/0)进结局 score 143 > 90 → tier 3;all_practice 同 tier 3 → 三档
+  不分化。四值记录见 `final/delivery_notes_fix_c3_ending_tiers.md`。
+
+**回归**:`spine_to_ending` 42/42(按读确认其 ENDING 断言不钉 tier 值);
+`clicks_only_storyline` 47/47;`save_load_roundtrip` 14/14(`deeds` 加法式 +
+对称,legacy 修复镜像 `equipped` 先例);`work_beats_idling`(C7 银两流不受
+deed 记账改动影响,重跑绿)。
+
+---
+
+#### 旧 M2 表(measured on empty seeded profile, superseded 2026-09-02)
 
 **仪器**:`tests/test_action_yield_curves.gd`(M1 曲线仪器)扩展为每个策略额外
 打印 `EndingLogic.evaluate` 的 `ending_score` / `ending_tier`。真实行动数学
@@ -718,7 +807,7 @@ score**——「选择持续影响结局直到最后一个月」由构造保证�
 | all_travel | 中(事件银两) | 低 | 低 | ≤ 36 | 0 | 中 | 2 |
 | balanced | 中 | 中 | 中 | 中 | 中 | 中 | 2 |
 
-**阈值冻结**:`ENDING_TIERS` 行改为 `min_score` 扫描键,取值 **90 / 60 / 0**
+**阈值冻结(旧)**:`ENDING_TIERS` 行改为 `min_score` 扫描键,取值 **90 / 60 / 0**
 (末行 0,任何 score 至少 tier 1)。由 M2 曲线设定,使 T-1..T-4 全成立:
 
 - **T-1 两条发散路线结局不同**:work-heavy(all_work)与 practice/travel-heavy
