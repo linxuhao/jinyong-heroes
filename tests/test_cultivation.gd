@@ -70,6 +70,9 @@ func _test_all() -> bool:
 	ok = _test_event_effects_fresh(ok)
 	ok = _test_event_effects_adversary(ok)
 	ok = _test_event_title_body_surface(ok)
+	ok = _test_practice_targeted(ok)
+	ok = _test_practice_target_fallback(ok)
+	ok = _test_practice_resolved_gid_invariant(ok)
 	return ok
 
 
@@ -589,3 +592,67 @@ func _expect(ok: bool, cond: bool, msg: String) -> bool:
 		return ok
 	push_error("test_cultivation: " + msg)
 	return false
+
+
+# --- C2: practice targets the chosen art --------------------------------------
+#
+# shaolin grants two unmastered D arts in grant order: row1 = shaolin_yijin_d
+# (internal, first unmastered), row2 = shaolin_luohan_d (external).
+# PRACTICE_TO_MASTER D = 4, PRACTICE_ACTION_GAIN = 2.
+
+func _test_practice_targeted(ok: bool) -> bool:
+	var node: Node = _setup("shaolin", [], 99)
+	var row1: String = "shaolin_yijin_d"
+	var row2: String = "shaolin_luohan_d"
+	ok = _expect(ok, node._unmastered_ids() == [row1, row2], "shaolin grants row1 internal + row2 external in order")
+	# Targeted increment: row2 +2, row1 unchanged (zero-diff).
+	node._add_practice(2, row2)
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row2).get("practice", 0)) == 2, "targeted practice -> row2 practice +2")
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row1).get("practice", 0)) == 0, "targeted practice leaves row1 unchanged")
+	# The two computed observables via the real _apply_action path.
+	node._apply_action({"kind": "practice", "target": row2})
+	ok = _expect(ok, node.last_practice_target == row2, "last_practice_target == the chosen row2")
+	ok = _expect(ok, node.last_practice_other_rows_unchanged == true, "other unmastered rows unchanged (zero-diff)")
+	ok = _expect(ok, node.last_practice_target_increased == true, "target row practice increased")
+	ok = _expect(ok, node.last_yield_text.contains("罗汉拳"), "receipt contains the chosen art's display name")
+	ok = _expect(ok, not node.last_yield_text.contains("_"), "receipt has no raw ASCII id")
+	_teardown(node)
+	return ok
+
+
+func _test_practice_target_fallback(ok: bool) -> bool:
+	var node: Node = _setup("shaolin", [], 99)
+	var row1: String = "shaolin_yijin_d"
+	var row2: String = "shaolin_luohan_d"
+	# Empty target -> first unmastered (row1), byte-identical to the old call.
+	node._add_practice(2, "")
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row1).get("practice", 0)) == 2, "empty target falls back to first unmastered (row1)")
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row2).get("practice", 0)) == 0, "empty target leaves row2 unchanged")
+	# Unknown id -> first unmastered, month not dropped.
+	node._add_practice(2, "unknown_id")
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row1).get("practice", 0)) == 4, "unknown target falls back to first unmastered (row1 +2)")
+	ok = _expect(ok, bool(_sm.profile.get_gongfa(row1).get("mastered", false)) == true, "row1 mastered at 4 practices")
+	# Already-mastered target -> first unmastered (now row2), month not dropped.
+	node._add_practice(2, row1)
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row2).get("practice", 0)) == 2, "mastered target falls back to first unmastered (row2 +2)")
+	_teardown(node)
+	return ok
+
+
+func _test_practice_resolved_gid_invariant(ok: bool) -> bool:
+	var node: Node = _setup("shaolin", [], 99)
+	var row1: String = "shaolin_yijin_d"
+	var row2: String = "shaolin_luohan_d"
+	# Master row1 so a raw target of row1 must resolve to the fallback (row2).
+	for i in range(4):
+		node._add_practice(1, row1)
+	ok = _expect(ok, bool(_sm.profile.get_gongfa(row1).get("mastered", false)) == true, "row1 mastered")
+	# _apply_action with a mastered raw target: last_practice_target must hold the
+	# RESOLVED gid (row2), never the raw input (row1).
+	node._apply_action({"kind": "practice", "target": row1})
+	ok = _expect(ok, node.last_practice_target == row2, "last_practice_target == resolved gid (row2), not the raw mastered input")
+	ok = _expect(ok, int(_sm.profile.get_gongfa(row2).get("practice", 0)) == 2, "practice landed on the resolved row2")
+	ok = _expect(ok, node.last_practice_other_rows_unchanged == true, "other unmastered rows unchanged")
+	ok = _expect(ok, node.last_practice_target_increased == true, "resolved target row increased")
+	_teardown(node)
+	return ok

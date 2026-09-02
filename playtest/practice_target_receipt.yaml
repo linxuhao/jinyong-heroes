@@ -1,0 +1,216 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# PRACTICE TARGET RECEIPT NAIL (R3b C2, 2026-09-02).
+#
+# Proves the practice action targets the player-CHOSEN art and the receipt
+# reflects that choice:
+#   - month 1 practice picks row 1 (default focus, shaolin_yijin_d)
+#   - month 2 practice CLICKS row 2 (GONGFA_PICK CultOptionButton1,
+#     shaolin_luohan_d)
+#   - asserts last_practice_target: changed (the two months target different
+#     arts), last_practice_other_rows_unchanged == true (zero-diff differential:
+#     row 1 and every other unmastered row unchanged), last_practice_target_
+#     increased == true, and last_yield_text: changed + containing the chosen
+#     art's DISPLAY name (罗汉拳 — the CJK literal whose value comes from
+#     ProgressionGongfaData.display_name_of, same discipline as the
+#     event_pool_new_event_resolved Chinese pins).
+#
+# BOOT: real-save boot (main.tscn -> tutorial -> creation -> join sect) via the
+# spine_to_ending grammar — ui_accept through the tutorial intro, debug_win_
+# tutorial (the one sanctioned battle-outcome seed), creation, sect select
+# (SectButton0 = shaolin), landing in CULTIVATION with 2 unmastered D arts.
+# Then the two practice months are driven by real clicks (CultOptionButton0 =
+# card, CultOptionButton1 = the row-2 gongfa pick).
+#
+# ZERO balance literals: only "changed" differentials and the == true computed
+# booleans; the display-name pin is a CJK literal sourced from display_name_of.
+#
+# RED-FIRST EVIDENCE — MEASURED (2026-09-02, godot_playtest_scenario on the
+#   pre-fix tree with the TEMPORARY RED-FIRST REVERT applied to
+#   scripts/segments/cultivation.gd — the _add_practice pass-through removed so
+#   the practice branch calls _add_practice(PRACTICE_ACTION_GAIN) with no target
+#   and last_practice_target records the raw input):
+#
+#   failing_frame:            f560 (the month-2 practice assert frame)
+#   first_failing_assert:     CultivationScreen.last_practice_target
+#                             (last_practice_target: changed)
+#   exact_error/observed:     observed last_practice_target == "shaolin_yijin_d"
+#                             on BOTH months (the revert made month 2 add to row 1
+#                             while the raw input "shaolin_luohan_d" was recorded
+#                             — the receipt said one thing, the practice landed
+#                             on another)
+#   green_asserts_before_red: 12 (f260 CULTIVATION 4 + f360 month-1 practice 4 +
+#                             f460 month-2 GONGFA_PICK 4 = 12)
+#
+#   Revert recipe (mark `# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT`):
+#     scripts/segments/cultivation.gd _apply_action "practice" branch: replace
+#       `_add_practice(PRACTICE_ACTION_GAIN, resolved)` with
+#       `_add_practice(PRACTICE_ACTION_GAIN)` (no target) and
+#       `last_practice_target = resolved` with `last_practice_target = target`.
+#   Restore byte-identically (grep scripts/ for "TEMPORARY RED-FIRST REVERT"
+#   -> zero hits) and re-run GREEN.
+name: practice_target_receipt
+description: >-
+  Real-save boot (main.tscn -> tutorial -> creation -> join sect). Month 1
+  practice picks row 1 (default focus); month 2 practice CLICKS row 2
+  (CultOptionButton1). Asserts last_practice_target: changed (two months target
+  different arts), last_practice_other_rows_unchanged == true (zero-diff), 
+  last_practice_target_increased == true, and last_yield_text: changed +
+  containing the chosen art's display name (罗汉拳). Every touched frame:
+  UiOcclusionWatch clean.
+timeline:
+# ── BOOT: tutorial intro (7 ui_accept) -> battle seed -> overlay -> transition
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
+- at: 40
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 50
+  actions:
+  - ui_accept
+- at: 70
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 110
+  actions:
+  - move_right
+- at: 120
+  actions:
+  - move_right
+- at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - move_right
+- at: 180
+  actions:
+  - ui_accept
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 210
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 220
+  actions:
+  - ui_accept
+- at: 260
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.year: year == 1
+    CultivationScreen.month: month == 1
+    CultivationScreen.gongfa_count: gongfa_count == 2
+    CultivationScreen.phase: phase == "CARD_PICK"
+# ── MONTH 1: card -> ACTION_PICK -> 练功 (focus 0) -> GONGFA_PICK row 1 ──────
+- at: 270
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 280
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 290
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 300
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultOptionButton0.visible: visible == true
+    CultOptionButton1.visible: visible == true
+    CultivationScreen.pressed_connected: pressed_connected["CultOptionButton1"] == true
+# Month 1 practice: row 1 (default focus, CultOptionButton0)
+- at: 310
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 360
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "practice"
+    CultivationScreen.last_practice_target: last_practice_target == "shaolin_yijin_d"
+    CultivationScreen.last_practice_other_rows_unchanged: last_practice_other_rows_unchanged == true
+    CultivationScreen.last_practice_target_increased: last_practice_target_increased == true
+    CultivationScreen.last_yield_text: last_yield_text != ""
+    CultivationScreen.phase: phase == "CARD_PICK"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── MONTH 2: card -> ACTION_PICK -> 练功 -> GONGFA_PICK row 2 (CLICK) ────────
+- at: 380
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 390
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 400
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 410
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultOptionButton1.visible: visible == true
+    CultOptionButton1.text: text.contains("罗汉拳")
+    CultivationScreen.pressed_connected: pressed_connected["CultOptionButton1"] == true
+# Month 2 practice: CLICK row 2 (CultOptionButton1 = shaolin_luohan_d)
+- at: 420
+  actions: []
+  clicks:
+  - CultOptionButton1
+- at: 560
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "practice"
+    CultivationScreen.last_practice_target: last_practice_target == "shaolin_luohan_d"
+    CultivationScreen.last_practice_target: last_practice_target != "shaolin_yijin_d"
+    CultivationScreen.last_practice_other_rows_unchanged: last_practice_other_rows_unchanged == true
+    CultivationScreen.last_practice_target_increased: last_practice_target_increased == true
+    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳")
+    CultivationScreen.last_yield_text: not last_yield_text.contains("_")
+    CultivationScreen.phase: phase == "CARD_PICK"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
