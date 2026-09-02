@@ -59,11 +59,11 @@ static func derive_stats(profile) -> Dictionary:
 	var mp: int = ProgressionMath.mastery_points(profile)
 	var gear: Dictionary = EquipmentData.sum_bonuses(profile.get("equipped") if profile.get("equipped") != null else {})
 	return {
-		"max_health": bone * 5 + 6 * mp + int(gear.get("health", 0)),
+		"max_health": bone * 5 + 18 * mp + int(gear.get("health", 0)),
 		"energy": inner * 2 + 4 * mp,
-		"move_range": 2 + int(floor(float(agility) / 20.0)) + int(floor(float(mp) / 3.0)) + int(gear.get("move", 0)),
+		"move_range": 2 + int(floor(float(agility) / 20.0)) + int(floor(float(mp) / 2.0)) + int(gear.get("move", 0)),
 		"initiative": agility + 3 * mp + int(gear.get("initiative", 0)),
-		"attack_damage": 10 + bone + 2 * mp + int(gear.get("attack", 0)),
+		"attack_damage": 10 + bone + 12 * mp + int(gear.get("attack", 0)),
 		"attack_range": _attack_range_for(profile),
 	}
 

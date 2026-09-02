@@ -981,3 +981,43 @@ target_id := "")` 的第三参 `target_id`:非空且命名未大成行 → 用�
 UX-37/38/39 与 `99_changelog.md` 收口行)。两层分开记——「R3b 数值绑定已在
 真实档上成立」这一主张,在九条红收口前不得引用场景绿作证据。
 
+## R3b C5 — 华山数据解锁裁决(2026-09-02,项目所有者裁定)
+
+**背景**:上行 Open question (1) 的 C5 等待所有者裁定已到期。上一交付轮
+(`fix_c5_winnable_huashan_route`)实测:最强档(全大成)hero max_health 327、
+先攻 46,五绝先攻 68–86、melee 攻击距离 1 / 移动 2 无法在 Chebyshev 4–5 间隔内
+近身,hero 第 4 回合阵亡、五绝满血(95/115/100/120/130),`huashan_winnable_normal_route`
+为许可红。升级条款触发,所有者批准解锁。
+
+**授予范围(逐字)**:
+1. `scripts/data/map_battle_data.gd` — **仅** `POSITIONS` / `PLAYER_SPAWN`(几何为实测根因:
+   melee hero 永远够不到敌线)。ROSTERS 名单 / 五绝 `max_health` / `attack_damage` /
+   `attack_range` / 单位数一律不动。
+2. `scripts/battlefield.gd:504-590` — **仅**五绝的五个 `cd.initiative` 字面量,该文件其它
+   任何一行(含注释)不动。目标不是「玩家先手」,而是「强真实档在被压垮前有机会出手」。
+3. `scripts/data/battle_setup.gd`(不在六文件锁内)— R3 裁决 D4「mp 不进 move_range /
+   attack_damage,保持质感」就此**作废**,三年修行可折现为移动与伤害(形状自由,先测)。
+
+**禁止项**:不许降低任何一绝的 max_health / attack_damage / attack_range;不许减少单位数;
+不许改任何 AI 文件;不许把「赢」重定义成「多活两回合」;finale 的威胁必须保持。
+其余四个锁文件(`scripts/battlefield.gd` 除五先攻外、`game_manager.gd`、`scene_manager.gd`、
+`map.gd`、`playtest/map_battle_node_huashan.yaml`)与三条逐字闸门继续逐字节不动。
+`huashan_winnable_normal_route` 教程段一条 `debug_win_tutorial` 为架构闸门许可的帧预算回落
+(零-debug 禁令**只**覆盖华山战本身);华山段零 debug、零键盘。
+
+**落地杠杆(实测,见 `final/unlock_record_r3b_huashan.md`)**:POSITIONS 五绝左移成
+Chebyshev 3–6 梯环(East(4,4)→West/North(1,·)最远),PLAYER_SPAWN (7,5) 不动;五先攻
+85/70/76/74/80 → 79/71/75/73/77(相对序 East>Central>South>North>West 保持、杨过 88 不动、
+全部 > hero 使 hero 仍末位、`turn_order.size()==6` 锁不破);`battle_setup.derive_stats`:
+attack_damage 系数 mp 2→12、move_range `floor(mp/3)`→`floor(mp/2)`、max_health 系数 mp 6→18。
+`mp==0` 逐字复现旧公式(fresh boot readiness power 仍 35 → 弱档不变)。
+
+**本轮状态(诚实)**:三杠杆 + 时间线重建(525-entry 溢出与 `== -1` 哨兵断言删除、单调
+40→2990、CultOptionButton0 溢出点击裁掉、overlay 点击前置 `visible==true` 闸帧)已落地,
+`huashan_winnable_normal_route` 自跑由 23/42 推进到 **29/39**:华山段到达、C4 边界钉
+(`current_round >= 3 and Player.health > 0`)f1660 转绿、无 CultOptionButton0 runtime 错误;
+**末回合 WON 腿仍红**(脚本化的邻接/回合节奏需多轮活体调参,本轮预算未穷尽——非敌方
+数值不足)。裁决**不**因红未收口而撤回;继续以真实点击逼近 WIN,不以 debug 伪造。
+设计记录:M3'' 每字面量改前/改后/理由/种子结果表见 `final/unlock_record_r3b_huashan.md`
+与 `design/40_progression.md` M3''(5_design 终步落盘)。
+

@@ -54,11 +54,11 @@ const PLAYER_SPAWN: Vector2i = Vector2i(7, 5)
 ##     melee hero. Per-great 改前/改后 rows: design/40_progression.md M3''.
 const POSITIONS: Dictionary = {
 	"huashan_duel": {
-		"East Heretic":   Vector2i(3, 2),
-		"West Poison":    Vector2i(3, 3),
-		"South Emperor":  Vector2i(3, 7),
-		"North Beggar":   Vector2i(5, 9),
-		"Central Divine": Vector2i(11, 2),
+		"East Heretic":   Vector2i(4, 4),
+		"West Poison":    Vector2i(1, 3),
+		"South Emperor":  Vector2i(3, 6),
+		"North Beggar":   Vector2i(1, 7),
+		"Central Divine": Vector2i(2, 2),
 	},
 }
 
