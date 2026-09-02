@@ -12,8 +12,11 @@ class_name ProgressionMath
 ## measurements — they never re-derive the math inline, so the ending evaluator
 ## and the battle-stat extension can never drift apart.
 
-## Grade → mastery points (design/10_systems.md §3: 丁=1 丙=2 乙=3 甲=4).
-const GRADE_POINTS := {"丁": 1, "丙": 2, "乙": 3, "甲": 4}
+## Grade → mastery points (design/10_systems.md §3: D=1 C=2 B=3 A=4).
+## SINGLE-SOURCE: key set must equal ProgressionGongfaData.PRACTICE_TO_MASTER.keys()
+## (Latin D/C/B/A) — guarded by the key-set-equality nail in
+## tests/test_progression_math.gd::_test_grade_points.
+const GRADE_POINTS := {"D": 1, "C": 2, "B": 3, "A": 4}
 
 ## Deed-score weights (PROVISIONAL — r3_ending_logic (M2) tunes THESE consts
 ## after measuring the 36-month yield curves; never the formula).

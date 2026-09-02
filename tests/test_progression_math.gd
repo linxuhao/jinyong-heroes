@@ -16,7 +16,12 @@
 ## LATER by consumer tasks, so this test asserts only monotonicity / differential
 ## facts, never the specific provisional numbers.
 
-const GRADE_KEYS: Array[String] = ["丁", "丙", "乙", "甲"]
+## Grade keys are taken from the production vocabulary (SINGLE-SOURCE rule,
+## C1). ProgressionGongfaData is a class_name global — accessible directly.
+## A helper static func is used instead of a const because .keys() is not a
+## compile-time constant expression in GDScript.
+static func _grade_keys() -> Array:
+	return ProgressionGongfaData.PRACTICE_TO_MASTER.keys()
 
 
 static func run() -> bool:
@@ -34,18 +39,28 @@ static func run() -> bool:
 	return ok
 
 
-# --- criterion 1: GRADE_POINTS covers exactly the four grades -----------------
+# --- criterion 1: GRADE_POINTS key-set equals PRACTICE_TO_MASTER keys --------
+# (SINGLE-SOURCE guard: both directions of mutual inclusion + per-key values)
 
 static func _test_grade_points(ok: bool) -> bool:
-	ok = _expect(ok, ProgressionMath.GRADE_POINTS.size() == 4, "GRADE_POINTS.size() == 4")
-	for key in GRADE_KEYS:
-		ok = _expect(ok, ProgressionMath.GRADE_POINTS.has(key), "GRADE_POINTS has " + key)
-	ok = _expect(ok, int(ProgressionMath.GRADE_POINTS["丁"]) == 1, "丁 == 1")
-	ok = _expect(ok, int(ProgressionMath.GRADE_POINTS["丙"]) == 2, "丙 == 2")
-	ok = _expect(ok, int(ProgressionMath.GRADE_POINTS["乙"]) == 3, "乙 == 3")
-	ok = _expect(ok, int(ProgressionMath.GRADE_POINTS["甲"]) == 4, "甲 == 4")
+	var prod_keys: Array = _grade_keys()
+	ok = _expect(ok, ProgressionMath.GRADE_POINTS.size() == prod_keys.size(),
+		"GRADE_POINTS.size() == PRACTICE_TO_MASTER.size()")
+	# Every production key must be present in GRADE_POINTS with its point value.
+	for key in prod_keys:
+		var k: String = str(key)
+		ok = _expect(ok, ProgressionMath.GRADE_POINTS.has(k), "GRADE_POINTS has production key " + k)
+	# No extra keys beyond the production vocabulary.
 	for key in ProgressionMath.GRADE_POINTS.keys():
-		ok = _expect(ok, GRADE_KEYS.has(str(key)), "no unknown grade key " + str(key))
+		var k: String = str(key)
+		ok = _expect(ok, prod_keys.has(key), "no non-production grade key " + k)
+	# Per-key point values (design/10_systems.md §3: D=1 C=2 B=3 A=4).
+	var expected_points := {"D": 1, "C": 2, "B": 3, "A": 4}
+	for key in prod_keys:
+		var k: String = str(key)
+		var pv: int = int(ProgressionMath.GRADE_POINTS.get(k, -1))
+		ok = _expect(ok, pv == int(expected_points.get(k, -1)),
+			"GRADE_POINTS[\"%s\"] == %d (got %d)" % [k, int(expected_points.get(k, -1)), pv])
 	return ok
 
 
@@ -54,9 +69,10 @@ static func _test_grade_points(ok: bool) -> bool:
 static func _test_mastered_count(ok: bool) -> bool:
 	var p: PlayerProfile = PlayerProfile.new_default()
 	ok = _expect(ok, ProgressionMath.mastered_count(p) == 0, "empty profile mastered_count == 0")
-	p.add_gongfa("a1", "丁")
-	p.add_gongfa("a2", "丙")
-	p.add_gongfa("a3", "乙")
+	var keys: Array = _grade_keys()
+	p.add_gongfa("a1", str(keys[0]))
+	p.add_gongfa("a2", str(keys[1]))
+	p.add_gongfa("a3", str(keys[2]))
 	ok = _expect(ok, ProgressionMath.mastered_count(p) == 0, "all-unmastered mastered_count == 0")
 	p.master_gongfa_of("a1")
 	p.master_gongfa_of("a3")
@@ -65,31 +81,43 @@ static func _test_mastered_count(ok: bool) -> bool:
 
 
 # --- criterion 3: mastery_points sums GRADE_POINTS over mastered rows only -----
+# C1: one mastered row per production grade must yield > 0.
 
 static func _test_mastery_points(ok: bool) -> bool:
 	var p: PlayerProfile = PlayerProfile.new_default()
 	ok = _expect(ok, ProgressionMath.mastery_points(p) == 0, "empty profile mastery_points == 0")
-	# 丁 mastered, 丙 unmastered, 乙 mastered, 甲 unmastered -> 1 + 3 = 4
-	p.add_gongfa("a1", "丁")
-	p.add_gongfa("a2", "丙")
-	p.add_gongfa("a3", "乙")
-	p.add_gongfa("a4", "甲")
-	p.master_gongfa_of("a1")
-	p.master_gongfa_of("a3")
-	ok = _expect(ok, ProgressionMath.mastery_points(p) == 4, "丁+乙 mastered -> 4")
-	# all-unmastered -> 0
+	# Build one mastered row per production grade; each must contribute > 0.
+	var keys: Array = _grade_keys()
+	var i := 0
+	for key in keys:
+		var gid: String = "art_%s" % str(key)
+		p.add_gongfa(gid, str(key))
+		p.master_gongfa_of(gid)
+		ok = _expect(ok, ProgressionMath.mastery_points(p) > 0,
+			"mastery_points > 0 after mastering grade " + str(key))
+		i += 1
+	# Two specific mastered rows sum to their point values: D(1) + B(3) = 4
 	var p2: PlayerProfile = PlayerProfile.new_default()
-	p2.add_gongfa("b1", "甲")
-	ok = _expect(ok, ProgressionMath.mastery_points(p2) == 0, "unmastered 甲 -> 0")
-	# unknown grade string contributes 0 even when mastered
+	p2.add_gongfa("x1", str(keys[0]))  # D
+	p2.add_gongfa("x2", str(keys[2]))  # B
+	p2.master_gongfa_of("x1")
+	p2.master_gongfa_of("x2")
+	var expected: int = int(ProgressionMath.GRADE_POINTS.get(str(keys[0]), 0)) + int(ProgressionMath.GRADE_POINTS.get(str(keys[2]), 0))
+	ok = _expect(ok, ProgressionMath.mastery_points(p2) == expected,
+		"D + B mastered -> " + str(expected))
+	# all-unmastered -> 0
 	var p3: PlayerProfile = PlayerProfile.new_default()
-	p3.add_gongfa("c1", "ZZ")
-	p3.master_gongfa_of("c1")
-	ok = _expect(ok, ProgressionMath.mastery_points(p3) == 0, "unknown grade mastered -> 0")
-	# a row with a missing `mastered` key reads as unmastered (0)
+	p3.add_gongfa("b1", str(keys[3]))
+	ok = _expect(ok, ProgressionMath.mastery_points(p3) == 0, "unmastered A -> 0")
+	# unknown grade string contributes 0 even when mastered
 	var p4: PlayerProfile = PlayerProfile.new_default()
-	p4.gongfa.append({"id": "d1", "grade": "甲", "practice": 0})
-	ok = _expect(ok, ProgressionMath.mastery_points(p4) == 0, "missing mastered key -> 0")
+	p4.add_gongfa("c1", "ZZ")
+	p4.master_gongfa_of("c1")
+	ok = _expect(ok, ProgressionMath.mastery_points(p4) == 0, "unknown grade mastered -> 0")
+	# a row with a missing `mastered` key reads as unmastered (0)
+	var p5: PlayerProfile = PlayerProfile.new_default()
+	p5.gongfa.append({"id": "d1", "grade": str(keys[3]), "practice": 0})
+	ok = _expect(ok, ProgressionMath.mastery_points(p5) == 0, "missing mastered key -> 0")
 	return ok
 
 

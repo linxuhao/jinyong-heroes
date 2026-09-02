@@ -76,11 +76,11 @@ static func _test_divergence(ok: bool) -> bool:
 	ok = _expect(ok, int(ev1["score"]) != int(ev2["score"]), "deeds-only difference changes score")
 	# Same attrs, same deeds; differ only in mastery (mastered arts).
 	var p3: PlayerProfile = PlayerProfile.new_default()
-	p3.add_gongfa("a1", "丁")
+	p3.add_gongfa("a1", "D")
 	p3.master_gongfa_of("a1")
 	var ev3: Dictionary = EndingLogic.evaluate(p3, p3.deeds)
 	ok = _expect(ok, int(ev3["score"]) != int(ev1["score"]), "mastery-only difference changes score")
-	ok = _expect(ok, int(ev3["axes"]["mastery"]) == 1, "mastered 丁 -> mastery 1")
+	ok = _expect(ok, int(ev3["axes"]["mastery"]) == 1, "mastered D -> mastery 1")
 	return ok
 
 
@@ -96,7 +96,7 @@ static func _test_monotonicity(ok: bool) -> bool:
 	ok = _expect(ok, int(ev_attr["score"]) >= int(base_ev["score"]), "attrs up -> score non-decreasing")
 	# mastery up
 	var p_mast: PlayerProfile = PlayerProfile.new_default()
-	p_mast.add_gongfa("b1", "甲")
+	p_mast.add_gongfa("b1", "A")
 	p_mast.master_gongfa_of("b1")
 	var ev_mast: Dictionary = EndingLogic.evaluate(p_mast, p_mast.deeds)
 	ok = _expect(ok, int(ev_mast["score"]) >= int(base_ev["score"]), "mastery up -> score non-decreasing")

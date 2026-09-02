@@ -59,14 +59,14 @@ static func _test_mp_strictly_increases(ok: bool) -> bool:
 	var p0 = _profile({"bone": 20, "inner": 12, "agility": 40})
 	var s0: Dictionary = BattleSetup.derive_stats(p0)
 	# Master a 丁 art -> mp = 1.
-	p0.add_gongfa("shaolin_luohan_d", "丁")
+	p0.add_gongfa("shaolin_luohan_d", "D")
 	p0.master_gongfa_of("shaolin_luohan_d")
 	var s1: Dictionary = BattleSetup.derive_stats(p0)
 	ok = _expect(ok, int(s1.max_health) > int(s0.max_health), "mp 0->1: max_health strictly increases")
 	ok = _expect(ok, int(s1.energy) > int(s0.energy), "mp 0->1: energy strictly increases")
 	ok = _expect(ok, int(s1.initiative) > int(s0.initiative), "mp 0->1: initiative strictly increases")
-	# Master a 甲 art -> mp jumps by 4.
-	p0.add_gongfa("a_sword", "甲")
+	# Master an A art -> mp jumps by 4.
+	p0.add_gongfa("a_sword", "A")
 	p0.master_gongfa_of("a_sword")
 	var s5: Dictionary = BattleSetup.derive_stats(p0)
 	ok = _expect(ok, int(s5.max_health) > int(s1.max_health), "mp 1->5: max_health strictly increases")
@@ -80,9 +80,9 @@ static func _test_mp_strictly_increases(ok: bool) -> bool:
 static func _test_mp_unchanged_texture(ok: bool) -> bool:
 	var p0 = _profile({"bone": 20, "inner": 12, "agility": 40})
 	var s0: Dictionary = BattleSetup.derive_stats(p0)
-	p0.add_gongfa("shaolin_luohan_d", "丁")
+	p0.add_gongfa("shaolin_luohan_d", "D")
 	p0.master_gongfa_of("shaolin_luohan_d")
-	p0.add_gongfa("a_sword", "甲")
+	p0.add_gongfa("a_sword", "A")
 	p0.master_gongfa_of("a_sword")
 	var s5: Dictionary = BattleSetup.derive_stats(p0)
 	ok = _expect(ok, int(s5.attack_damage) == int(s0.attack_damage), "attack_damage UNCHANGED by mp (fight texture preserved)")
@@ -103,11 +103,11 @@ static func _test_gear_additivity(ok: bool) -> bool:
 	ok = _expect(ok, int(s_eq.initiative) > int(s_empty.initiative), "equipped: initiative strictly higher (boots)")
 	# Gear additivity holds WITH mastery too: same profile + gear strictly higher.
 	var p_mastered = _profile({"bone": 20, "inner": 12, "agility": 40})
-	p_mastered.add_gongfa("shaolin_luohan_d", "丁")
+	p_mastered.add_gongfa("shaolin_luohan_d", "D")
 	p_mastered.master_gongfa_of("shaolin_luohan_d")
 	var s_mastered: Dictionary = BattleSetup.derive_stats(p_mastered)
 	var p_mastered_eq = _profile({"bone": 20, "inner": 12, "agility": 40})
-	p_mastered_eq.add_gongfa("shaolin_luohan_d", "丁")
+	p_mastered_eq.add_gongfa("shaolin_luohan_d", "D")
 	p_mastered_eq.master_gongfa_of("shaolin_luohan_d")
 	p_mastered_eq.equipped = {"weapon": "eq_sword_3", "armor": "eq_armor_2", "boots": "eq_boots_3"}
 	var s_mastered_eq: Dictionary = BattleSetup.derive_stats(p_mastered_eq)
@@ -121,7 +121,7 @@ static func _test_gear_additivity(ok: bool) -> bool:
 
 static func _test_readiness_single_source(ok: bool) -> bool:
 	var p = _profile({"bone": 20, "inner": 12, "agility": 40})
-	p.add_gongfa("shaolin_luohan_d", "丁")
+	p.add_gongfa("shaolin_luohan_d", "D")
 	p.master_gongfa_of("shaolin_luohan_d")
 	var verdict: Dictionary = BattleSetup.readiness(p)
 	var stats: Dictionary = BattleSetup.derive_stats(p)
@@ -145,7 +145,7 @@ static func _test_readiness_band_ordering(ok: bool) -> bool:
 	# A heavily-mastered profile must be strong (or at least not weak).
 	var grown = _profile({"bone": 20, "inner": 12, "agility": 40})
 	for art in ["shaolin_luohan_d", "shaolin_luohan_c", "shaolin_luohan_b", "a_sword", "a_palm"]:
-		grown.add_gongfa(art, "甲")
+		grown.add_gongfa(art, "A")
 		grown.master_gongfa_of(art)
 	var grown_v: Dictionary = BattleSetup.readiness(grown)
 	ok = _expect(ok, str(grown_v.verdict_key) != "huashan_weak", "grown profile -> not weak")
@@ -155,7 +155,7 @@ static func _test_readiness_band_ordering(ok: bool) -> bool:
 	# Walk mastery up until power >= even (monotone in mp).
 	var guard := 0
 	while int(BattleSetup.readiness(at_even).power) < even and guard < 40:
-		at_even.add_gongfa("art_%d" % guard, "甲")
+		at_even.add_gongfa("art_%d" % guard, "A")
 		at_even.master_gongfa_of("art_%d" % guard)
 		guard += 1
 	var at_even_v: Dictionary = BattleSetup.readiness(at_even)
