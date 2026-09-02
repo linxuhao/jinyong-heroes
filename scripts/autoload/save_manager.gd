@@ -72,6 +72,11 @@ var loaded_decks_string: String = ""
 ## divergence nail compares leg B's evaluation_text against this to prove two
 ## playstyles evaluate differently. "" until the first ending renders.
 var first_ending_evaluation: String = ""
+## Surface: the profile.silver at the FIRST ending reached this session (C7
+## work-economy ratio nail — leg A captures it, leg B compares final_silver
+## against it). Written by ending.gd on its first _render, same lifecycle as
+## first_ending_evaluation. 0 until the first ending renders.
+var first_ending_silver: int = 0
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 

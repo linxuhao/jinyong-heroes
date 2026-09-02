@@ -26,12 +26,17 @@ var diverged_from_first: bool = false
 ## Surface: true after restart routed onward.
 var done: bool = false
 
+## Surface: snapshot of SaveManager.profile.silver at _ready (C7 work-economy
+## ratio nail — the ending silver the player actually reached).
+var final_silver: int = 0
+
 ## Surface: button name -> pressed-signal wired.
 var pressed_connected: Dictionary = {}
 
 
 func _ready() -> void:
 	_wire_restart_button()
+	final_silver = SaveManager.profile.silver
 	var ev: Dictionary = EndingLogic.evaluate(SaveManager.profile, SaveManager.profile.deeds)
 	tier = int(ev["tier"])
 	score = int(ev["score"])
@@ -79,6 +84,7 @@ func _render() -> void:
 	evaluation_text = summary
 	if SaveManager.first_ending_evaluation == "":
 		SaveManager.first_ending_evaluation = summary
+		SaveManager.first_ending_silver = SaveManager.profile.silver
 	body.text = tr("【结局 · %s】\n\n%s\n\n%s\n\n按回车重新开始") % [tr(title), tr(text_lines), summary]
 	var restart_btn: Button = get_node_or_null("RestartButton") as Button
 	if restart_btn != null:

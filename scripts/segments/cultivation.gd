@@ -486,10 +486,12 @@ func _apply_action(action: Dictionary) -> void:
 			last_action_silver = 0
 			last_yield_text = tr("修习：%s +%d") % [str(action.get("target", "bone")), gain]
 		"work":
-			# 做工: silver scales with mastered arts — the only action whose yield
-			# compounds with the run, and the only repeatable silver source that
-			# beats the one-shot free cards. Pure arithmetic, zero new RNG.
-			var gain: int = ProgressionMath.work_income(ProgressionMath.mastered_count(SaveManager.profile))
+			# 做工: silver grows with each month worked (10 + 3 * work_months) —
+			# the only action whose yield compounds with the run, and the only
+			# repeatable silver source that beats the one-shot free cards. Pure
+			# arithmetic, zero new RNG. The gain MUST be computed from the deed
+			# BEFORE work_months is incremented (current order, byte-identical).
+			var gain: int = ProgressionMath.work_income(SaveManager.profile.get_deed("work_months"))
 			SaveManager.profile.silver += gain
 			SaveManager.profile.deeds["work_months"] = SaveManager.profile.get_deed("work_months") + 1
 			SaveManager.profile.deeds["silver_earned"] = SaveManager.profile.get_deed("silver_earned") + gain
@@ -740,7 +742,7 @@ func _rebuild_options_box() -> void:
 			for c in _monthly_cards:
 				labels.append(_card_button_label(c))
 		"ACTION_PICK":
-			var action_labels: Array[String] = ["练功（+2 所选功法）", "修习（属性 +1~3）", "做工（银两随大成数）", "游历（事件与物品）", "存盘", "读档", "删档"]
+			var action_labels: Array[String] = ["练功（+2 所选功法）", "修习（属性 +1~3）", "做工（银两随做工月数递增）", "游历（事件与物品）", "存盘", "读档", "删档"]
 			for label in action_labels:
 				labels.append(tr(label))
 		"GONGFA_PICK":

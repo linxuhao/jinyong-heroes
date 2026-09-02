@@ -43,11 +43,13 @@ static func mastery_points(profile: PlayerProfile) -> int:
 		total += int(GRADE_POINTS.get(grade, 0))
 	return total
 
-## Work income: 10 + 2 * mastered_count (PROVISIONAL R3 D3). Monotone
-## non-decreasing; strictly > 10 once mastered >= 1. Total over all ints
-## (negative input clamps to 0 via maxi).
-static func work_income(mastered: int) -> int:
-	return 10 + 2 * maxi(mastered, 0)
+## Work income: 10 + 3 * months_worked (PROVISIONAL R3 D3, C7). Monotone
+## non-decreasing; strictly > 10 once months_worked >= 1. Total over all ints
+## (negative input clamps to 0 via maxi). Input n is the CURRENT work_months
+## deed value at call time (0-indexed), not "the n-th call" — the caller reads
+## the deed BEFORE incrementing it, so the k-th work month pays 10 + 3*(k-1).
+static func work_income(months_worked: int) -> int:
+	return 10 + 3 * maxi(months_worked, 0)
 
 ## Deed score: travel_resolved and silver_earned weighted (PROVISIONAL
 ## weights). Missing keys read as 0 without raising.

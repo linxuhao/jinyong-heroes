@@ -487,7 +487,7 @@ const EN: Dictionary = {
 	"游历": "Travel",
 		"练功（+2 所选功法）": "Train (+2 to chosen art)",
 		"修习（属性 +1~3）": "Study (attr +1~3)",
-		"做工（银两随大成数）": "Work (silver scales with mastered arts)",
+		"做工（银两随做工月数递增）": "Work (silver grows with months worked)",
 		"游历（事件与物品）": "Travel (events & items)",
 	"存盘": "Save",
 	"读档": "Load",
