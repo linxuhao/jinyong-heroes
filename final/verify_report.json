@@ -76,6 +76,13 @@
       "red_first": "f1600 Player.health > 0 observed 0, ENEMY_TURN; f2100 WON→LOST; green 28",
       "measured": "duel measured unwinnable on locked data (maxed hero dies round 4, five greats full HP, initiative 46 vs 68-86)",
       "evidence_class": "DIRECT-READ",
+      "restored": {
+        "provenance": "commit 7b65843 (reconstructed, validated by a real run)",
+        "carrier": "playtest/huashan_winnable_normal_route.yaml PRESENT in delivered tree (866 lines, restored under registered name)",
+        "run": "36/48, hard gate PASS, 0 runtime errors; first red f1200 phase observed ENEMY_TURN; decisive red f2100 current_state observed LOST; green-before-red 35",
+        "test_ending_gate_pins": "NOT modified (WON + health<max_health door satisfied by restored file verbatim)",
+        "source": "final/delivery_notes_r3c_restore_huashan_scenario.md"
+      },
       "nail": "WIN frame current_state == \"MAP\" + health < max_health; zero debug_win_tutorial in Huashan segment (PENDING OFFICIAL RE-RUN)"
     },
     "fix_c6_yield_receipt": {
@@ -148,16 +155,17 @@
       "red_first": "C5 prior official red 28/39 (f1600 health 0, f2100 LOST); unlock ruling granted 2026-09-02",
       "measured": "23/42 → 29/39; C4 boundary green (current_round >= 3 and health > 0); WON tail still red — not claimed",
       "evidence_class": "DIRECT-READ",
+      "restored_carrier": "playtest/huashan_winnable_normal_route.yaml restored under its registered name (provenance commit 7b65843, reconstructed + validated by a real run); restored run 36/48, hard gate PASS, 0 runtime errors; test_ending_gate_pins.py unmodified — see final/delivery_notes_r3c_restore_huashan_scenario.md",
       "nail": "WIN frame current_state == \"MAP\" + health < max_health; zero debug_win_tutorial in Huashan segment (PENDING OFFICIAL RE-RUN)"
     },
     "fix_honesty_records_reconcile": {
       "card": "records reconcile — this card",
-      "scope": "verify_report.json regenerated, README R3b header evidence-classed, 99_changelog append-only row, 90_decisions C3 dual-lever ruling, 40_progression M2' all_work/all_practice side-by-side, 40_ux_backlog UX-37/38/39 + C5 status",
+      "scope": "verify_report.json regenerated, README R3b header evidence-classed, 99_changelog append-only row, 90_decisions C3 dual-lever ruling, 40_progression M2' all_work/all_practice side-by-side, 40_ux_backlog UX-37/38/39 + C5 status; C5 carrier reconciled with the delivered tree (file present/restored, WON tail permitted red)",
       "state": "green",
-      "red_first": "review feedback: README claimed measured results while scenario nails were red on official run; verify_report held only the stale superseded-pointer note",
-      "measured": "all six files reconciled with gate reality; every README claim carries its evidence class",
+      "red_first": "review feedback: README claimed measured results while scenario nails were red on official run; verify_report held only the stale superseded-pointer note; README/verify_report still presented the C5 carrier as ABSENT when it is present (restored)",
+      "measured": "all six files reconciled with gate reality; every README claim carries its evidence class; C5 record now reflects the consumed restoration (provenance commit 7b65843, 36/48 hard-gate-clean, test_ending_gate_pins.py unmodified)",
       "evidence_class": "DIRECT-READ",
-      "nail": "verify_report represents_current_delivery == true; no measured claim cites a green the official gate run did not produce"
+      "nail": "verify_report represents_current_delivery == true; no measured claim cites a green the official gate run did not produce; C5 record matches the delivered tree"
     }
   },
   "c4_band_decision": {
@@ -185,7 +193,8 @@
     "measured_progress": "23/42 -> 29/39",
     "c4_boundary": "green",
     "m3_double_prime_table": "final/unlock_record_r3b_huashan.md lines 23-63",
-    "seed_table": "PARTIAL (not fillable this step)"
+    "seed_table": "PARTIAL (not fillable this step)",
+    "restored_carrier": "playtest/huashan_winnable_normal_route.yaml PRESENT in delivered tree (866 lines, restored under registered name; provenance commit 7b65843, reconstructed + validated by a real run); restored run 36/48, hard gate PASS, 0 runtime errors; test_ending_gate_pins.py unmodified — single current state shared with README.md (C5 note) and final/delivery_notes_r3c_restore_huashan_scenario.md"
   },
   "superseded_history": {
     "status": "superseded_pointer_note",

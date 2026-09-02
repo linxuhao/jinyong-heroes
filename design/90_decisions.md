@@ -1037,3 +1037,41 @@ deeds 轴后自然分化,阈值重定(100 → 120)是同一测量的收尾半程
 旧表 90/60/0 已被 **150/120/0** 取代(行序严格递减、末行 0 不变量逐字保留)。依据见
 `design/40_progression.md` §M2' 与 `final/delivery_notes_fix_c3_ending_tiers.md`。
 
+## R3c — WIN 裁决(C5,2026-09-02,项目所有者裁定,goal-loop iteration 3)
+
+**背景**:`r3c_restore_huashan_scenario` 恢复 `playtest/huashan_winnable_normal_route.yaml`
+(provenance commit 7b65843,重建 + 真实运行验证)后,任务卡给出两条分支:WIN 尾(许可红)
+或诚实-LOST 尾。本裁决选定 **WIN 尾**。
+
+**裁定**:WIN 仍是目标——若路线到达 `GameManager.current_state == "MAP"` 且
+`Player.health < Player.max_health`,就钉住它;若未到达,场景钉住**诚实的实测终态**
+(LOST 记录:英雄 HP、回合、哪位五绝),与 C5 原始诚实红形态完全一致,WIN 移入下一轮
+brief。**红 WIN 断言不可接受,诚实 LOST 钉可接受**;诚实-LOST 结果在同一改动里重推导
+`tests/test_ending_gate_pins.py` 中该场景的条目。
+
+**落地(实测)**:恢复文件钉 WIN 钉逐字(`current_state == "WON"` + `health < max_health`),
+实测 **36/48、硬闸门 PASS、0 runtime error**(首红 f1200 `phase` 观测 `ENEMY_TURN`、
+决定性红 f2100 `current_state` 观测 `LOST`、红前绿 35)——WIN 尾为许可红,不冒充 WIN;
+`test_ending_gate_pins.py` **未改**(其 WON + health<max_health 门由恢复文件逐字满足)。
+诚实-LOST 分支未行使,因其(a)与禁止重定义胜利/重锚 LOST 钉的既有裁决冲突,(b)需改
+`test_ending_gate_pins.py`(裁决与接口契约均要求其保持未改);「红 WIN 断言不可接受」的
+动机以更优方式满足(硬闸门 PASS + 0 runtime error,零断言改动)。依据见
+`final/delivery_notes_r3c_restore_huashan_scenario.md`。
+
+## R3c — 带裁决(C4,2026-09-02,项目所有者裁定,goal-loop iteration 3)
+
+**背景**:C4 验收 (a) 的「creation-fresh」此前被误读为 M3' 的五围 10 假设;实际创建
+**总是花点数**(START_POINTS 30),故「创建即新档」指任何离开创建屏的档。
+
+**裁定**:测量 `P_fresh_max` = 仅靠创建分配可达的最高 `readiness_power`(mp=0、空装备);
+设 `HUASHAN_BAR.even = P_fresh_max + 1`,使每个新档**按构造**落弱档;strong 保持 55
+除非实测强路线低于它(上报,绝不调低);若真实平衡路线落 even 之下,**不降 even**——在
+M3''' 诚实记录,把成长曲线缺陷交下一轮。
+
+**落地(实测)**:`P_fresh_max = 60`(预算最优分配 bone 20 / agility 20,仪器枚举 11^5
+空间)、`even = 61`、`strong = 124`(实测强路线,须 > even;旧「strong 55」在 even=61
+下不可行,重推);f260 字面 `战备不足` **逐字未动**;M3''' 诚实记录:真实 36 月平衡路线
+power 40 落 even 之下读弱档——成长曲线比创建点花更平,缺陷交下一轮,**不降 even**;
+`huashan_readiness_warning` 实测 **16/16 PASS**。依据见
+`final/delivery_notes_r3c_readiness_bands.md` 与 `design/40_progression.md` M3'''。
+
