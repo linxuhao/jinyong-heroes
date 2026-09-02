@@ -629,45 +629,64 @@ derive_stats(profile))`(单一公式源,预警永不偏离实战数值)。档位
 
 ### M3 实测记录(measured 2026-09-01, R3 M3, seeds s1..s5)
 
-**仪器**:`tests/test_battle_setup_readiness.gd`(无头单元)+
-`playtest/huashan_winnable_normal_route.yaml`(旗舰场景,真实技能点击 + end_turn)。
-固定输入脚本:平衡路线(clicks-only 月语法:卡牌 + 做工,无 min-max)。
+> **measured on empty seeded profile, superseded 2026-09-02 by M3' below.**
+> 旧表用 `debug_seed_save` 空档(0 门派 0 功法),mastery 恒为 0,武学轴与
+> readiness 均不受成长影响。
 
-**HUASHAN_BAR 取值推导**:`{even: 30, strong: 40}`。由 M3 实测的胜/负分界设定,
-不是目测复合区间。平衡路线 36 个月后 `readiness_power` 落在 even 带(≥30),
-创建即新 profile(五围 10、零修为)落在 weak 带(<30)。
+| seed | 平衡路线 power | 平衡路线 verdict | 创建即新 power | 创建即新 verdict |
+|---|---|---|---|---|
+| s1 | 34 | even | 12 | weak |
+| s2 | 33 | even | 12 | weak |
+| s3 | 35 | even | 12 | weak |
+| s4 | 32 | even | 12 | weak |
+| s5 | 34 | even | 12 | weak |
 
-| seed | 平衡路线 power | 平衡路线 verdict | 平衡路线胜负 | 创建即新 power | 创建即新 verdict | 创建即新胜负 |
-|---|---|---|---|---|---|---|
-| s1 | 34 | even | WIN | 12 | weak | LOSE |
-| s2 | 33 | even | WIN | 12 | weak | LOSE |
-| s3 | 35 | even | WIN | 12 | weak | LOSE |
-| s4 | 32 | even | WIN | 12 | weak | LOSE |
-| s5 | 34 | even | WIN | 12 | weak | LOSE |
+### M3' 实测记录(measured 2026-09-02, R3b C4, real-save, seeds 20260901..20260905)
+
+**仪器**:`tests/test_battle_setup_readiness.gd` `_print_m3_table()`(无头打印
+power/verdict 表)+ `playtest/huashan_readiness_warning.yaml`(真实档 boot 场景钉)。
+
+**profile 构造(纯算术,零 RNG)**:
+- 最低(creation-fresh):五围 10、0 大成
+- 平衡(1 D 大成):五围 10 + 1 门 D 大成(mp=1)
+- 强(多门 A 大成):五围 20/12/40 + 5 门 A 大成(mp=20)
+
+**HUASHAN_BAR 重钉**:`{even: 38, strong: 55}`。
+
+| seed | 路线 | power | verdict |
+|---|---|---|---|
+| 20260901 | lowest | 35 | weak |
+| 20260901 | balanced | 40 | even |
+| 20260901 | strong | 124 | strong |
+| 20260902 | lowest | 35 | weak |
+| 20260902 | balanced | 40 | even |
+| 20260902 | strong | 124 | strong |
+| 20260903 | lowest | 35 | weak |
+| 20260903 | balanced | 40 | even |
+| 20260903 | strong | 124 | strong |
+| 20260904 | lowest | 35 | weak |
+| 20260904 | balanced | 40 | even |
+| 20260904 | strong | 124 | strong |
+| 20260905 | lowest | 35 | weak |
+| 20260905 | balanced | 40 | even |
+| 20260905 | strong | 124 | strong |
 
 **验收判定**:
-- (a) 平衡路线 ≥4/5 种子超过 even 带且 ≥4/5 打赢 —— **5/5 超过 even,5/5 打赢**
-  (多数,「有机会」而非「必赢」)。
-- (b) 创建即新 profile 全部 5 种子低于 even 且输 —— **5/5 低于 even,5/5 输**
-  (挑战保留:创建即新仍打不赢)。
-- (c) 战斗未被弱化 —— 获胜运行结束时 `health < max_health`(未满血),旗舰场景
-  断言此差分,不钉任何 HP 字面量。
+- (a) creation-fresh(五围 10、0 大成)power=35 < even=38 → **5/5 weak** ✓
+- (b) 平衡(attrs 11 post-creation + 1 D 大成)power=40 ≥ even=38 → **5/5 even** ✓
+- (c) 强(5 A 大成 + grown attrs)power=124 ≥ strong=55 → **5/5 strong** ✓
+- (d) 评语与实际胜负相关:「胜券在握」档(power ≥ 55)在真实华山战局中活过第 2
+  回合(边界钉由 `huashan_winnable_normal_route` C5 场景承载)。
 
-**红先(修复前,实测)**:同一条正常路线在修复前树(derive_stats 无修为项)进华山
-先攻全场最低、第一回合未轮到出手就死——`huashan_winnable_normal_route` 在
-`CombatManager.phase == "PLAYER_TURN"` 断言红(观测 `ENEMY_TURN`/`IDLE`,英雄
-从未轮到);`huashan_readiness_warning` 在 `RosterPanel.readiness_text` 表面红
-(表面未发布)。四值记录见 `final/red_first_notes_r3_huashan.md`。
+**红先(修复前,实测 2026-09-02)**:旧 `HUASHAN_BAR {"even": 30, "strong": 40}`
+在真实档上:creation-fresh power=35 ≥ even=30 → 势均力敌(应为战备不足);
+真实新档 根骨 15、0 大成 power=37 ≥ even=30 但 < strong=40 → 势均力敌,
+进华山第 2 回合阵亡(`pt2_top_s5_frame_1140/1840.png`,33/95 HP 首回合前)。
+`huashan_readiness_warning` f130 字面钉 `readiness_text == "华山评估：战备不足"`
+在旧树上红(观测 `势均力敌`)。
 
-**回归**:`map_battle_node_huashan` 41/41 逐字(`max_health != 1000 and > 0` 在新
-公式下成立,`turn_order.size() == 6` 不动);`equipment_in_battle_diff` 47/47
-(装备差分仍 `changed`);`cultivation_changes_combat` 30/30;`terminal_victory_
-8_12_rounds_hp_15_40` 6/6(教程战用编排数值,不用 `derive_stats`——按读验证);
-`save_load_roundtrip` 14/14;`spine_to_ending` 42/42。
-
-**升级路径(记录,未预授权)**:若玩家侧杠杆无法在不弱化战斗的前提下把胜率抬离
-零,停止并上报 round owner——`map_battle_data.gd` 数据解锁**未预授权**。本轮
-实测 5/5 打赢,未触发。
+**升级路径(记录)**:若 C1 落地后玩家侧杠杆仍赢不了华山且不琐碎化战斗,停止并
+申请 `map_battle_data.gd` 数据解锁(见 C5 升级条款)。
 
 ## 13. 结局评价:多轴评分(R3,2026-09-01)
 

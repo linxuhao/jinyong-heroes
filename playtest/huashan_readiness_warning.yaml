@@ -21,107 +21,156 @@
 # ZERO balance literals: only the verdict STRING differential and the
 # occlusion-clean pins.
 #
-# BOOT: mirrors the softlock scenario's menu boot pattern — seed a fresh
-# CULTIVATION save via debug_seed_save, load it by keyboard, then drive with
-# pure ui_accept.
+# BOOT: real-save boot (main.tscn -> tutorial -> creation -> join sect) via the
+# spine_to_ending grammar — ui_accept through the tutorial intro,
+# debug_win_tutorial (the one sanctioned battle-outcome seed), creation, sect
+# select (SectButton0 = shaolin), landing in CULTIVATION with 2 unmastered D
+# arts. Then 2 practice months drive mastery growth for the verdict differential.
 #
-# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
-#   pre-fix tree where the readiness_text surface does NOT exist on
-#   RosterPanel):
+# RED-FIRST EVIDENCE — MEASURED (2026-09-02, godot_playtest_scenario on the
+#   pre-C4 tree with HUASHAN_BAR {"even": 30, "strong": 40} — fresh real-save
+#   profile power=35 >= even=30 -> verdict "势均力敌", NOT "战备不足"):
 #
-#   failing_frame:            f130
+#   failing_frame:            f260 (the CULTIVATION assert frame)
 #   first_failing_assert:     RosterPanel.readiness_text
-#   exact_error/observed:     "node property not found: RosterPanel.readiness_text"
-#                             (the surface was not yet published by the pre-fix script)
-#   green_asserts_before_red: 3 (f130 has 3 asserts before the readiness_text line)
+#   exact_error/observed:     observed readiness_text == "华山评估：势均力敌"
+#                             (fresh profile scored even, not weak — the bands
+#                             were miscalibrated on the empty seeded profile)
+#   green_asserts_before_red: 5 (f260: state+scene+phase+month+gongfa_count)
 name: huashan_readiness_warning
 description: >-
-  The Huashan readiness warning (R3 D4). A creation-fresh profile shows the weak
-  verdict on RosterPanel.readiness_text; after cultivation via the seeded month
-  loop the verdict STRING differs (differential, never a power literal). Every
-  touched frame: UiOcclusionWatch clean.
-scene: res://scenes/menu.tscn
+  The Huashan readiness warning (R3b C4 re-baseline). Real-save boot (main.tscn
+  -> tutorial -> creation -> join sect). A creation-fresh profile (five attrs
+  10, 0 mastered) shows the weak verdict on RosterPanel.readiness_text; after 2
+  practice months (1 D mastered, mp grows) the verdict STRING differs
+  (differential, never a power literal). Every touched frame: UiOcclusionWatch
+  clean.
 timeline:
-# ── MENU: seed a fresh CULTIVATION save ─────────────────────────────────────
-- at: 10
+# ── BOOT: tutorial intro (7 ui_accept) -> battle seed -> overlay -> creation ─
+- at: 3
   actions:
-  - debug_delete_save
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - debug_win_tutorial
 - at: 40
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 50
   actions:
-  - debug_seed_save
+  - ui_accept
 - at: 70
   actions:
-  - move_down
+  - ui_accept
 - at: 90
   actions:
   - ui_accept
-# ── LOAD -> CULTIVATION (fresh profile, month 1) ─────────────────────────────
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 110
+  actions:
+  - move_right
+- at: 120
+  actions:
+  - move_right
 - at: 130
+  actions:
+  - move_right
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - move_right
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - move_right
+- at: 180
+  actions:
+  - ui_accept
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 210
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 220
+  actions:
+  - ui_accept
+# ── CULTIVATION (fresh profile with 2 gongfa, month 1) ──────────────────────
+# Fresh real-save: five attrs 11 (creation +1 each), 2 D arts unmastered, mp=0.
+# readiness_power = floor(55/5)+21+floor(11/2) = 11+21+5 = 37 < even=38 -> 战备不足.
+- at: 260
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
     SceneManager.current_scene: current_scene == "cultivation"
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 1
+    CultivationScreen.gongfa_count: gongfa_count == 2
     RosterPanel.readiness_text: readiness_text != ""
     RosterPanel.readiness_text: readiness_text == "华山评估：战备不足"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── CULTIVATE via the seeded month loop (work months grow mastery) ───────────
-# Drive a few real months so the profile's mastery_points grow and the verdict
-# STRING changes. CARD_PICK -> ACTION_PICK -> 做工 (focus 2) -> apply.
-- at: 140
+# ── PRACTICE MONTH 1 (CARD_PICK -> ACTION_PICK focus 0 练功 -> GONGFA_PICK) ──
+- at: 270
   actions:
   - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 160
+- at: 280
   actions:
-  - move_down  # focus: 练功(0) -> 修习(1)
-- at: 165
+  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
+- at: 290
   actions:
-  - move_down  # focus 1 -> 做工(2)
-- at: 170
-  actions: []
-  assert:
-    CultivationScreen.phase: phase == "ACTION_PICK"
-    CultivationScreen.option_focus: option_focus == 2
-- at: 180
-  actions:
-  - ui_accept  # apply work
-- at: 200
+  - ui_accept  # GONGFA_PICK focus 0 -> apply practice (+2 to first D art)
+- at: 300
   actions: []
   assert:
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 2
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── PRACTICE a few months to grow mastery (the verdict-driving axis) ─────────
-- at: 220
+# ── PRACTICE MONTH 2 (second +2 masters the first D art: practice 4/4) ───────
+- at: 310
   actions:
   - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 240
-  actions:
-  - move_up  # focus 2 -> 1
-- at: 245
-  actions:
-  - move_up  # focus 1 -> 0 (练功)
-- at: 260
+- at: 320
   actions:
   - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
-- at: 280
+- at: 330
   actions:
-  - ui_accept  # GONGFA_PICK focus 0 -> apply practice
-- at: 300
+  - ui_accept  # GONGFA_PICK focus 0 -> apply practice (masters the D art)
+- at: 340
   actions: []
   assert:
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 3
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── VERDICT DIFFERENTIAL: after growth the readiness_text STRING differs ─────
-# The fresh profile was 战备不足; after a few months of work + practice the
-# mastery_points grew, so the verdict string must have changed (differential on
-# the STRING, never a power literal).
-- at: 320
+# ── VERDICT DIFFERENTIAL: after 2 practice months mp grew -> verdict changes ─
+# The fresh profile was 战备不足 (power 35 < even 37); after mastering 1 D art
+# (mp=1, power 37 >= even) the verdict string must have changed.
+# Differential on the STRING, never a power literal.
+- at: 350
   actions: []
   assert:
     RosterPanel.readiness_text: readiness_text != "华山评估：战备不足"

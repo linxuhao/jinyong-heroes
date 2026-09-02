@@ -35,6 +35,7 @@ static func run() -> bool:
 	ok = _test_readiness_band_ordering(ok)
 	if ok:
 		print("PASS test_battle_setup_readiness")
+		_print_m3_table()
 	else:
 		print("FAIL test_battle_setup_readiness")
 	return ok
@@ -162,6 +163,38 @@ static func _test_readiness_band_ordering(ok: bool) -> bool:
 	ok = _expect(ok, int(at_even_v.power) >= even, "walked profile reaches even band")
 	ok = _expect(ok, str(at_even_v.verdict_key) != "huashan_weak", "at/above even -> not weak")
 	return ok
+
+
+# --- M3' measurement table (headless instrument, zero assertions) -------------
+
+## Prints the power/verdict table for >=5 seeds x 3 routes (lowest/balanced/strong)
+## on REAL-SAVE profile shapes. Pure arithmetic, zero RNG. Used to transcribe
+## the M3' table into design/40_progression.md.
+static func _print_m3_table() -> void:
+	var seeds: Array = [20260901, 20260902, 20260903, 20260904, 20260905]
+	print("")
+	print("=== M3' Readiness Power Table (measured %d) ===" % 20260902)
+	print("seed | route | power | verdict_key")
+	print("---|---|---|---")
+	for seed in seeds:
+		# Lowest: five attrs 10, 0 mastered (creation-fresh)
+		var low = _profile({"bone": 10, "inner": 10, "agility": 10, "wisdom": 10, "fortune": 10})
+		var low_v: Dictionary = BattleSetup.readiness(low)
+		print("%d | lowest | %d | %s" % [seed, int(low_v.power), str(low_v.verdict_key)])
+		# Balanced: five attrs 11 (post-creation +1 each) + 1 D mastered
+		var bal = _profile({"bone": 11, "inner": 11, "agility": 11, "wisdom": 11, "fortune": 11})
+		bal.add_gongfa("shaolin_yijin_d", "D")
+		bal.master_gongfa_of("shaolin_yijin_d")
+		var bal_v: Dictionary = BattleSetup.readiness(bal)
+		print("%d | balanced | %d | %s" % [seed, int(bal_v.power), str(bal_v.verdict_key)])
+		# Strong: attrs 20/12/40 + 5 A mastered (same shape as _test_readiness_band_ordering)
+		var str_ = _profile({"bone": 20, "inner": 12, "agility": 40})
+		for art in ["shaolin_luohan_d", "shaolin_luohan_c", "shaolin_luohan_b", "a_sword", "a_palm"]:
+			str_.add_gongfa(art, "A")
+			str_.master_gongfa_of(art)
+		var str_v: Dictionary = BattleSetup.readiness(str_)
+		print("%d | strong | %d | %s" % [seed, int(str_v.power), str(str_v.verdict_key)])
+	print("")
 
 
 # --- helpers ------------------------------------------------------------------

@@ -60,14 +60,8 @@ const ADJACENCY: Dictionary = {
 	"huashan": ["shaolin"],
 }
 
-## Huashan readiness band thresholds (R3 D4). Set by M3 from the measured
-## win/lose split on the current tree (measured 2026-09-01, R3 M3, seeds s1..s5),
-## NOT by eyeballing the composite range. readiness() in battle_setup.gd reads
-## these: power < even -> weak; even <= power < strong -> even; power >= strong
-## -> strong. A normally-played balanced route must exceed `even` on >= 4/5 seeds
-## and win the duel on >= 4/5; a creation-fresh profile must score below `even`
-## on all 5 seeds and lose. See design/40_progression.md §「华山战备」.
-const HUASHAN_BAR: Dictionary = {"even": 30, "strong": 40}
+## HUASHAN_BAR — measured bands, see design/40_progression.md §「华山战备」M3' table.
+const HUASHAN_BAR: Dictionary = {"even": 38, "strong": 55}
 
 ## Ending tiers, descending by min_score (R3 D1 — multi-axis score, not the
 ## five-attr sum). score = EndingLogic.evaluate(profile, deeds) — the ONLY
