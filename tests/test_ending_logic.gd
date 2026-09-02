@@ -121,7 +121,8 @@ static func _test_tier_scan(ok: bool) -> bool:
 		ok = _expect(ok, cur >= prev, "ending_tier_score non-decreasing at " + str(s))
 		prev = cur
 	# ending_tier (the old attrs-only fn) is REMOVED — no dead dual path.
-	ok = _expect(ok, not MapData.has_method("ending_tier"), "ending_tier removed (no dead dual path)")
+		var src := FileAccess.get_file_as_string("res://scripts/data/map_data.gd")
+		ok = _expect(ok, src.contains("func ending_tier_score(") and not src.contains("func ending_tier("), "ending_tier removed (no dead dual path)")
 	return ok
 
 

@@ -18,6 +18,7 @@
 ## The printed table is transcribed into design/40_progression.md §3 with the
 ## run label "measured 2026-09-01, R3 M1, seeded run".
 
+const TraitEffects = preload("res://scripts/data/trait_effects.gd")
 const PRACTICE_ACTION_GAIN: int = 2  # mirrors cultivation.gd's PROVISIONAL const
 const SECT_ID: String = "shaolin"
 const MONTHS: int = 36
