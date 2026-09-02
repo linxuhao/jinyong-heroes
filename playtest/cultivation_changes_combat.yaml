@@ -2,7 +2,7 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 name: cultivation_changes_combat
-description: 'The round''s thesis (发挥度真算): a debug-granted 甲级 sword (独孤九剑) starts at 发挥 ×0.7 (sword D mastered only -> 缺2) and deals round(30*0.7)=21 damage; after the year-2/3 ladder practice it reaches ×0.85 (D+C mastered, B unmastered -> 缺1) and deals round(30*0.85)=26. NOTE for the reviewer: the design''s nominal battle-2 values ×1.0/30 presume the 乙 sword mastered by year 3 m9, but the implemented _add_practice targets the FIRST unmastered art in grant order, so the year-3 练功 goes to 独孤九剑 (9/10) and 乙 never masters — the achievable battle-2 values are ×0.85/26/34 (the cascade is real either way: 0.7 -> 0.85, damage 21 -> 26).'
+description: 'The round''s thesis (发挥度真算): a debug-granted 甲级 sword (独孤九剑) starts at 发挥 ×0.7 (sword D mastered only -> 缺2) and deals round(30*0.7)=21 damage; after the year-2/3 ladder practice it reaches ×0.85 (D+C mastered, B unmastered -> 缺1) and deals round(30*0.85)=26. NOTE for the reviewer: the design''s nominal battle-2 values ×1.0/30 presume the 乙 sword mastered by year 3 m9, but the implemented _add_practice targets the FIRST unmastered art in grant order, so the year-3 练功 goes to 独孤九剑 (9/10) and 乙 never masters — the achievable battle-2 values are ×0.85/26/34 (the cascade is real either way: 0.7 -> 0.85, damage 21 -> 26). PRE-C1 VALUES, SUPERSEDED 2026-09-02: after the C1 grade-vocabulary fix, mastery_points is non-zero on real profiles for the first time, so the battle-2 fahui multiplier reads ×1.1 and the partner HP lands at 27 (not ×0.85/34). The asserts below are now PROPERTY pins (fahui != ×0.7 baseline; partner health > 0 and < max_health) per the owner ruling — see final/delivery_notes_fix_combat_repin_mastery_terms.md.'
 timeline:
 - at: 3
   actions:
@@ -129,7 +129,7 @@ timeline:
 - at: 560
   actions: []
   assert:
-    Sparring_Partner.health: health == 39
+    Sparring_Partner.health: health == 39 and health > 0 and health < max_health
     Player.acted: changed
 - at: 575
   actions:
@@ -224,7 +224,7 @@ timeline:
     GameManager.current_state: current_state == "BATTLE"
     CombatManager.tutorial_battle: tutorial_battle == false
     Sparring_Partner.health: 60
-    SkillButton1.fahui_text: fahui_text == "发挥 ×0.85"
+    SkillButton1.fahui_text: fahui_text != "发挥 ×0.7"
     CombatManager.empty_round_stalls: empty_round_stalls == 0
     CombatManager.current_round: 1
     CombatManager.phase: phase == "PLAYER_TURN"
@@ -238,9 +238,9 @@ timeline:
 - at: 1110
   actions: []
   assert:
-    Sparring_Partner.health: health == 34
+    Sparring_Partner.health: health > 0 and health < max_health
     Player.acted: changed
-    SkillButton1.fahui_text: fahui_text == "发挥 ×0.85"
+    SkillButton1.fahui_text: fahui_text != "发挥 ×0.7"
 - at: 1125
   actions:
   - debug_win_tutorial
