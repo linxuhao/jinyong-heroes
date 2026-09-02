@@ -57,9 +57,24 @@ description: >-
   + last_practice_target changed (targeted niche), travel last_action_kind ==
   "travel" + last_yield_text non-empty (routing proof). Every touched frame:
   UiOcclusionWatch clean.
-scene: res://scenes/menu.tscn
+# BOOT SCENE (2026-09-02 re-anchor): NO `scene:` override here — this file
+# inherits `res://scenes/main.tscn` from _common.yaml, which boots straight to
+# the TUTORIAL intro with the `Next` node present (same grammar as the green
+# practice_target_receipt). An explicit `scene: res://scenes/menu.tscn` was the
+# measured root cause (sidecar: every `Next`/`AttackButton` click aimed at a
+# nonexistent node, the game never left MENU, and all 44 asserts read
+# current_state == "MENU"). Under menu.tscn the tutorial `Next` node only exists
+# after a RestartButton click, which this main.tscn boot grammar does not do.
 timeline:
-# ── BOOT: tutorial intro (7 Next clicks) -> battle seed -> overlay -> transition
+# ── BOOT: tutorial intro (7 Next clicks) -> battle seed -> overlay -> transition.
+# NOTE: this file inherits `scene: res://scenes/main.tscn` from _common.yaml (no
+# local override). Under main.tscn the game boots straight to the TUTORIAL intro,
+# so the 7 Next clicks advance the intro and the real-save path (tutorial battle
+# -> creation -> sect) drives to CULTIVATION with a 2-gongfa profile — the same
+# proven grammar as practice_target_receipt (green). An explicit
+# `scene: res://scenes/menu.tscn` here was WRONG (measured 2026-09-02 sidecar:
+# the menu boot never creates the tutorial `Next` node, so every boot click aimed
+# at a nonexistent node and the game stayed at MENU for all 44 asserts). Removed.
 - at: 40
   actions: []
   clicks:
