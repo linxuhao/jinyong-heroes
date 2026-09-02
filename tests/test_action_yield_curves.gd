@@ -68,7 +68,7 @@ static func _run_strategy(strategy: String) -> Dictionary:
 		# The strategy's monthly action.
 		match strategy:
 			"all_work":
-				var gain: int = ProgressionMath.work_income(ProgressionMath.mastered_count(profile))
+				var gain: int = ProgressionMath.work_income(profile.get_deed("work_months"))
 				profile.silver += gain
 				profile.deeds["work_months"] = profile.get_deed("work_months") + 1
 				profile.deeds["silver_earned"] = profile.get_deed("silver_earned") + gain
