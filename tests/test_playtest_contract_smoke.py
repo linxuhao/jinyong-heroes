@@ -2272,7 +2272,7 @@ def test_work_beats_idling_ratio_nail_contract() -> None:
     equal to its basename, every timeline ``at:`` is a single integer, the two
     new observables (EndingScreen.final_silver / SaveManager.first_ending_silver)
     are whitelisted on the surface, and the ratio assert line
-    ``EndingScreen.final_silver > SaveManager.first_ending_silver * 3 / 2``
+    ``EndingScreen.final_silver: final_silver > first_ending_silver * 3 / 2``
     carries the ``>`` comparison operator (the ratio pin — zero absolute silver
     values). The comparison operator must be present so a future round cannot
     silently weaken the ratio to a bare-scalar assert.
@@ -2301,11 +2301,11 @@ def test_work_beats_idling_ratio_nail_contract() -> None:
             )
     # The ratio nail line must carry the > comparison operator (anti-weakening).
     assert re.search(
-        r"EndingScreen\.final_silver\s*>\s*SaveManager\.first_ending_silver\s*\*\s*3\s*/\s*2",
+        r"EndingScreen\.final_silver:\s*final_silver\s*>\s*first_ending_silver\s*\*\s*3\s*/\s*2",
         ftext,
     ), (
         f"{name}.yaml must contain the ratio line "
-        "`EndingScreen.final_silver > SaveManager.first_ending_silver * 3 / 2` "
+        "`EndingScreen.final_silver: final_silver > first_ending_silver * 3 / 2` "
         "(the C7 ratio pin, comparison operator required)"
     )
     # The two new observables are whitelisted on the surface.

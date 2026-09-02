@@ -430,7 +430,7 @@ const EN: Dictionary = {
 	"江湖中人都认得你的名号。\n行至何处，皆有豪杰相迎。\n虽未登峰造极，亦是一方武林名宿。": "All the jianghu knows your name.\nWherever you go, heroes greet you.\nNot yet the summit — but a renowned elder of the land.",
 	"隐于市井": "Hidden Among the Crowd",
 	"你收起兵刃，隐入市井。\n江湖纷争从此与你无关。\n唯有炊烟与酒香，伴你终老。": "You sheathe your blade and vanish into the streets.\nThe jianghu's strife is no longer yours.\nOnly hearth smoke and the scent of wine keep you company to the end.",
-	"【结局 · %s】\n\n%s\n\n按回车重新开始": "[Ending · %s]\n\n%s\n\nPress Enter to restart",
+	"【结局 · %s】\n\n%s\n\n%s\n\n点击「重新开始」重启江湖": "[Ending · %s]\n\n%s\n\n%s\n\nClick 重新开始 (Restart) to begin anew",
 	"按回车重新开始": "Press Enter to restart",
 	"结局 · 属性：%d": "Ending · Attributes: %d",
 	"结局 · 武学：%d": "Ending · Martial Arts: %d",

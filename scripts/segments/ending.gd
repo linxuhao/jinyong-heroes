@@ -107,7 +107,7 @@ func _render() -> void:
 	if SaveManager.first_ending_evaluation == "":
 		SaveManager.first_ending_evaluation = summary
 		SaveManager.first_ending_silver = SaveManager.profile.silver
-	body.text = tr("【结局 · %s】\n\n%s\n\n%s\n\n按回车重新开始") % [tr(title), tr(text_lines), summary]
+	body.text = tr("【结局 · %s】\n\n%s\n\n%s\n\n点击「重新开始」重启江湖") % [tr(title), tr(text_lines), summary]
 	var restart_btn: Button = get_node_or_null("RestartButton") as Button
 	if restart_btn != null:
 		restart_btn.text = tr("重新开始")
