@@ -72,16 +72,16 @@ measurements and rulings live in `design/40_progression.md` (M2'/M3' real-save t
    `final/delivery_notes_fix_readiness_verdict_rebaseline.md`).
 5. **C5 — the winnable-route card matches its title** (`huashan_winnable_normal_route`
    rewritten: clicks-only, menu boot, real-save 36 practice months, real skill clicks in
-   the duel, WIN frame asserts `current_state == "WON"` + `health < max_health`).
-   **Status: unlock ruling granted 2026-09-02, levers landed, WIN measured on the
-   real-save route — WON overlay not reached (recorded honestly).** The owner granted the
+   the duel, WIN frame asserts `current_state == "MAP"` + `health < max_health`).
+   **Status: unlock ruling granted 2026-09-02, levers landed, WON overlay not reached —
+   recorded honestly (not claimed as a measured WIN).** The owner granted the
    C5 escalation unlock (`design/90_decisions.md` "R3b C5 — 华山数据解锁裁决"): scope =
    `map_battle_data.gd` POSITIONS/PLAYER_SPAWN, the five greats' `cd.initiative` literals
    in `battlefield.gd:504-590`, and `battle_setup.gd` derive_stats mp terms (R3 D4
    cancelled); prohibitions = no lowering any great's max_health/attack_damage/attack_range,
    no reducing unit count, no AI edits, no redefining "win". Implemented by
-   `fix_huashan_route_honest_red`: `huashan_winnable_normal_route` progressed 23/42 →
-   29/39, the C4 boundary (`current_round >= 3 and health > 0`) is green, zero
+   `fix_huashan_route_honest_red`: `huashan_winnable_normal_route` progressed
+   23/42 → 29/39, the C4 boundary (`current_round >= 3 and health > 0`) is green, zero
    CultOptionButton0 runtime errors, and the WON tail is still red — not claimed as a
    measured WIN. `[EVIDENCE: DIRECT-READ]` — unlock ruling + M3'' per-literal table in
    `final/unlock_record_r3b_huashan.md`; `[EVIDENCE: PENDING OFFICIAL RE-RUN]` — the
