@@ -249,14 +249,25 @@ input script: balanced route (clicks-only month grammar, no min-max).
   not the official gate verdict. Reason: the gate artifacts are not available in
   this task's context.
 - **`ending_divergent_playstyles` / `ending_last_month_choice` post-fix full
-  scenario green** — not fully executed: a post-fix probe of
-  `ending_divergent_playstyles` reached CULTIVATION at f130 and the leg-A ENDING
-  asserts, but the leg-A month clicks reported `aim: node not found:
-  CultOptionButton0/2` runtime errors and leg B routed to TUTORIAL instead of MAP.
-  This is a scenario frame-timing / boot-scene concern, not an evaluation-logic
-  defect — the evaluation surfaces and multi-axis math are verified by the headless
-  unit suite (`tests/test_ending_logic.gd`) and the M2 curves. Recorded honestly;
-  not silently claimed green.
+  scenario green** — **EXECUTED (2026-09-02, task `fix_r3_ending_nails_e2e`)**:
+  both scenarios now PASS with 0 runtime errors on the current tree via the
+  `godot_playtest_scenario` sidecar. The pre-fix red was MEASURED (not predicted):
+  `ending_divergent_playstyles` red at f140 (`aim: node not found:
+  CultOptionButton0`, 15 greens before red) with leg B stranded in TUTORIAL at
+  f1375; `ending_last_month_choice` red at f320 (`month` observed 10, 16 greens
+  before red) with leg B's steps gated by `GameManager.current_state`. **Root
+  cause (scenario defect, not a game defect):** the divergent leg-A month loop
+  had no year boundaries (132 clicks, no 年初/岁末 stay), so after month 36 the
+  CultOptionButton0/2 node no longer exists; and both leg-B restart paths never
+  landed in CULTIVATION before the debug action, so `debug_fast_forward` /
+  `debug_step_month` were gated by `GameManager.current_state`. This is the same
+  boot-scene/timeline desync defect class as `event_option_refused_no_charge`
+  (the third occurrence). Fixed by rewriting leg A to the proven month grammar
+  (year boundaries + 年初/岁末 stay clicks) and inserting a CULTIVATION assert
+  before the debug action in both leg-B paths. The evaluation differential itself
+  is proven by the headless unit suite (`tests/test_ending_logic.gd`) and the M2
+  curves; the e2e proof is now green on screen. Full measured four-values in
+  `final/red_first_notes_r3_ending.md`.
 
 ---
 

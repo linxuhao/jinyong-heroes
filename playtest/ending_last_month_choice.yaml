@@ -302,6 +302,12 @@ timeline:
 - at: 810
   actions:
   - ui_accept
+# ── LEG B: confirm the restart path landed in CULTIVATION before stepping ─────
+- at: 840
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
 - at: 870
   actions:
   - debug_step_month

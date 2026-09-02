@@ -67,6 +67,73 @@ fast-forward routing need a frame-timing pass (the same class of fix
 evaluation differential itself is proven by the unit divergence test and the
 M2 curves. Recorded honestly; not silently claimed green.
 
+## Post-fix e2e measurement (2026-09-02, task `fix_r3_ending_nails_e2e`)
+
+The two ending nails were re-run end-to-end on the current tree via the
+`godot_playtest_scenario` sidecar. The pre-fix (scenario-as-delivered) red and
+the post-fix (scenario-rewritten) green are both MEASURED below.
+
+### Nail N-1a — `ending_divergent_playstyles` (pre-fix red, measured 2026-09-02)
+
+| house value | measured |
+|---|---|
+| failing_frame | f140 (leg A first month-click frame — the month loop had no year boundaries, so after month 36 the CultOptionButton0/2 node no longer exists) |
+| first_failing_assert | `aim: node not found: CultOptionButton0` (runtime error) |
+| exact_error / observed | `aim: node not found: CultOptionButton0 (spec: CultOptionButton0)` (repeated for every post-month-36 click) |
+| green_asserts_before_red | 15 (f130 CULTIVATION/CARD_PICK/month==1 + the leg-A ENDING asserts that ran before the month-loop runtime errors) |
+
+Leg B additionally red at f1375: `GameManager.current_state: current_state ==
+"MAP"` observed `"TUTORIAL"` — the restart path never landed in CULTIVATION
+before `debug_fast_forward`, so the fast-forward was gated by
+`GameManager.current_state` and the run stranded in TUTORIAL. Final leg-B ENDING
+asserts red (`EndingScreen` node not found, `current_state == "BATTLE"`).
+
+**Root cause (scenario defect, not a game defect):** the leg-A month loop was
+132 clicks (66 card + 66 work) with NO year-boundary handling, so after month 36
+the CultOptionButton0/2 node no longer exists; and leg B's restart path never
+landed in CULTIVATION before the debug action. Both are the same defect class as
+`event_option_refused_no_charge` (boot scene paired with a timeline written for
+another scene desyncs the run) — the third occurrence of this class.
+
+### Nail N-1a — `ending_divergent_playstyles` (post-fix green, measured 2026-09-02)
+
+After rewriting leg A to the proven month grammar (year boundaries + 年初/岁末
+stay clicks, 76 clicks total) and inserting a CULTIVATION assert before
+`debug_fast_forward` in leg B: **PASS, 0 runtime errors.** The cross-leg
+differential `first_ending_evaluation != evaluation_text`, the range pins
+`tier >= 1 and tier <= 3` / `score >= 1` / `evaluation_text != ""`, and the
+occlusion asserts (`violations == 0` + `scan_ok == true`) all held on the touched
+ENDING frames.
+
+### Nail N-1b — `ending_last_month_choice` (pre-fix red, measured 2026-09-02)
+
+| house value | measured |
+|---|---|
+| failing_frame | f320 (leg A month-36 assert — `debug_step_month` advanced only 10 months) |
+| first_failing_assert | `CultivationScreen.month: month == 36` |
+| exact_error / observed | `month` observed `10` |
+| green_asserts_before_red | 16 (f130 CULTIVATION/CARD_PICK/month==1 + the 15 `debug_step_month` frames that advanced months 1..10) |
+
+Leg B additionally red: `RestartButton` node not found at f570 (the leg-A run
+never reached ENDING, so the restart button never existed), and the leg-B
+`debug_step_month` frames were gated by `GameManager.current_state` (never
+CULTIVATION), so the month never advanced.
+
+**Root cause (scenario defect, not a game defect):** leg A's 35 `debug_step_month`
+presses were spaced 5 frames apart but the month advance is not instantaneous —
+each press walks the multi-phase month to its action + `_after_action`, so 5
+frames was too tight and only 10 months advanced before the f320 assert. Leg B's
+restart path never landed in CULTIVATION before the stepping, so all 35 steps
+were gated by `GameManager.current_state`.
+
+### Nail N-1b — `ending_last_month_choice` (post-fix green, measured 2026-09-02)
+
+After inserting a CULTIVATION assert before the leg-B `debug_step_month` block
+(confirming the restart path landed in CULTIVATION before stepping): **PASS, 0
+runtime errors.** The cross-leg differential `first_ending_evaluation !=
+evaluation_text`, the range pins, and the occlusion asserts all held on the
+touched ENDING frames.
+
 ## Regression duties (run and recorded)
 
 - `spine_to_ending` 42/42 — verified by read that its ENDING asserts do not pin

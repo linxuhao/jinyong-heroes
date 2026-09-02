@@ -72,7 +72,10 @@ timeline:
     CultivationScreen.month: month == 1
 # ── 36 months of WORK (card + work per month, the clicks_only_storyline
 #    grammar). Each month: CultOptionButton0 (card) then CultOptionButton2
-#    (做工). Year-end stay via CultOptionButton0. ─────────────────────────────
+#    (做工). Year boundaries: y1m12/y2m12 card+work → YEAR_END then a stay
+#    CultOptionButton0; y2m1/y3m1 an extra CultOptionButton0 (year-augment)
+#    BEFORE the card. ────────────────────────────────────────────────────────
+# YEAR 1 — m1..m11 (card + work), m12 (card + work + stay)
 - at: 140
   actions: []
   clicks:
@@ -161,6 +164,7 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
+# Year 1 month 12: card + work → YEAR_END; stay (留在本门)
 - at: 250
   actions: []
   clicks:
@@ -175,8 +179,10 @@ timeline:
   - CultOptionButton0
 - at: 265
   actions: []
-  clicks:
-  - CultOptionButton2
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+# YEAR 2 — m1 (augment + card + work), m2..m11 (card + work), m12 (card+work+stay)
 - at: 270
   actions: []
   clicks:
@@ -184,111 +190,114 @@ timeline:
 - at: 275
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 280
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 285
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 290
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 295
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 300
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 305
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 310
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 315
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 320
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 325
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 330
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 335
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 340
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 345
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 350
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 355
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 360
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 365
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 370
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 375
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 380
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# Year 2 month 12: card + work → YEAR_END; stay
 - at: 385
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 390
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 395
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 400
   actions: []
-  clicks:
-  - CultOptionButton0
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 1
+# YEAR 3 — m1 (augment + card + work), m2..m11 (card + work), m12 (card + work → MAP)
 - at: 405
   actions: []
   clicks:
-  - CultOptionButton2
+  - CultOptionButton0
 - at: 410
   actions: []
   clicks:
@@ -377,6 +386,7 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
+# Year 3 month 12: card + work → _finish_to_map (year 3 month 12)
 - at: 520
   actions: []
   clicks:
@@ -385,258 +395,42 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton2
-- at: 530
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 535
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 540
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 545
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 550
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 555
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 560
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 565
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 570
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 575
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 580
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 585
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 590
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 595
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 600
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 605
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 610
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 615
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 620
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 625
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 630
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 635
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 640
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 645
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 650
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 655
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 660
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 665
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 670
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 675
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 680
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 685
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 690
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 695
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 700
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 705
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 710
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 715
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 720
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 725
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 730
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 735
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 740
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 745
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 750
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 755
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 760
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 765
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 770
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 775
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 780
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 785
-  actions: []
-  clicks:
-  - CultOptionButton2
-- at: 790
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 795
-  actions: []
-  clicks:
-  - CultOptionButton2
 # ── MAP: travel to kunlun (endpoint -> ENDING) ────────────────────────────────
-- at: 845
+- at: 545
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
     MapScreen.phase: phase == "TRAVEL"
-- at: 855
+- at: 555
   actions: []
   clicks:
   - TravelButton0
-- at: 865
+- at: 565
   actions: []
   clicks:
   - EventOptionButton0
-- at: 875
+- at: 575
   actions: []
   clicks:
   - TravelButton1
-- at: 885
+- at: 585
   actions: []
   clicks:
   - EventOptionButton0
-- at: 895
+- at: 595
   actions: []
   clicks:
   - TravelButton1
-- at: 905
+- at: 605
   actions: []
   clicks:
   - EventOptionButton0
-- at: 915
+- at: 615
   actions: []
   clicks:
   - TravelButton1
 # ── LEG A ENDING: capture the work-heavy evaluation record ───────────────────
-- at: 945
+- at: 645
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"
@@ -647,41 +441,81 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG B: restart -> re-seed the SAME seed -> practice-heavy fast-forward ──
-- at: 955
+- at: 655
   actions: []
   clicks:
   - RestartButton
-- at: 985
+- at: 685
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
-- at: 995
+- at: 695
   actions:
   - debug_win_tutorial
-- at: 1025
+- at: 725
   actions:
   - ui_accept
-- at: 1055
+- at: 755
   actions:
   - ui_accept
-- at: 1065
+- at: 765
   actions:
   - ui_accept
+- at: 795
+  actions:
+  - move_right
+- at: 805
+  actions:
+  - move_right
+- at: 815
+  actions:
+  - move_right
+- at: 825
+  actions:
+  - move_right
+- at: 835
+  actions:
+  - move_right
+- at: 845
+  actions:
+  - ui_accept
+- at: 855
+  actions:
+  - move_right
+- at: 865
+  actions:
+  - ui_accept
+- at: 895
+  actions:
+  - ui_accept
+# ── LEG B: confirm the restart path landed in CULTIVATION before fast-forward ──
+- at: 925
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+- at: 955
+  actions:
+  - debug_fast_forward
+- at: 1075
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
 - at: 1095
   actions:
   - move_right
 - at: 1105
   actions:
-  - move_right
+  - ui_accept
 - at: 1115
   actions:
-  - move_right
+  - ui_accept
 - at: 1125
   actions:
   - move_right
 - at: 1135
   actions:
-  - move_right
+  - ui_accept
 - at: 1145
   actions:
   - ui_accept
@@ -691,51 +525,17 @@ timeline:
 - at: 1165
   actions:
   - ui_accept
+- at: 1175
+  actions:
+  - ui_accept
+- at: 1185
+  actions:
+  - move_right
 - at: 1195
   actions:
   - ui_accept
-- at: 1255
-  actions:
-  - debug_fast_forward
-- at: 1375
-  actions: []
-  assert:
-    GameManager.current_state: current_state == "MAP"
-- at: 1395
-  actions:
-  - move_right
-- at: 1405
-  actions:
-  - ui_accept
-- at: 1415
-  actions:
-  - ui_accept
-- at: 1425
-  actions:
-  - move_right
-- at: 1435
-  actions:
-  - ui_accept
-- at: 1445
-  actions:
-  - ui_accept
-- at: 1455
-  actions:
-  - move_right
-- at: 1465
-  actions:
-  - ui_accept
-- at: 1475
-  actions:
-  - ui_accept
-- at: 1485
-  actions:
-  - move_right
-- at: 1495
-  actions:
-  - ui_accept
 # ── LEG B ENDING: the evaluation record DIFFERS from leg A ───────────────────
-- at: 1525
+- at: 1225
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"
