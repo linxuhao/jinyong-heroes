@@ -505,6 +505,16 @@ func _apply_action(action: Dictionary) -> void:
 			# non-target rows, increased pin for the target row).
 			var before_counts: Dictionary = _practice_counts_by_id()
 			_add_practice(PRACTICE_ACTION_GAIN, resolved)
+			# 练功 builds the body (R3b scenario rebaseline, 2026-09-02): every
+			# REAL practice month strengthens the art's feeding attribute —
+			# internal arts 内力, external arts 根骨. The soft-lock month
+			# (resolved == "") gains nothing (it applies no practice), card /
+			# event practice effects do NOT fire this (only the player-chosen
+			# 练功 month does), and the instrument's direct EventLogic.
+			# add_practice calls are untouched. Pure arithmetic, zero RNG.
+			if resolved != "":
+				SaveManager.profile.add_attr(
+					"inner" if EventLogic.is_internal_art_id(resolved) else "bone", 1)
 			SaveManager.profile.deeds["practice_months"] = SaveManager.profile.get_deed("practice_months") + 1
 			last_action_kind = "practice"
 			last_action_silver = 0

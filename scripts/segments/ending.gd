@@ -30,6 +30,13 @@ var done: bool = false
 ## ratio nail — the ending silver the player actually reached).
 var final_silver: int = 0
 
+## Surface: mirror of SaveManager.first_ending_silver at this render. The C7
+## ratio expression `final_silver > first_ending_silver * 3 / 2` is evaluated
+## by the harness against THIS node, so the idle baseline must be readable
+## here without a cross-node reference (same self-contained discipline as
+## diverged_from_first). 0 until the first ending has rendered.
+var first_ending_silver: int = 0
+
 ## Surface: the mastery (武学) axis value of this ending (int, EndingLogic
 ## evaluate axes["mastery"]). C1 scene nail reads this > 0 on a real-save
 ## practice route (red-first pre-C1: always 0 because GRADE_POINTS used CJK
@@ -107,6 +114,9 @@ func _render() -> void:
 	if SaveManager.first_ending_evaluation == "":
 		SaveManager.first_ending_evaluation = summary
 		SaveManager.first_ending_silver = SaveManager.profile.silver
+	# Mirror AFTER the once-per-session guard so later renders (leg B) read the
+	# FIRST ending's baseline, not their own.
+	first_ending_silver = SaveManager.first_ending_silver
 	body.text = tr("【结局 · %s】\n\n%s\n\n%s\n\n点击「重新开始」重启江湖") % [tr(title), tr(text_lines), summary]
 	var restart_btn: Button = get_node_or_null("RestartButton") as Button
 	if restart_btn != null:

@@ -166,10 +166,10 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton0
-- at: 375
-  actions: []
-  clicks:
-  - CultOptionButton0
+# Month 1 is at GONGFA_PICK now (card@355 + 练功@365) — the row click below
+# applies it. (No third pre-assert click: the measured run proved each monthly
+# click lands, so an extra click here would burn the month before the
+# GONGFA_PICK assert frame.)
 - at: 385
   actions: []
   assert:

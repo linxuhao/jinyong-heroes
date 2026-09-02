@@ -116,6 +116,19 @@ static func _resolve_target(profile: PlayerProfile, target_id: String) -> String
 	return _first_unmastered_id(profile)
 
 
+## True when an art id names a sect INTERNAL art — ids are
+## `<sect_id>_<internal_pinyin>_<grade>` (progression_gongfa_data art-id
+## convention), so the internal pinyin segment decides. External arts
+## (shaolin_luohan_d) and the hand-authored 甲 pool (a_sword) return false.
+## Pure data lookup, zero RNG. Used by the 练功 month's builds-the-body side
+## effect (cultivation.gd): internal arts train 内力, external arts 根骨.
+static func is_internal_art_id(art_id: String) -> bool:
+	for row in ProgressionGongfaData.SECTS:
+		if art_id.begins_with("%s_%s_" % [str(row["id"]), str(row["internal_pinyin"])]):
+			return true
+	return false
+
+
 ## First unmastered gongfa id over profile.gongfa, in order (rows with
 ## mastered != true and a non-empty String id); "" when none.
 static func _first_unmastered_id(profile: PlayerProfile) -> String:
