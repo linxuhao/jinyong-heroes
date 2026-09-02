@@ -741,6 +741,17 @@ duel 在锁定敌方数据上实测不可赢(最强档先攻 46 vs 五绝 68–8
 五绝满血),所有者解锁 `scripts/data/map_battle_data.gd` 前 (d) 无法转绿;不许改
 场景伪造胜利。M3' 表本身由无头仪器实测、不依赖该场景,5/5 × 三档的结论不受影响。
 
+> **2026-09-02 附注(fix_readiness_verdict_rebaseline,STOP-and-report)**:真实档 boot 的
+> 新档是**根骨 15**(f110–f150 五次 `move_right`、无行移动,`creation.gd:34` 默认五围 10 起),
+> mp=0、空装备 → `readiness_power = floor(75/5)+25+floor(10/2) = 45`,落 even 带 → 势均力敌,
+> 与官方 f260 观测串逐字一致。带算术无解:本 boot 45→weak 需 `even ≥ 46`,而 M3' balanced
+> 40→even 指派需 `even ≤ 40`,`40 < 46` ⇒ 不存在同时满足三指派的单一 `even` → 卡规停手报告,
+> **本卡不改带、不改 f260 字面钉、不改 f350**;冲突已上报(详见
+> `final/delivery_notes_fix_readiness_verdict_rebaseline.md`)。M3' 表「creation-fresh 35→weak」
+> 指派仍成立且被单元钉守护(`tests/test_battle_setup_readiness.gd:141-144` 五围 10 → weak);
+> 漂移的是场景 boot 的属性分配,不是带。f350 差分钉在该 boot 上不可满足(mp=1 → power 47 仍同带),
+> 属既有缺陷,由收口卡 `fix_honesty_records_reconcile` 升级为「与 f260 捕获串比较」的性质钉。
+
 ## 13. 结局评价:多轴评分(R3,2026-09-01)
 
 **问题形状(实测)**:结局档位 = 五围等权求和 vs 90/60 两个阈值
