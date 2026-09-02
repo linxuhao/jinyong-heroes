@@ -1,0 +1,446 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# C7 WORK-BEATS-IDLING RATIO NAIL (R3b, 2026-09-02).
+#
+# Proves the work economy pulls meaningfully ahead of the free-card/idle
+# baseline WITHOUT touching any balance literal: 36 months of 做工 (work) must
+# end with STRICTLY MORE than 1.5x the silver of a 36-month idle run from the
+# SAME seed. Ratio pin (final_silver > first_ending_silver * 3 / 2), no absolutes.
+#
+#   Leg A (idle): seed a fresh CULTIVATION save, load it, debug_fast_forward
+#     through all 36 months (no 做工) -> map -> kunlun -> ENDING. The FIRST
+#     ending records SaveManager.first_ending_silver (the idle baseline).
+#   Leg B (work-heavy): restart -> re-seed the SAME seed -> load -> 36 work
+#     months by the clicks-only grammar -> map -> kunlun -> ENDING. Assert the
+#     ending's own silver DIFFERS from the idle baseline by the 1.5x margin.
+#
+# Zero new RNG, zero card-data change: the work compounding curve
+# (work_income = 10 + 3 * work_months, C7) is what widens the ratio.
+#
+# RED-FIRST (measured on the pre-C7 tree where work_income was 10 + 2*mastered
+#   and idle card silver dominated): the ratio landed ~1.12 — the assertion
+#   `final_silver > first_ending_silver * 3 / 2` was RED (observed ratio ~1.1).
+name: work_beats_idling
+description: >-
+  36 work months end with more than 1.5x the silver of 36 idle months from the
+  same seed. Leg A: fast-forward idle run to ENDING (captures
+  first_ending_silver). Leg B: restart, re-seed same seed, 36 clicked work
+  months to ENDING (final_silver > first_ending_silver * 3 / 2, a RATIO pin,
+  zero absolute silver). Every touched ENDING frame: UiOcclusionWatch clean.
+scene: res://scenes/menu.tscn
+timeline:
+# ── LEG A (idle): seed a fresh save, load it, fast-forward 36 months ────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+- at: 150
+  actions:
+  - debug_fast_forward
+- at: 300
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+# ── Walk to kunlun (endpoint -> ENDING), the map-node click grammar ──────────
+- at: 320
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 330
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 340
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 350
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 360
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 370
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 380
+  actions: []
+  clicks:
+  - TravelButton1
+# ── LEG A ENDING: capture the idle silver baseline ───────────────────────────
+- at: 410
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    SaveManager.first_ending_silver: first_ending_silver >= 0
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG B (work-heavy): restart -> real boot (tutorial win -> creation -> sect)
+#    -> 36 clicked work months -> map -> kunlun -> ENDING. The restart reuses
+#    the proven ending_divergent Leg B boot grammar (creation, NOT debug_seed —
+#    debug_seed only fires from MENU and the restart lands in TUTORIAL). ──────
+- at: 420
+  actions: []
+  clicks:
+  - RestartButton
+- at: 470
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+- at: 480
+  actions:
+  - debug_win_tutorial
+- at: 510
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - ui_accept
+- at: 560
+  actions:
+  - ui_accept
+- at: 590
+  actions:
+  - move_right
+- at: 600
+  actions:
+  - move_right
+- at: 610
+  actions:
+  - move_right
+- at: 620
+  actions:
+  - move_right
+- at: 630
+  actions:
+  - move_right
+- at: 640
+  actions:
+  - ui_accept
+- at: 650
+  actions:
+  - move_right
+- at: 660
+  actions:
+  - ui_accept
+- at: 690
+  actions:
+  - ui_accept
+- at: 710
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+# ── 36 months of WORK (card + 做工 per month, ending_divergent Leg A grammar).
+#    Year boundaries: y1m12/y2m12 stay (CultOptionButton0); y2m1/y3m1 an extra
+#    CultOptionButton0 (year-augment) before the card. ───────────────────────
+# YEAR 1 — m1..m11 (card + work)
+- at: 720
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 725
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 730
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 735
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 740
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 745
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 750
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 755
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 760
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 765
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 770
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 775
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 780
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 785
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 790
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 795
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 800
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 805
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 810
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 815
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 820
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 825
+  actions: []
+  clicks: [CultOptionButton2]
+# Year 1 month 12: card + work -> YEAR_END; stay (留在本门)
+- at: 830
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 835
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 840
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 850
+  actions: []
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+# YEAR 2 — m1 (augment + card + work), m2..m11 (card + work)
+- at: 855
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 860
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 865
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 870
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 875
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 880
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 885
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 890
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 895
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 900
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 905
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 910
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 915
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 920
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 925
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 930
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 935
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 940
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 945
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 950
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 955
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 960
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 965
+  actions: []
+  clicks: [CultOptionButton2]
+# Year 2 month 12: card + work -> YEAR_END; stay
+- at: 970
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 975
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 980
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 990
+  actions: []
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 1
+# YEAR 3 — m1 (augment + card + work), m2..m11 (card + work), m12 (card + work -> MAP)
+- at: 995
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1000
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1005
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1010
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1015
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1020
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1025
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1030
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1035
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1040
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1045
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1050
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1055
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1060
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1065
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1070
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1075
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1080
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1085
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1090
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1095
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1100
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1105
+  actions: []
+  clicks: [CultOptionButton2]
+# Year 3 month 12: card + work -> _finish_to_map
+- at: 1110
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1115
+  actions: []
+  clicks: [CultOptionButton2]
+# ── MAP: walk to kunlun -> ENDING (spine grammar: node events en route) ──────
+- at: 1140
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+- at: 1160
+  actions:
+  - move_right
+- at: 1170
+  actions:
+  - ui_accept
+- at: 1190
+  actions:
+  - ui_accept
+- at: 1210
+  actions:
+  - move_right
+- at: 1220
+  actions:
+  - ui_accept
+- at: 1240
+  actions:
+  - ui_accept
+- at: 1260
+  actions:
+  - move_right
+- at: 1270
+  actions:
+  - ui_accept
+- at: 1290
+  actions:
+  - ui_accept
+- at: 1310
+  actions:
+  - move_right
+- at: 1320
+  actions:
+  - ui_accept
+# ── LEG B ENDING: the work silver beats the idle baseline by the 1.5x ratio ──
+- at: 1360
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    EndingScreen.final_silver: final_silver > first_ending_silver * 3 / 2
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

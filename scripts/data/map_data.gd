@@ -75,13 +75,20 @@ const HUASHAN_BAR: Dictionary = {"even": 30, "strong": 40}
 ## INVARIANT: rows must stay sorted by min_score descending — ending_tier_score()
 ## scans top-down and returns the first row the score reaches. The final row's
 ## min_score is always 0, so any score yields at least tier 1.
-## min_score values set by M2 from the measured 36-month yield curves
-## (measured 2026-09-01, R3 M2, seeded runs) — see design/40_progression.md
-## §「结局评价」. NEVER pinned by a gate literal.
+## min_score values set by M2' from the measured 36-month yield curves on a
+## REAL-SAVE boot (measured 2026-09-02, R3b M2', real-save) — see
+## design/40_progression.md §「结局评价」. NEVER pinned by a gate literal.
+## Measured anchors (post-C1 mastery + post-C7 work curve + post-C3 deed lever
+## that excludes free-card silver from 历练): a 36-month empty-profile
+## fast-forward scores 110 (attrs-only, mastery 0, deeds 0); a single-route
+## practice run clears 110 only via the mastery axis; a balanced work+travel
+## run pulls past 150 on the silver deeds. The bands below put the lowest legal
+## routes in tier 1, a focused route in tier 2, and a strong/balanced route in
+## tier 3, so all three titles are reachable from distinct playstyles.
 const ENDING_TIERS: Array = [
-	{"tier": 3, "min_score": 90, "title": "一代宗师",
+	{"tier": 3, "min_score": 150, "title": "一代宗师",
 		"text": "武林为之震动。\n你的名号传遍江湖，各派掌门纷纷登门请教。\n此世武学之巅，自此有了你的名字。"},
-	{"tier": 2, "min_score": 60, "title": "武林名宿",
+	{"tier": 2, "min_score": 100, "title": "武林名宿",
 		"text": "江湖中人都认得你的名号。\n行至何处，皆有豪杰相迎。\n虽未登峰造极，亦是一方武林名宿。"},
 	{"tier": 1, "min_score": 0, "title": "隐于市井",
 		"text": "你收起兵刃，隐入市井。\n江湖纷争从此与你无关。\n唯有炊烟与酒香，伴你终老。"},

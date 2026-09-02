@@ -245,6 +245,8 @@ surface:
   - debug_user_dir_exists
   - first_ending_evaluation
   - first_ending_silver
+  - ending_tier_history
+  - ending_title_history
   Player:
   - health
   - max_health
@@ -825,6 +827,7 @@ surface:
   - last_apply_attr_value
   EndingScreen:
   - tier
+  - ending_title
   - score
   - final_silver
   - evaluation_text
