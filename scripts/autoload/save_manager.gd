@@ -77,6 +77,19 @@ var first_ending_evaluation: String = ""
 ## against it). Written by ending.gd on its first _render, same lifecycle as
 ## first_ending_evaluation. 0 until the first ending renders.
 var first_ending_silver: int = 0
+## Surface: the tier of EVERY ending reached this session, in order (C3 tier
+## differential — the ending_tiers_differentiate nail reads index [1] vs [0] to
+## prove two routes land on DIFFERENT tiers, not merely different texts).
+## Appended UNCONDITIONALLY on every EndingScreen _render (one entry per ending),
+## NOT gated to the first ending of the session — a single-session multi-leg
+## scenario accumulates one entry per leg. Session-scoped observable, never a
+## save field. Empty until the first ending renders.
+var ending_tier_history: Array[int] = []
+## Surface: the title text of EVERY ending reached this session, in order (C3
+## three-distinct-titles nail — pairwise inequality across the first three
+## legs). Same lifecycle as ending_tier_history: appended once per EndingScreen
+## _render. Session-scoped observable, never a save field. Empty until first.
+var ending_title_history: Array[String] = []
 var decks: Dictionary = {}    # {"economy": {"remaining": Array, "drawn": Array}, ...} — six keys, all String
 var segment: String = ""      # not surface; save writes GameManager.current_state, load restores it
 

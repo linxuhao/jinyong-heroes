@@ -428,9 +428,15 @@ func _apply_card(card: Dictionary) -> void:
 		"silver":
 			var silver_before: int = SaveManager.profile.silver
 			SaveManager.profile.silver = maxi(SaveManager.profile.silver + int(card.get("effect_value", 0)), 0)
-			# Deed: track the REAL clamped silver delta (never the raw card value,
-			# so a negative / clamped-to-0 card never inflates silver_earned).
-			SaveManager.profile.deeds["silver_earned"] = SaveManager.profile.get_deed("silver_earned") + maxi(SaveManager.profile.silver - silver_before, 0)
+			# C3 M2': FREE-CARD silver is NOT counted toward the 历练 (deeds) axis.
+			# Measurement (design/40_progression.md M2'): a pure 度过本月 run scores
+			# the free eco_20 card's +20/month into silver_earned, and the deed axis
+			# (0.05 * silver_earned) alone pushed the do-nothing route past the old
+			# tier-3 threshold — so every playstyle evaluated identically. The card's
+			# silver still enters profile.silver (the player keeps the money); only
+			# the deed bookkeeping stops counting it, so 历练 reflects *earned*
+			# effort (work / events), not free draws. Zero new systems.
+			pass
 		"attr":
 			SaveManager.profile.add_attr(card.get("effect_target", ""), int(card.get("effect_value", 0)))
 		"item":

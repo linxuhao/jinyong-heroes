@@ -30,6 +30,12 @@ var done: bool = false
 ## ratio nail — the ending silver the player actually reached).
 var final_silver: int = 0
 
+## Surface: the tier title the player actually sees on this ending screen
+## (MapData.ending_def(tier)["title"], the raw untranslated key — set in
+## _render). C3 three-distinct-titles nail reads SaveManager.ending_title_history
+## which is appended from this value once per render.
+var ending_title: String = ""
+
 ## Surface: button name -> pressed-signal wired.
 var pressed_connected: Dictionary = {}
 
@@ -82,6 +88,15 @@ func _render() -> void:
 	summary += "\n" + tr("结局 · 武学：%d") % int(axes["mastery"])
 	summary += "\n" + tr("结局 · 历练：%.1f") % float(axes["deeds"])
 	evaluation_text = summary
+	# C3: append the tier/title to the per-session history UNCONDITIONALLY, once
+	# per render. A single-session multi-leg scenario (ending_tiers_differentiate)
+	# renders several ENDINGs; these arrays accumulate one entry each so the
+	# tier-differential ([1] vs [0]) and three-pairwise-title nails can read
+	# history across legs. Deliberately OUTSIDE the once-per-session
+	# first_ending_evaluation guard below — that guard records only the FIRST.
+	ending_title = title
+	SaveManager.ending_tier_history.append(tier)
+	SaveManager.ending_title_history.append(title)
 	if SaveManager.first_ending_evaluation == "":
 		SaveManager.first_ending_evaluation = summary
 		SaveManager.first_ending_silver = SaveManager.profile.silver
