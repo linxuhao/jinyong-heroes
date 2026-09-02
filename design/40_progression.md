@@ -729,6 +729,18 @@ power/verdict 表)+ `playtest/huashan_readiness_warning.yaml`(真实档 boot 场
 **升级路径(记录)**:若 C1 落地后玩家侧杠杆仍赢不了华山且不琐碎化战斗,停止并
 申请 `map_battle_data.gd` 数据解锁(见 C5 升级条款)。
 
+**官方闸门实测(2026-09-02,5_design 补记;三闸门产物落盘后)**:本节与 C5 的
+官方状态——`huashan_readiness_warning` 重基线后官方运行 **20/21**:f260 字面钉
+`readiness_text == "华山评估：战备不足"` 实测 `华山评估：势均力敌`——重基线对该
+真实档 boot 的档位猜错一档(该 boot 的 readiness power ≥ 38,落 even 带);词表与
+格式未变,按本节 M3' 表重推导该 boot 的 power 后重基线一次即绿,记
+`40_ux_backlog.md` UX-38。f350 的 STRING 差分钉仍绿。C4 验收 (d) 的**战斗相关性
+边界钉**(「胜券在握」档进华山活过第 2 回合,由 `huashan_winnable_normal_route`
+承载)官方观测 `Player.health == 0` → LOST——这是 C5 升级条款行使后的**许可红**:
+duel 在锁定敌方数据上实测不可赢(最强档先攻 46 vs 五绝 68–86、第 4 回合阵亡、
+五绝满血),所有者解锁 `scripts/data/map_battle_data.gd` 前 (d) 无法转绿;不许改
+场景伪造胜利。M3' 表本身由无头仪器实测、不依赖该场景,5/5 × 三档的结论不受影响。
+
 ## 13. 结局评价:多轴评分(R3,2026-09-01)
 
 **问题形状(实测)**:结局档位 = 五围等权求和 vs 90/60 两个阈值
@@ -848,6 +860,22 @@ tier-1 min_score = 0(不变量)。
 `clicks_only_storyline` 47/47;`save_load_roundtrip` 14/14(`deeds` 加法式 +
 对称,legacy 修复镜像 `equipped` 先例);`work_beats_idling`(C7 银两流不受
 deed 记账改动影响,重跑绿)。
+
+**官方闸门实测(2026-09-02,5_design 补记;三闸门产物落盘后)**:C3/C7 的官方
+状态——playtest 硬闸门 `passed: false`(85 条 runtime error),本节两条场景钉
+官方红、如实入档(记 `40_ux_backlog.md` UX-37):`ending_tiers_differentiate`
+**13/22**(时间线 f720 停 TUTORIAL——boot 就绪时序与 `at:` 帧错位;
+`ending_tier_history[1]` 报索引错位系第二条结局未到达;另有引号包裹的
+`text.contains(...)` 恒假标量比较,重蹈 2026-08-23「值里必须含比较/逻辑运算符」
+教训)、`work_beats_idling` **11/21**(同根停 TUTORIAL,TUTORIAL 态点击
+`CultOptionButton0/2` 不存在,构成本轮 85 条 runtime error 的主体)——C3 的
+tier 差分与 C7 的比率钉的**官方屏上证明未建立**,修场景后官方复跑收口。
+**方向性佐证(非闸门绿)**:零大成 idle 腿的结局在官方运行实测到达,
+`evaluation_text` 观测 `结局 · 属性：105 / 武学：0 / 历练：0.0`——按 150/120/0
+扫描落 tier 1(105 < 120),与 M2' 表 do_nothing/idle_real 110 → tier 1 方向
+一致;免费卡银两不计入 deeds 的杠杆在真实运行的历练轴 0.0 上可见。上文「回归」
+段所记 `work_beats_idling 重跑绿` 系交付时点自跑预期,被本官方运行取代(该场景
+本轮红,时序缺陷),以上段实测为准。
 
 ---
 

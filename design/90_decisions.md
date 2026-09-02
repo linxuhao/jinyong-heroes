@@ -966,3 +966,18 @@ target_id := "")` 的第三参 `target_id`:非空且命名未大成行 → 用�
 `card_data.gd` + 其测试镜像 + M1 表三处,而做工曲线只改
 `progression_math.gd` 一行 + `cultivation.gd` 调用点一行。
 
+**Open questions(2026-09-02 官方闸门后,5_design 补记)**:
+(1) **C5 等待所有者裁定**——解锁 `scripts/data/map_battle_data.gd` 数据
+(解锁后 `huashan_winnable_normal_route` 原样复跑),或接受「华山不可赢」为
+已记录的交付状态。裁决前该场景保持许可红(官方运行实测 LOST:f1600
+`Player.health > 0` observed 0),不以任何 debug/削弱手段伪造胜利,
+也不把「赢」重定义成「多活两回合」。
+(2) `huashan_readiness_warning` f260 字面在该真实档 boot 实测 `势均力敌`
+(该 boot 的 readiness power ≥ 38)——重基线须按 `40_progression.md` M3' 表
+重推导该 boot 的 power 后只换档位字面,不许改词表/格式迁就。
+(3) R3b 的**单元仪器层**(红先四值、M2'/M3' 表)已实测在档,但**场景证据层**
+未验收:官方 93 场景整合运行 9 红(五条时间线/表达式缺陷、一条 readiness
+字面、两条既有网数值/时序红、一条 C5 许可红;全单见 `40_ux_backlog.md`
+UX-37/38/39 与 `99_changelog.md` 收口行)。两层分开记——「R3b 数值绑定已在
+真实档上成立」这一主张,在九条红收口前不得引用场景绿作证据。
+

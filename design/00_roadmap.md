@@ -236,18 +236,33 @@ Button)。本轮给全部六段加上可见、可点的控件,向既有 handler 
 
 R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级条款行使:
 华山 duel 实测不可赢,等待所有者解锁 `map_battle_data.gd`)。
-后续队列如下:
+**官方三闸门实测已抵达(2026-09-02,5_design 收口)**:编译 **107/107** 零错误;
+视觉闸门 passed 非盲(93 场景 372 帧,Q6 93 好 / 0 坏);playtest 硬闸门
+**`passed: false`**(85 条 runtime error)——**84/93 场景零断言失败、9 红**:
+`cultivation_changes_combat` 27/30、`action_yield_differential` 27/38、
+`huashan_readiness_warning` 20/21、`huashan_winnable_normal_route` 28/39(C5
+许可红)、`ending_divergent_playstyles` 19/27、`ending_last_month_choice` 16/30、
+`work_beats_idling` 11/21、`practice_target_receipt` 29/40、
+`ending_tiers_differentiate` 13/22;RNG 生命线绿(`save_load_roundtrip` 14/14、
+`event_travel_effects` 19/19)、三条逐字保护闸门全绿(49/49 / 32/32 / 41/41)、
+`spine_to_ending` 42/42。九条红逐条入档 `40_ux_backlog.md`(UX-37/38/39 + C5
+许可红),**下一轮先做队列第 0 项(R3b 场景收口)再开新卡**。后续队列如下:
 
 ```
+0. R3b 场景收口           —— 官方 9 红的修复:五条时间线/boot 时序重基线 +
+                             表达式书写修正(UX-37)、readiness 字面重基线(UX-38)、
+                             既有网两条红收口(UX-39);C5 待所有者解锁
+                             `map_battle_data.gd` 后 `huashan_winnable_normal_route`
+                             原样复跑(许可红,不许修场景伪造胜利)
 1. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
-2. 回执/结算              —— 结算屏与结局回顾(UX-30)
+2. 回执/结算              —— 结局回顾与结算页(UX-30)
 3. 教程与目标             —— 教程页加「本关目标」提示
 4. 创建屏剩余点数         —— 捏人屏未用完点数显示
 5. 地图有图              —— 大地图加背景图(terrain 已有占位)
 6. 非战斗美术             —— 六段非战斗屏的美术填充
 ```
 
-### Backlog(R3b 试玩发现,record-only,**本轮不做**)
+### Backlog(R3b 试玩发现,record-only,**本轮不做**;2026-09-02 已收进 `40_ux_backlog.md` UX-33..36 队列行,本表为发现时的原始快照)
 
 | id | 界面 | 看见什么 | 备注 |
 |---|---|---|---|
