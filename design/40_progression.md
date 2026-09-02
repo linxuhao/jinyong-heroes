@@ -824,6 +824,7 @@ external 丁级各一门,`main_external_id` 置位,键取自生产词表 `GRADE_
 | idle_real | 20260903 | 110 | 1 |
 | idle_real | 20260904 | 110 | 1 |
 | idle_real | 20260905 | 110 | 1 |
+| all_work — 未测,不推算 | | | |
 | all_practice | 20260901 | 134 | 2 |
 | all_practice | 20260902 | 134 | 2 |
 | all_practice | 20260903 | 134 | 2 |
@@ -841,6 +842,7 @@ external 丁级各一门,`main_external_id` 置位,键取自生产词表 `GRADE_
 |---|---|---|---|
 | do_nothing | 110 | 110 | 110 |
 | idle_real | 110 | 110 | 110 |
+| all_work — 未测,不推算 | | | |
 | all_practice | 134 | 134 | 134 |
 | balanced | ≥150 | ≥150 | ≥150 |
 

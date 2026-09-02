@@ -1021,3 +1021,19 @@ attack_damage 系数 mp 2→12、move_range `floor(mp/3)`→`floor(mp/2)`、max_
 设计记录:M3'' 每字面量改前/改后/理由/种子结果表见 `final/unlock_record_r3b_huashan.md`
 与 `design/40_progression.md` M3''(5_design 终步落盘)。
 
+## R3b C3 双杠杆 — 构成杠杆与阈值重定同属一次测量(2026-09-02,owner feedback round #2 item 4)
+
+**背景**:C3 的交付说明承诺「EXACTLY ONE LEVER」,而实际落地移动了**两处**——构成杠杆
+(免费卡 `一袋碎银` 的银两不再计入 `deeds["silver_earned"]`,卡牌银两仍入 `profile.silver`,
+只动 `cultivation.gd` `_apply_card` "silver" 分支的 deed 记账一行)与阈值重定(tier-2
+`min_score` 100 → 120)。为避免记录读成「承诺一个杠杆却动了两个」,本条把两处改动
+**同属一次测量、按新构成一次重推阈值**的半程记档。
+
+**裁定**:构成杠杆与阈值重定确为两处改动,但它们是**同一次测量**的两半——先剔除免费卡
+银两对 deeds 轴的污染,再按新构成重推 `ENDING_TIERS` 阈值。剔除后 do-nothing 路线只剩
+attrs 轴(~110,五围和),落在 tier-1 带;all_practice 经 mastery 轴(~134)落在
+[120, 150) → tier 2;balanced 经 silver deeds 拉过 150 → tier 3。三档在免费卡停止喂
+deeds 轴后自然分化,阈值重定(100 → 120)是同一测量的收尾半程,不是第二个独立杠杆。
+旧表 90/60/0 已被 **150/120/0** 取代(行序严格递减、末行 0 不变量逐字保留)。依据见
+`design/40_progression.md` §M2' 与 `final/delivery_notes_fix_c3_ending_tiers.md`。
+
