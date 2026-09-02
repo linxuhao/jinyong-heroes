@@ -72,11 +72,10 @@ static func _test_adjacency(ok: bool) -> bool:
 
 
 static func _test_ending_tiers(ok: bool) -> bool:
-	ok = _expect(ok, MapData.ending_tier_score(90) == 3, "90 -> tier 3")
-	ok = _expect(ok, MapData.ending_tier_score(120) == 3, "120 -> tier 3")
-	ok = _expect(ok, MapData.ending_tier_score(89) == 2, "89 -> tier 2")
-	ok = _expect(ok, MapData.ending_tier_score(60) == 2, "60 -> tier 2")
-	ok = _expect(ok, MapData.ending_tier_score(59) == 1, "59 -> tier 1")
+	ok = _expect(ok, MapData.ending_tier_score(150) == 3, "150 -> tier 3")
+	ok = _expect(ok, MapData.ending_tier_score(149) == 2, "149 -> tier 2")
+	ok = _expect(ok, MapData.ending_tier_score(120) == 2, "120 -> tier 2")
+	ok = _expect(ok, MapData.ending_tier_score(119) == 1, "119 -> tier 1")
 	ok = _expect(ok, MapData.ending_tier_score(0) == 1, "0 -> tier 1")
 	ok = _expect(ok, MapData.ending_def(3)["title"] == "一代宗师", "tier 3 title")
 	ok = _expect(ok, MapData.ending_def(2)["title"] == "武林名宿", "tier 2 title")

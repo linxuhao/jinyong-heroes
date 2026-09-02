@@ -27,12 +27,20 @@ const MONTHS: int = 36
 static func run() -> bool:
 	var ok := true
 	var table: Array[Dictionary] = []
-	for strategy in _strategy_names():
-		var res: Dictionary = _run_strategy(strategy)
-		table.append(res)
-		ok = _assert_structural(ok, res)
+	# M2' 5-seed sweep (C3): every strategy runs on 5 deterministic seeds so the
+	# ending-tier separation is measured across the RNG spread, not one draw.
+	var seeds: Array[int] = [20260901, 20260902, 20260903, 20260904, 20260905]
+	for seed in seeds:
+		for strategy in _strategy_names():
+			var res: Dictionary = _run_strategy(strategy, seed)
+			table.append(res)
+			ok = _assert_structural(ok, res)
 	# Cross-strategy structural facts.
 	ok = _assert_cross_strategy(ok, table)
+	# M2' tier-separation structural pins (C3): the lowest legal routes land in
+	# tier 1, a focused route in tier 2, a strong/balanced route in tier 3 —
+	# read from MapData.ENDING_TIERS at runtime, never hard-coded.
+	ok = _assert_tier_separation(ok, table)
 	_print_table(table)
 	if ok:
 		print("PASS test_action_yield_curves")
@@ -42,14 +50,14 @@ static func run() -> bool:
 
 
 static func _strategy_names() -> Array[String]:
-	return ["all_work", "all_practice", "all_cultivate", "all_travel", "balanced"]
+	return ["do_nothing", "idle_real", "all_work", "all_practice", "all_cultivate", "all_travel", "balanced"]
 
 
 ## Run one strategy over 36 seeded months and return its yield record.
-static func _run_strategy(strategy: String) -> Dictionary:
+static func _run_strategy(strategy: String, seed: int) -> Dictionary:
 	var profile: PlayerProfile = PlayerProfile.new_default()
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 20260901
+	rng.seed = seed
 	var practice_points: int = 0
 	var attr_points: int = 0
 	# Deterministic deck order via the seeded rng (same seed across strategies,
@@ -57,7 +65,11 @@ static func _run_strategy(strategy: String) -> Dictionary:
 	var card_deck: Array[String] = _seeded_shuffle(CardData.initial_deck("growth"), rng)
 	var deck_pos: int = 0
 	for month in range(MONTHS):
-		_grant_year_arts(profile, month)
+		# do_nothing is the EMPTY profile (0 sects, 0 arts) — the only legal
+		# zero-yield route. Every other strategy is a real-save profile that
+		# receives the sect's year grants (year 1 D, year 2 C, year 3 B).
+		if strategy != "do_nothing":
+			_grant_year_arts(profile, month)
 		# Monthly free card (one growth card per month, same seed across
 		# strategies so the card contribution is a constant, not a confound).
 		if deck_pos >= card_deck.size():
@@ -67,6 +79,10 @@ static func _run_strategy(strategy: String) -> Dictionary:
 		deck_pos += 1
 		# The strategy's monthly action.
 		match strategy:
+			"do_nothing":
+				pass  # pure monthly card, no action (empty-profile do-nothing)
+			"idle_real":
+				pass  # real-save prefix granted once, then card only, no action
 			"all_work":
 				var gain: int = ProgressionMath.work_income(profile.get_deed("work_months"))
 				profile.silver += gain
@@ -105,6 +121,7 @@ static func _run_strategy(strategy: String) -> Dictionary:
 						_resolve_travel(profile, rng)
 	return {
 		"strategy": strategy,
+		"seed": seed,
 		"silver_earned": profile.get_deed("silver_earned"),
 		"practice_points": practice_points,
 		"attr_points": attr_points,
@@ -147,15 +164,16 @@ static func _resolve_travel(profile: PlayerProfile, rng: RandomNumberGenerator) 
 ## Apply one card's effect (mirrors cultivation._apply_card's effect math).
 ## Trait / shen_gong / tech_unlock cards are skipped (they do not feed the
 ## measured action yields and would add unneeded RNG).
+## C3 M2' deed lever: FREE-CARD silver is NOT counted toward the 历练 (deeds)
+## axis — mirrors the live cultivation.gd _apply_card change (the card's silver
+## still enters profile.silver; only the deed bookkeeping stops counting it).
 static func _apply_card(profile: PlayerProfile, id: String, rng: RandomNumberGenerator) -> void:
 	var card = CardData.def(id)
 	if card == null:
 		return
 	match card.effect_type:
 		"silver":
-			var before: int = profile.silver
 			profile.silver = maxi(profile.silver + card.effect_value, 0)
-			profile.deeds["silver_earned"] = profile.get_deed("silver_earned") + maxi(profile.silver - before, 0)
 		"attr":
 			profile.add_attr(card.effect_target, card.effect_value)
 		"item":
@@ -217,12 +235,90 @@ static func _assert_cross_strategy(ok: bool, table: Array[Dictionary]) -> bool:
 	return ok
 
 
-static func _print_table(table: Array[Dictionary]) -> void:
-	print("=== R3 M1 ACTION YIELD CURVES (measured 2026-09-01, seeded run) ===")
-	print("strategy | silver_earned | practice_points | attr_points | events_resolved | mastered | work_income_final | ending_score | ending_tier")
+## M2' tier-separation structural pins (C3). Reads the ENDING_TIERS thresholds
+## from MapData at runtime (never hard-coded): the lowest legal routes
+## (do_nothing / idle_real) must land strictly below the tier-2 min_score, the
+## balanced route must reach the tier-3 min_score, the three routes must land on
+## three DISTINCT tiers, and the three ENDING_TIERS titles must be pairwise
+## distinct — across all 5 seeds. This is the deterministic consumer of the
+## tier/title data (the in-session scenario renders two endings for the
+## differential; the three-distinct-titles proof is carried here because a
+## third full boot within the frame cap is not reliable).
+static func _assert_tier_separation(ok: bool, table: Array[Dictionary]) -> bool:
+	var tier2_min: int = 0
+	var tier3_min: int = 0
+	var titles: Array[String] = []
+	for row in MapData.ENDING_TIERS:
+		if int(row["tier"]) == 2:
+			tier2_min = int(row["min_score"])
+		elif int(row["tier"]) == 3:
+			tier3_min = int(row["min_score"])
+		titles.append(str(row["title"]))
+	# Three distinct titles (C3): the three ENDING_TIERS rows are pairwise distinct.
+	ok = _expect(ok, titles.size() == 3, "ENDING_TIERS has exactly 3 rows")
+	ok = _expect(ok, titles[0] != titles[1] and titles[1] != titles[2] and titles[0] != titles[2],
+		"three ENDING_TIERS titles pairwise distinct")
+	# do_nothing / idle_real average score strictly below the tier-2 threshold.
+	var do_nothing_scores: Array[int] = []
+	var idle_real_scores: Array[int] = []
+	var balanced_scores: Array[int] = []
 	for res in table:
-		print("%s | %d | %d | %d | %d | %d | %d | %d | %d" % [
-			res["strategy"], res["silver_earned"], res["practice_points"],
+		if res["strategy"] == "do_nothing":
+			do_nothing_scores.append(int(res["ending_score"]))
+		elif res["strategy"] == "idle_real":
+			idle_real_scores.append(int(res["ending_score"]))
+		elif res["strategy"] == "balanced":
+			balanced_scores.append(int(res["ending_score"]))
+	var do_nothing_avg: float = _avg(do_nothing_scores)
+	var idle_real_avg: float = _avg(idle_real_scores)
+	var balanced_avg: float = _avg(balanced_scores)
+	ok = _expect(ok, do_nothing_avg < float(tier2_min),
+		"do_nothing avg score %.1f < tier-2 min_score %d" % [do_nothing_avg, tier2_min])
+	ok = _expect(ok, idle_real_avg < float(tier2_min),
+		"idle_real avg score %.1f < tier-2 min_score %d" % [idle_real_avg, tier2_min])
+	ok = _expect(ok, balanced_avg >= float(tier3_min),
+		"balanced avg score %.1f >= tier-3 min_score %d" % [balanced_avg, tier3_min])
+	# The three routes land on three DISTINCT tiers (do_nothing tier 1, a
+	# focused route tier 2, balanced tier 3) — the tier differential, not text.
+	var do_nothing_tiers: Array[int] = []
+	var practice_tiers: Array[int] = []
+	for res in table:
+		if res["strategy"] == "do_nothing":
+			do_nothing_tiers.append(int(res["ending_tier"]))
+		elif res["strategy"] == "all_practice":
+			practice_tiers.append(int(res["ending_tier"]))
+	ok = _expect(ok, _all_same(do_nothing_tiers) and int(do_nothing_tiers[0]) == 1,
+		"do_nothing lands tier 1 on every seed")
+	ok = _expect(ok, _all_same(practice_tiers) and int(practice_tiers[0]) == 2,
+		"all_practice lands tier 2 on every seed")
+	return ok
+
+
+static func _all_same(values: Array[int]) -> bool:
+	if values.is_empty():
+		return false
+	var first: int = values[0]
+	for v in values:
+		if v != first:
+			return false
+	return true
+
+
+static func _avg(values: Array[int]) -> float:
+	if values.is_empty():
+		return 0.0
+	var total: int = 0
+	for v in values:
+		total += v
+	return float(total) / float(values.size())
+
+
+static func _print_table(table: Array[Dictionary]) -> void:
+	print("=== R3 M1/M2' ACTION YIELD CURVES (measured 2026-09-02, seeded run) ===")
+	print("strategy | seed | silver_earned | practice_points | attr_points | events_resolved | mastered | work_income_final | ending_score | ending_tier")
+	for res in table:
+		print("%s | %d | %d | %d | %d | %d | %d | %d | %d | %d" % [
+			res["strategy"], res["seed"], res["silver_earned"], res["practice_points"],
 			res["attr_points"], res["events_resolved"], res["mastered_count"],
 			res["work_income_final"], res["ending_score"], res["ending_tier"],
 		])

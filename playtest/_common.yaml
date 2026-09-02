@@ -830,6 +830,7 @@ surface:
   - ending_title
   - score
   - final_silver
+  - mastery_axis
   - evaluation_text
   - done
   - visible
@@ -1176,3 +1177,4 @@ scenario_order:
 - ending_last_month_choice
 - work_beats_idling
 - practice_target_receipt
+- ending_tiers_differentiate

@@ -30,6 +30,12 @@ var done: bool = false
 ## ratio nail — the ending silver the player actually reached).
 var final_silver: int = 0
 
+## Surface: the mastery (武学) axis value of this ending (int, EndingLogic
+## evaluate axes["mastery"]). C1 scene nail reads this > 0 on a real-save
+## practice route (red-first pre-C1: always 0 because GRADE_POINTS used CJK
+## keys the save never wrote). Set in _render from the already-scoped axes.
+var mastery_axis: int = 0
+
 ## Surface: the tier title the player actually sees on this ending screen
 ## (MapData.ending_def(tier)["title"], the raw untranslated key — set in
 ## _render). C3 three-distinct-titles nail reads SaveManager.ending_title_history
@@ -88,6 +94,7 @@ func _render() -> void:
 	summary += "\n" + tr("结局 · 武学：%d") % int(axes["mastery"])
 	summary += "\n" + tr("结局 · 历练：%.1f") % float(axes["deeds"])
 	evaluation_text = summary
+	mastery_axis = int(axes["mastery"])
 	# C3: append the tier/title to the per-session history UNCONDITIONALLY, once
 	# per render. A single-session multi-leg scenario (ending_tiers_differentiate)
 	# renders several ENDINGs; these arrays accumulate one entry each so the

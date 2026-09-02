@@ -90,6 +90,7 @@ ROUND_SCENARIOS: list[str] = [
     "ending_last_month_choice",
     "work_beats_idling",
     "practice_target_receipt",
+    "ending_tiers_differentiate",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -1195,6 +1196,63 @@ def test_focus_marker_surface_contract() -> None:
         f"{name}.yaml missing a line ending `: changed` "
         f"(mandatory differential on focused_option_text)"
     )
+
+
+def test_ending_tiers_differentiate_nail_contract() -> None:
+    """Static anti-weakening pins for the C3 ending-tiers nail.
+
+    The nail (``ending_tiers_differentiate``) proves the ending tiers DIVIDE on
+    real saves. Hard pins:
+
+      1. the scenario is in BOTH registries — ``scenario_order`` in
+         ``playtest/_common.yaml`` AND ``ROUND_SCENARIOS`` here (two-place
+         sync, both tails, same relative order);
+      2. the file exists with ``name:`` == its basename;
+      3. every timeline ``at:`` is a single integer;
+      4. the file MUST carry the tier-differential line
+         ``ending_tier_history[1] != ending_tier_history[0]`` (the TIER
+         differential, not text — the hole where the old pin passed on
+         identical titles), the tier-<3 boundary line ``tier < 3``, and the
+         C1 scene nail ``mastery_axis > 0`` (the mastery axis is > 0 on a
+         real-save practice route);
+      5. the new EndingScreen surface observable ``mastery_axis`` is
+         whitelisted on the surface.
+    """
+    name = "ending_tiers_differentiate"
+    order_text = COMMON.read_text(encoding="utf-8")
+    order_names = _items_under(order_text, "scenario_order")
+    assert name in order_names, f"{name} missing from scenario_order"
+    assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
+    assert [n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
+        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
+        "relative order"
+    )
+    blocks = _surface_blocks(order_text)
+    ending_items = blocks.get("EndingScreen", [])
+    assert "mastery_axis" in ending_items, (
+        "EndingScreen.mastery_axis not whitelisted on the surface"
+    )
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        match = re.search(r"\bat\s*:\s*([^,}\s]+)", line)
+        if match and not match.group(1).isdigit():
+            assert False, (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {match.group(1)!r}"
+            )
+    for mandatory in (
+        "ending_tier_history[1] != ending_tier_history[0]",
+        "tier < 3",
+        "mastery_axis > 0",
+    ):
+        assert mandatory in ftext, (
+            f"{name}.yaml missing the mandatory nail line `{mandatory}`"
+        )
 
 
 def test_softlock_nail_contract() -> None:

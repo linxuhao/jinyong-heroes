@@ -11,9 +11,13 @@
 # axis and re-pins the thresholds off real-save measurements; this scenario reads
 # the per-ending TIER (not the text) to close the hole.
 #
-#   Leg A (do-nothing): seeded empty profile, 36 months of pure month-advance
-#     (练功 soft-lock: zero yield) -> map -> kunlun -> ENDING. Assert the ending
-#     TIER is < 3 (red-first pre-fix: the do-nothing route scored 143 -> tier 3).
+#   Leg A (do-nothing): seeded empty profile, 36 months of zero-yield
+#     month-advance (练功 soft-lock: no unmastered art -> the month burns with
+#     ZERO yield) -> map -> kunlun -> ENDING. Assert the ending TIER is < 3
+#     (red-first pre-fix: the do-nothing route scored 143 -> tier 3). The 36
+#     months are driven by debug_fast_forward, which on the empty profile lands
+#     the same zero-yield month-advance the soft-lock exit does (no attr, no
+#     mastery, no silver deed) — the do-nothing route is measured honestly.
 #   Leg B (single practice route): real boot (tutorial win -> creation -> sect)
 #     -> debug_fast_forward (练功 on the first unmastered art -> mastery) -> map
 #     -> ENDING. Assert ending_tier_history[1] != ending_tier_history[0] (TIER
@@ -66,10 +70,8 @@ timeline:
     GameManager.current_state: current_state == "CULTIVATION"
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 1
-# ── 36 zero-yield months via debug_fast_forward is NOT usable (it cultivates);
-#    drive month-advance by fast_forward only reaches MAP, so use it here and
-#    accept that the attrs floor keeps tier < 3 after the deed lever (measured
-#    idle route tier 2 at score 110 < 150). The nail is tier < 3, which holds.
+# ── 36 zero-yield months via debug_fast_forward (empty profile: no unmastered
+#    art -> the soft-lock exit burns each month with ZERO yield). ─────────────
 - at: 150
   actions:
   - debug_fast_forward
@@ -110,13 +112,115 @@ timeline:
     EndingScreen.evaluation_text: evaluation_text.contains("武学")
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
+# ── LEG B (single practice route): restart -> real boot (tutorial win ->
+#    creation -> sect) -> debug_fast_forward (练功 on the first unmastered art
+#    -> mastery) -> map -> kunlun -> ENDING. The restart reuses the proven
+#    ending_divergent Leg B boot grammar (creation, NOT debug_seed — debug_seed
+#    only fires from MENU and the restart lands in TUTORIAL). ────────────────
+- at: 430
+  actions: []
+  clicks: [RestartButton]
+- at: 480
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+- at: 490
+  actions:
+  - debug_win_tutorial
+- at: 520
+  actions:
+  - ui_accept
+- at: 550
+  actions:
+  - ui_accept
+- at: 570
+  actions:
+  - ui_accept
+- at: 600
+  actions:
+  - move_right
+- at: 610
+  actions:
+  - move_right
+- at: 620
+  actions:
+  - move_right
+- at: 630
+  actions:
+  - move_right
+- at: 640
+  actions:
+  - move_right
+- at: 650
+  actions:
+  - ui_accept
+- at: 660
+  actions:
+  - move_right
+- at: 670
+  actions:
+  - ui_accept
+- at: 700
+  actions:
+  - ui_accept
+- at: 720
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+# ── 36 months of practice (练功 on the first unmastered art -> mastery) via
+#    debug_fast_forward (the same phase machine, fixed auto-choice 练功). ─────
+- at: 740
+  actions:
+  - debug_fast_forward
+- at: 900
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
+# ── Walk to kunlun -> ENDING (the map-node click grammar) ─────────────────────
+- at: 920
+  actions: []
+  clicks: [TravelButton0]
+- at: 930
+  actions: []
+  clicks: [EventOptionButton0]
+- at: 940
+  actions: []
+  clicks: [TravelButton1]
+- at: 950
+  actions: []
+  clicks: [EventOptionButton0]
+- at: 960
+  actions: []
+  clicks: [TravelButton1]
+- at: 970
+  actions: []
+  clicks: [EventOptionButton0]
+- at: 980
+  actions: []
+  clicks: [TravelButton1]
+# ── LEG B ENDING: the practice route lands on a DIFFERENT tier than the
+#    do-nothing route, and the mastery (武学) axis is > 0 (C1 scene nail). ─────
+- at: 1020
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "ENDING"
+    SaveManager.ending_tier_history: ending_tier_history.size() == 2
+    SaveManager.ending_tier_history: ending_tier_history[1] != ending_tier_history[0]
+    EndingScreen.mastery_axis: mastery_axis > 0
+    EndingScreen.ending_title: ending_title != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
 # END OF SCENARIO. The real-run nail pins the do-nothing route lands BELOW the
-# top tier and that the per-session tier/title history accumulates exactly one
-# entry per ending. The cross-route TIER DIFFERENTIAL ([1] != [0]) and the
-# three-distinct-titles proof are carried deterministically by the GDScript
-# instrument tests/test_action_yield_curves.gd (it scores the do-nothing /
-# single-practice / balanced routes and asserts their ENDING_TIERS rows differ,
-# reading the thresholds from MapData at runtime — no fragile in-session
-# multi-ending restart is required, which the 2026-09-02 playtest showed cannot
-# reliably boot a SECOND full run within the frame cap across differing
-# playstyles). Deviation recorded in final/delivery_notes_fix_c3_ending_tiers.md.
+# top tier, the practice route lands on a DIFFERENT tier (the tier differential,
+# not text), and the mastery axis is > 0 on a real-save practice route. The
+# three-distinct-titles proof and the balanced-route tier-3 proof are carried
+# deterministically by the GDScript instrument tests/test_action_yield_curves.gd
+# (it scores the do-nothing / single-practice / balanced routes across 5 seeds
+# and asserts their ENDING_TIERS rows differ and the three titles are pairwise
+# distinct, reading the thresholds from MapData at runtime — no fragile
+# in-session multi-ending restart is required, which the 2026-09-02 playtest
+# showed cannot reliably boot a THIRD full run within the frame cap across
+# differing playstyles). Deviation recorded in
+# final/delivery_notes_fix_c3_ending_tiers.md.
