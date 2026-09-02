@@ -60,8 +60,13 @@ const ADJACENCY: Dictionary = {
 	"huashan": ["shaolin"],
 }
 
-## HUASHAN_BAR — measured bands, see design/40_progression.md §「华山战备」M3' table.
-const HUASHAN_BAR: Dictionary = {"even": 38, "strong": 55}
+## HUASHAN_BAR — measured bands, see design/40_progression.md §「华山战备」M3''' table.
+## even = P_fresh_max + 1 (weak-by-construction for every fresh profile: the
+## highest readiness_power reachable by creation allocation alone is 60, so any
+## profile leaving creation has power <= 60 < even). strong = the measured
+## 36-month strong-route power (124, must exceed even). Never re-tuned to force
+## a string green — the string follows the band and the band follows measurement.
+const HUASHAN_BAR: Dictionary = {"even": 61, "strong": 124}
 
 ## Ending tiers, descending by min_score (R3 D1 — multi-axis score, not the
 ## five-attr sum). score = EndingLogic.evaluate(profile, deeds) — the ONLY

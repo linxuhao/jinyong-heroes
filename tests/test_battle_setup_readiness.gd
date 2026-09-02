@@ -33,9 +33,11 @@ static func run() -> bool:
 	ok = _test_gear_additivity(ok)
 	ok = _test_readiness_single_source(ok)
 	ok = _test_readiness_band_ordering(ok)
+	ok = _test_p_fresh_max_weak(ok)
 	if ok:
 		print("PASS test_battle_setup_readiness")
 		_print_m3_table()
+		_print_p_fresh_max()
 	else:
 		print("FAIL test_battle_setup_readiness")
 	return ok
@@ -163,6 +165,83 @@ static func _test_readiness_band_ordering(ok: bool) -> bool:
 	ok = _expect(ok, int(at_even_v.power) >= even, "walked profile reaches even band")
 	ok = _expect(ok, str(at_even_v.verdict_key) != "huashan_weak", "at/above even -> not weak")
 	return ok
+
+
+# --- P_fresh_max: weak-by-construction unit pin + instrument ------------------
+
+## The highest readiness_power reachable by creation allocation alone (mp = 0,
+## empty gear) under creation.gd's real rules (START_POINTS 30, ATTR_MIN 10,
+## ATTR_MAX 20, _step_cost 1 below 15 / 2 from 15 up). Enumerates the 11^5
+## allocation space (bounded, trivial) and returns the max power + the
+## budget-optimal allocation. The instrument print is the record; hand
+## arithmetic is verification only.
+static func _p_fresh_max() -> Dictionary:
+	var best_power: int = -1
+	var best_alloc: Dictionary = {}
+	for bone in range(10, 21):
+		for inner in range(10, 21):
+			for agility in range(10, 21):
+				for wisdom in range(10, 21):
+					for fortune in range(10, 21):
+						var cost: int = _creation_cost(bone) + _creation_cost(inner) \
+							+ _creation_cost(agility) + _creation_cost(wisdom) \
+							+ _creation_cost(fortune)
+						if cost > 30:
+							continue
+						var p = _profile({"bone": bone, "inner": inner, "agility": agility,
+							"wisdom": wisdom, "fortune": fortune})
+						var power: int = int(BattleSetup.readiness(p).power)
+						if power > best_power:
+							best_power = power
+							best_alloc = {"bone": bone, "inner": inner, "agility": agility,
+								"wisdom": wisdom, "fortune": fortune}
+	return {"power": best_power, "alloc": best_alloc}
+
+
+## creation.gd _step_cost: cost to raise an attr from v to v+1 (1 below 15,
+## 2 from 15 up). Sum over the attr's 10..value range.
+static func _creation_cost(value: int) -> int:
+	var total: int = 0
+	for v in range(10, value):
+		total += 1 if v < 15 else 2
+	return total
+
+
+## P_fresh_max allocation -> weak unit pin (the by-construction boundary). The
+## expected even is derived from the SAME enumeration (never hard-coded), so a
+## future creation-cost-table change that silently breaks weak-by-construction
+## reddens here. power == 60 is kept only as a formula regression check.
+static func _test_p_fresh_max_weak(ok: bool) -> bool:
+	var fm: Dictionary = _p_fresh_max()
+	var alloc: Dictionary = fm["alloc"]
+	var p = _profile({"bone": int(alloc["bone"]), "inner": int(alloc["inner"]),
+		"agility": int(alloc["agility"]), "wisdom": int(alloc["wisdom"]),
+		"fortune": int(alloc["fortune"])})
+	var v: Dictionary = BattleSetup.readiness(p)
+	var even: int = int(MapData.HUASHAN_BAR.get("even", 0))
+	ok = _expect(ok, int(v.power) == int(fm["power"]),
+		"P_fresh_max allocation power == enumerated max")
+	ok = _expect(ok, int(v.power) == 60,
+		"P_fresh_max power == 60 (formula regression check)")
+	ok = _expect(ok, even == int(fm["power"]) + 1,
+		"HUASHAN_BAR.even == P_fresh_max + 1 (weak-by-construction)")
+	ok = _expect(ok, str(v.verdict_key) == "huashan_weak",
+		"P_fresh_max allocation -> huashan_weak (by-construction boundary)")
+	return ok
+
+
+## Prints the P_fresh_max derivation (allocation + integer). Zero assertions —
+## the print is the record, hand arithmetic is verification only.
+static func _print_p_fresh_max() -> void:
+	var fm: Dictionary = _p_fresh_max()
+	var alloc: Dictionary = fm["alloc"]
+	print("")
+	print("=== P_fresh_max (measured 2026-09-02) ===")
+	print("budget-optimal allocation: bone %d, inner %d, agility %d, wisdom %d, fortune %d" % [
+		int(alloc["bone"]), int(alloc["inner"]), int(alloc["agility"]),
+		int(alloc["wisdom"]), int(alloc["fortune"])])
+	print("P_fresh_max = %d" % int(fm["power"]))
+	print("")
 
 
 # --- M3' measurement table (headless instrument, zero assertions) -------------
