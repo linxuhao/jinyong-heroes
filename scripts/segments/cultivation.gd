@@ -178,6 +178,16 @@ var last_practice_target: String = ""
 ## Surface: the practice amount the last 练功 action granted (== PRACTICE_ACTION_GAIN).
 var last_practice_amount: int = 0
 
+## Surface: true when the last 练功 month left every unmastered row OTHER than
+## the resolved target's practice count unchanged (zero-diff pin). Computed
+## boolean — no absolute counts. false until a practice month runs.
+var last_practice_other_rows_unchanged: bool = false
+
+## Surface: true when the last 练功 month increased the resolved target row's
+## practice count. Computed boolean — no absolute counts. false until a practice
+## month runs (and false when the month no-oped with no unmastered rows).
+var last_practice_target_increased: bool = false
+
 ## Surface: travel-event rerolls remaining this year (year-scoped budget minus
 ## profile.deeds.rerolls_used_this_year, clamped >= 0). Published by
 ## _sync_surface(). The reroll affordance (EventRerollButton + event_reroll key)
@@ -467,13 +477,27 @@ func _apply_action(action: Dictionary) -> void:
 			# gid comes from GONGFA_PICK). The only action where the player picks
 			# WHICH art advances — the targeted-niche proof. Zero new RNG.
 			var target: String = str(action.get("target", ""))
-			_add_practice(PRACTICE_ACTION_GAIN)
+			# Resolve the target FIRST (post-fallback) so the wrapper threads the
+			# RESOLVED gid and last_practice_target holds the resolved gid — never
+			# the raw input. Deterministic, zero RNG; add_practice re-resolves
+			# internally with the same result.
+			var resolved: String = EventLogic._resolve_target(SaveManager.profile, target)
+			# Pre/post snapshot for the two computed observables: every unmastered
+			# row's practice count before the month vs after (zero-diff pin for the
+			# non-target rows, increased pin for the target row).
+			var before_counts: Dictionary = _practice_counts_by_id()
+			_add_practice(PRACTICE_ACTION_GAIN, resolved)
 			SaveManager.profile.deeds["practice_months"] = SaveManager.profile.get_deed("practice_months") + 1
 			last_action_kind = "practice"
 			last_action_silver = 0
-			last_practice_target = target
+			last_practice_target = resolved
 			last_practice_amount = PRACTICE_ACTION_GAIN
-			last_yield_text = tr("练功：%s +%d") % [target, PRACTICE_ACTION_GAIN]
+			last_practice_other_rows_unchanged = _other_rows_unchanged(before_counts, resolved)
+			last_practice_target_increased = _target_increased(before_counts, resolved)
+			var display_name: String = ProgressionGongfaData.display_name_of(resolved)
+			if display_name == "":
+				display_name = resolved
+			last_yield_text = tr("练功：%s +%d") % [display_name, PRACTICE_ACTION_GAIN]
 		"cultivate":
 			# 修习 lookup table (design §4.1): one rng draw mapped to +1/+2/+3
 			# by 悟性 tier — the same one-op count as the old randi_range(1, 3),
@@ -578,10 +602,49 @@ func _grant_year_arts() -> void:
 	_sync_surface()
 
 
-## Add practice to the first unmastered gongfa; masters it on reaching the
-## grade's threshold (丁4/丙6/乙8). A mastered art is never re-offered.
-func _add_practice(amount: int) -> void:
-	EventLogic.add_practice(SaveManager.profile, amount)
+## Add practice to the player-CHOSEN gongfa (target_id); masters it on reaching
+## the grade's threshold (丁4/丙6/乙8). A mastered art is never re-offered. The
+## target is threaded through to EventLogic.add_practice, which resolves it
+## (falling back to the first unmastered row when empty / unknown / mastered).
+func _add_practice(amount: int, target_id: String = "") -> void:
+	EventLogic.add_practice(SaveManager.profile, amount, target_id)
+
+
+## Snapshot every gongfa row's practice count keyed by id (for the pre/post
+## differential observables). Pure read, zero RNG.
+func _practice_counts_by_id() -> Dictionary:
+	var out: Dictionary = {}
+	for entry in SaveManager.profile.gongfa:
+		var id: String = str(entry.get("id", ""))
+		if id != "":
+			out[id] = int(entry.get("practice", 0))
+	return out
+
+
+## True when every unmastered row OTHER than the resolved target has the same
+## practice count it had before the month (zero-diff pin). Trivially true when
+## the target is the only unmastered row. Computed boolean — no absolute counts.
+func _other_rows_unchanged(before_counts: Dictionary, resolved: String) -> bool:
+	for entry in SaveManager.profile.gongfa:
+		var id: String = str(entry.get("id", ""))
+		if id == "" or id == resolved:
+			continue
+		if not bool(entry.get("mastered", false)):
+			if int(entry.get("practice", 0)) != int(before_counts.get(id, 0)):
+				return false
+	return true
+
+
+## True when the resolved target row's practice count increased over the month
+## (by the pojun-transformed amount). False when the month no-oped (no unmastered
+## rows -> resolved == ""). Computed boolean — no absolute counts.
+func _target_increased(before_counts: Dictionary, resolved: String) -> bool:
+	if resolved == "":
+		return false
+	var entry: Dictionary = SaveManager.profile.get_gongfa(resolved)
+	if entry.is_empty():
+		return false
+	return int(entry.get("practice", 0)) > int(before_counts.get(resolved, 0))
 
 
 func _unmastered_ids() -> Array[String]:

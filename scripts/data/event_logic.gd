@@ -80,14 +80,19 @@ static func apply_option_effects(profile: PlayerProfile, opt: EventData.EventOpt
 	return {"ok": true, "reason": ""}
 
 
-## Add practice to the first unmastered gongfa; masters it on reaching the
-## grade's threshold (丁4/丙6/乙8). A mastered art is never re-offered.
+## Add practice to the player-CHOSEN gongfa (target_id) when it names an
+## unmastered row; otherwise fall back to the first unmastered gongfa. Masters
+## it on reaching the grade's threshold (丁4/丙6/乙8). A mastered art is never
+## re-offered. The sha_po_lang transform keeps its exact order (pure arithmetic,
+## zero RNG). A practice month is never silently dropped: an empty / unknown /
+## already-mastered target falls back to the first unmastered row, and only a
+## profile with NO unmastered rows at all no-ops (existing behavior).
 ## (verbatim from cultivation._add_practice; the first-unmastered scan is
 ## re-implemented privately here over the profile parameter)
-static func add_practice(profile: PlayerProfile, amount: int) -> void:
+static func add_practice(profile: PlayerProfile, amount: int, target_id: String = "") -> void:
 	if profile.has_trait("sha_po_lang"):
 		amount = TraitEffects.pojun_practice(amount)
-	var gid: String = _first_unmastered_id(profile)
+	var gid: String = _resolve_target(profile, target_id)
 	if gid == "":
 		return
 	var entry: Dictionary = profile.get_gongfa(gid)
@@ -95,6 +100,20 @@ static func add_practice(profile: PlayerProfile, amount: int) -> void:
 	var grade: String = entry.get("grade", "D")
 	if int(entry["practice"]) >= int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(grade, 4)):
 		entry["mastered"] = true
+
+
+## Resolve the practice target: if target_id is non-empty AND names an
+## unmastered row in the profile, return it; otherwise (empty / unknown id /
+## already mastered) fall back to the first unmastered id. Returns "" only when
+## the profile has no unmastered rows at all. Deterministic, zero RNG — the
+## caller may call this for bookkeeping and add_practice re-resolves internally
+## with the same result (no mutation between the two calls).
+static func _resolve_target(profile: PlayerProfile, target_id: String) -> String:
+	if target_id != "":
+		var entry: Dictionary = profile.get_gongfa(target_id)
+		if not entry.is_empty() and not bool(entry.get("mastered", false)):
+			return target_id
+	return _first_unmastered_id(profile)
 
 
 ## First unmastered gongfa id over profile.gongfa, in order (rows with

@@ -790,6 +790,8 @@ surface:
   - last_yield_text
   - last_practice_target
   - last_practice_amount
+  - last_practice_other_rows_unchanged
+  - last_practice_target_increased
   - rerolls_left
   MapScreen:
   - current_node_id
@@ -1170,3 +1172,4 @@ scenario_order:
 - ending_divergent_playstyles
 - ending_last_month_choice
 - work_beats_idling
+- practice_target_receipt

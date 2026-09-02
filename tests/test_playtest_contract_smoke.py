@@ -89,6 +89,7 @@ ROUND_SCENARIOS: list[str] = [
     "ending_divergent_playstyles",
     "ending_last_month_choice",
     "work_beats_idling",
+    "practice_target_receipt",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
