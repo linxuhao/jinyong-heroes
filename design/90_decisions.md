@@ -917,3 +917,52 @@ anchor / offset / 宽度(零文案、零字号分级、零脚本;`sect_select.gd
 华山难度 = R3);把节点事件改成整局只触发一次;为让新钉子变绿而放宽或改写
 保护闸门 (a)(b);`debug_fast_forward` 进软锁钉子的时间线。
 
+## R3b — 等级词表单一来源(2026-09-02,项目所有者裁定)
+
+**背景**:R3 的 `GRADE_POINTS` 用 CJK 键(丁/丙/乙/甲),而生产写入端
+(`progression_gongfa_data.gd` 的 `PRACTICE_TO_MASTER` / `GRADE_BY_YEAR`、
+`cultivation.gd` 的 `add_gongfa` 调用)全部用拉丁键(D/C/B/A)。结果:
+真实档上 `mastery_points` 恒为 0 → 武学结局轴 0、华山 mastery 项 0、
+修习收益曲线虚假——R3 的全部钉子只在空档上验证过,从未见过非零 mastery。
+
+**裁定**:`ProgressionGongfaData.PRACTICE_TO_MASTER` 的键集(拉丁 D/C/B/A)
+是等级词表的**唯一来源**。`GRADE_POINTS` 的键集必须与之相等(点值
+D=1, C=2, B=3, A=4);键集相等由单元钉
+(`tests/test_progression_math.gd`)守护。测试夹具**禁止手写等级字符串**——
+一律从 `PRACTICE_TO_MASTER.keys()` 取键。
+
+**附注(C2 target 回落语义)**:`EventLogic.add_practice(profile, amount,
+target_id := "")` 的第三参 `target_id`:非空且命名未大成行 → 用它;
+空 / 未知 id / 已大成 → 回落 `_first_unmastered_id`(练功月不蒸发——
+静默丢弃等于月份蒸发,回落保持「练功必有所得」的不变量)。UI 路径
+(`GONGFA_PICK` 只列未大成行)永远不触发该回落;它是纯防御分支。
+事件效果路径(`apply_option_effects` "practice" 行)不传 target →
+回落,行为逐字节不变。
+
+## R3b — M2/M3 必须真实档实测(2026-09-02,项目所有者裁定)
+
+**背景**:R3 的 M2/M3 表全部在 `debug_seed_save` 空档(0 门派、0 功法)
+上测得,而真实档(创建 → 入门派 → 36 月)因等级词表分裂武学轴恒为 0、
+免费卡 `一袋碎银` +20/月喂进 deeds 轴,8 条路线全部落到 tier 3——
+旧阈值从下面够不到,武林名宿/隐于市井实际不可达。
+
+**裁定**:M2/M3 必须用**真实档**验证(main.tscn → 教程 → 创建 → 入门派
+的完整 boot)。空档(`debug_seed_save`)只允许承载一条**唯一合法的无功法
+路线**:「度过本月」×36(该按钮仅在无未大成功法时出现——在 0 功法空档
+上它从第 1 月就存在;真实档上它要求先练满全部功法,不再是「什么都不做」)。
+
+**路线定义(附注)**:
+- **腿 A · do_nothing**:空档 `度过本月` ×36(唯一合法的零收益路线)。
+- **腿 A' · idle_real**:真实档前缀 + 36 × 收卡(最低产出合法真实路线)。
+- **腿 B · all_practice**:真实档,36 × 练功(只推武学轴)。
+- **腿 C · balanced**:真实档,练功 + 修习 + 做工 + 游历混合。
+
+**C7 杠杆选择(附注)**:选「做工曲线拉开」(`work_income` 输入从
+大成交数改为持久 deed `work_months`,曲线 `10 + 3 × work_months`),
+否决「稀释卡牌」路线。算术理由:稀释 `eco_20`(count 4 → 降低/删除)
+只能把 36 月做工 vs 不做的比率推到 ~1.3–1.46×,压不住 1.5× 钉;
+而做工曲线 36 次收入 ≈ 2250(单做工)+ 免费卡/事件 ≈ 4100,
+对「度过多月」~1900 比率 ≈ 2.1×,余量充足。且稀释卡牌必改
+`card_data.gd` + 其测试镜像 + M1 表三处,而做工曲线只改
+`progression_math.gd` 一行 + `cultivation.gd` 调用点一行。
+

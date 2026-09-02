@@ -219,13 +219,27 @@
 |---|---|
 | **练功** | 选一门已学功法,+经验;满级则该门类前置 +1 |
 | **修习** | 选一项属性,+1~3(查表,不用曲线) |
-| **做工** | +银两 |
+| **做工** | +银两(随做工月数递增) |
 | **游历** | 触发一个第 5 段事件 |
 
-**四行动各有唯一擅长(R3,2026-09-01)。** 练功是唯一「选哪门功法」的推进
-(每次 +2,目标自选);修习是唯一可重复的属性来源;做工是唯一随掌握功法
-复利、且可重复超过一次性免费卡的银两来源;游历是唯一的物品/事件来源,
-也是福缘重掷的作用面。屏上 ACTION_PICK 每行带一行效果后缀,玩家看得出差别。
+**四行动各有唯一擅长(R3,2026-09-01;R3b C7,2026-09-02 更新)。**
+练功是唯一「选哪门功法」的推进(每次 +2,目标自选);修习是唯一可重复的
+属性来源;做工是唯一随做工月数递增(每次 +3)的银两来源,36 月做工路线
+银两 > 1.5× 36 月「度过本月」路线银两(measured 2026-09-02, R3b C7,
+seeds 20260901..20260905);游历是唯一的物品/事件来源,也是福缘重掷的
+作用面。屏上 ACTION_PICK 每行带一行效果后缀(「做工(银两随做工月数递增)」),
+玩家看得出差别。
+
+**做工收入曲线(measured 2026-09-02, R3b C7, 代码现值 `ProgressionMath.work_income`)。**
+公式:`10 + 3 × work_months`(第 k 次做工收入 = 10 + 3(k−1);
+`work_months` 为持久 deed,首次做工时 gain 在 `work_months += 1` 之前计算)。
+36 次做工单做工收入 ≈ 360 + 3×(0+1+…+35) = 360 + 1890 = 2250;
+叠免费卡/事件后总银两 ≈ 4100+,对「度过多月」路线(~1900)比率 ≈ 2.1× > 1.5×
+(measured 2026-09-02, R3b C7, `playtest/work_beats_idling.yaml` 比率钉承载)。
+
+> **旧 M1 表(measured on empty seeded profile, R3 M1, 2026-09-01,
+> superseded 2026-09-02 by C7)** — 旧做工公式 `10 + 2 × 大成数` 使做工
+> 36 月仅 2248 银 vs 不做 ~2000(比率 ≈ 1.12 < 1.5 红);旧表只作历史保留。
 
 **M1 产出曲线(measured 2026-09-01, R3 M1, seeded run)。** 由
 `tests/test_action_yield_curves.gd` 用真实行动数学(ProgressionMath /
@@ -240,11 +254,38 @@ EventLogic / TraitEffects / PlayerProfile)在 36 个播种月 × 5 策略下测�
 | all_travel | 中(事件银两) | 低 | 低 | ≤ 36 | 0 | 10 |
 | balanced | 中 | 中 | 中 | 中 | 中 | 随大成数 > 10 |
 
-结构事实(该测试只钉结构,不钉数值):所有产出有限且非负;大成多的
-(all_practice)末月做工收入严格大于 fresh(all_work);游历事件解决 ≤ 36。
-做工收入公式 `10 + 2 × 大成数`(PROVISIONAL,`ProgressionMath.work_income`)
-使做工成为唯一随局复利的可重复银两来源,最终超过一次性免费卡
-`gr_silver_30`(+30)。
+结构事实(该测试只钉结构,不钉数值):所有产出有限且非负;游历事件解决 ≤ 36。
+做工收入公式现值 `10 + 3 × work_months`(R3b C7,2026-09-02),
+使做工成为唯一随局递增的可重复银两来源,最终超过一次性免费卡
+`eco_20`(+20/月)。
+
+### 3.0 等级词表单一来源(R3b C1,2026-09-02)
+
+**问题(R3 实测)**:`progression_math.gd` 的 `GRADE_POINTS` 用 CJK 键
+(丁/丙/乙/甲),而生产写入端(`progression_gongfa_data.gd` 的
+`PRACTICE_TO_MASTER` / `GRADE_BY_YEAR`、`cultivation.gd` 的 `add_gongfa`
+调用)全部用拉丁键(D/C/B/A)。结果:真实档上 `mastery_points` 恒为 0,
+武学结局轴为 0,华山 mastery 项为 0——R3 全部钉子只在空档上验证过,
+从未见过非零 mastery。
+
+**裁定(裁决一,2026-09-02)**:等级词表只允许**一个来源**——
+`ProgressionGongfaData.PRACTICE_TO_MASTER` 的键集(拉丁 D/C/B/A)。
+`GRADE_POINTS` 的键集必须与之相等;点值 D=1, C=2, B=3, A=4。
+**键集相等由单元钉守护**(`tests/test_progression_math.gd` 断言
+`GRADE_POINTS.keys()` 与 `PRACTICE_TO_MASTER.keys()` 互为充要)。
+**测试夹具禁止手写等级字符串**:夹具一律从
+`ProgressionGongfaData.PRACTICE_TO_MASTER.keys()` 取键,不写 `"丁"` /
+`"D"` 等字面量。
+
+**波及面扫描结果(measured 2026-09-02, R3b C1)**:除 `GRADE_POINTS`
+本体外,全部 grade 消费点已用拉丁键——`event_logic.gd:95`
+(`PRACTICE_TO_MASTER.get(grade, 4)`)、`cultivation.gd:456/566/573/967`
+(全部拉丁)、`battle_setup.gd` / `gongfa_data.gd`(`GRADE_RANK` 拉丁)。
+唯一 CJK 消费者就是 `GRADE_POINTS` 自己 + 旧测试夹具,已全部修复。
+
+**场景钉(C1 的树上证明)**:真实档练功路线到结局,`EndingScreen.mastery_axis > 0`
+(红先:当前树上 == 0,measured 2026-09-02, R3b C1, 由 C3 新场景的腿 B
+承载)。
 
 ### 3.1 每年年末:留,还是换门派
 
