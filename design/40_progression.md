@@ -752,6 +752,58 @@ duel 在锁定敌方数据上实测不可赢(最强档先攻 46 vs 五绝 68–8
 > 漂移的是场景 boot 的属性分配,不是带。f350 差分钉在该 boot 上不可满足(mp=1 → power 47 仍同带),
 > 属既有缺陷,由收口卡 `fix_honesty_records_reconcile` 升级为「与 f260 捕获串比较」的性质钉。
 
+### M3''' 实测记录(measured 2026-09-02, R3c readiness-bands-fresh-max, real-save, weak-by-construction)
+
+> **本表取代 M3' 的「creation-fresh 落 even 带」争议**:停手报告
+> (`final/delivery_notes_fix_readiness_verdict_rebaseline.md`)证明单个 `even` 无法同时满足「真实 boot
+> (根骨 15 → power 45)落 weak」与「M3' balanced(power 40)落 even」——冲突在 M3' 的 balanced 形状,不在钉。
+> 所有者裁决(反馈 #3 §2):「creation-fresh」在 C4 验收 (a) 里指**任何离开创建屏的档**,故按**构造**定 weak
+> 下界,钉保留。M3' 表本身逐字保留(它是历史实测),本表 add-on 重定带。
+
+**P_fresh_max 推导**:创建屏在 `creation.gd` 真实规则下(START_POINTS 30、ATTR_MIN 10、ATTR_MAX 20、
+`_step_cost` 15 以下 1 点 / 15 起 2 点)可达的最高 readiness_power(mp=0、空装备)。预算最优分配:30 点全投
+骨 + 身法 → 骨 10→20 花 15(10→15 五步各 1、15→20 五步各 2)、身法 10→20 花 15;
+`power = floor(100/5) + 30 + floor(20/2) = 20 + 30 + 10 = 60`。骨最经济(2 power/点;身法 0.5 power/点;
+内力/悟性/福缘对 readiness_power 贡献 0)。仪器 `tests/test_battle_setup_readiness.gd::_print_p_fresh_max()`
+枚举 11^5 分配空间、打印最优分配 + 整数(记录在此,手算仅作核对):**P_fresh_max = 60**。
+
+**带重定(按构造)**:
+- `even = P_fresh_max + 1 = 61` —— 任何创建档 power ≤ 60 < 61,**离开创建屏必为 weak,by construction**;
+  f260 字面钉 `readiness_text == "华山评估：战备不足"` 逐字节保留,带重定不动任何 yaml 字面。
+- `strong`:旧「strong stays 55」在 even=61 下破坏 `strong > even` 不变量(55 > 61 假),被实测取代 →
+  **strong = 124**(实测 36 月强路线 power,必须 > even)。
+- 单元钉:`tests/test_battle_setup_readiness.gd` 新增 `_test_p_fresh_max_weak()`(P_fresh_max 分配 → weak;
+  期望 `even` 由**同一枚举**导出、绝不写字面 61;`power == 60` 仅作公式回归);既有五围 10 → weak 钉逐字保留。
+
+**真实 36 月平衡/强路线实测(≥5 种子;无头仪器 `_print_m3_table()` 现 derive_stats 含 mp 项)**:
+
+| seed | 路线 | power | verdict(even=61 / strong=124) |
+|---|---|---|---|
+| 20260901 | balanced(attrs 11 + 1 D 大成,mp=1) | 40 | weak |
+| 20260902 | balanced | 40 | weak |
+| 20260903 | balanced | 40 | weak |
+| 20260904 | balanced | 40 | weak |
+| 20260905 | balanced | 40 | weak |
+| 20260901 | strong(5 A 大成 + grown attrs) | 124 | strong |
+| 20260902 | strong | 124 | strong |
+| 20260903 | strong | 124 | strong |
+| 20260904 | strong | 124 | strong |
+| 20260905 | strong | 124 | strong |
+
+**如实记录的红(成长曲线缺陷,非带缺陷)**:**36 月平衡路线 power=40 < even=61 → 读 weak**。
+「growth is flatter than creation's point spend」——玩家用创建屏 30 点买到的 60 power,36 个月的平衡成长
+(五围 +1 + 1 门 D 大成)只推到 40,落在新 weak 带之下。真实档 boot 本身(根骨 15、mp=0)power=45 < 61,同样
+落 weak——正是 f260 字面钉实测 `战备不足` 成立之由。这是**成长曲线**问题,不是带问题:**不降低 even、不移线凑绿**,
+交给下一轮(路线图 / `40_ux_backlog` backlog)。
+
+**差分证明(f350 → f310/f320 重锚)**:2 练功月档恰在 even 边界(mp=1 → power 61),不得承载差分。改用
+`debug_fast_forward` 把 36 月路线跑到**真实成长档**:f260 fresh `战备不足` → fast-forward 后玩家回地图
+(`current_state == "MAP"`),`readiness_text` 实测 `华山评估：胜券在握`(power ≥ strong)——高余量差分,非边界
+抖动。f350 升级为对 f260 捕获串的**性质差分**(`readiness_text != "华山评估：战备不足"`,绝不写 power 字面量)。
+若成长档与 f260 同串则差分如实转红、线不动(上表 balanced 形状即该红的实例;差分场景走 fast-forward 强成长故为绿)。
+`playtest/huashan_readiness_warning.yaml` 场景实测 **16/16 绿**(measured 2026-09-02,
+godot_playtest_scenario on this file)。
+
 ## 13. 结局评价:多轴评分(R3,2026-09-01)
 
 **问题形状(实测)**:结局档位 = 五围等权求和 vs 90/60 两个阈值

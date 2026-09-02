@@ -42,8 +42,22 @@ only.
   growth is flatter than creation's point spend" and handed to the next round.
   even is NOT lowered; the string follows the band and the band follows the
   measurement.
-- **f350 re-anchored** to a real grown save (36-month fast-forward), property
-  pin against the f260 verdict string (never a power literal).
+- **f350 re-anchored** to a real grown save (`debug_fast_forward` auto-plays the
+  36-month run to its end, landing the player back on the map), property pin
+  against the f260 captured weak verdict string (never a power literal).
+
+## Verification (measured 2026-09-02, godot_playtest_scenario)
+
+- `playtest/huashan_readiness_warning.yaml` runs **16/16 PASS** (staged edit).
+- f260 (fresh boot, CULTIVATION): `RosterPanel.readiness_text` observed
+  `"华山评估：战备不足"` (weak — power ≤ P_fresh_max < even, by construction).
+- After `debug_fast_forward` (f310): `GameManager.current_state` observed
+  `"MAP"` (the 36-month run completed, a genuinely grown save).
+- f320 (grown save, MAP): `RosterPanel.readiness_text` observed
+  `"华山评估：胜券在握"` (strong, power ≥ strong=124) → the f350→f320 differential
+  `readiness_text != "华山评估：战备不足"` holds with high margin (not a boundary
+  tick), and `UiOcclusionWatch.violations == 0 / scan_ok == true` on both post
+  frames.
 
 ## Files changed
 - `scripts/data/map_data.gd` — HUASHAN_BAR.even = 61, strong = 124; pointer

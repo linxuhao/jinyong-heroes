@@ -25,7 +25,9 @@
 # spine_to_ending grammar — ui_accept through the tutorial intro,
 # debug_win_tutorial (the one sanctioned battle-outcome seed), creation, sect
 # select (SectButton0 = shaolin), landing in CULTIVATION with 2 unmastered D
-# arts. Then 2 practice months drive mastery growth for the verdict differential.
+# arts. Then debug_fast_forward auto-plays the 36-month run (练功 on the first
+# unmastered art, else 修习 根骨) to its end — a REAL grown save (mastery +
+# attr growth), not 2 practice months — for the verdict differential.
 #
 # RED-FIRST EVIDENCE — MEASURED (2026-09-02, godot_playtest_scenario on the
 #   pre-C4 tree with HUASHAN_BAR {"even": 30, "strong": 40} — fresh real-save
@@ -39,12 +41,13 @@
 #   green_asserts_before_red: 5 (f260: state+scene+phase+month+gongfa_count)
 name: huashan_readiness_warning
 description: >-
-  The Huashan readiness warning (R3b C4 re-baseline). Real-save boot (main.tscn
-  -> tutorial -> creation -> join sect). A creation-fresh profile (five attrs
-  10, 0 mastered) shows the weak verdict on RosterPanel.readiness_text; after 2
-  practice months (1 D mastered, mp grows) the verdict STRING differs
-  (differential, never a power literal). Every touched frame: UiOcclusionWatch
-  clean.
+  The Huashan readiness warning (R3c readiness-bands re-anchor). Real-save boot
+  (main.tscn -> tutorial -> creation -> join sect). A creation-fresh profile
+  shows the weak verdict on RosterPanel.readiness_text (even = P_fresh_max + 1,
+  weak-by-construction); after debug_fast_forward auto-plays the 36-month run to
+  a REAL grown save, the verdict STRING differs (differential against the f260
+  captured weak verdict, never a power literal). Every touched frame:
+  UiOcclusionWatch clean.
 timeline:
 # ── BOOT: tutorial intro (7 ui_accept) -> battle seed -> overlay -> creation ─
 - at: 3
@@ -132,45 +135,31 @@ timeline:
     RosterPanel.readiness_text: readiness_text == "华山评估：战备不足"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── PRACTICE MONTH 1 (CARD_PICK -> ACTION_PICK focus 0 练功 -> GONGFA_PICK) ──
+# ── REAL GROWN SAVE: debug_fast_forward drives the SAME phase machine with ──
+# fixed auto-choices to the end of the 36-month run (练功 on the first
+# unmastered art, else 修习 根骨) — genuine mastery + attr growth (mp climbs,
+# bone climbs), landing the player back on the map. A REAL grown save, NOT 2
+# practice months: the 2-month boot sat exactly on the mp=1 boundary of `even`
+# and could not honestly carry the differential (R3b C4 card rule).
 - at: 270
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 280
-  actions:
-  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
-- at: 290
-  actions:
-  - ui_accept  # GONGFA_PICK focus 0 -> apply practice (+2 to first D art)
-- at: 300
-  actions: []
-  assert:
-    CultivationScreen.phase: phase == "CARD_PICK"
-    CultivationScreen.month: month == 2
-    UiOcclusionWatch.violations: violations == 0
-    UiOcclusionWatch.scan_ok: scan_ok == true
-# ── PRACTICE MONTH 2 (second +2 masters the first D art: practice 4/4) ───────
+  - debug_fast_forward  # auto-play the 36-month run to its end
 - at: 310
-  actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 320
-  actions:
-  - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
-- at: 330
-  actions:
-  - ui_accept  # GONGFA_PICK focus 0 -> apply practice (masters the D art)
-- at: 340
   actions: []
   assert:
-    CultivationScreen.phase: phase == "CARD_PICK"
-    CultivationScreen.month: month == 3
+    GameManager.current_state: current_state == "MAP"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── VERDICT DIFFERENTIAL: after 2 practice months mp grew -> verdict changes ─
-# The fresh profile was 战备不足 (power 35 < even 37); after mastering 1 D art
-# (mp=1, power 37 >= even) the verdict string must have changed.
-# Differential on the STRING, never a power literal.
-- at: 350
+# ── VERDICT DIFFERENTIAL: the grown save's verdict STRING differs from the ──
+# f260 fresh weak verdict. Property pin against the f260 CAPTURED verdict string
+# (never a power literal): the fresh boot reads 战备不足, the 36-month grown save
+# no longer does. Measured (2026-09-02, godot_playtest_scenario on this file):
+# fresh boot f260 readiness_text == "华山评估：战备不足" (weak); after
+# debug_fast_forward the grown save on the map reads "华山评估：胜券在握" (strong)
+# — a high-margin change, not a boundary tick. If growth ever reads the SAME
+# verdict as f260 this differential reddens honestly; the line never moves to
+# green it (see M3''' in design/40_progression.md).
+- at: 320
   actions: []
   assert:
     RosterPanel.readiness_text: readiness_text != "华山评估：战备不足"
