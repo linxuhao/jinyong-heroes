@@ -795,6 +795,7 @@ surface:
   - last_practice_other_rows_unchanged
   - last_practice_target_increased
   - rerolls_left
+  - last_yield_readable
   MapScreen:
   - current_node_id
   - focus_id

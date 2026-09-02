@@ -526,7 +526,11 @@ func _apply_action(action: Dictionary) -> void:
 			SaveManager.profile.deeds["cultivate_months"] = SaveManager.profile.get_deed("cultivate_months") + 1
 			last_action_kind = "cultivate"
 			last_action_silver = 0
-			last_yield_text = tr("修习：%s +%d") % [_attr_label(str(action.get("target", "bone"))), gain]
+			# The raw attr key is kept so last_yield_readable can verify the
+			# receipt carries no raw id (identity fallback when _attr_label
+			# misses an unknown key). Same default ("bone") as _attr_label.
+			_last_cultivate_target_key = str(action.get("target", "bone"))
+			last_yield_text = tr("修习：%s +%d") % [_attr_label(_last_cultivate_target_key), gain]
 		"work":
 			# 做工: silver grows with each month worked (10 + 3 * work_months) —
 			# the only action whose yield compounds with the run, and the only
@@ -1141,7 +1145,7 @@ func _sync_surface() -> void:
 	last_yield_readable = (
 		last_yield_text != ""
 		and not last_yield_text.contains("_")
-		and not last_yield_text.contains(raw_id)
+		and (raw_id == "" or not last_yield_text.contains(raw_id))
 	)
 
 
@@ -1217,11 +1221,14 @@ func _render() -> void:
 	# its notice here so the player SEES what happened (never a silent jump).
 	if status_text != "":
 		text += "\n" + status_text + "\n"
-		# C6: the action receipt (last_yield_text) is drawn on screen after the
-		# status block so the player reads what the last action yielded. Display
-		# names already applied at the assignment sites; zero new control level.
-		if last_yield_text != "":
-			text += "\n" + last_yield_text + "\n"
+	# C6: the action receipt (last_yield_text) is drawn on screen after the
+	# status block so the player reads what the last action yielded. Display
+	# names already applied at the assignment sites; zero new control level.
+	# Drawn at TOP LEVEL (not inside the status block) so it appears on every
+	# normal action month — _on_accept clears status_text, so nesting it there
+	# would leave the receipt invisible on the dominant code path.
+	if last_yield_text != "":
+		text += "\n" + last_yield_text + "\n"
 	body.text = text
 	_rebuild_options_box()
 	# Observables recomputed on every render. cursor_markers_visible is the

@@ -214,3 +214,46 @@ timeline:
     CultivationScreen.phase: phase == "CARD_PICK"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
+# ── C6 (fix_c6_yield_receipt): the receipt is DRAWN on screen — not just a
+#    published var — with display names (no raw id, no underscore), and the body
+#    label actually carries it. Month 3 runs 修习 (ATTR_PICK focus 0 = 根骨) and
+#    asserts:
+#      - the action-before snapshot (still month 2's practice receipt)
+#      - last_yield_text: changed across the action (player-readable diff)
+#      - the receipt renders in BodyLabel.text (the C6 defect: a value with no
+#        consumer — _render() used to append only status_text, so the line was
+#        invisible even though last_yield_text was non-empty)
+#      - display name 根骨 via the existing _attr_label, no raw key "bone"
+#      - last_yield_readable == true (no '_', no raw id)
+#      - UiOcclusionWatch clean on the new body lines
+# ── MONTH 3: card -> ACTION_PICK -> 修习 (CultOptionButton1) -> ATTR_PICK row 1
+- at: 570
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "practice"
+    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳")
+- at: 580
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 590
+  actions: []
+  clicks:
+  - CultOptionButton1
+- at: 600
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 620
+  actions: []
+  assert:
+    CultivationScreen.last_action_kind: last_action_kind == "cultivate"
+    CultivationScreen.last_yield_text: changed
+    CultivationScreen.last_yield_text: not last_yield_text.contains("罗汉拳")
+    CultivationScreen.last_yield_text: last_yield_text.contains("修习") and last_yield_text.contains("根骨")
+    CultivationScreen.last_yield_text: not last_yield_text.contains("bone")
+    CultivationScreen.last_yield_readable: last_yield_readable == true
+    CultivationScreen.phase: phase == "CARD_PICK"
+    BodyLabel.text: text.contains("修习")
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
