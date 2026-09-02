@@ -62,14 +62,19 @@ measurements and rulings live in `design/40_progression.md` (M2'/M3' real-save t
    110/tier1, all_practice 134/tier2, balanced ≥150/tier3. The nail pins the **tier**
    differential, not text (`ending_tiers_differentiate`) `[EVIDENCE: PENDING OFFICIAL
    RE-RUN]` — 13/22 on the official run.
-4. **C4 — Huashan readiness tells the truth** (`HUASHAN_BAR` {even: 38, strong: 55},
-   re-derived from real-save M3' measurements; the old self-defensive comment is gone):
-   a creation-fresh profile reads 战备不足, a grown one 势均力敌/胜券在握.
-   `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — M3' 5 seeds × 3 routes: lowest 35/weak,
-   balanced 40/even, strong 124/strong. `[EVIDENCE: PENDING OFFICIAL RE-RUN]` —
-   `huashan_readiness_warning` was 20/21 on the official run (f260 literal observed
-   势均力敌 on a bone-15 boot; the band-or-nail measurement STOP-and-reported — see
-   `final/delivery_notes_fix_readiness_verdict_rebaseline.md`).
+4. **C4 — Huashan readiness tells the truth** (`HUASHAN_BAR` {even: 61, strong: 124},
+   re-derived per the R3c owner band ruling; the old self-defensive comment is gone,
+   replaced by a pointer to the measured table): `P_fresh_max = 60` (the highest
+   readiness_power reachable by creation allocation alone — instrument enumeration,
+   mp=0, empty gear) so `even = P_fresh_max + 1 = 61` makes every profile leaving
+   creation read 战备不足 **by construction**; `strong = 124` (measured strong route,
+   must exceed even). The f260 战备不足 literal holds byte-identical and the scenario
+   self-runs 16/16. `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — M3''' honest record: a
+   real 36-month balanced route (power 40) still reads 战备不足 under even=61 — the
+   growth curve is flatter than the creation budget; recorded in
+   `design/40_progression.md` M3''', `even` NOT lowered, handed to the next round
+   (see `final/delivery_notes_r3c_readiness_bands.md`).
+   `[EVIDENCE: PENDING OFFICIAL RE-RUN]`.
 5. **C5 — the winnable-route card matches its title** (`huashan_winnable_normal_route`
    rewritten: clicks-only, menu boot, real-save 36 practice months, real skill clicks in
    the duel, WIN frame asserts `current_state == "MAP"` + `health < max_health`).
@@ -153,9 +158,9 @@ ratio-nail/guard regex sync, the i18n composite-key fix (`ending.gd:129` ↔
 scope (`battle_setup.gd` mp terms direct-read). Blocking findings: (1) C5's WON tail is
 measured red (29/39 on the official run; the restored carrier now runs 36/48 hard-gate
 clean with the WON tail still a permitted red — escalation honored, unlock granted, win
-not achieved); (2) C4's `huashan_readiness_warning` f260 rebaseline is red (20/21 — band
-conflict STOP-and-reported; the r3c band ruling re-derived even = P_fresh_max + 1 = 61,
-strong = 124, and the scenario now runs 16/16 with f260 byte-identical); (3) the five
+not achieved); (2) C4's f260 band conflict is RESOLVED in-tree (the r3c band ruling
+re-derived even = P_fresh_max + 1 = 61, strong = 124; f260 byte-identical, the scenario
+self-runs 16/16 — the official re-run is the remaining evidence); (3) the five
 re-anchored scenarios and both pytest-gate fixes await the official re-run —
 compile/test/vision artifacts for the post-fix tree do not exist yet and are therefore
 not claimed. The `playtest/huashan_winnable_normal_route.yaml` registry-file mismatch
