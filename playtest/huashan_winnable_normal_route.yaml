@@ -527,14 +527,11 @@ timeline:
   actions: []
   clicks:
   - TravelButton1
-- at: 1070
-  actions: []
-  assert:
-    GameManager.current_state: current_state == "MAP"
-    MapScreen.focus_id: focus_id == "huashan"
-# ── HUASHAN ARRIVAL (travel-onto-huashan auto-fires the duel). Profile-built
-#    hero with the mastery terms (C1) faces the five greats. ──────────────────
-- at: 1110
+# ── HUASHAN ARRIVAL: traveling ONTO 华山 auto-fires the duel a few frames
+#    after the travel click lands (measured: the f1070 "MAP" expectation of the
+#    previous revision observed "BATTLE" — re-anchored here on the observed
+#    timing, the way the locked green gate's f580 leg does it). ───────────────
+- at: 1075
   actions: []
   assert:
     GameManager.current_state: current_state == "BATTLE"
@@ -544,80 +541,171 @@ timeline:
     Player.max_health: "max_health != 1000 and max_health > 0"
     CombatManager.current_round: "current_round >= 1"
     CombatManager.phase: "phase != 'IDLE'"
-# ── ROUND 1 (MEASURED): the five greats act first (initiative 68-86; the hero's
-#    46 puts it LAST in turn_order), the round-1 damage floor lands, the hero's
-#    turn arrives already hurt (health < max_health — a real fight). ──────────
-- at: 1240
+# TEMPORARY RED-FIRST PROBES — DO NOT SHIP: print the real-save hero + field
+- at: 1085
+  actions: []
+  assert:
+    Player.max_health: max_health == -1
+    Player.health: health == -2
+    CombatManager.turn_order: "turn_order == ''"
+    East_Heretic.health: health == -3
+    South_Emperor.grid_pos: "grid_pos == ''"
+# ── ROUND 1: the greats act first (ladder 71-79 after the M3'' initiative
+#    rows; the practice-route hero acts last), the hero's turn arrives already
+#    hurt (health < max_health — a real fight). ───────────────────────────────
+- at: 1250
   actions: []
   assert:
     CombatManager.phase: phase == "PLAYER_TURN"
     Player.health: health < max_health
-# ── Honest real-skill duel attempt: walk up toward the greats, cast a skill
-#    (SkillButton1) at the nearest great's body, end the turn; repeat. This
-#    contains ZERO debug — the WIN below is decided only by the real loop. ────
-- at: 1255
+# ── The real duel, clicks-only with scripted targeting: each round advances
+#    toward the west ring, opens with AttackButton on ONE focus-fired great
+#    (body click on the unit's own Node2D anchor — adjacency-gated, so the
+#    focus order South -> East -> West -> North -> Central matches the M3''
+#    spawn ring), then ends the turn. ZERO debug actions in this segment. ─────
+- at: 1265
   actions: []
   clicks:
   - Player +64,0
-- at: 1270
+- at: 1275
   actions: []
   clicks:
-  - SkillButton1
+  - AttackButton
 - at: 1285
   actions: []
   clicks:
-  - East_Heretic
+  - South_Emperor
 - at: 1300
   actions: []
   clicks:
   - EndTurnButton
-- at: 1420
+- at: 1450
   actions: []
   assert:
     CombatManager.current_round: current_round >= 2
     CombatManager.phase: phase == "PLAYER_TURN"
     Player.health: health > 0
-- at: 1435
+# TEMPORARY PROBE — DO NOT SHIP
+- at: 1455
   actions: []
-  clicks:
-  - Player +64,0
-- at: 1450
-  actions: []
-  clicks:
-  - AttackButton
+  assert:
+    South_Emperor.health: health == -4
+    Player.health: health == -5
 - at: 1465
   actions: []
   clicks:
+  - Player +64,-64
+- at: 1475
+  actions: []
+  clicks:
+  - AttackButton
+- at: 1485
+  actions: []
+  clicks:
+  - South_Emperor
+- at: 1500
+  actions: []
+  clicks:
   - EndTurnButton
-- at: 1600
+- at: 1660
   actions: []
   assert:
     CombatManager.current_round: current_round >= 3
     Player.health: health > 0
     CombatManager.phase: phase == "PLAYER_TURN"
-- at: 1615
+- at: 1675
   actions: []
   clicks:
   - AttackButton
-- at: 1630
+- at: 1685
+  actions: []
+  clicks:
+  - East_Heretic
+- at: 1700
   actions: []
   clicks:
   - EndTurnButton
-# ── The duel is WON by the real loop and the hero is NOT at full HP. On the
-#    current tree this is the MEASURED RED: the maxed hero dies before round 4
-#    with the five greats unscratched (see header + delivery notes) — the C5
-#    escalation clause (no debug win, no redefining victory). ─────────────────
-- at: 2100
+- at: 1860
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+- at: 1875
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 1885
+  actions: []
+  clicks:
+  - AttackButton
+- at: 1895
+  actions: []
+  clicks:
+  - East_Heretic
+- at: 1910
+  actions: []
+  clicks:
+  - EndTurnButton
+- at: 2070
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+- at: 2085
+  actions: []
+  clicks:
+  - AttackButton
+- at: 2095
+  actions: []
+  clicks:
+  - West_Poison
+- at: 2110
+  actions: []
+  clicks:
+  - EndTurnButton
+- at: 2270
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+- at: 2285
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 2295
+  actions: []
+  clicks:
+  - AttackButton
+- at: 2305
+  actions: []
+  clicks:
+  - West_Poison
+- at: 2320
+  actions: []
+  clicks:
+  - EndTurnButton
+# TEMPORARY PROBE — DO NOT SHIP
+- at: 2500
+  actions: []
+  assert:
+    Player.health: health == -6
+    CombatManager.current_round: current_round == -7
+    GameManager.current_state: current_state == "-8"
+# ── RETURN TO MAP (click ContinueButton — NOT ui_accept): honest post-win
+#    state, gated on the overlay being actually visible (the previous run's
+#    hard error was an aim at ContinueButton while the LOST overlay — whose
+#    button is RetryButton — was on screen). ─────────────────────────────────
+- at: 2600
   actions: []
   assert:
     GameManager.current_state: current_state == "WON"
     Player.health: health < max_health
-# ── RETURN TO MAP (click ContinueButton — NOT ui_accept): honest post-win state.
-- at: 2140
+- at: 2610
+  actions: []
+  assert:
+    ContinueButton.visible: visible == true
+- at: 2620
   actions: []
   clicks:
   - ContinueButton
-- at: 2220
+- at: 2700
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"

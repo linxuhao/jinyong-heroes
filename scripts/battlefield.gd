@@ -507,7 +507,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.move_range = 4
 	cd.attack_damage = 22
 	cd.attack_range = 3
-	cd.initiative = 85
+	cd.initiative = 79  # R3b C5 unlock: was 85 (M3'' — strong route acts before the burst; ladder East>Central>South>North>West preserved, all > 68)
 	cd.energy = 0
 	cd.team = 1
 	cd.passive_id = "finger_dart"
@@ -526,7 +526,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.move_range = 3
 	cd.attack_damage = 26
 	cd.attack_range = 1
-	cd.initiative = 70
+	cd.initiative = 71  # R3b C5 unlock: was 70 -> floor of the ladder (must stay > Yang Guo 88 - 20 debuff pin)
 	cd.energy = 0
 	cd.team = 1
 	cd.passive_id = "toad_reflect"
@@ -545,7 +545,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.move_range = 3
 	cd.attack_damage = 24
 	cd.attack_range = 2
-	cd.initiative = 76
+	cd.initiative = 75  # R3b C5 unlock: was 76 (ladder preserved)
 	cd.energy = 0
 	cd.team = 1
 	cd.passive_id = "one_yang_renewal"
@@ -564,7 +564,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.move_range = 3
 	cd.attack_damage = 28
 	cd.attack_range = 1
-	cd.initiative = 74
+	cd.initiative = 73  # R3b C5 unlock: was 74 (ladder preserved)
 	cd.energy = 0
 	cd.team = 1
 	cd.passive_id = "beggar_iron_bone"
@@ -583,7 +583,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	cd.move_range = 3
 	cd.attack_damage = 26
 	cd.attack_range = 1
-	cd.initiative = 80
+	cd.initiative = 77  # R3b C5 unlock: was 80 (ladder preserved)
 	cd.energy = 0
 	cd.team = 1
 	cd.passive_id = "innate_qi"

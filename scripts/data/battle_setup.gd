@@ -36,13 +36,22 @@ const _MELEE_SCHOOLS: Array[String] = [
 ## Derive the battle stats for a PlayerProfile. Returns a Dictionary with
 ## max_health / energy / move_range / initiative / attack_damage / attack_range.
 ##
-## R3 (r3_huashan_winnable) EXTENDS the formulas player-side only with a
-## cultivation term: mp = ProgressionMath.mastery_points(profile) (sum of
-## GRADE_POINTS over MASTERED gongfa rows). Three years of practice/cultivate
-## visibly cash out in the finale. attack_damage / move_range / attack_range are
-## UNCHANGED by mp (the fight's texture is preserved). EquipmentData.sum_bonuses
-## returns keys attack/health/initiative/move ONLY — there is NO energy field, so
-## energy = inner*2 + 4*mp (the gear energy bonus does not exist).
+## R3b C5 unlock (owner ruling 2026-09-02) CANCELS the R3 D4 rule
+## ("mp 不进 move_range / attack_damage，保持质感"): three years of cultivation
+## may now cash out into movement and damage as well. mp =
+## ProgressionMath.mastery_points(profile) (sum of GRADE_POINTS over MASTERED
+## gongfa rows) feeds:
+##   attack_damage += 2 * mp   (a fresh mp = 0 profile reproduces the old
+##                              formula EXACTLY — property-pinned in
+##                              tests/test_battle_setup.gd)
+##   move_range    += floor(mp / 3)   (six mastered D-grade arts = mp 6 ->
+##                              move 4, the measured threshold at which a
+##                              melee hero closes the M3'' spawn ring)
+## max_health / energy / initiative / attack_range terms are UNCHANGED.
+## EquipmentData.sum_bonuses returns keys attack/health/initiative/move ONLY —
+## there is NO energy field, so energy = inner*2 + 4*mp (the gear energy bonus
+## does not exist). Per-literal measurement table: design/40_progression.md
+## M3'' (supersedes the R3 D4 note).
 static func derive_stats(profile) -> Dictionary:
 	var bone: int = _attr(profile, "bone")
 	var inner: int = _attr(profile, "inner")
@@ -52,9 +61,9 @@ static func derive_stats(profile) -> Dictionary:
 	return {
 		"max_health": bone * 5 + 6 * mp + int(gear.get("health", 0)),
 		"energy": inner * 2 + 4 * mp,
-		"move_range": 2 + int(floor(float(agility) / 20.0)) + int(gear.get("move", 0)),
+		"move_range": 2 + int(floor(float(agility) / 20.0)) + int(floor(float(mp) / 3.0)) + int(gear.get("move", 0)),
 		"initiative": agility + 3 * mp + int(gear.get("initiative", 0)),
-		"attack_damage": 10 + bone + int(gear.get("attack", 0)),
+		"attack_damage": 10 + bone + 2 * mp + int(gear.get("attack", 0)),
 		"attack_range": _attack_range_for(profile),
 	}
 
