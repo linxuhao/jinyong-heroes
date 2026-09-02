@@ -1,556 +1,314 @@
-# Technical Architecture Design — R3 "Meaningful Numbers: Choices Must Shape the Ending"
+# 技术架构设计 — R3b「Numbers That Bind」(数值真的绑上)
 
-> Architect step, 2026-09-01. Inputs: Project Brief (R3), Step-1 SOTA report (verified
-> against the current post-R2 tree, review verdict `passed: true`), `design/` archive
-> (verbatim input constraint), and direct reads of every touched file on today's tree.
-> All file paths are repo-root-relative (`./scripts/...`). All code anchors were
-> re-read on the current tree today unless explicitly cited as a prior round's
-> official measurement.
+> Step 2 · Architect. 输入:项目 brief(8 张卡 C1–C8)+ Step 1 SOTA 报告(全部代码锚点已由本步逐一直读复核,见 §3 各卡的「已验证锚点」)。
+> 本轮**不加任何新系统、不加任何新货币**;只让 R3 已声称的数字绑定在**真实存档**上成立。
+> 排序遵守 `design/01_process.md`:L2(C1、C7)→ L3(C2/C3/C4/C5,C5 依赖 C1+C4)→ L4(C6)→ 设计记录(C8)。
 
 ---
 
-## 0. Round identity and the one pre-existing assumption this design resolves
+## 0. 概述
 
-**Resolved Step-1 Assumption #2 first (the most consequential open question):**
-the brief's phrase "tune only MapBattleData data or battle numbers" is implemented
-as **player-side only**. `scripts/data/map_battle_data.gd` and
-`scripts/battlefield.gd` (where the five greats' HP/damage/initiative literally
-live) are BOTH in the six-file jinyong-huashan lock ledger, so the Huashan
-difficulty fix routes **exclusively through the player-side battle-number surface
-`scripts/data/battle_setup.gd::derive_stats`** (a sanctioned extension surface per
-the brief's Technical Constraints). **No scope unlock is requested or required.**
-Contingency (recorded, not designed): if the measured win rate with sanctioned
-levers cannot be lifted off zero without weakening the fight's challenge, the
-implementer escalates to the round owner for an explicit `map_battle_data.gd`
-data unlock — it is NOT pre-authorized by this design.
+R3 落地的数值公式(结局多轴评价、华山战备、做工收益、功法修习)在**空档**(`debug_seed_save`,0 门派 0 功法)上验证过,但在真实档(创建 → 入门派 → 36 月)上因一个**等级词表分裂**而大面积失效:`GRADE_POINTS` 用 CJK 键(丁丙乙甲),而生产写入用拉丁键(D/C/B/A),导致 `mastery_points` 在任何真实档上恒为 0 → 武学结局轴为 0、华山 mastery 项为 0、修习收益曲线虚假。本轮逐卡先立**实测红**(brief 已给帧号/观测值),再落地绿,全部钉子改在真实档路径上。
 
-The six locked files this round must not move by one byte:
-`scripts/battlefield.gd`, `scripts/autoload/game_manager.gd`,
-`scripts/autoload/scene_manager.gd`, `scripts/segments/map.gd`,
-`scripts/data/map_battle_data.gd`, `playtest/map_battle_node_huashan.yaml`.
-The three verbatim-protected gates (`facility_use_reusable`,
-`map_node_event_shaolin`, `map_battle_node_huashan`) stay byte-identical.
+**改动的文件面(全部可编辑,六文件锁零触碰)**:
 
----
-
-## 1. Overview
-
-Four problems, four fixes, one shared principle: **every fix is measured first on
-the current tree, then landed, then pinned by a choice-differential nail** (never
-a `== 90`-style literal).
-
-| # | Problem (verified shape) | Fix shape (this design) | Core new component |
-|---|---|---|---|
-| P1 | Ending tier = equal-weight sum of 5 attrs vs 90/60 (`map_data.gd:68-75`, `ending.gd:16-21`); a growth route saturates tier 3 mid-journey | Multi-axis ending evaluation: attrs + art mastery + deeds (travel/work), computed fresh at the ending screen from persisted profile data; thresholds re-derived from measured 36-month yield curves | `scripts/data/ending_logic.gd` (NEW, pure static) |
-| P2 | `fortune` has zero consumers while `creation.gd:21` promises 「影响事件与奇遇(游历事件可重掷)」; hook `yearly_event_reroll` (`trait_data.gd:29`) is repo-wide unreferenced | Implement the promise literally: a **travel-event reroll** on the cultivation 游历 channel with a fortune-scaled yearly budget; `deep_fortune` trait grants +1 | `TraitEffects.fortune_reroll_budget()` + reroll action in `cultivation.gd` |
-| P3 | `work` = flat +10 silver (dominated by the free `gr_silver_30` card), `practice` = +1 (≤ free `gr_practice_2` card) | Each action gets a unique measured niche: work scales with mastery (only scalable repeatable silver), practice becomes +2 and is the only **target-chosen** advancement, cultivate stays the only attribute source, travel stays the only item/event source | `_apply_action` rebalance + yield surfaces + measured curves |
-| P4 | Huashan finale: normal-route profile (measured `max_health = 135`, official jinyong-huashan run) vs five greats (95–130 HP, initiative 70–85) = dead before acting; no screen says what is needed | (a) **Winnability** via the sanctioned `derive_stats` extension: cultivation output (mastered arts) feeds player battle numbers; (b) **advance warning**: a readiness verdict computed by `BattleSetup.readiness()` and rendered on the roster panel + cultivation monthly body | `battle_setup.gd` extension (sanctioned surface) |
-
-Design-change discipline: every numeric formula this round touches is listed in
-§9 (设计变更) with old → new and the measurement that justifies it. Provisional
-constants are marked **PROVISIONAL — set by measurement task M1/M2**, never
-hard-pinned by gates.
-
----
-
-## 2. Verified ground-truth anchors (re-read today, 2026-09-01)
-
-- `scripts/segments/ending.gd:16-22` — tier = `MapData.ending_tier(sum of 5 attrs)`;
-  renders ONLY tier title/text; `_render()` writes `BodyLabel.text`.
-- `scripts/data/map_data.gd:68-75` — `ENDING_TIERS` rows `{tier, min_total, title, text}`,
-  90/60/0, top-down first-row-wins (`ending_tier` at :115-119). `map_data.gd` is **editable**
-  (it is NOT in the six-file lock).
-- `scripts/data/battle_setup.gd:36-48` — `derive_stats` consumes bone/inner/agility
-  (+ gear via `EquipmentData.sum_bonuses`); wisdom/fortune absent. `build_character`
-  (:59-114) is the live caller path for encounter AND map battles
-  (`battlefield.gd` calls `BattleSetup.build_character(SaveManager.profile)` in both
-  `_setup_encounter_battle` and `_setup_map_battle` — verified in the jinyong-huashan
-  round record; the call site itself is locked, the callee is editable).
-- `scripts/data/trait_effects.gd` — pure-static helper home; `practice_gain(wisdom, roll)`
-  is wisdom's sole consumer; `SaveManager.rng` op-order contract documented in-header.
-- `scripts/data/event_logic.gd:21-31` — `draw_unseen_id(profile, rng)` = exactly ONE
-  `rng.randi_range` draw (empty-pool reset branch = zero RNG); `validate_option` /
-  `apply_option_effects` = zero RNG (R2 lifeline).
-- `scripts/segments/cultivation.gd` (editable) — `_apply_action` :393-408
-  (practice +1 / cultivate 1 randf → +1..3 / work +10 / travel draws), `_on_accept`
-  :247-322 (ACTION_PICK cases 0-6; case 3 = travel draw + `_sync_surface()`),
-  `_after_action` :413-428 = the single month-advance path, `_advance_year` :455-463
-  (year reset point), empty-GONGFA soft-lock exit :287-301 (zero RNG, must survive),
-  `_sync_surface` publishes `CultivationScreen.*` observables (event_title/event_body
-  publish at :862-866).
-- `scripts/data/player_profile.gd` — pure data layer; `to_dict`/`from_dict` (:97-230)
-  is the additive-schema precedent: `equipped` was added with legacy-default repair
-  ("a LEGACY save with no `equipped` key → keep the three-empty slot default: no
-  crash, nothing wiped"). `flags` from_dict DROPS unknown keys (only
-  `tutorial_done`/`events_seen` survive) — **new deed counters must be first-class
-  profile fields, not `flags` entries.**
-- `scripts/data/card_data.gd:28-66` — free monthly card yields: `gr_silver_30` +30
-  silver, `gr_practice_2` +2 practice (×2 in deck), `gr_attr_*` +1 attr — the
-  structural dominance evidence for P3.
-- `scripts/data/trait_data.gd:29` — `deep_fortune` (福缘深厚, cost 5, hook
-  `yearly_event_reroll`, description 「游历事件每年可重掷一次」).
-- `scripts/segments/creation.gd:14-22` — `_ATTR_DESCS` incl.
-  `"fortune": "影响事件与奇遇(游历事件可重掷)"` (the on-screen promise).
-- Official measured anchor (jinyong-huashan, 2026-09-01, official 5_compile run):
-  a fully-played 36-month profile hero enters the map duel with
-  `max_health = 135`; `map_battle_node_huashan` 41/41 pins
-  `max_health != 1000 and max_health > 0`, `turn_order.size() == 6`,
-  `tutorial_battle == false` — these stay verbatim-green under this design.
-- RNG lifelines that must stay green: `save_load_roundtrip` 14/14,
-  `event_travel_effects` 19/19 (op order of the seeded stream).
-- Harness surfaces already whitelisted (`playtest/_common.yaml`):
-  `CultivationScreen.{month, month_before_accept, status_text, attr_*, gongfa_count,
-  mastered_count, event_id, event_title, event_body, events_seen_count,
-  last_effect_types, focused_option_text, phase, ...}`, `MapScreen.{silver,
-  attr_*, events_resolved_count, map_status_text, event_open_silver, last_use_*,
-  last_apply_attr_value, facility_id, ...}`, `EndingScreen.{tier, ...}`,
-  `RosterPanel.*`, `UiOcclusionWatch.{violations, violations_text, scan_ok}`.
-
----
-
-## 3. Architecture (component relations and data flow)
-
-```
-                       ┌──────────────────────────── cultivation month loop (editable) ───────────────────────────┐
-                       │                                                                                            │
-  monthly card draw    │   _apply_action(kind)                        EVENT phase (travel)                          │
-  CardData (unchanged) │   ├─ practice → +2 practice, chosen art ─┐           │ draw_unseen_id (1 RNG)             │
-  SaveManager decks    │   ├─ cultivate → attr +1..3 (1 randf)    │           │ [NEW] reroll (event_reroll input)  │
-  (unchanged decks)    │   ├─ work → silver = f(mastered) ────────┤           │  budget = TraitEffects.            │
-                       │   └─ travel → interactive event          │           │   fortune_reroll_budget(fortune,   │
-                       │   ALL FOUR increment profile.deeds ──────┘           │            deep_fortune)           │
-                       └──────────────┬─────────────────────────────────────┴──────────────┬─────────────────────┘
-                                      │                                                     │
-                                      ▼                                                     ▼
-                     PlayerProfile (editable, additive schema)                    seeded SaveManager.rng
-                     ├─ attrs / gongfa / silver / inventory / equipped (unchanged)  (op-order lifeline:
-                     ├─ deeds {work_months, cultivate_months, practice_months,      old paths untouched; the only
-                     │         travel_resolved, silver_earned}   ← NEW, persisted    new draw sits on a NEW
-                     └─ flags (unchanged semantics)                                  player-initiated input)
-                                      │
-              ┌───────────────────────┼─────────────────────────────────────────────┐
-              ▼                       ▼                                             ▼
-  scripts/data/ending_logic.gd   scripts/data/battle_setup.gd                  scripts/segments/ending.gd
-  (NEW pure static)              (sanctioned extension)                        (editable)
-  evaluate(profile, deeds) ->   derive_stats(profile) EXTENDED:               renders tier + axis summary
-    {score, axes, tier, summary}   max_health/energy/initiative gain           (evaluation_text, score)
-  MapData.ENDING_TIERS             a mastered-arts cultivation term              ▲
-    re-thresholded (min_score)     readiness(profile) -> verdict band            │ warning surface
-                                   MapData.HUASHAN_BAR (NEW data)  ─────────► scripts/ui/roster_panel.gd (editable)
-                                                                              + CultivationScreen body line (year ≥ 3)
-```
-
-Data-flow invariants:
-
-1. **One evaluation function, three readers.** `EndingLogic.evaluate(profile, deeds)`
-   is the single scoring path; `ending.gd` renders it, the playtest nails assert on
-   it, and the unit suite exercises it headlessly. No duplicated tier math.
-2. **Deeds are persisted, never derived from session mirrors.** `map.gd`'s session
-   mirrors (`map_events_resolved_count`, `settled_node_events`) are session-scoped
-   by R2 design and live in a **locked** file — the ending must not depend on them.
-   Deeds count only cultivation-channel events (`profile.deeds.travel_resolved`),
-   which `cultivation.gd` owns end-to-end.
-3. **Zero new RNG on old paths.** Deed increments, work scaling, practice +2, the
-   ending evaluation, and readiness are pure arithmetic. The ONLY new RNG draw in
-   the round is the reroll's second `draw_unseen_id` call, which executes only when
-   the player presses the new reroll input — old timelines (which never press it)
-   keep byte-identical streams.
-4. **Warning surfaces read the same math the fight uses.** `readiness()` wraps
-   `derive_stats()`; the preview can never drift from the actual duel numbers
-   because there is one formula source.
-
----
-
-## 4. Design decisions (with rejected alternatives)
-
-### D1 — Ending evaluation: multi-axis score, thresholds from measured curves (P1)
-
-`scripts/data/ending_logic.gd` (NEW, pure static, mirrors `EventLogic`/`TraitEffects`
-conventions: no autoloads, no scene tree, unit-testable):
-
-```
-evaluate(profile, deeds) -> Dictionary:
-  axes = {
-    "attrs":    bone + inner + agility + wisdom + fortune,          # existing sum, kept
-    "mastery":  Σ over profile.gongfa where mastered: GRADE_POINTS[grade]   # D=1 C=2 B=3 A=4
-    "deeds":    W_TRAVEL * deeds.travel_resolved + W_SILVER * deeds.silver_earned
-  }
-  score = round(axes.attrs * K_ATTR + axes.mastery * K_MASTERY + axes.deeds)
-  tier  = MapData.ending_tier(score)          # same first-row-wins scan
-  return {score, tier, axes, summary}         # summary = per-axis lines for the screen
-```
-
-- `MapData.ENDING_TIERS` rows gain `min_score` (replacing `min_total` as the scan
-  key); titles/texts stay (they are pinned copy elsewhere — reuse, never rewrite).
-  `ending_tier(total)` becomes `ending_tier_score(score)`; the old function is
-  removed together with its caller in the same task (no dead dual path).
-- **Why axes and not just higher thresholds:** with thresholds alone, "choices
-  matter" still dies the moment one axis saturates. Mastery and deeds keep growing
-  through month 36 *by construction* (mastery needs 4–10 practice months per art;
-  deeds accrue per action), so a choice in month 36 still moves `score`.
-- **Why deeds are cultivation-channel-only** (rejected: counting map node events /
-  battle wins): `map.gd` and `GameManager` are locked; their counters are
-  session-scoped and would silently zero on reload — a persisted-deed design that
-  silently reads zero after a reload would make the ending lie. Limitation recorded
-  in `design/40_progression.md` by 5_design.
-- **Tuning targets (the gate is these differentials, never the constants):**
-  - T-1 two divergent seeded playthroughs (work-heavy vs practice/travel-heavy)
-    reach **different** `{tier, score}` records.
-  - T-2 a month-36 action flip changes the evaluation record on a
-    boundary-straddling seeded save.
-  - T-3 a creation-maximized profile that then plays zero-growth months cannot
-    reach tier 3 (the early-freeze hole stays closed at the TOP as well).
-  - T-4 a normally-played balanced route reaches tier 2 comfortably (measured
-    median over ≥ 5 seeded runs, recorded in `design/40_progression.md`).
-  - Constants `K_*`, `W_*`, thresholds: **PROVISIONAL — M2 measurement sets them**;
-    the implementer records the measured curves before freezing values, exactly as
-    the equipment round recorded its tier anchor derivation.
-
-### D2 — Fortune consumer: implement the screen promise verbatim (P2, option (a))
-
-- `scripts/data/trait_effects.gd` gains the pure-static consumer:
-  `fortune_reroll_budget(fortune: int, has_deep_fortune: bool) -> int` =
-  `1 + floor(max(0, fortune - 10) / 10) + (1 if has_deep_fortune else 0)`
-  (PROVISIONAL curve; tiers at fortune 10/20/30 → 1/2/3 yearly rerolls, +1 trait).
-  This is the sanctioned `trait_effects.gd` extension surface; the trait hook
-  `yearly_event_reroll` finally gets its reader (`profile.has_trait("deep_fortune")`).
-- `scripts/segments/cultivation.gd` EVENT phase: new `rerolls_left` surface +
-  reroll affordance (keyboard action `event_reroll` + a code-built
-  `EventRerollButton` rendered in the existing event options flow, visible only
-  when `rerolls_left > 0`). Pressing it: decrement the year-scoped counter
-  (`profile.flags` is wrong for this — see the D-schema note below), re-draw
-  `event_id = EventLogic.draw_unseen_id(profile, SaveManager.rng)` (ONE draw, the
-  same op the original draw used), publish `event_title`/`event_body` via the
-  existing `_sync_surface()`, receipt via `status_text` (new i18n string with the
-  remaining count). The reroll budget counter lives in `profile.deeds`
-  (`rerolls_used_this_year`, zeroed in `_advance_year` — the editable year-reset
-  point), so it survives save/load for free.
-- `scripts/segments/creation.gd::_ATTR_DESCS["fortune"]` is updated to the
-  implemented mechanic, verbatim-consistent with the trait description:
-  「影响事件与奇遇(福缘越高，每年游历事件可重掷次数越多)」 (PROVISIONAL wording;
-  final wording lands with the i18n task). The `creation_attr_effect_info`
-  scenario's copy pins are re-derived in the same task (documented change table —
-  this is the one sanctioned existing-scenario touch outside the protected trio).
-- Rejected: (a) removing the promise instead — the brief prefers a real consumer
-  and the mechanism already has a defined hook and trait; (b) fortune-scaled event
-  pool weighting — that changes `draw_unseen_id` op order (lifeline) for a benefit
-  the screen never promised; (c) wiring `map_inquire` too — out of scope (recorded
-  by Step 1 as record-only).
-- Honest boundary recorded for 5_design: `map_inquire` (江湖阅历) remains
-  unimplemented after this round — the creation-screen TRAIT list is not touched by
-  this round; only the ATTR promise is resolved. The residual stays recorded.
-
-### D3 — Four monthly actions, four measured niches (P3)
-
-Mechanism edits in `cultivation.gd::_apply_action` (+ action-list copy), all
-zero-new-RNG:
-
-| Action | Now (measured shape) | New niche (PROVISIONAL constants) | Why it is unique |
-|---|---|---|---|
-| 练功 practice | +1 practice, target art chosen | **+2 practice** into the player-CHOSEN art | the only action where the player picks WHICH art advances (cards dump into first-unmastered); the only path up the 甲 prereq cascade |
-| 修习 cultivate | wisdom-gated +1..3 attr | unchanged (kept) | the only repeatable attribute source among the four |
-| 做工 work | flat +10 silver | **+10 + 2 × mastered_count** silver | the only action whose yield *compounds with the run*; strictly the best repeatable silver source (a free card is one-shot, the economy deck exhausts) |
-| 游历 travel | event draw | unchanged draw; **now interacts with fortune (reroll budget) and feeds `deeds.travel_resolved`** | the only item source and the only action fortune acts on |
-
-- The screen shows the difference: each ACTION_PICK row gets a one-line effect
-  suffix (new i18n strings), and `CultivationScreen` publishes `last_action_kind`
-  + `last_yield_text` (e.g. 「做工：银两 +14」) for the differential nails.
-- Measurement instrument (M1): a GDScript unit harness
-  (`tests/test_action_yield_curves.gd`, NEW) runs the REAL `_apply_action` math
-  (static-extractable: the per-action yield helpers live in
-  `scripts/data/progression_math.gd` — NEW pure static — so the curve measurement
-  needs no scene) over 36 seeded months × 5 single-action strategies + 1 balanced
-  strategy, and records the yield table into `design/40_progression.md` §3 (5_design).
-  Playtest nails then pin the *differential* facts on screen, never the numbers:
-  - N-3a: a work-month yields strictly more silver than each of the other three
-    actions' silver yield, measured on the same seeded save (4 comparisons).
-  - N-3b: a practice-month advances the targeted art's practice strictly more than
-    a card-only month.
-  - N-3c: pre-fix red evidence: on the current tree `work` (+10) ≤ one free card
-    (`gr_silver_30` +30) — measured once, recorded as the red value.
-- Rejected: tying work income to fortune (would double-book fortune's consumer);
-  making travel grant practice (would erase practice's niche); raising work to a
-  flat 30+ (still dominated by `art_silver_500` and re-opens the R2 silver→attr
-  facility redemption pressure the cap just closed).
-
-### D4 — Huashan winnable through the sanctioned stat surface, pre-warned on two editable screens (P4)
-
-**Winnability (player-side battle numbers only):**
-
-`scripts/data/battle_setup.gd::derive_stats` gains a cultivation term (PROVISIONAL
-coefficients, finalized by M3):
-
-```
-m  = Σ over profile.gongfa mastered: 1                     (count)
-mp = Σ over mastered arts: GRADE_POINTS[grade]             (D=1 C=2 B=3 A=4, same table as D1)
-max_health  = bone*5      + 6*mp + gear.health      (135 → ~200+ on a normal route)
-energy      = inner*2     + 4*mp + gear —           (finisher affordability late-run)
-initiative  = agility      + 3*mp + gear.initiative  (25 → ~45-60: player acts before
-                                                       the 70-initiative greats' second
-                                                       wind, not before round 1 globals)
-attack_damage / move_range / attack_range: UNCHANGED (keep the fight's texture)
-```
-
-- Why these levers: they are pure functions of the SAME persisted profile the
-  ending reads — three years of practice/cultivate/work visibly cash out in the
-  finale — and they live entirely in `battle_setup.gd` (editable, sanctioned).
-  Enemy numbers, roster, positions, and the round-1 damage-floor layout in
-  `MapBattleData`/`battlefield.gd` are untouched, so the fight's challenge is
-  structurally intact (5 enemies, 560 total HP, same AI).
-- `build_character` needs no signature change (it already calls `derive_stats`).
-- Regression duties from this change (task T5's checklist):
-  `equipment_in_battle_diff` 47/47 (gear differentials still `changed`),
-  `cultivation_changes_combat` 30/30 (differentials, not literals),
-  `map_battle_node_huashan` 41/41 **verbatim** (`max_health != 1000 and > 0`
-  trivially holds; `turn_order.size() == 6` untouched),
-  `terminal_victory_8_12_rounds_hp_15_40` 6/6 (tutorial path does not use
-  `derive_stats` — verify by read, not by hope).
-- Winnability proof (N-4c, the round's flagship nail): a seeded, normally-played
-  route (balanced actions, no min-max) runs 36 months on screen, travels to 华山,
-  and WINS the duel with real skill clicks + end turns (the same click grammar the
-  existing `map_battle_node_huashan` win leg uses), asserting the WIN → MAP return.
-  Red-first: the same route on the pre-fix tree measured LOSING (record the frame).
-  Challenge preservation (never nerfed to triviality) is pinned structurally, not
-  numerically: the same scenario asserts the player did NOT end at full health
-  (`health < max_health` differential) — a fight won untouched is a red flag, and
-  the assertion says so without pinning any HP literal.
-
-**Advance warning (two editable surfaces, zero locked-file edits):**
-
-- `BattleSetup.readiness(profile) -> {power: int, verdict_key: String}` where
-  `power = max_health/5 + attack_damage + initiative/2` (PROVISIONAL composite) and
-  `verdict_key ∈ {"huashan_weak", "huashan_even", "huashan_strong"}` against
-  `MapData.HUASHAN_BAR = {"even": E, "strong": S}` (NEW const in the editable data
-  layer; values set by M3 from the winnable-run measurement).
-- Surfaces: `RosterPanel.readiness_text` (visible on map AND cultivation via the
-  existing panel) + a `CultivationScreen` body line from year 3 month 1 onward —
-  both render 「华山论剑评估：…」 so the warning exists for the ~30 months BEFORE
-  the map even opens. All strings → `i18n.gd` EN dictionary.
-- Differential nail (N-4a): two seeded profiles (creation-fresh vs mid-grown)
-  produce **different** verdict strings (never a literal power number).
-
-### D5 — Persistence: `profile.deeds`, additive with legacy repair (P1/P2/P3 carrier)
-
-- New field `var deeds: Dictionary = {"work_months": 0, "cultivate_months": 0,
-  "practice_months": 0, "travel_resolved": 0, "silver_earned": 0,
-  "rerolls_used_this_year": 0}` — String keys only (JSON-lossless, per the
-  `equipped` precedent comment in `player_profile.gd:24-29`).
-- `to_dict()` adds `"deeds": deeds.duplicate()`; `from_dict` coerces each known
-  key with `maxi(int(v), 0)` and **defaults missing keys to 0** (legacy saves load
-  clean — mirrors the `equipped` repair philosophy; nothing wiped, nothing crashed).
-- `save_load_roundtrip` 14/14 stays green: the field round-trips symmetrically.
-- Increment points (all in editable files): `_apply_action` (per kind),
-  `_apply_event_option` success path (`travel_resolved`, `silver_earned` when an
-  event pays), `_apply_card` (`silver_earned` on silver cards), `_advance_year`
-  (`rerolls_used_this_year = 0`).
-
-### D6 — What is intentionally NOT built (scope discipline)
-
-- No companion/party work, no sect-relations, no 同伴 recruitment (Out of scope).
-- No new map nodes, no new battle slots, no `map.gd` edits of any kind (locked).
-- No change to R2 rules: facility cap 2/month, no-re-settlement, all-or-nothing
-  purchases, soft-lock exit — all preserved verbatim; deed/rebalance code must not
-  touch `_resolve_node_event`, `FACILITY_MONTHLY_USE_CAP`, or `EventLogic`'s
-  validate-then-apply contract.
-- No UI theme/geometry work: `assets/themes/global_theme.tres`,
-  `scenes/ui/{tutorial_overlay,roster_panel,hud}.tscn`,
-  `scenes/segments/sect_select.tscn` untouched. The new reroll button and readiness
-  lines are code-built controls inside existing containers in
-  `scripts/segments/cultivation.gd` / `scripts/ui/roster_panel.gd` (their .tscn
-  files stay unopened), and every touched frame re-asserts
-  `UiOcclusionWatch.violations == 0 and scan_ok == true` inside the new nails.
-- `ending.gd` gains text content only (existing `BodyLabel`, no new nodes) — the
-  ending screen's geometry stays as-is.
-
-### D7 — RNG-stream safety ledger
-
-| Change | RNG ops added on old paths | New-path ops |
+| 层 | 文件 | 卡 |
 |---|---|---|
-| deeds increments, work scaling, +2 practice | 0 | 0 |
-| Ending evaluation / readiness | 0 | 0 |
-| fortune reroll | 0 | 1 × `draw_unseen_id` per press (player-initiated only) |
-| derive_stats extension | 0 | 0 |
+| 纯数学单源 | `scripts/data/progression_math.gd` | C1、C7 |
+| 事件/修习核心 | `scripts/data/event_logic.gd` | C2 |
+| 养成段 | `scripts/segments/cultivation.gd` | C2、C6、C7 调用点 |
+| 地图数据 | `scripts/data/map_data.gd` | C3(ENDING_TIERS)、C4(HUASHAN_BAR + 删辩护注释) |
+| 结局屏 | `scripts/segments/ending.gd` | C3(历史观测量)、C7(银两观测量) |
+| 单元测试 | `tests/test_progression_math.gd`、`tests/test_action_yield_curves.gd`(既有文件更新) | C1、C7 |
+| playtest | `playtest/huashan_winnable_normal_route.yaml`(重写)、`playtest/huashan_readiness_warning.yaml`(重基线)、新增 3 条场景、`playtest/_common.yaml` | C2–C7 |
+| 契约守卫 | `tests/test_playtest_contract_smoke.py`(ROUND_SCENARIOS 两地同步 + 新钉子门) | 全部 |
+| 设计档案 | `design/40_progression.md`、`design/90_decisions.md`、`design/00_roadmap.md`、`design/99_changelog.md` | C8 |
 
-`save_load_roundtrip` and `event_travel_effects` must re-run green in the
-consolidated gate; the reroll nail declares its own seeded stream in its header.
-
----
-
-## 5. Component list & interfaces (file-by-file, repo-root-relative)
-
-| # | File | Status | Change |
-|---|---|---|---|
-| 1 | `scripts/data/progression_math.gd` | **NEW** | Pure static: `GRADE_POINTS`, `mastery_points(profile)`, `work_income(mastered_count)`, `deed_score(deeds)`, `readiness_power(stats)`. Zero autoload refs; consumed by 2/4/6; unit-tested headless. |
-| 2 | `scripts/data/ending_logic.gd` | **NEW** | `evaluate(profile, deeds) -> {score, tier, axes, summary_lines}`; the ONLY tier-scoring path. |
-| 3 | `scripts/data/player_profile.gd` | edit | `deeds` field + `to_dict`/`from_dict` additive repair (D5). |
-| 4 | `scripts/data/map_data.gd` | edit | `ENDING_TIERS` → `min_score` rows (values from M2); NEW `HUASHAN_BAR` const; `ending_tier_score()` replaces `ending_tier()`. |
-| 5 | `scripts/data/trait_effects.gd` | edit | NEW `fortune_reroll_budget(fortune, has_deep_fortune)` (pure). |
-| 6 | `scripts/data/battle_setup.gd` | edit | `derive_stats` mastery terms (D4); NEW `readiness(profile)`; `_attr` untouched. |
-| 7 | `scripts/segments/cultivation.gd` | edit | deed instrumentation; work/practice rebalance; ACTION_PICK copy lines; EVENT reroll affordance + `rerolls_left`/`last_action_kind`/`last_yield_text` surfaces; `_advance_year` reroll-budget reset; body line year ≥ 3. |
-| 8 | `scripts/segments/ending.gd` | edit | compute via `EndingLogic.evaluate`; render axis summary into `BodyLabel` (existing node); surfaces `score`, `evaluation_text`. |
-| 9 | `scripts/ui/roster_panel.gd` | edit | readiness line (`readiness_text`) via `BattleSetup.readiness` — warning visible on map + cultivation. |
-| 10 | `scripts/segments/creation.gd` | edit | `_ATTR_DESCS["fortune"]` honest copy (D2); `_step_cost`/`START_POINTS` untouched. |
-| 11 | `scripts/autoload/i18n.gd` | edit | EN-dict appends only (Chinese-as-key convention). |
-| 12 | `project.godot` | edit | `[input]` action `event_reroll` (R key + ui_select alias). |
-| 13 | `playtest/_common.yaml` | edit | **append-only**: surfaces (`CultivationScreen.rerolls_left/last_action_kind/last_yield_text`, `EndingScreen.score/evaluation_text`, `RosterPanel.readiness_text`) + `scenario_order` tail appends. |
-| 14 | `playtest/ending_divergent_playstyles.yaml` | **NEW** | Nail N-1a (two playstyles → different evaluations). |
-| 15 | `playtest/ending_last_month_choice.yaml` | **NEW** | Nail N-1b (month-36 flip changes evaluation). |
-| 16 | `playtest/fortune_reroll_budget.yaml` | **NEW** | Nail N-2 (reroll replaces drawn event, budget decrements, exhausted state inert). |
-| 17 | `playtest/action_yield_differential.yaml` | **NEW** | Nails N-3a/3b (per-action unique-yield differentials). |
-| 18 | `playtest/huashan_readiness_warning.yaml` | **NEW** | Nail N-4a (verdict differs weak vs strong; occlusion watch on the touched frames). |
-| 19 | `playtest/huashan_winnable_normal_route.yaml` | **NEW** | Nail N-4c (normal route wins the duel; asserts a non-trivial fight). |
-| 20 | `tests/test_ending_logic.gd` | **NEW** | Unit: scoring monotonicity, tier scan, deeds schema, legacy-deeds defaults, divergence property. |
-| 21 | `tests/test_action_yield_curves.gd` | **NEW** | M1 instrument: 36-month seeded per-strategy yield curves (the measurement run IS a test artifact). |
-| 22 | `tests/test_battle_setup_readiness.gd` | **NEW** | Unit: derive_stats mastery terms, readiness bands, gear additivity preserved, tutorial-path isolation (by construction). |
-| 23 | `tests/test_ending_gate_pins.py` | **NEW** | stdlib anti-weakening door over the new nails' load-bearing literals (mirrors `test_map_battle_gate_pins.py`). |
-| 24 | `tests/test_playtest_contract_smoke.py` | edit | `ROUND_SCENARIOS` two-place tail sync + surface-append guards. |
-
-Never touched: the six locked files, the three verbatim gates, `event_data.gd`,
-`facility_data.gd`, `card_data.gd` values, theme/UI-geometry files,
-`scenes/segments/map.tscn` (its `HintLabel.text` is text-contract-pinned),
-`scripts/autoload/ui_occlusion_watch.gd`.
+**零触碰清单(锁)**:`scripts/battlefield.gd`、`scripts/autoload/game_manager.gd`、`scripts/autoload/scene_manager.gd`、`scripts/segments/map.gd`、`scripts/data/map_battle_data.gd`、`playtest/map_battle_node_huashan.yaml`(六文件锁);三条 verbatim 闸门(`facility_use_reusable` / `map_node_event_shaolin` / `map_battle_node_huashan`)逐字节不动;RNG 生命线 `save_load_roundtrip`、`event_travel_effects` 在改动后必须复跑绿。**本设计全部改动为纯算术/数据/观测量,零新增 RNG 操作**(逐条核对见 §8)。
 
 ---
 
-## 6. Playtest contract (Architect-owned observables + scenario skeletons)
+## 1. 硬约束(每张卡都吃)
 
-Surfaces (all appended to `_common.yaml` — append-only):
+1. **先红后绿**:每张卡先跑出实测红(失败帧 / 首断 / 确切错误串 / 红前绿数),才准落修复。brief 已给的红值视为权威测量(帧在服务器 `~/.AItelier/play_frames_r3/`,不在仓内,不重推);修复轮用**临时回退法直连边车**(`# TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` 标记 + `godot_playtest_scenario` 直连,跑红后逐字节还原)补齐每条新钉子的四值。
+2. **钉性质不钉字面量**:差分(`changed`)、边界、比率、计算型布尔观测量;禁绝对银两/血量/Power 字面量;测试夹具的等级键**必须取自生产词表**(`PRACTICE_TO_MASTER`/`GRADE_BY_YEAR` 的键),不许手写字符串。
+3. **真实档验证**:仪器与钉子走 main.tscn → 教程 → 创建 → 入门派的完整 boot;`debug_seed_save` 空档只允许出现在「度过多月 ×36」这条**唯一合法的无功法路线**上(C3 腿 A,见 §3-C3 的路线裁定)。
+4. **升级条款(C5)**:C1 落地后若玩家侧杠杆仍赢不了华山且不琐碎化战斗 → **停手**,向所有者申请解锁 `scripts/data/map_battle_data.gd`。不许把「赢」重定义成「多活两回合」,不许用 debug 胜利充数。
+5. **`map_data.gd:63-69` 辩护散文删除**:「fresh profile scores below 30 on all seeds」与算术不符(10/10/10 → power = 50/5 + 20 + 10/2 = 35 ≥ 30)。改为 C4 实测值,或删。
+
+---
+
+## 2. 架构图(数据流)
 
 ```
-CultivationScreen: rerolls_left, last_action_kind, last_yield_text   # + existing set
-EndingScreen:      score, evaluation_text                            # tier already exposed
-RosterPanel:       readiness_text
+                    ┌── 生产等级词表(唯一来源,拉丁键 D/C/B/A)──────────────┐
+                    │  scripts/data/progression_gongfa_data.gd              │
+                    │   PRACTICE_TO_MASTER {"D":4,"C":6,"B":8,"A":10}       │
+                    │   GRADE_BY_YEAR ["D","C","B"]  GRADE_SUFFIX/GRADE_STEP│
+                    └──────────────┬────────────────────────────────────────┘
+                                   │ keys 派生(唯一词表来源,C1)
+                    scripts/data/progression_math.gd
+                      GRADE_POINTS  ← 由 PRACTICE_TO_MASTER 的键派生,值=丁1丙2乙3甲4
+                      mastery_points(profile)   ├──→ EndingLogic.evaluate → 结局武学轴 (C1)
+                      work_income(months)       ├──→ cultivation 做工 (C7,驱动改为 work_months)
+                      deed_score(deeds)         ├──→ 结局历练轴 (C3 阈值重测)
+                      readiness_power(stats)    ────→ BattleSetup.readiness → HUASHAN_BAR (C4)
+                                   │
+        scripts/segments/cultivation.gd          scripts/data/event_logic.gd
+          _apply_action("practice") ──┐   add_practice(profile, amount, target_id:="") (C2)
+             target 传入 ↓            │      target 空才回落 _first_unmastered_id
+          last_yield_text(显示名) ────┼──→ _render() 追加回执行 (C6)
+          practice/attr 回执去 raw id ─┘
+                                   │
+      scripts/data/map_data.gd     │
+        ENDING_TIERS min_score(90/60/0 → M2' 实测重定)  ←── 36 月真实档路线表 (C3)
+        HUASHAN_BAR {even,strong} → M3' 实测重定 + 删辩护注释 (C4)
+                                   │
+      scripts/segments/ending.gd   │
+        ending_tier_history / ending_title_history / first_ending_silver 观测量 (C3/C7 钉)
+                                   │
+      playtest/*.yaml(真实档 boot)+ tests/*.gd(无头仪器)
+        新钉子:practice_target_receipt (C2+C6) · ending_tiers_differentiate (C3)
+               work_beats_idling (C7) · huashan_winnable_normal_route 重写 (C5)
+               huashan_readiness_warning 重基线 (C4)
 ```
 
-Scenario skeletons (PM fills thresholds; every nail is a differential, zero
-balance literals; each carries a RED-FIRST EVIDENCE header block with the four
-house values: failing frame / first failing assert / exact observed / greens
-before red):
+---
 
-1. `ending_divergent_playstyles` — debug-seeded fresh save → 36 months of
-   work-heavy clicks → ENDING: capture `score`/`tier`/`evaluation_text`; second
-   leg (same seed, practice-heavy) → assert the evaluation record DIFFERS from
-   leg 1. Skeleton asserts `EndingScreen.tier >= 1` early, then the differential.
-2. `ending_last_month_choice` — seeded save near month 36 → leg A: month-36 work →
-   record evaluation; debug-reload same save → leg B: month-36 练功 → assert
-   evaluation record differs from leg A (same-frame comparison discipline).
-3. `fortune_reroll_budget` — seed a profile with fortune ≥ 20 via the seeded
-   creation path → travel draw → press `event_reroll` → assert `event_id`
-   changed, `rerolls_left` decremented, `event_title`/`event_body` re-published;
-   second leg: exhaust the budget → reroll press is inert (no change, receipt
-   non-empty); third leg: `UiOcclusionWatch.violations == 0` on the reroll frame.
-4. `action_yield_differential` — same seeded start, four one-month legs
-   (work/practice/cultivate/travel): assert `last_yield_text` non-empty per leg
-   and the silver differential `silver(work leg) > silver(each other leg)`;
-   practice leg asserts the TARGET art's practice advanced (targeted-niche proof).
-5. `huashan_readiness_warning` — boot a creation-fresh profile →
-   `RosterPanel.readiness_text` == weak verdict; grant cultivation via the seeded
-   month loop → verdict differs. (Differential on the verdict string, never on a
-   power literal.)
-6. `huashan_winnable_normal_route` — full seeded balanced route (clicks-only
-   month grammar: `CultOptionButton0` + `CultOptionButton2`, year-boundary clicks)
-   → map → travel to 华山 → fight with real skill clicks + `end_turn` → assert
-   WIN → `current_state == "MAP"` → assert `health < max_health` at the win frame
-   (fight was real). This is the round's flagship nail and the longest scenario;
-   its frame budget follows the `map_battle_node_huashan` precedent (≤ 2999 hard cap).
+## 3. 组件设计(逐卡)
 
-GDScript unit suite (headless, seeded — the cheap differential workhorse):
-`tests/test_ending_logic.gd` (divergence + monotonicity + legacy schema),
-`tests/test_action_yield_curves.gd` (the M1 curves),
-`tests/test_battle_setup_readiness.gd` (stat math + bands).
+### C1 (L2) — 等级词表单一来源
+
+**已验证锚点**:`scripts/data/progression_math.gd:16`(`GRADE_POINTS := {"丁":1,"丙":2,"乙":3,"甲":4}`,CJK);生产写入端全部拉丁键 — `progression_gongfa_data.gd:22/27/30/33`(`PRACTICE_TO_MASTER`/`GRADE_BY_YEAR`/`GRADE_SUFFIX`/`GRADE_STEP`)、`cultivation.gd:456/455`(shen_gong `add_gongfa(pick,"A")`)、`:566-573`(`_grant_year_arts` 用 `GRADE_BY_YEAR`)、`:967`(debug A 授予);`event_logic.gd:95-96`(`PRACTICE_TO_MASTER.get(grade,4)`)。唯一消费 CJK 键的就是 `GRADE_POINTS` 自己 + `tests/test_progression_math.gd:19` 的 `GRADE_KEYS := ["丁","丙","乙","甲"]` 手写夹具。
+
+**设计**:
+
+1. `scripts/data/progression_math.gd`:`GRADE_POINTS` 改为**从 `PRACTICE_TO_MASTER` 的键派生**:
+   ```gdscript
+   const ProgressionGongfaData = preload("res://scripts/data/progression_gongfa_data.gd")
+   ## 设计点值(10_systems §3: 丁1 丙2 乙3 甲4),键一律取生产词表。
+   const _GRADE_POINT_VALUES := {"D": 1, "C": 2, "B": 3, "A": 4}
+   ## SINGLE-SOURCE:键集 = PRACTICE_TO_MASTER.keys()(生产词表),从不手写。
+   static var GRADE_POINTS: Dictionary = _derive_grade_points()
+   static func _derive_grade_points() -> Dictionary:
+       var out := {}
+       for key in ProgressionGongfaData.PRACTICE_TO_MASTER.keys():
+           out[key] = int(_GRADE_POINT_VALUES.get(key, 0))
+       return out
+   ```
+   - `mastery_points` 本体不动(它读 `GRADE_POINTS.get(grade,0)`,键换拉丁后真实档立即非零)。
+   - **回退路**(若 static-var 初始化在 headless 装载序上出问题,实测才会暴露):退为 `const GRADE_POINTS := {"D":1,"C":2,"B":3,"A":4}` 字面拉丁键 + 一条**键集相等**单元钉(`GRADE_POINTS.keys()` 与 `PRACTICE_TO_MASTER.keys()` 互为充要)——「共享同一套键」同样满足 C1;两条路线都由同一个单元钉守护,实现者按实测择一。
+2. 全仓 `grade` 消费面扫荡(实现时逐点核对,预期零残余):`event_logic.gd:95`(拉丁 ✓)、`cultivation.gd:566/759`(拉丁 ✓)、`battle_setup.gd`/`GongfaData.GRADE_RANK`(键为拉丁,实现时直读 `scripts/data/gongfa_data.gd` 确认)。**除 `progression_math.gd` 外预期零改动** — 扫荡是防漏,不是预期改动面。
+3. **单元钉重写**(`tests/test_progression_math.gd`,既有文件):
+   - 删 `GRADE_KEYS` 手写 CJK 常量,改为 `var GRADE_KEYS: Array = ProgressionGongfaData.PRACTICE_TO_MASTER.keys()`(夹具从生产词表取键,卡规原文);
+   - `_test_grade_points`:断言 `GRADE_POINTS` 键集与 `PRACTICE_TO_MASTER.keys()` 互为充要(C1 单源守卫)、每个键的点值与 `_GRADE_POINT_VALUES` 一致;
+   - `_test_mastery_points`:用生产键构造 mastered 行(D/C/B/A),保留既有性质钉(未大成 → 0、未知键 `"ZZ"` → 0、缺 `mastered` 键 → 0);
+   - `PlayerProfile.add_gongfa(id, grade)` 的 grade 实参一律取词表键。
+4. **场景钉(C1 的树上证明)**:真实档练功路线跑到结局,断言 `EndingScreen` 武学轴 > 0 — 挂在 C3 新场景的腿上(见下),红先值 = 当前树上武学轴 `== 0`(brief 实测:`pt2_top_s2_frame_1020.png` 武学:0)。
+
+### C2 (L3) — 练功加到所选功法
+
+**已验证锚点**:`cultivation.gd:469-476`(读 `target` 却调 `_add_practice(PRACTICE_ACTION_GAIN)` 不带 target;`last_yield_text = tr("练功：%s +%d") % [target, ...]` 用裸 ASCII id);`event_logic.gd:87-97`(`add_practice(profile, amount)` → `_first_unmastered_id`);`cultivation.gd:581-582`(`_add_practice` 转发);事件效果调用点 `event_logic.gd:79`(无 target,必须保留回落)。
+
+**接口变更**:
+
+```gdscript
+# scripts/data/event_logic.gd
+static func add_practice(profile: PlayerProfile, amount: int, target_id: String = "") -> void:
+    if profile.has_trait("sha_po_lang"):
+        amount = TraitEffects.pojun_practice(amount)     # 变换次序不变(纯算术,零 RNG)
+    var gid: String = _resolve_target(profile, target_id)
+    if gid == "":
+        return
+    ...  # 既有累加 + PRACTICE_TO_MASTER 门槛判大成,逐字不动
+## target 非空且是 profile 里**未大成**的行 → 用它;否则(空 / 未知 id / 已大成)
+## 一律回落首个未大成 — 绝不静默丢弃这次练功。
+static func _resolve_target(profile: PlayerProfile, target_id: String) -> String
+```
+
+- **裁定(记入 90_decisions 裁决一附注)**:target 指向已大成或未知 id 时**回落**到首个未大成而不是丢弃 — 理由:练功月份已经付出,静默丢弃等于月份蒸发;回落保持「练功必有所得」的不变量。UI 路径(`GONGFA_PICK` 只列 `_unmastered_ids()`)永远不会触发该回落,它是纯防御分支。
+- `cultivation.gd:_apply_action` "practice" 分支:`_add_practice(PRACTICE_ACTION_GAIN, target)`(包装函数加透传参数);`last_practice_target` 语义升级为**实际生效的 gid**(解析后的),不再是原始输入。
+- 事件效果路径 `apply_option_effects` → `add_practice(profile, value)` 不传 target → 回落,行为逐字节不变。
+
+**回执显示名(与 C6 共用)**:`last_yield_text = tr("练功：%s +%d") % [ProgressionGongfaData.display_name_of(gid), gain]`;`display_name_of` 未知时返回 `""`,此时降级回原始 gid(诚实降级,roster_panel 先例)。
+
+**钉(新场景 `playtest/practice_target_receipt.yaml`,承载 C2+C6)**:
+- 第 1 月练功选第 1 行(默认焦点)→ 第 2 月练功**点第 2 行**(`GONGFA_PICK` 的 `CultOptionButton1`):断言 `CultivationScreen.last_practice_target: changed`(两月目标不同)、新观测量 `CultivationScreen.last_practice_other_rows_unchanged == true`(**零差分钉**:第 1 行及全部其它未大成行的 practice 计数不变,计算型观测量,不写任何绝对计数)、`CultivationScreen.last_yield_text: changed` 且 `last_yield_text` 含所选功法**显示名**(CJK 字面钉,值源自 `display_name_of`,与 `event_pool_new_event_resolved` 的中文钉同纪律)。
+- 红先:修复前选第 2 行,`last_practice_target` 记的是 `"shaolin_luohan_d"` 但实际加到第 1 行(brief 实测 `pt2_top_s0_frame_0340/0425.png`:`易筋经·入门(2/4)`、`罗汉拳(0/4)`)→ 修复后树上先以临时回退(`_add_practice` 去掉透传)跑出四值。
+
+### C3 (L3) — 结局档位分化
+
+**已验证锚点**:`map_data.gd:81-88`(`ENDING_TIERS` min_score 90/60/0);`ending_logic.gd:27-33`(score = attrs×1.0 + mastery×2.0 + deed_score);`progression_math.gd:20-21/51-54`(deed = travel×2.0 + silver_earned×0.05);`ending.gd:76-80`(三轴渲染 + `first_ending_evaluation`);deeds 写入点 `cultivation.gd:423`(卡牌银两,真实钳位差值)/`:495`(做工)/`:617`(游历)。免费卡 `card_data.gd:30` `eco_20` value 20、count 4 → 每月卡池近乎必出 +20。
+
+**M2' 实测流程(先测后调,红先绿后)**:
+
+1. **仪器**:扩展 `tests/test_action_yield_curves.gd` 的月循环模拟(它已复刻真实行动数学 + 播种 RNG),新增「真实档入档前缀」:先模拟入派授艺(`_grant_year_arts` 等价:internal+external 丁级各一门,`main_external_id` 置位),再跑 36 月 — 使测量发生在**有功法、有门派**的档上,而不是 0/0 空档。
+2. **路线定义(裁定,记入 90_decisions 裁决二附注)**:
+   - **腿 A · 什么都不做**:`度过本月` ×36。该按钮只在「无未大成功法」时出现 — 在 0 功法空档上它从第 1 月就存在,是**唯一合法的零收益路线**;真实档(入门派)上它要求先练满全部功法,不再是「什么都不做」。故腿 A 用空档播种子 + 纯键盘(收卡 + 练功→度过多月),**并在 40_progression.md 记录该路线的可达性边界**;真实档上的 tier-1 下界由腿 A' (最低产出合法路线:36 × 修习,+1~3 属性/月)承载,两条都断言 tier < 3。
+   - **腿 B · 单一路线**:36 × 练功(只推武学轴)。
+   - **腿 C · 均衡/强路线**:练功 + 修习 + 做工 + 游历混合(clicks-only 月语法,`ending_divergent_playstyles` Leg A 先例)。
+3. **阈值重定**:由三条腿 × ≥5 种子的实测 score 分布重定 `ENDING_TIERS` 三行 `min_score`(替换 90/60/0;行序 descending、末行 0 的不变量逐字保留)。同时按实测定**历练轴构成**:跑一组「免费卡银两计入 / 不计入 `deeds.silver_earned`」的对照 — 若免费卡银两剔除后三档分化自然成立,则把 `cultivation.gd:423` 的卡牌银两 deed 增量改为不计入(卡牌银两仍入 `profile.silver`,只动 deed 记账一行,零新系统);若剔除后仍不分化,则只动阈值。**两条杠杆按实测择一,不许都动**;结论写进 `40_progression.md` M2' 小节(替换旧表,旧表标注 "measured on empty seeded profile")。
+4. **观测量**(`scripts/segments/ending.gd`,加法不动既有):`ending_tier_history: Array[int]`、`ending_title_history: Array[String]`(每次 `_ready` 追加 tier/title,与 `first_ending_evaluation` 同生命周期);`SaveManager` surface 白名单加这两个名字。
+
+**钉(新场景 `playtest/ending_tiers_differentiate.yaml`,三腿同 run)**:
+- 腿 A(空档度过多月 ×36,键盘语法)→ ENDING:断言 `EndingScreen.tier < 3`(红先:当前 143 > 90 → tier 3);
+- 腿 B(真实档单一路线)→ 断言 `SaveManager.ending_tier_history[1] != SaveManager.ending_tier_history[0]`(**tier 差分,不是 text 差分** — 旧钉 `first_ending_evaluation != evaluation_text` 被三个数字差异满足的漏洞就此关死);
+- 腿 C(真实档强路线)→ 断言 `ending_tier_history[2] != ending_tier_history[0]`、三标题两两互异:`ending_title_history[0] != [1] and [1] != [2] and [0] != [2]`(表达式内联三连不等);
+- `ending_divergent_playstyles.yaml` 的既有差分保留(它钉「同种子异玩法 → 评价不同」,与本钉互补)。
+
+### C4 (L3/L4) — 华山评估两头修真
+
+**已验证锚点**:`progression_math.gd:60-64`(`readiness_power = floor(hp/5)+atk+floor(ini/2)`);`map_data.gd:70`(`HUASHAN_BAR {"even":30,"strong":40}`)与 `:63-69` 辩护散文;`battle_setup.gd:67-78`(`readiness()`,不动);`playtest/huashan_readiness_warning.yaml:67`(`readiness_text == "华山评估：战备不足"` 字面钉,f130 **当前已红** — 10/10/10 空档 power=35 ≥ 30 → 势均力敌,这就是红先值);`cultivation.gd:1074-1082`(第 3 年起正文华山水位行,同一公式源)。
+
+**流程**:
+
+1. **C1 先落**(mastery 项进入 `derive_stats` 的 mp 才非零,战备才随成长动)。
+2. **M3' 实测**:真实档 boot(创建 → 入派)× ≥5 种子 × 三条路线(最低/平衡/强),无头仪器(`tests/test_battle_setup_readiness.gd` 扩展,输出 power/verdict 表)+ 真实华山战局验证(胜负与「活过第 2 回合」)。
+3. **重定 `HUASHAN_BAR`**(`map_data.gd:70`,常量行替换):判据 —(a) 创建即新档(五围 10、0 大成)落 weak 带;(b) 平衡路线落 even 带;(c) 强路线落 strong 带且**进华山后活过第 2 回合**;(d) 评语与实际胜负相关(胜券在握的档不许第 2 回合死)。同时删 `:63-69` 辩护散文,替换为一句指向 `40_progression.md` M3' 实测表的指针(实测值住档案,代码住公式)。
+4. **既有钉转绿**:`huashan_readiness_warning.yaml` 的 f130 字面行按实测重基线(若重定后空档 fresh verdict 仍为 `战备不足` 则该行逐字保留;若词表/格式变了则同步改该行与 :127 — 这是**有意的重基线**,在交付说明逐行记变更,零断言放松)。f320 的 STRING 差分钉原样保留。
+5. **新钉(边界/差分,不写 HP 字面量)**:强路线进华山后,在「第 2 回合结束后」的帧断 `CombatManager.current_round >= 3 and Player.health > 0` — 「胜券在握不许第 2 回合死」由轮次边界承载。挂进重写后的 `huashan_winnable_normal_route`(见 C5)的时间线,不新增场景。
+
+### C5 (L3) — huashan_winnable_normal_route 重写(头身相符)
+
+**已验证锚点**:`playtest/huashan_winnable_normal_route.yaml` 现状 — `scene: menu.tscn` 但时间线 f20 用 `debug_win_tutorial`、f280 用 `debug_fast_forward`、f400 前后全是 `ui_accept`/`move_right` 键盘动作 → 与标题「clicks-only month grammar: card + work」头身不符,且 WIN 证据实为 debug 胜利。`playtest/map_battle_node_huashan.yaml`(锁定、verbatim)的 WIN 腿同样来自 f815 `debug_win_tutorial` — 它**保持逐字不动**,本轮可赢路线的唯一证据源就是重写后的本场景。
+
+**重写规格**(该文件不在锁内):
+
+- `scene: res://scenes/menu.tscn` 保持;**时间线全部点击语法**(`clicks:`,真实 GUI 命中,`clicks_only_storyline` / `ending_divergent_playstyles` Leg A 先例),**时间线内零 `debug_win_tutorial`、零 `debug_fast_forward`、零键盘动作**:
+  1. 主菜单点「新的冒险」(`MenuStartButton` 类真实按钮锚,菜单按钮池稳定,clicks 语法可用)→ 捏人屏确认点击 → **教程战用真实点击打赢**(战斗点击先例:`battle_end_turn_attack_buttons` / `click_targeting_fixed`:技能按钮 `SkillButton{i}` + 敌方单位 Node2D 锚如 `Central_Divine +0,0` + `EndTurnButton`;禁止 `*_ClickTarget` 锚 — 2026-08-29 裁定);
+  2. 教程结算/过场/拜师/养成全部按 `clicks_only_storyline` 的按钮名点击(`CultOptionButton0` 收卡 + `CultOptionButton2` 做工,年界附加 `CultOptionButton0` 留门、开年 `CultOptionButton0` 收际遇);
+  3. 大地图 `TravelButton{i}` / `EventOptionButton0` 点击走到华山(路线同 `map_battle_node_huashan` 的洛阳 → 少林 → 华山,但用点击);
+  4. **真打华山**:技能按钮点击 + 敌方单位锚点击 + `EndTurnButton` 点击,目标/站位脚本化;C1 落地后 mp 项抬高玩家先攻/血量/内力,胜负由真实技能循环决定;
+  5. 断言:WIN 帧 `Player.health < Player.max_health`(战斗是真的,不是满血白拿);`ui_accept`(结局 overlay 的确认键 — overlay 的 ContinueButton 也可点,取点击)回地图后 `GameManager.current_state == "MAP"`、`SceneManager.current_scene == "map"`、`map_battle_id == ""`、`MapScreen.current_node_id == "huashan"`;
+  6. 附加 C4 边界钉:战斗中段一帧断 `CombatManager.current_round >= 3 and Player.health > 0`(强档活过第 2 回合)。
+- **帧预算**:36 个点击月(~5 帧/月 ≈ 190 帧)+ boot/捏人/教程点击战(~300 帧)+ 地图行走(~120 帧)+ 华山多回合(敌人先手、回合间隔 ~120-150 帧/回合,预估 4-8 回合 ≈ 1000-1400 帧)→ 总计 ~1800-2200,2999 上限内;点击间距按既有场景 5-20 帧/击放宽,回合等待帧按 `map_battle_node_huashan` 实测(f580 起战斗、f720 玩家回合)外推。若实测超预算:**先砍月内 click 间距,再合并断言帧**,不许删断言。
+- **先红后绿**:重写后先在修复前树上跑(时间线走不到 WON → 首断即红,记录四值);C1+C4 落地后复跑转绿。
+- **升级条款检查点**:若 C1 落地、C4 曲线调完,玩家侧真实技能仍赢不了(五绝 95-130 HP、95-130 先攻区间压制)→ 停手,出报告向所有者申请解锁 `scripts/data/map_battle_data.gd` 数据;不许削弱敌人、不许重定义胜利。
+
+### C6 (L4) — 回执画上屏
+
+**已验证锚点**:`cultivation.gd:1058-1134` `_render()` 只追加 `status_text`(`:1120-1121`);`last_yield_text` 在 surface 白名单(`_common.yaml:789`)但**零消费者**;回执用裸 id(修习:`bone`、练功:`shaolin_luohan_b`)。
+
+**设计**:
+
+1. `_render()` 在 `status_text` 块之后追加回执行(位置形式不限,沿用组合式 BodyLabel,零新控件层级):
+   ```gdscript
+   if last_yield_text != "":
+       text += "\n" + last_yield_text + "\n"
+   ```
+2. **显示名替换**(三处生成点):
+   - 练功(C2 已改):`display_name_of(gid)`(易筋经·入门 等);
+   - 修习(`:487`):`tr("修习：%s +%d") % [_attr_label(action.get("target","bone")), gain]` — 复用既有 `_attr_label`(根骨/内力/身法/悟性/福缘),**零新 i18n 键**;
+   - 做工(`:498`)已是中文,不动。
+3. **新观测量(计算型,性质钉)**:`CultivationScreen.last_yield_readable: bool` — 回执非空时 = `not last_yield_text.contains("_") and not last_yield_text.contains(<本次裸 id>)`(练功对 `last_practice_target`、修习对原始属性键、做工恒 true);`CultivationScreen.last_practice_other_rows_unchanged: bool`(C2 零差分钉,同点计算)。
+4. **i18n**:`last_yield_text` 的两条格式键已在 i18n EN 表(现网在用),EN 侧显示名由 `display_name_of`/`_attr_label` 产出(中文专名,i18n 覆盖测试不波及);新增观测量进 `_common.yaml` surface 白名单。
+5. **遮挡**:`UiOcclusionWatch.violations == 0 + scan_ok == true` 挂在新场景每个触帧(回执多两行文本,BodyLabel 加高不得压任何按钮 — 既有 5 判据闸门兜底)。
+
+**钉**:`practice_target_receipt.yaml` 中,动作前帧 `last_yield_text` 与动作后帧差分(`changed`),且 `last_yield_readable == true`(不含 `_`、不含裸 id);红先 = 修复前 `_render` 不含回执 → `last_yield_text` 有值但屏上无消费者(性质红以「回执行不存在」的临时回退实测:注释掉追加行跑红)。
+
+### C7 (L2) — 做工拉开与免费卡
+
+**已验证锚点**:`progression_math.gd:46-47`(`work_income = 10 + 2*maxi(mastered,0)`);`card_data.gd:30`(`eco_20` +20, count 4);`cultivation.gd:492-498`(做工调用点,deed 先读后加,顺序保持);`tests/test_action_yield_curves.gd:71/90`(仪器里的同款调用);`tests/test_card_data.gd:39`(`eco_20 x4` 钉)。
+
+**杠杆裁定(二选一,本设计选「做工曲线拉开」,记录否决理由)**:
+
+- **选 (ii) 做工曲线真正拉开**:`work_income` 的输入从「大成交数」改为**既有持久 deed `work_months`**,曲线改为 `10 + 3 * maxi(work_months, 0)` — 递增做工(第 k 次做工 +10+3(k−1)),36 次做工单做工收入 ≈ 360 + 3×630 = 2250,叠免费卡/事件后总银两 ≈ 4100+,对「度过多月」路线(~1900-2000)比率 ≈ **2.1× > 1.5×**,余量充足。
+  - 签名改为 `work_income(months_worked: int) -> int`(参数语义变,形状不变:floor 10、严格递增、非负、负数钳 0 — 既有单元钉全部保留成立);`cultivation.gd:492` 调用点改传 `SaveManager.profile.get_deed("work_months")`,**注意 gain 必须在 `work_months += 1` 之前计算**(现序正好如此,逐字保持,零 RNG)。
+  - 免费卡 `eco_20` **一个字节不动** → `tests/test_card_data.gd` 与 `eco_20` 相关镜像零改动(否决「稀释卡牌」路线的决定性理由:该杠杆必改 `card_data.gd` + 其测试镜像 + M1 表三处,且按算术只能把比率推到 ~1.3-1.46×,压不住 1.5× 钉)。
+  - 与 C3 的交互:做工路线的 `deeds.silver_earned` 随之抬高 → 历练轴上升 → 强路线 tier 3 更稳;do-nothing 无做工收入,tier 1 不受威胁。M2' 测表按新曲线重测,两卡的数据在 `40_progression.md` 各自小节**互相引用**(一次测量,两处引用)。
+- **钉(新场景 `playtest/work_beats_idling.yaml`,两腿同 run)**:
+  - 腿 A:空档 `度过多月` ×36(收卡 + 度过多月)→ ENDING,`SaveManager.first_ending_silver` 捕获(新观测量,`ending.gd` 在首次评价时记 `SaveManager.profile.silver`);
+  - 腿 B:真实档 36 × 做工(clicks 语法)→ ENDING:断言 `EndingScreen.final_silver > SaveManager.first_ending_silver * 3 / 2`(整数安全写法,**比率钉,零绝对银两**);`EndingScreen.final_silver` 为新观测量(`_ready` 时快照 `SaveManager.profile.silver`)。
+  - 红先:修复前比率 ≈ 1.12(brief 实测 2248 vs ~2000)→ 比率断言红。
+
+### C8 — 设计记录(5_design 的交付物,本架构只定内容大纲)
+
+- `design/40_progression.md`:M2' 表(真实档三路线 × ≥5 种子,阈值推导,旧表标 "measured on empty seeded profile" 并保留)、M3' 表(≥5 种子 × 三档带,「胜券在握活过第 2 回合」实测)、做工小节替换(`work_income` 新曲线 + 比率实测,旧数标注被取代)、C1 词表单一来源小节。
+- `design/90_decisions.md` 两条裁决(2026-09-02 日期):①**等级词表单一来源**(GRADE_POINTS 从 PRACTICE_TO_MASTER 派生;测试夹具禁手写等级键;附 C2 的 target 回落语义);②**M2/M3 必须真实档**(空档只承载「度过多月 ×36」腿 A 的可达性边界,附路线定义)。
+- `design/00_roadmap.md`:队列改为 R3b → 外号 → 回执/结算 → 教程与目标 → 创建屏剩余点数 → 地图有图 → 非战斗美术;UX-11/UX-12 焦点标记、技能栏 704px 截断、槽位数字压名、`ProgressionHero`/`Sparring Partner` 裸上屏等试玩发现记入 backlog(UX-33+,record-only,本轮不做)。
+- `design/99_changelog.md`:**append-only**,新增 2026-09-02 R3b 行(实测红值 + 卡清单),零删改旧行。
 
 ---
 
-## 7. Measurement plan (M1–M3, red-first, all on the current post-R2 tree)
+## 4. 接口规范汇总(实现者契约)
 
-- **M1 — per-action yield curves** (`tests/test_action_yield_curves.gd`): 5
-  single-action strategies + 1 balanced, 36 seeded months each; outputs
-  silver earned / practice points / attr points / events resolved per strategy.
-  Feeds D3's provisional constants; the table lands in `design/40_progression.md`
-  §3 with the run label ("measured 2026-09-01, R3 M1, seeded run").
-- **M2 — ending score curves**: the same runs scored by `EndingLogic.evaluate`
-  BEFORE thresholds are chosen; thresholds set so T-1..T-4 (D1) hold; the chosen
-  values + the curves are recorded with their run id.
-- **M3 — Huashan readiness & win rate**: `tests/test_battle_setup_readiness.gd`
-  + the winnable scenario run under ≥ 5 distinct seeds with a fixed competent
-  input script; target: normal route wins on the majority of seeds while the
-  creation-fresh profile still loses (challenge preserved). Both facts recorded
-  with their runs. If the sanctioned levers cannot reach "has a chance" without
-  trivializing the fight, STOP and escalate the recorded contingency (§0) — never
-  silently weaken the roster.
+| 签名 / 观测量 | 变更 | 消费者 |
+|---|---|---|
+| `EventLogic.add_practice(profile, amount, target_id := "")` | 加第三参,默认空 | `cultivation._add_practice`(透传)、`apply_option_effects`(不传,回落) |
+| `ProgressionMath.GRADE_POINTS` | 键集改为派生自 `PRACTICE_TO_MASTER`(拉丁) | `mastery_points`、单元测试 |
+| `ProgressionMath.work_income(months_worked: int)` | 参数语义 mastered→work_months,斜率 2→3 | `cultivation._apply_action`、`test_action_yield_curves` |
+| `MapData.ENDING_TIERS[].min_score` | M2' 实测重定(行序 descending、末行 0 不变量逐字保留) | `ending_tier_score` |
+| `MapData.HUASHAN_BAR` | M3' 实测重定;`:63-69` 散文删/换指针 | `BattleSetup.readiness` |
+| `CultivationScreen.last_yield_readable / last_practice_other_rows_unchanged`(bool) | 新增计算型观测量 | 新场景、`_common.yaml` surface |
+| `EndingScreen.final_silver`(int)、`SaveManager.first_ending_silver`(int)、`SaveManager.ending_tier_history`(Array[int])、`SaveManager.ending_title_history`(Array[String]) | 新增观测量 | C3/C7 场景、`_common.yaml` surface |
 
-Every nail's red is MEASURED on the pre-fix tree (temporary-revert discipline,
-`TEMPORARY RED-FIRST REVERT — DO NOT COMMIT` markers, restored byte-identically,
-zero residue — house standard), never predicted. Any nail that cannot be measured
-records 「未执行 + 原因」 honestly.
+**不变式**:上述全部为纯算术/数据/发布,零新增 RNG 操作、零新增存档字段(deeds 键集不动)、零场景节点改名;`gongfa` 行结构 `{id, grade, practice, mastered}` 不变(grade 值域拉丁,老档无损)。
 
 ---
 
-## 8. Regression-safety matrix (what must stay green and why it survives)
+## 5. 技术栈(沿用 Step 1 推荐,零新增)
 
-| Existing gate | Why it survives this design |
+- **帧捕获 playtest 边车**(`playtest/*.yaml` + `_common.yaml` + `godot_playtest_scenario`):所有场景钉、修红四值实测。
+- **无头 GDScript 单元**(`tests/*.gd` + `tests/unit_test_runner.gd` 注册表):M2'/M3' 调参仪器、C1/C7 数学钉。
+- **pytest 契约守卫**(`tests/test_playtest_contract_smoke.py` 等):新场景两地注册、新 load-bearing 钉的防删门。
+- **UiOcclusionWatch / i18n 覆盖闸**:C6 新文本的遮挡与 EN 覆盖自动兜底。
+- 否决 GUT / gdUnit4(Step 1 已裁定):不引入任何新依赖。
+
+---
+
+## 6. 测试与契约变更清单
+
+**单元(更新 2 个既有文件,零新增文件 → `unit_test_runner.gd` 注册表不动)**:
+- `tests/test_progression_math.gd`:夹具键改生产词表;新增 GRADE_POINTS↔PRACTICE_TO_MASTER 键集互充守卫;`work_income` 语义更新(floor 10 / 严格递增 / 单调 / 负数钳 0 全保留)。
+- `tests/test_action_yield_curves.gd`:`work_income` 调用点改 `work_months` 驱动;M1 表加打真实档前缀授艺;`mastered-heavy > fresh` 差分钉改为 `late-work > early-work` 形状(曲线变陡的性质钉)。
+
+**playtest(改 2、增 3;`_common.yaml` scenario_order 尾部 + `ROUND_SCENARIOS` 两地同步,相对序守卫自动核)**:
+- 重写:`huashan_winnable_normal_route.yaml`(C5,零 debug 胜利)。
+- 重基线:`huashan_readiness_warning.yaml`(C4,f130 字面按实测)。
+- 新增:`practice_target_receipt.yaml`(C2+C6)、`ending_tiers_differentiate.yaml`(C3)、`work_beats_idling.yaml`(C7)。
+- `_common.yaml`:surface 白名单加 `CultivationScreen.last_yield_readable / last_practice_other_rows_unchanged`、`EndingScreen.final_silver`、`SaveManager.first_ending_silver / ending_tier_history / ending_title_history`;actions 零新增(全部用既有动作/点击)。
+- `tests/test_playtest_contract_smoke.py`:三个新名进 `ROUND_SCENARIOS` 尾部(与 `scenario_order` 同相对序);为比率钉/档位钉各加一条防删弱化门(照 `facility_use_reusable` 门形状:关键断言行必须在场且带比较符)。
+
+**回归网(改动后必须全绿)**:`spine_to_ending` 42/42、`clicks_only_storyline` 47/47、`facility_use_reusable` 49/49、`map_node_event_shaolin` 32/32、`save_load_roundtrip` 14/14、`event_travel_effects` 19/19、`equipment_in_battle_diff` 47/47、`cultivation_changes_combat` 30/30、`softlock_empty_practice_month_advances`、`occlusion_no_button_over_text` 22/22、`ending_divergent_playstyles`、`ending_last_month_choice`、`action_yield_differential`、`fortune_reroll_budget`。
+
+---
+
+## 7. 设计变更(对 design/ 档案的冲击,供 5_design 执行)
+
+1. **`40_progression.md`**:M2/M3 两表被实测表**替换**(旧表保留并标注 "measured on empty seeded profile, superseded 2026-09-02");做工小节数值替换;新增「等级词表单一来源」小节;`度过多月` 路线的可达性边界注记。
+2. **`90_decisions.md`**:新增两条裁决(词表单源;M2/M3 真实档)+ C2 target 回落语义附注 + C7 杠杆选择(做工曲线,否决稀释卡)的算术理由。
+3. **`00_roadmap.md` / `99_changelog.md`**:按 C8 大纲更新(队列重排;append-only 追加)。
+4. **`map_data.gd:63-69`**:辩护散文删除,替换为一行指向 40_progression.md M3' 表的指针注释。
+5. **不动的档案**:10/20/30/31/32 系列零改动(无数值/呈现/内容变更);`20_content.md` 的 eco_20 行不变(C7 未动卡牌)。
+
+---
+
+## 8. 风险登记与回滚
+
+| 风险 | 缓解 |
 |---|---|
-| `spine_to_ending` 42/42 | cultivation month flow untouched (only `_apply_action` internals + copy); ENDING asserts don't pin tier values. |
-| `clicks_only_storyline` 47/47 | same; reroll button only exists in EVENT phase and is optional (never required to advance). |
-| `save_load_roundtrip` 14/14 | `deeds` is additive + symmetric; `from_dict` legacy-repair mirrors the `equipped` precedent. |
-| `event_travel_effects` 19/19 | zero new RNG on the travel path; reroll sits on a NEW input only. |
-| `softlock_empty_practice_month_advances` 15/15 | the empty-GONGFA exit block is untouched (deed increments only wrap `_apply_action`, which the empty path never calls). |
-| `facility_use_reusable` / `map_node_event_shaolin` / `map_battle_node_huashan` (verbatim trio) | none of the three files' bytes are touched; deed counters are separate from `events_resolved_count`; `map_battle_node_huashan`'s `max_health != 1000` holds under the new formula. |
-| `terminal_victory_8_12_rounds_hp_15_40` 6/6 | tutorial battle uses编排数值, never `derive_stats` (verify by read in T5). |
-| `equipment_in_battle_diff` 47/47, `cultivation_changes_combat` 30/30 | gear/attr differentials remain differentials; mastery terms only add. |
-| `event_pool_new_event_resolved` 15/15 | draw → render → resolve chain untouched; reroll is an additional affordance, not a replacement. |
-| `occlusion_no_button_over_text` 22/22 | new controls are code-built in existing layouts; the new nails re-assert `violations == 0` on their touched frames. |
-| i18n coverage guards | every new string lands in the EN dictionary in the same task that adds it. |
+| static-var 派生 GRADE_POINTS 的装载序 | 回退路已备(字面拉丁键 + 键集相等钉);两种实现由同一守卫测试裁决 |
+| C1 波及面(grade 消费者) | §3-C1 扫荡清单逐一核对;唯一 CJK 消费者是 GRADE_POINTS 本体 |
+| RNG 操作序漂移 | 全部改动零新增 RNG op;`save_load_roundtrip` / `event_travel_effects` 改后必跑 |
+| C5 帧预算超 2999 | 先压点击间距,再并断言帧;仍超则减重复断言(不删钉);仍超则报告并重排 |
+| C5 玩家侧仍赢不了 | **升级条款**:停手申请 `map_battle_data.gd` 解锁,不琐碎化 |
+| C3 阈值/历练构成二选一犹豫 | 按 M2' 实测择一,`40_progression.md` 记录数据与抉择 |
+| 观测量新增破坏既有白名单守卫 | 两地同步 + 相对序守卫自动拦;新钉子配 pytest 门 |
+| 锁文件误碰 | 变更面表(§0)即为审计清单;六文件 + 三 verbatim 闸逐一比对 |
+
+**回滚路径**:每张卡独立成 commit 粒度的改动集;数据常量(HUASHAN_BAR / ENDING_TIERS / work_income 斜率)回滚 = 还原常量行;观测量为加法字段,回滚零破坏;playtest yaml 重写前旧版本在 git 历史中(该文件非 verbatim 锁,可回退)。
 
 ---
 
-## 9. 设计变更 (for 5_design to fold into `design/` after acceptance)
+## 9. 给 PM 的分解建议(顺序即依赖)
 
-1. `design/40_progression.md` §7 (派生公式): `气血 = 根骨×5` →
-   `气血 = 根骨×5 + 6×修为点` etc. (PROVISIONAL until M3); new §「结局评价」
-   (multi-axis formula + measured curves + thresholds + run ids); new §「福缘」
-   (reroll budget formula + the honest `map_inquire` residual); §3 monthly-action
-   table updated to the four niches with the M1 yield table.
-2. `design/20_content.md`: no content-table changes (event/facility/card data
-   untouched); the Huashan §11 record gains the readiness/warning surface note.
-3. `design/90_decisions.md`: rulings for D1–D4 incl. the rejected alternatives
-   and the MapBattleData lock reading (§0).
-4. `design/99_changelog.md`: one appended row (2026-09-01, this round).
-5. `design/10_systems.md` §1 属性表: 福缘 row's 养成意义 gains the implemented
-   reroll wording (matches the creation screen).
+1. **T-C1**:GRADE_POINTS 派生 + test_progression_math 夹具重写(先行,其余卡依赖 mastery 非 0)。
+2. **T-C7**:work_income 曲线 + 调用点 + 仪器更新(独立于 C2/C3,可与 C1 同批)。
+3. **T-C2**:add_practice 透传 + 回执显示名 + `practice_target_receipt.yaml`(依赖 C1 的显示名数据无关,但建议 C1 后跑)。
+4. **T-C3**:M2' 仪器实测 → 阈值/历练构成裁定 → `ending_tiers_differentiate.yaml` + ending.gd 观测量。
+5. **T-C4**:M3' 实测 → HUASHAN_BAR + 删散文 → `huashan_readiness_warning` 重基线(依赖 C1)。
+6. **T-C5**:`huashan_winnable_normal_route` 重写(依赖 C1+C4;含升级条款检查点)。
+7. **T-C6**:回执渲染 + 观测量(可独立,建议与 C2 场景合并验收)。
+8. **T-C8**:四份设计档案更新(收尾,带实测数字)。
 
-## 10. Rollback / reversibility
-
-No irreversible operations exist in this design: no schema migration (additive
-`deeds` with legacy defaults), no data rewrites (all data files byte-untouched),
-no deletes. Rollback = revert the task's file set; legacy saves keep loading
-(with deeds defaulting to 0 → tier computed from attrs+mastery only, never a
-crash). The temporary red-first reverts follow the house
-mark-and-restore discipline with zero-residue verification.
-
-## 11. 扩展性考虑 (extension points, deliberately few)
-
-- `EndingLogic.axes` is a dictionary — future rounds add axes (battle results,
-  companion deeds) without touching the scan; `HUASHAN_BAR` generalizes to a
-  per-battle-id requirement table when a second map battle lands.
-- `TraitEffects.fortune_reroll_budget` is the single fortune hook site — new
-  fortune consumers (event quality, encounter luck) slot next to it.
-- `progression_math.gd` is the shared numeric home so D1 and D4 never drift apart.
-
-## 12. 给 PM 的任务分解建议 (dependency-ordered)
-
-1. `T1 schema` — `player_profile.deeds` + roundtrip tests (blocks everything).
-2. `T2 math home` — `progression_math.gd` + unit tests (blocks T3/T5/T6).
-3. `T3 actions` — cultivation deed instrumentation + work/practice rebalance +
-   copy + surfaces; M1 curves; yield nails.
-4. `T4 fortune` — `fortune_reroll_budget` + reroll affordance + input + i18n +
-   nail; creation copy sync.
-5. `T5 ending` — `ending_logic.gd` + `MapData` thresholds (after M2) + ending.gd
-   summary + divergence/last-month nails.
-6. `T6 huashan` — `derive_stats` extension + readiness + warning surfaces (after
-   M3) + winnable scenario + anti-weakening pytest.
-7. `T7 sync` — `_common.yaml`/`ROUND_SCENARIOS` sync, i18n sweep, pytest guards,
-   consolidated red-first evidence file under `final/`.
-
-Tasks 3/4/5/6 are parallelizable after 1+2; every task lands its own nail with
-its own measured red before its green.
+每张卡交付物固定四件:代码/数据改动、单元或场景钉、修红实测四值、(C8)档案行。
