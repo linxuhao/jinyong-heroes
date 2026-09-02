@@ -17,7 +17,80 @@ art contract). UI text is Chinese, rendered with the bundled NotoSansSC font
 stage 3 (game content); the board's visibility belongs to a **following
 camera**, and sprites only stand on their own tiles.
 
-## Latest round: R3 Meaningful Numbers — choices must shape the ending (2026-09-01)
+## Latest round: R3b Numbers That Bind — the claimed numbers now hold on real saves (2026-09-02)
+
+R3b is a **no-new-systems fix pass**: every number R3 claimed (grade points, practice
+targeting, ending tiers, Huashan readiness, on-screen receipts, the work economy) is
+now bound to **real saves** (main.tscn → tutorial → creation → join sect), each fixed
+red-first against a measured failure and pinned by property nails (differentials,
+ratios, boundaries — never balance literals). Per-card evidence lives in
+`final/delivery_notes_fix_c1_grade_vocabulary.md` … `_fix_c8_design_records.md`; the
+measurements and rulings live in `design/40_progression.md` (M2'/M3' real-save tables),
+`design/90_decisions.md` (two rulings, both 2026-09-02) and the append-only
+`design/99_changelog.md` R3b row.
+
+**The seven fixes (all verified in the tree by direct read this round):**
+
+1. **C1 — one grade vocabulary** (`scripts/data/progression_math.gd:19`): `GRADE_POINTS`
+   was keyed 丁/丙/乙/甲 while every save writes D/C/B/A, so mastery was 0 on every real
+   save (武学轴 0, Huashan mastery term dead). Now Latin-keyed, its key set guarded
+   equal to `ProgressionGongfaData.PRACTICE_TO_MASTER.keys()`; test fixtures take keys
+   from production vocabulary. The practice route's ending now shows 武学 > 0
+   (`EndingScreen.mastery_axis > 0` nail in `ending_tiers_differentiate` Leg B).
+2. **C2 — practice hits what you picked** (`event_logic.gd::add_practice(profile, amount,
+   target_id := "")`): the chosen art's row advances; empty/unknown/mastered targets fall
+   back to the first unmastered (a practice month is never silently dropped). Zero-diff
+   pins: the untouched rows' counters do not move (`last_practice_other_rows_unchanged`),
+   and the receipt shows the chosen art's **display name** (`罗汉拳`), not `shaolin_luohan_d`.
+3. **C3 — endings actually tier** (`map_data.gd::ENDING_TIERS` 150/120/0 + the
+   deed-composition lever): free-card silver no longer inflates the 历练 axis, so
+   do-nothing ×36 lands tier 1, a single practice route tier 2, a balanced/strong route
+   tier 3 — measured on 5 real-save seeds (M2' table). The nail pins the **tier**
+   differential, not text (`ending_tiers_differentiate`).
+4. **C4 — Huashan readiness tells the truth** (`HUASHAN_BAR` {even: 38, strong: 55},
+   re-derived from real-save M3' measurements; the old self-defensive comment is gone):
+   a creation-fresh profile reads 战备不足, a grown one 势均力敌/胜券在握, and
+   `huashan_readiness_warning` is rebaselined on a real-save boot with the verdict
+   string differential intact.
+5. **C5 — the winnable-route card matches its title** (`huashan_winnable_normal_route`
+   rewritten: clicks-only, menu boot, real-save 36 practice months, real skill clicks in
+   the duel, WIN frame asserts `current_state == "WON"` + `health < max_health`).
+   **Status: BLOCKED — the brief's escalation clause was exercised.** The duel is
+   measured unwinnable on the locked enemy data (the strongest legitimate hero acts last,
+   initiative 46 vs the five greats' 68–86, and dies round 4 with all five at full HP).
+   Per the pre-declared clause no fake win, no redefined victory and no enemy-data edits
+   were made; **owner action requested: unlock `scripts/data/map_battle_data.gd`**, after
+   which the authored scenario re-runs as-is. (One sanctioned `debug_win_tutorial` at
+   f220 skips the tutorial skirmish — the Huashan segment itself contains zero debug.)
+6. **C6 — the receipt is on the screen** (`cultivation.gd::_render`): `last_yield_text`
+   is drawn under the status block on every action month, with display names (根骨, not
+   `bone`), guarded by the `last_yield_readable` property (no `_`, no raw ASCII id) and
+   UiOcclusionWatch-clean on every touched frame.
+7. **C7 — work out-earns idling** (`ProgressionMath.work_income = 10 + 3 × work_months`):
+   the free card 一袋碎银 is untouched; work now compounds, and the ratio nail
+   (`work_beats_idling`, same seed both legs) requires 36×work ending silver >
+   1.5× 36×do-nothing (measured ≈2.1×, was ≈1.12).
+
+**C8 — design records**: `40_progression.md` (C1 vocabulary section, work-curve section
+replaced, M2'/M3' real-save tables, old tables marked "measured on empty seeded profile,
+superseded 2026-09-02"), `90_decisions.md` (ruling: single grade-vocabulary source;
+ruling: M2/M3 must use real saves, with route definitions), `00_roadmap.md` (queue:
+外号 → 回执/结算 → 教程与目标 → 创建屏剩余点数 → 地图有图 → 非战斗美术; playtest
+findings UX-33…36 backlogged, record-only), `99_changelog.md` (append-only R3b row).
+
+**New playtest scenarios**: `practice_target_receipt` (C2+C6), `ending_tiers_differentiate`
+(C3), `work_beats_idling` (C7); rewritten `huashan_winnable_normal_route` (C5) and
+rebaselined `huashan_readiness_warning` (C4) — all registered in both
+`playtest/_common.yaml` and `tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS`
+with anti-weakening doors. Protected surfaces untouched: the six-file lock, the three
+verbatim gates, and the RNG op-order lifelines (all fixes are pure arithmetic).
+
+**Verification status (honest):** code/data, pins, registration and design records were
+verified in-tree by direct read; compile / unit-suite / vision gate results are pipeline
+artifacts produced after this round's verification step and are not claimed here. The
+C5 WIN remains red until the owner unlocks `map_battle_data.gd`.
+
+## Previous round: R3 Meaningful Numbers — choices must shape the ending (2026-09-01)
 
 Progression/economy overhaul: the three-year loop now actually decides the ending.
 Before this round the ending tier was the flat sum of five attrs vs two thresholds
