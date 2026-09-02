@@ -42,7 +42,13 @@ FINAL = ROOT / "final"
 SCENARIO_LOAD_BEARING_LINES: dict[str, tuple[str, ...]] = {
     "ending_divergent_playstyles": (
         # Cross-leg differential: the two playthroughs' evaluations must differ.
-        "first_ending_evaluation != evaluation_text",
+        # The carrier is the self-contained mirror EndingScreen.diverged_from_first
+        # (written every render at ending.gd:128 = summary != first_ending_evaluation).
+        # The old cross-node literal `first_ending_evaluation != evaluation_text` could
+        # never evaluate (the harness runs an assert against the node in its KEY; the
+        # two names live on different nodes), so it no longer appears in the yaml and
+        # this door is re-derived to the carrier that DOES — same property, new carrier.
+        "EndingScreen.diverged_from_first: diverged_from_first == true",
     ),
     "ending_last_month_choice": (
         # Cross-leg differential: the month-36 action flip must change the eval.

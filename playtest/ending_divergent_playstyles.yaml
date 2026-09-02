@@ -573,6 +573,7 @@ timeline:
   actions:
   - ui_accept
 # ── LEG B ENDING: the evaluation record DIFFERS from leg A ───────────────────
+# Cross-leg carrier below (EndingScreen.diverged_from_first == true) is the self-contained mirror of the unresolvable cross-node literal SaveManager.first_ending_evaluation != evaluation_text (the harness runs an assert against the node in its KEY; the two names live on different nodes), written every render at ending.gd:128 — same property, new carrier.
 - at: 1350
   actions: []
   assert:
