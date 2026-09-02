@@ -88,6 +88,7 @@ ROUND_SCENARIOS: list[str] = [
     "huashan_winnable_normal_route",
     "ending_divergent_playstyles",
     "ending_last_month_choice",
+    "work_beats_idling",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -2201,3 +2202,60 @@ def test_event_option_refused_nail_contract() -> None:
             f"MapScreen.{var} not whitelisted on the surface — the refusal nail's "
             "zero-delta anchor is unreadable"
         )
+
+
+def test_work_beats_idling_ratio_nail_contract() -> None:
+    """Static anti-weakening pin for the C7 work-economy ratio nail.
+
+    Pins ``work_beats_idling`` against ``playtest/_common.yaml`` and
+    ``ROUND_SCENARIOS`` (two-place sync): the scenario is in scenario_order AND
+    in ROUND_SCENARIOS at the same relative order, the file exists with ``name:``
+    equal to its basename, every timeline ``at:`` is a single integer, the two
+    new observables (EndingScreen.final_silver / SaveManager.first_ending_silver)
+    are whitelisted on the surface, and the ratio assert line
+    ``EndingScreen.final_silver > SaveManager.first_ending_silver * 3 / 2``
+    carries the ``>`` comparison operator (the ratio pin — zero absolute silver
+    values). The comparison operator must be present so a future round cannot
+    silently weaken the ratio to a bare-scalar assert.
+    """
+    name = "work_beats_idling"
+    text = COMMON.read_text(encoding="utf-8")
+    order = _items_under(text, "scenario_order")
+    assert name in order, f"{name} not in _common.yaml scenario_order (two-place sync)"
+    assert name in ROUND_SCENARIOS, f"{name} not in ROUND_SCENARIOS (two-place sync)"
+    assert [n for n in order if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
+        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
+        "relative order"
+    )
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+    # The ratio nail line must carry the > comparison operator (anti-weakening).
+    assert re.search(
+        r"EndingScreen\.final_silver\s*>\s*SaveManager\.first_ending_silver\s*\*\s*3\s*/\s*2",
+        ftext,
+    ), (
+        f"{name}.yaml must contain the ratio line "
+        "`EndingScreen.final_silver > SaveManager.first_ending_silver * 3 / 2` "
+        "(the C7 ratio pin, comparison operator required)"
+    )
+    # The two new observables are whitelisted on the surface.
+    blocks = _surface_blocks(text)
+    assert "EndingScreen" in blocks, "surface has no EndingScreen block"
+    assert "final_silver" in blocks["EndingScreen"], (
+        "EndingScreen.final_silver not whitelisted on the surface"
+    )
+    assert "SaveManager" in blocks, "surface has no SaveManager block"
+    assert "first_ending_silver" in blocks["SaveManager"], (
+        "SaveManager.first_ending_silver not whitelisted on the surface"
+    )

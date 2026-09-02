@@ -244,6 +244,7 @@ surface:
   - last_io_error_text
   - debug_user_dir_exists
   - first_ending_evaluation
+  - first_ending_silver
   Player:
   - health
   - max_health
@@ -823,6 +824,7 @@ surface:
   EndingScreen:
   - tier
   - score
+  - final_silver
   - evaluation_text
   - done
   - visible
@@ -1167,3 +1169,4 @@ scenario_order:
 - huashan_winnable_normal_route
 - ending_divergent_playstyles
 - ending_last_month_choice
+- work_beats_idling

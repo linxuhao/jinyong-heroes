@@ -87,7 +87,7 @@ static func _run_strategy(strategy: String) -> Dictionary:
 			"balanced":
 				match month % 4:
 					0:
-						var gain2: int = ProgressionMath.work_income(ProgressionMath.mastered_count(profile))
+						var gain2: int = ProgressionMath.work_income(profile.get_deed("work_months"))
 						profile.silver += gain2
 						profile.deeds["work_months"] = profile.get_deed("work_months") + 1
 						profile.deeds["silver_earned"] = profile.get_deed("silver_earned") + gain2
@@ -110,7 +110,8 @@ static func _run_strategy(strategy: String) -> Dictionary:
 		"attr_points": attr_points,
 		"events_resolved": profile.get_deed("travel_resolved"),
 		"mastered_count": ProgressionMath.mastered_count(profile),
-		"work_income_final": ProgressionMath.work_income(ProgressionMath.mastered_count(profile)),
+		"work_months": profile.get_deed("work_months"),
+		"work_income_final": ProgressionMath.work_income(profile.get_deed("work_months")),
 		"ending_score": int(EndingLogic.evaluate(profile, profile.deeds)["score"]),
 		"ending_tier": int(EndingLogic.evaluate(profile, profile.deeds)["tier"]),
 	}
@@ -206,12 +207,13 @@ static func _assert_cross_strategy(ok: bool, table: Array[Dictionary]) -> bool:
 			practice_run = res
 		elif res["strategy"] == "all_work":
 			work_run = res
-	# A mastered-heavy run (all-practice masters arts) has strictly higher
-	# per-month work income than a fresh run (all-work masters none).
-	ok = _expect(ok, int(practice_run["mastered_count"]) > 0, "all_practice masters at least one art")
-	ok = _expect(ok, int(work_run["mastered_count"]) == 0, "all_work masters no arts")
-	ok = _expect(ok, int(practice_run["work_income_final"]) > int(work_run["work_income_final"]),
-		"mastered-heavy work income > fresh work income")
+	# The work curve is months-driven (C7): a late-work run (all_work, 36 work
+	# months) has strictly higher per-month work income than an early-work run
+	# (all_practice, 0 work months) — the curve steepens with months worked.
+	ok = _expect(ok, int(work_run["work_months"]) > 0, "all_work accumulates work months")
+	ok = _expect(ok, int(practice_run["work_months"]) == 0, "all_practice does no work")
+	ok = _expect(ok, int(work_run["work_income_final"]) > int(practice_run["work_income_final"]),
+		"late-work work income > early-work work income")
 	return ok
 
 
