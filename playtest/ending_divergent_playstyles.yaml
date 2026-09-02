@@ -440,102 +440,140 @@ timeline:
     SaveManager.first_ending_evaluation: first_ending_evaluation != ""
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── LEG B: restart -> re-seed the SAME seed -> practice-heavy fast-forward ──
+# ── LEG B: restart -> real boot (tutorial win -> creation -> sect) -> practice
+#    fast-forward. The restart reuses the proven clicks_only_storyline boot
+#    grammar (tutorial intro Next x7 -> battle -> debug_win_tutorial ->
+#    ContinueButton -> transition NextButton x2 -> creation -> SectButton0),
+#    landing in CULTIVATION with a real sect-joined profile. ────────────────
 - at: 655
   actions: []
   clicks:
   - RestartButton
-- at: 685
+- at: 705
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
-- at: 695
+# ── TUTORIAL INTRO (7 Next clicks; STEP_COUNT == 7) ───────────────────────────
+- at: 715
+  actions: []
+  clicks: [Next]
+- at: 725
+  actions: []
+  clicks: [Next]
+- at: 735
+  actions: []
+  clicks: [Next]
+- at: 745
+  actions: []
+  clicks: [Next]
+- at: 755
+  actions: []
+  clicks: [Next]
+- at: 765
+  actions: []
+  clicks: [Next]
+- at: 775
+  actions: []
+  clicks: [Next]
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
+- at: 785
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 790
+  actions: []
+  clicks: [AttackButton]
+- at: 800
   actions:
   - debug_win_tutorial
-- at: 725
-  actions:
-  - ui_accept
-- at: 755
-  actions:
-  - ui_accept
-- at: 765
-  actions:
-  - ui_accept
-- at: 795
-  actions:
-  - move_right
-- at: 805
-  actions:
-  - move_right
-- at: 815
-  actions:
-  - move_right
-- at: 825
-  actions:
-  - move_right
-- at: 835
-  actions:
-  - move_right
-- at: 845
-  actions:
-  - ui_accept
-- at: 855
-  actions:
-  - move_right
-- at: 865
-  actions:
-  - ui_accept
-- at: 895
-  actions:
-  - ui_accept
+- at: 820
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 830
+  actions: []
+  clicks: [ContinueButton]
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
+- at: 850
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 860
+  actions: []
+  clicks: [NextButton]
+- at: 880
+  actions: []
+  clicks: [NextButton]
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 900
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 910
+  actions: []
+  clicks: [AttrNextButton]
+- at: 930
+  actions: []
+  clicks: [TraitNextButton]
+- at: 950
+  actions: []
+  clicks: [ConfirmButton]
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 970
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 980
+  actions: []
+  clicks: [SectButton0]
 # ── LEG B: confirm the restart path landed in CULTIVATION before fast-forward ──
-- at: 925
+- at: 1020
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
     CultivationScreen.phase: phase == "CARD_PICK"
-- at: 955
+- at: 1040
   actions:
   - debug_fast_forward
-- at: 1075
+- at: 1200
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
-- at: 1095
+- at: 1220
   actions:
   - move_right
-- at: 1105
+- at: 1230
   actions:
   - ui_accept
-- at: 1115
+- at: 1240
   actions:
   - ui_accept
-- at: 1125
+- at: 1250
   actions:
   - move_right
-- at: 1135
+- at: 1260
   actions:
   - ui_accept
-- at: 1145
+- at: 1270
   actions:
   - ui_accept
-- at: 1155
+- at: 1280
   actions:
   - move_right
-- at: 1165
+- at: 1290
   actions:
   - ui_accept
-- at: 1175
+- at: 1300
   actions:
   - ui_accept
-- at: 1185
+- at: 1310
   actions:
   - move_right
-- at: 1195
+- at: 1320
   actions:
   - ui_accept
 # ── LEG B ENDING: the evaluation record DIFFERS from leg A ───────────────────
-- at: 1225
+- at: 1350
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"

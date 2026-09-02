@@ -96,8 +96,11 @@ timeline:
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG B (work-heavy): restart -> real boot (tutorial win -> creation -> sect)
 #    -> 36 clicked work months -> map -> kunlun -> ENDING. The restart reuses
-#    the proven ending_divergent Leg B boot grammar (creation, NOT debug_seed —
-#    debug_seed only fires from MENU and the restart lands in TUTORIAL). ──────
+#    the proven clicks_only_storyline boot grammar (tutorial intro Next x7 ->
+#    battle -> debug_win_tutorial -> ContinueButton -> transition NextButton x2
+#    -> creation (attrs/traits/confirm) -> SectButton0), landing in CULTIVATION
+#    with a real sect-joined profile. debug_seed only fires from MENU and the
+#    restart lands in TUTORIAL, so the boot is the real-save path. ────────────
 - at: 420
   actions: []
   clicks:
@@ -106,46 +109,95 @@ timeline:
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
+# ── TUTORIAL INTRO (7 steps, each advanced by a Next click; STEP_COUNT == 7) ──
 - at: 480
+  actions: []
+  clicks:
+  - Next
+- at: 490
+  actions: []
+  clicks:
+  - Next
+- at: 500
+  actions: []
+  clicks:
+  - Next
+- at: 510
+  actions: []
+  clicks:
+  - Next
+- at: 520
+  actions: []
+  clicks:
+  - Next
+- at: 530
+  actions: []
+  clicks:
+  - Next
+- at: 540
+  actions: []
+  clicks:
+  - Next
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
+- at: 550
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 555
+  actions: []
+  clicks:
+  - AttackButton
+- at: 565
   actions:
   - debug_win_tutorial
-- at: 510
-  actions:
-  - ui_accept
-- at: 540
-  actions:
-  - ui_accept
-- at: 560
-  actions:
-  - ui_accept
-- at: 590
-  actions:
-  - move_right
-- at: 600
-  actions:
-  - move_right
-- at: 610
-  actions:
-  - move_right
-- at: 620
-  actions:
-  - move_right
-- at: 630
-  actions:
-  - move_right
-- at: 640
-  actions:
-  - ui_accept
-- at: 650
-  actions:
-  - move_right
-- at: 660
-  actions:
-  - ui_accept
-- at: 690
-  actions:
-  - ui_accept
-- at: 710
+- at: 585
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 595
+  actions: []
+  clicks:
+  - ContinueButton
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
+- at: 615
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 625
+  actions: []
+  clicks:
+  - NextButton
+- at: 645
+  actions: []
+  clicks:
+  - NextButton
+# ── CREATION (attrs -> traits -> confirm) ────────────────────────────────────
+- at: 665
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 675
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 695
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 715
+  actions: []
+  clicks:
+  - ConfirmButton
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 735
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 745
+  actions: []
+  clicks:
+  - SectButton0
+- at: 785
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
@@ -155,48 +207,6 @@ timeline:
 #    Year boundaries: y1m12/y2m12 stay (CultOptionButton0); y2m1/y3m1 an extra
 #    CultOptionButton0 (year-augment) before the card. ───────────────────────
 # YEAR 1 — m1..m11 (card + work)
-- at: 720
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 725
-  actions: []
-  clicks: [CultOptionButton2]
-- at: 730
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 735
-  actions: []
-  clicks: [CultOptionButton2]
-- at: 740
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 745
-  actions: []
-  clicks: [CultOptionButton2]
-- at: 750
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 755
-  actions: []
-  clicks: [CultOptionButton2]
-- at: 760
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 765
-  actions: []
-  clicks: [CultOptionButton2]
-- at: 770
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 775
-  actions: []
-  clicks: [CultOptionButton2]
-- at: 780
-  actions: []
-  clicks: [CultOptionButton0]
-- at: 785
-  actions: []
-  clicks: [CultOptionButton2]
 - at: 790
   actions: []
   clicks: [CultOptionButton0]
@@ -221,7 +231,6 @@ timeline:
 - at: 825
   actions: []
   clicks: [CultOptionButton2]
-# Year 1 month 12: card + work -> YEAR_END; stay (留在本门)
 - at: 830
   actions: []
   clicks: [CultOptionButton0]
@@ -231,15 +240,15 @@ timeline:
 - at: 840
   actions: []
   clicks: [CultOptionButton0]
+- at: 845
+  actions: []
+  clicks: [CultOptionButton2]
 - at: 850
   actions: []
-  assert:
-    CultivationScreen.year: year == 2
-    CultivationScreen.month: month == 1
-# YEAR 2 — m1 (augment + card + work), m2..m11 (card + work)
+  clicks: [CultOptionButton0]
 - at: 855
   actions: []
-  clicks: [CultOptionButton0]
+  clicks: [CultOptionButton2]
 - at: 860
   actions: []
   clicks: [CultOptionButton0]
@@ -264,6 +273,7 @@ timeline:
 - at: 895
   actions: []
   clicks: [CultOptionButton2]
+# Year 1 month 12: card + work -> YEAR_END; stay (留在本门)
 - at: 900
   actions: []
   clicks: [CultOptionButton0]
@@ -273,15 +283,15 @@ timeline:
 - at: 910
   actions: []
   clicks: [CultOptionButton0]
-- at: 915
-  actions: []
-  clicks: [CultOptionButton2]
 - at: 920
   actions: []
-  clicks: [CultOptionButton0]
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+# YEAR 2 — m1 (augment + card + work), m2..m11 (card + work)
 - at: 925
   actions: []
-  clicks: [CultOptionButton2]
+  clicks: [CultOptionButton0]
 - at: 930
   actions: []
   clicks: [CultOptionButton0]
@@ -306,7 +316,6 @@ timeline:
 - at: 965
   actions: []
   clicks: [CultOptionButton2]
-# Year 2 month 12: card + work -> YEAR_END; stay
 - at: 970
   actions: []
   clicks: [CultOptionButton0]
@@ -316,15 +325,15 @@ timeline:
 - at: 980
   actions: []
   clicks: [CultOptionButton0]
+- at: 985
+  actions: []
+  clicks: [CultOptionButton2]
 - at: 990
   actions: []
-  assert:
-    CultivationScreen.year: year == 3
-    CultivationScreen.month: month == 1
-# YEAR 3 — m1 (augment + card + work), m2..m11 (card + work), m12 (card + work -> MAP)
+  clicks: [CultOptionButton0]
 - at: 995
   actions: []
-  clicks: [CultOptionButton0]
+  clicks: [CultOptionButton2]
 - at: 1000
   actions: []
   clicks: [CultOptionButton0]
@@ -349,6 +358,7 @@ timeline:
 - at: 1035
   actions: []
   clicks: [CultOptionButton2]
+# Year 2 month 12: card + work -> YEAR_END; stay
 - at: 1040
   actions: []
   clicks: [CultOptionButton0]
@@ -358,15 +368,15 @@ timeline:
 - at: 1050
   actions: []
   clicks: [CultOptionButton0]
-- at: 1055
-  actions: []
-  clicks: [CultOptionButton2]
 - at: 1060
   actions: []
-  clicks: [CultOptionButton0]
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 1
+# YEAR 3 — m1 (augment + card + work), m2..m11 (card + work), m12 (card + work -> MAP)
 - at: 1065
   actions: []
-  clicks: [CultOptionButton2]
+  clicks: [CultOptionButton0]
 - at: 1070
   actions: []
   clicks: [CultOptionButton0]
@@ -391,53 +401,95 @@ timeline:
 - at: 1105
   actions: []
   clicks: [CultOptionButton2]
-# Year 3 month 12: card + work -> _finish_to_map
 - at: 1110
   actions: []
   clicks: [CultOptionButton0]
 - at: 1115
   actions: []
   clicks: [CultOptionButton2]
-# ── MAP: walk to kunlun -> ENDING (spine grammar: node events en route) ──────
+- at: 1120
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1125
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1130
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1135
+  actions: []
+  clicks: [CultOptionButton2]
 - at: 1140
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1145
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1150
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1155
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1160
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1165
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 1170
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1175
+  actions: []
+  clicks: [CultOptionButton2]
+# Year 3 month 12: card + work -> _finish_to_map
+- at: 1180
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 1185
+  actions: []
+  clicks: [CultOptionButton2]
+# ── MAP: walk to kunlun -> ENDING (spine grammar: node events en route) ──────
+- at: 1210
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
-- at: 1160
+- at: 1230
   actions:
   - move_right
-- at: 1170
-  actions:
-  - ui_accept
-- at: 1190
-  actions:
-  - ui_accept
-- at: 1210
-  actions:
-  - move_right
-- at: 1220
-  actions:
-  - ui_accept
 - at: 1240
   actions:
   - ui_accept
 - at: 1260
   actions:
-  - move_right
-- at: 1270
-  actions:
   - ui_accept
+- at: 1280
+  actions:
+  - move_right
 - at: 1290
   actions:
   - ui_accept
 - at: 1310
   actions:
+  - ui_accept
+- at: 1330
+  actions:
   - move_right
-- at: 1320
+- at: 1340
+  actions:
+  - ui_accept
+- at: 1360
+  actions:
+  - ui_accept
+- at: 1380
+  actions:
+  - move_right
+- at: 1390
   actions:
   - ui_accept
 # ── LEG B ENDING: the work silver beats the idle baseline by the 1.5x ratio ──
-- at: 1360
+- at: 1430
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"

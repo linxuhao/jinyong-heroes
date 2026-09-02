@@ -109,7 +109,7 @@ timeline:
     EndingScreen.tier: tier < 3
     EndingScreen.ending_title: ending_title != ""
     SaveManager.ending_tier_history: ending_tier_history.size() == 1
-    EndingScreen.evaluation_text: evaluation_text.contains("武学")
+    EndingScreen.evaluation_text: evaluation_text.contains("武学") == true
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG B (single practice route): restart -> real boot (tutorial win ->
@@ -124,46 +124,80 @@ timeline:
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
+# ── TUTORIAL INTRO (7 Next clicks; STEP_COUNT == 7) ───────────────────────────
 - at: 490
+  actions: []
+  clicks: [Next]
+- at: 500
+  actions: []
+  clicks: [Next]
+- at: 510
+  actions: []
+  clicks: [Next]
+- at: 520
+  actions: []
+  clicks: [Next]
+- at: 530
+  actions: []
+  clicks: [Next]
+- at: 540
+  actions: []
+  clicks: [Next]
+- at: 550
+  actions: []
+  clicks: [Next]
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
+- at: 560
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 565
+  actions: []
+  clicks: [AttackButton]
+- at: 575
   actions:
   - debug_win_tutorial
-- at: 520
-  actions:
-  - ui_accept
-- at: 550
-  actions:
-  - ui_accept
-- at: 570
-  actions:
-  - ui_accept
-- at: 600
-  actions:
-  - move_right
-- at: 610
-  actions:
-  - move_right
-- at: 620
-  actions:
-  - move_right
-- at: 630
-  actions:
-  - move_right
-- at: 640
-  actions:
-  - move_right
-- at: 650
-  actions:
-  - ui_accept
-- at: 660
-  actions:
-  - move_right
-- at: 670
-  actions:
-  - ui_accept
-- at: 700
-  actions:
-  - ui_accept
-- at: 720
+- at: 595
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 605
+  actions: []
+  clicks: [ContinueButton]
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
+- at: 625
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 635
+  actions: []
+  clicks: [NextButton]
+- at: 655
+  actions: []
+  clicks: [NextButton]
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 675
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 685
+  actions: []
+  clicks: [AttrNextButton]
+- at: 705
+  actions: []
+  clicks: [TraitNextButton]
+- at: 725
+  actions: []
+  clicks: [ConfirmButton]
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 745
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 755
+  actions: []
+  clicks: [SectButton0]
+- at: 795
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
@@ -171,38 +205,38 @@ timeline:
     CultivationScreen.month: month == 1
 # ── 36 months of practice (练功 on the first unmastered art -> mastery) via
 #    debug_fast_forward (the same phase machine, fixed auto-choice 练功). ─────
-- at: 740
+- at: 815
   actions:
   - debug_fast_forward
-- at: 900
+- at: 975
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
 # ── Walk to kunlun -> ENDING (the map-node click grammar) ─────────────────────
-- at: 920
+- at: 995
   actions: []
   clicks: [TravelButton0]
-- at: 930
+- at: 1005
   actions: []
   clicks: [EventOptionButton0]
-- at: 940
+- at: 1015
   actions: []
   clicks: [TravelButton1]
-- at: 950
+- at: 1025
   actions: []
   clicks: [EventOptionButton0]
-- at: 960
+- at: 1035
   actions: []
   clicks: [TravelButton1]
-- at: 970
+- at: 1045
   actions: []
   clicks: [EventOptionButton0]
-- at: 980
+- at: 1055
   actions: []
   clicks: [TravelButton1]
 # ── LEG B ENDING: the practice route lands on a DIFFERENT tier than the
 #    do-nothing route, and the mastery (武学) axis is > 0 (C1 scene nail). ─────
-- at: 1020
+- at: 1095
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"

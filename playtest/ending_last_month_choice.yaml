@@ -254,111 +254,98 @@ timeline:
     SaveManager.first_ending_evaluation: first_ending_evaluation != ""
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── LEG B: restart -> re-seed the SAME seed -> 35 identical months ───────────
+# ── LEG B: restart -> real boot (tutorial win -> creation -> sect) -> 35
+#    identical months. The restart reuses the proven clicks_only_storyline boot
+#    grammar (tutorial intro Next x7 -> battle -> debug_win_tutorial ->
+#    ContinueButton -> transition NextButton x2 -> creation -> SectButton0),
+#    landing in CULTIVATION with a real sect-joined profile. ────────────────
 - at: 570
   actions: []
   clicks:
   - RestartButton
-- at: 600
+- at: 620
   actions: []
   assert:
     GameManager.current_state: current_state == "TUTORIAL"
-- at: 610
+# ── TUTORIAL INTRO (7 Next clicks; STEP_COUNT == 7) ───────────────────────────
+- at: 630
+  actions: []
+  clicks: [Next]
+- at: 640
+  actions: []
+  clicks: [Next]
+- at: 650
+  actions: []
+  clicks: [Next]
+- at: 660
+  actions: []
+  clicks: [Next]
+- at: 670
+  actions: []
+  clicks: [Next]
+- at: 680
+  actions: []
+  clicks: [Next]
+- at: 690
+  actions: []
+  clicks: [Next]
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
+- at: 700
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 705
+  actions: []
+  clicks: [AttackButton]
+- at: 715
   actions:
   - debug_win_tutorial
-- at: 640
-  actions:
-  - ui_accept
-- at: 670
-  actions:
-  - ui_accept
-- at: 680
-  actions:
-  - ui_accept
-- at: 710
-  actions:
-  - move_right
-- at: 720
-  actions:
-  - move_right
-- at: 730
-  actions:
-  - move_right
-- at: 740
-  actions:
-  - move_right
-- at: 750
-  actions:
-  - move_right
-- at: 760
-  actions:
-  - ui_accept
-- at: 770
-  actions:
-  - move_right
-- at: 780
-  actions:
-  - ui_accept
-- at: 810
-  actions:
-  - ui_accept
+- at: 735
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 745
+  actions: []
+  clicks: [ContinueButton]
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
+- at: 765
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 775
+  actions: []
+  clicks: [NextButton]
+- at: 795
+  actions: []
+  clicks: [NextButton]
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 815
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 825
+  actions: []
+  clicks: [AttrNextButton]
+- at: 845
+  actions: []
+  clicks: [TraitNextButton]
+- at: 865
+  actions: []
+  clicks: [ConfirmButton]
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
+- at: 885
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 895
+  actions: []
+  clicks: [SectButton0]
 # ── LEG B: confirm the restart path landed in CULTIVATION before stepping ─────
-- at: 840
+- at: 935
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
     CultivationScreen.phase: phase == "CARD_PICK"
-- at: 870
-  actions:
-  - debug_step_month
-- at: 875
-  actions:
-  - debug_step_month
-- at: 880
-  actions:
-  - debug_step_month
-- at: 885
-  actions:
-  - debug_step_month
-- at: 890
-  actions:
-  - debug_step_month
-- at: 895
-  actions:
-  - debug_step_month
-- at: 900
-  actions:
-  - debug_step_month
-- at: 905
-  actions:
-  - debug_step_month
-- at: 910
-  actions:
-  - debug_step_month
-- at: 915
-  actions:
-  - debug_step_month
-- at: 920
-  actions:
-  - debug_step_month
-- at: 925
-  actions:
-  - debug_step_month
-- at: 930
-  actions:
-  - debug_step_month
-- at: 935
-  actions:
-  - debug_step_month
-- at: 940
-  actions:
-  - debug_step_month
-- at: 945
-  actions:
-  - debug_step_month
-- at: 950
-  actions:
-  - debug_step_month
 - at: 955
   actions:
   - debug_step_month
@@ -413,62 +400,113 @@ timeline:
 - at: 1040
   actions:
   - debug_step_month
+- at: 1045
+  actions:
+  - debug_step_month
 - at: 1050
+  actions:
+  - debug_step_month
+- at: 1055
+  actions:
+  - debug_step_month
+- at: 1060
+  actions:
+  - debug_step_month
+- at: 1065
+  actions:
+  - debug_step_month
+- at: 1070
+  actions:
+  - debug_step_month
+- at: 1075
+  actions:
+  - debug_step_month
+- at: 1080
+  actions:
+  - debug_step_month
+- at: 1085
+  actions:
+  - debug_step_month
+- at: 1090
+  actions:
+  - debug_step_month
+- at: 1095
+  actions:
+  - debug_step_month
+- at: 1100
+  actions:
+  - debug_step_month
+- at: 1105
+  actions:
+  - debug_step_month
+- at: 1110
+  actions:
+  - debug_step_month
+- at: 1115
+  actions:
+  - debug_step_month
+- at: 1120
+  actions:
+  - debug_step_month
+- at: 1125
+  actions:
+  - debug_step_month
+- at: 1135
   actions: []
   assert:
     CultivationScreen.month: month == 36
     CultivationScreen.phase: phase == "CARD_PICK"
 # ── LEG B: month-36 练功 (practice) ──────────────────────────────────────────
-- at: 1060
+- at: 1145
   actions:
   - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 1080
+- at: 1165
   actions:
   - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
-- at: 1100
+- at: 1185
   actions:
   - ui_accept  # GONGFA_PICK focus 0 -> apply practice -> _after_action -> MAP
 # ── MAP: travel to kunlun (endpoint -> ENDING) ───────────────────────────────
-- at: 1150
+- at: 1235
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
     MapScreen.phase: phase == "TRAVEL"
-- at: 1160
+- at: 1245
   actions:
   - move_right
-- at: 1170
+- at: 1255
   actions:
   - ui_accept
-- at: 1180
+- at: 1265
   actions:
   - ui_accept
-- at: 1190
+- at: 1275
   actions:
   - move_right
-- at: 1200
+- at: 1285
   actions:
   - ui_accept
-- at: 1210
+- at: 1295
   actions:
   - ui_accept
-- at: 1220
+- at: 1305
   actions:
   - move_right
-- at: 1230
+- at: 1315
   actions:
   - ui_accept
-- at: 1240
+- at: 1325
   actions:
   - ui_accept
-- at: 1250
+- at: 1335
   actions:
   - move_right
-- at: 1260
+- at: 1345
   actions:
   - ui_accept
 # ── LEG B ENDING: the evaluation record DIFFERS from leg A ───────────────────
-- at: 1290
+- at: 1375
   actions: []
   assert:
     GameManager.current_state: current_state == "ENDING"

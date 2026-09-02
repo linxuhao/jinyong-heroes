@@ -61,78 +61,95 @@ description: >-
   containing the chosen art's display name (罗汉拳). Every touched frame:
   UiOcclusionWatch clean.
 timeline:
-# ── BOOT: tutorial intro (7 ui_accept) -> battle seed -> overlay -> transition
-- at: 3
-  actions:
-  - ui_accept
-- at: 5
-  actions:
-  - ui_accept
-- at: 7
-  actions:
-  - ui_accept
-- at: 9
-  actions:
-  - ui_accept
-- at: 11
-  actions:
-  - ui_accept
-- at: 13
-  actions:
-  - ui_accept
-- at: 15
-  actions:
-  - ui_accept
-- at: 20
+# ── BOOT: tutorial intro (7 Next clicks) -> battle seed -> overlay -> transition
+- at: 40
+  actions: []
+  clicks:
+  - Next
+- at: 50
+  actions: []
+  clicks:
+  - Next
+- at: 60
+  actions: []
+  clicks:
+  - Next
+- at: 70
+  actions: []
+  clicks:
+  - Next
+- at: 80
+  actions: []
+  clicks:
+  - Next
+- at: 90
+  actions: []
+  clicks:
+  - Next
+- at: 100
+  actions: []
+  clicks:
+  - Next
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
+- at: 110
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 115
+  actions: []
+  clicks:
+  - AttackButton
+- at: 125
   actions:
   - debug_win_tutorial
-- at: 40
+- at: 145
   actions: []
   assert:
     GameManager.current_state: current_state == "WON"
-- at: 50
-  actions:
-  - ui_accept
-- at: 70
-  actions:
-  - ui_accept
-- at: 90
-  actions:
-  - ui_accept
+- at: 155
+  actions: []
+  clicks:
+  - ContinueButton
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
+- at: 175
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 185
+  actions: []
+  clicks:
+  - NextButton
+- at: 205
+  actions: []
+  clicks:
+  - NextButton
 # ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
-- at: 110
-  actions:
-  - move_right
-- at: 120
-  actions:
-  - move_right
-- at: 130
-  actions:
-  - move_right
-- at: 140
-  actions:
-  - move_right
-- at: 150
-  actions:
-  - move_right
-- at: 160
-  actions:
-  - ui_accept
-- at: 170
-  actions:
-  - move_right
-- at: 180
-  actions:
-  - ui_accept
+- at: 225
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 235
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 255
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 275
+  actions: []
+  clicks:
+  - ConfirmButton
 # ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION ──────────────────────
-- at: 210
+- at: 295
   actions: []
   assert:
     GameManager.current_state: current_state == "SECT_SELECTION"
-- at: 220
-  actions:
-  - ui_accept
-- at: 260
+- at: 305
+  actions: []
+  clicks:
+  - SectButton0
+- at: 345
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
@@ -141,19 +158,19 @@ timeline:
     CultivationScreen.gongfa_count: gongfa_count == 2
     CultivationScreen.phase: phase == "CARD_PICK"
 # ── MONTH 1: card -> ACTION_PICK -> 练功 (focus 0) -> GONGFA_PICK row 1 ──────
-- at: 270
+- at: 355
   actions: []
   clicks:
   - CultOptionButton0
-- at: 280
+- at: 365
   actions: []
   clicks:
   - CultOptionButton0
-- at: 290
+- at: 375
   actions: []
   clicks:
   - CultOptionButton0
-- at: 300
+- at: 385
   actions: []
   assert:
     CultivationScreen.phase: phase == "GONGFA_PICK"
@@ -161,11 +178,11 @@ timeline:
     CultOptionButton1.visible: visible == true
     CultivationScreen.pressed_connected: pressed_connected["CultOptionButton1"] == true
 # Month 1 practice: row 1 (default focus, CultOptionButton0)
-- at: 310
+- at: 395
   actions: []
   clicks:
   - CultOptionButton0
-- at: 360
+- at: 445
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "practice"
@@ -176,32 +193,30 @@ timeline:
     CultivationScreen.phase: phase == "CARD_PICK"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-# ── MONTH 2: card -> ACTION_PICK -> 练功 -> GONGFA_PICK row 2 (CLICK) ────────
-- at: 380
+# ── MONTH 2: card -> ACTION_PICK -> 练功 (focus 0) -> GONGFA_PICK row 2 (CLICK)
+#    The ACTION_PICK->练功 click is REQUIRED: without it the next click lands on
+#    修习 (attribute +1~3) instead of the row-2 gongfa. ─────────────────────
+- at: 465
   actions: []
   clicks:
   - CultOptionButton0
-- at: 390
+- at: 475
   actions: []
   clicks:
   - CultOptionButton0
-- at: 400
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 410
+- at: 485
   actions: []
   assert:
     CultivationScreen.phase: phase == "GONGFA_PICK"
     CultOptionButton1.visible: visible == true
-    CultOptionButton1.text: text.contains("罗汉拳")
+    CultOptionButton1.text: text.contains("罗汉拳") == true
     CultivationScreen.pressed_connected: pressed_connected["CultOptionButton1"] == true
 # Month 2 practice: CLICK row 2 (CultOptionButton1 = shaolin_luohan_d)
-- at: 420
+- at: 495
   actions: []
   clicks:
   - CultOptionButton1
-- at: 560
+- at: 635
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "practice"
@@ -209,8 +224,8 @@ timeline:
     CultivationScreen.last_practice_target: last_practice_target != "shaolin_yijin_d"
     CultivationScreen.last_practice_other_rows_unchanged: last_practice_other_rows_unchanged == true
     CultivationScreen.last_practice_target_increased: last_practice_target_increased == true
-    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳")
-    CultivationScreen.last_yield_text: not last_yield_text.contains("_")
+    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳") == true
+    CultivationScreen.last_yield_text: last_yield_text.contains("_") == false
     CultivationScreen.phase: phase == "CARD_PICK"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
@@ -227,33 +242,33 @@ timeline:
 #      - last_yield_readable == true (no '_', no raw id)
 #      - UiOcclusionWatch clean on the new body lines
 # ── MONTH 3: card -> ACTION_PICK -> 修习 (CultOptionButton1) -> ATTR_PICK row 1
-- at: 570
+- at: 655
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "practice"
-    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳")
-- at: 580
+    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳") == true
+- at: 665
   actions: []
   clicks:
   - CultOptionButton0
-- at: 590
+- at: 675
   actions: []
   clicks:
   - CultOptionButton1
-- at: 600
+- at: 685
   actions: []
   clicks:
   - CultOptionButton0
-- at: 620
+- at: 705
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "cultivate"
     CultivationScreen.last_yield_text: changed
-    CultivationScreen.last_yield_text: not last_yield_text.contains("罗汉拳")
-    CultivationScreen.last_yield_text: last_yield_text.contains("修习") and last_yield_text.contains("根骨")
-    CultivationScreen.last_yield_text: not last_yield_text.contains("bone")
+    CultivationScreen.last_yield_text: last_yield_text.contains("罗汉拳") == false
+    CultivationScreen.last_yield_text: last_yield_text.contains("修习") == true and last_yield_text.contains("根骨") == true
+    CultivationScreen.last_yield_text: last_yield_text.contains("bone") == false
     CultivationScreen.last_yield_readable: last_yield_readable == true
     CultivationScreen.phase: phase == "CARD_PICK"
-    BodyLabel.text: text.contains("修习")
+    BodyLabel.text: text.contains("修习") == true
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true

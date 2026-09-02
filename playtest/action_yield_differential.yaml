@@ -16,73 +16,165 @@
 #
 # ZERO balance literals: only sign pins (> 0, == 0) and "changed" differentials.
 #
-# BOOT: mirrors the softlock scenario's menu boot pattern — seed a fresh CULTIVATION
-# save via debug_seed_save, load it by keyboard, then drive with pure ui_accept.
+# BOOT: real-save boot (tutorial win -> creation -> sect) via the
+# clicks_only_storyline grammar so the profile has 2 gongfa arts (debug_seed_save
+# creates an EMPTY profile with 0 gongfa, on which the practice leg would hit the
+# empty-GONGFA soft-lock exit and never apply practice — the measured red). The
+# four one-month legs are then driven by keyboard (ui_accept / move_up /
+# move_down). NOTE: _action_focus resets to 0 on every CARD_PICK -> ACTION_PICK
+# transition, so each leg's move counts start from focus 0 (the original
+# "focus persists" comments were wrong).
 #
-# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
-#   pre-fix tree where the 5 new surfaces do NOT exist on CultivationScreen):
+# RED-FIRST EVIDENCE — MEASURED (2026-09-02, godot_playtest_scenario on the
+#   pre-fix tree where the scenario booted debug_seed_save's EMPTY profile):
 #
-#   failing_frame:            f200
-#   first_failing_assert:     CultivationScreen.last_action_silver
-#   exact_error/observed:     "node property not found: CultivationScreen.last_action_silver"
-#                             (the surface was not yet published by the pre-fix script)
-#   green_asserts_before_red: 7 (f130 has 5 + f170 has 2 = 7)
+#   failing_frame:            f280 (leg 2 PRACTICE)
+#   first_failing_assert:     CultivationScreen.last_action_kind
+#                             (expected "practice", observed "work" — the empty
+#                             profile's GONGFA_PICK empty branch burned the month
+#                             without applying practice, so last_action_kind
+#                             stayed "work" from leg 1)
+#   exact_error/observed:     observed last_action_kind == "work" at f280;
+#                             f370 observed "practice" (leg 3 misaligned);
+#                             f425 observed GONGFA_PICK with option_focus 0
+#                             (expected ACTION_PICK focus 3); f460 observed
+#                             "practice"; f500 observed ACTION_PICK
+#   green_asserts_before_red: 9 (f130 has 5 + f170 has 2 + f200 has 2 = 9)
 #
-#   Structural red (current tree, card_data.gd):
-#     work grants flat +10 silver; the free monthly card gr_silver_30 grants +30
-#     — the dominance fact motivating the rebalance (work_income formula now
-#     scales with mastery so it eventually beats the one-shot card).
+#   ROOT CAUSE (diagnosed, not a game defect): debug_seed_save creates an empty
+#   profile (0 sects, 0 gongfa), so the practice leg's GONGFA_PICK is empty and
+#   the soft-lock exit (proven by softlock_empty_practice_month_advances) burns
+#   the month without applying practice. The scenario needs a profile WITH
+#   gongfa to demonstrate the practice niche — hence the real-save boot. The
+#   ACTION_PICK focus also resets to 0 each month, so the original move_up ×2
+#   from a "persisted" focus 2 was wrong. No game-code change required.
 name: action_yield_differential
 description: >-
-  Four one-month legs (work / practice / cultivate / travel) from the same
-  seeded save. Asserts work's last_action_silver > 0 (unique silver niche),
-  practice/cultivate/travel last_action_silver == 0 (zero-delta proof),
-  practice last_practice_amount > 0 + last_practice_target changed (targeted
-  niche), travel last_action_kind == "travel" + last_yield_text non-empty
-  (routing proof). Every touched frame: UiOcclusionWatch clean.
+  Four one-month legs (work / practice / cultivate / travel) from a real-save
+  profile (tutorial win -> creation -> sect, 2 gongfa). Asserts work's
+  last_action_silver > 0 (unique silver niche), practice/cultivate/travel
+  last_action_silver == 0 (zero-delta proof), practice last_practice_amount > 0
+  + last_practice_target changed (targeted niche), travel last_action_kind ==
+  "travel" + last_yield_text non-empty (routing proof). Every touched frame:
+  UiOcclusionWatch clean.
 scene: res://scenes/menu.tscn
 timeline:
-# ── MENU: seed a fresh CULTIVATION save ─────────────────────────────────────
-- at: 10
-  actions:
-  - debug_delete_save
+# ── BOOT: tutorial intro (7 Next clicks) -> battle seed -> overlay -> transition
 - at: 40
-  actions:
-  - debug_seed_save
+  actions: []
+  clicks:
+  - Next
+- at: 50
+  actions: []
+  clicks:
+  - Next
+- at: 60
+  actions: []
+  clicks:
+  - Next
 - at: 70
-  actions:
-  - move_down
+  actions: []
+  clicks:
+  - Next
+- at: 80
+  actions: []
+  clicks:
+  - Next
 - at: 90
+  actions: []
+  clicks:
+  - Next
+- at: 100
+  actions: []
+  clicks:
+  - Next
+# ── TUTORIAL BATTLE (screen click-path proof + documented outcome seed) ──────
+- at: 110
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 115
+  actions: []
+  clicks:
+  - AttackButton
+- at: 125
   actions:
-  - ui_accept
-# ── LOAD -> CULTIVATION (fresh profile, month 1) ─────────────────────────────
-- at: 130
+  - debug_win_tutorial
+- at: 145
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 155
+  actions: []
+  clicks:
+  - ContinueButton
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION (creation_done == false) ──────
+- at: 175
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 185
+  actions: []
+  clicks:
+  - NextButton
+- at: 205
+  actions: []
+  clicks:
+  - NextButton
+# ── CREATION (attrs -> traits -> confirm) ─────────────────────────────────────
+- at: 225
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 235
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 255
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 275
+  actions: []
+  clicks:
+  - ConfirmButton
+# ── SECT SELECT -> shaolin (SectButton0) -> CULTIVATION (2 gongfa) ───────────
+- at: 295
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 305
+  actions: []
+  clicks:
+  - SectButton0
+- at: 345
   actions: []
   assert:
     GameManager.current_state: current_state == "CULTIVATION"
     SceneManager.current_scene: current_scene == "cultivation"
     CultivationScreen.phase: phase == "CARD_PICK"
     CultivationScreen.month: month == 1
+    CultivationScreen.gongfa_count: gongfa_count == 2
     CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
 # ── LEG 1: WORK (month 1) ────────────────────────────────────────────────────
-- at: 140
+- at: 355
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 160
+  - ui_accept  # CARD_PICK -> ACTION_PICK (focus resets to 0)
+- at: 365
   actions:
-  - move_down  # focus: 练功(0) -> 修习(1) -> 做工(2)
-- at: 165
+  - move_down  # focus 0 -> 1
+- at: 370
   actions:
-  - move_down
-- at: 170
+  - move_down  # focus 1 -> 2 (做工)
+- at: 380
   actions: []
   assert:
     CultivationScreen.phase: phase == "ACTION_PICK"
     CultivationScreen.option_focus: option_focus == 2
-- at: 180
+- at: 390
   actions:
   - ui_accept  # apply work
-- at: 200
+- at: 410
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "work"
@@ -93,22 +185,16 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG 2: PRACTICE (month 2) ───────────────────────────────────────────────
-- at: 220
+- at: 430
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK (focus persists at 2 = 做工 from leg 1)
-- at: 240
-  actions:
-  - move_up  # focus 2 -> 1
-- at: 245
-  actions:
-  - move_up  # focus 1 -> 0 (练功)
-- at: 260
+  - ui_accept  # CARD_PICK -> ACTION_PICK (focus resets to 0)
+- at: 450
   actions:
   - ui_accept  # ACTION_PICK focus 0 = 练功 -> GONGFA_PICK
-- at: 280
+- at: 470
   actions:
   - ui_accept  # GONGFA_PICK focus 0 -> apply practice
-- at: 280
+- at: 490
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "practice"
@@ -120,19 +206,19 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG 3: CULTIVATE (month 3) ──────────────────────────────────────────────
-- at: 300
+- at: 510
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK
-- at: 320
+  - ui_accept  # CARD_PICK -> ACTION_PICK (focus resets to 0)
+- at: 520
   actions:
-  - move_down  # focus: 练功(0) -> 修习(1)
-- at: 330
+  - move_down  # focus 0 -> 1 (修习)
+- at: 530
   actions:
   - ui_accept  # ACTION_PICK focus 1 = 修习 -> ATTR_PICK
-- at: 350
+- at: 550
   actions:
   - ui_accept  # ATTR_PICK focus 0 (bone) -> apply cultivate
-- at: 370
+- at: 570
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "cultivate"
@@ -142,24 +228,27 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── LEG 4: TRAVEL (month 4) ────────────────────────────────────────────────
-- at: 390
+- at: 590
   actions:
-  - ui_accept  # CARD_PICK -> ACTION_PICK (focus persists at 1 = 修习 from leg 3)
-- at: 410
+  - ui_accept  # CARD_PICK -> ACTION_PICK (focus resets to 0)
+- at: 600
   actions:
-  - move_down  # focus 1 -> 2 (做工)
-- at: 415
+  - move_down  # focus 0 -> 1
+- at: 605
+  actions:
+  - move_down  # focus 1 -> 2
+- at: 610
   actions:
   - move_down  # focus 2 -> 3 (游历)
-- at: 425
+- at: 620
   actions: []
   assert:
     CultivationScreen.phase: phase == "ACTION_PICK"
     CultivationScreen.option_focus: option_focus == 3
-- at: 440
+- at: 630
   actions:
   - ui_accept  # ACTION_PICK focus 3 = 游历 -> EVENT phase
-- at: 460
+- at: 650
   actions: []
   assert:
     CultivationScreen.last_action_kind: last_action_kind == "travel"
@@ -168,10 +257,10 @@ timeline:
     CultivationScreen.phase: phase == "EVENT"
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
-- at: 480
+- at: 670
   actions:
   - ui_accept  # EVENT -> resolve option 0 -> _after_action -> CARD_PICK
-- at: 500
+- at: 690
   actions: []
   assert:
     CultivationScreen.phase: phase == "CARD_PICK"
