@@ -84,13 +84,23 @@ consolidated ledger `final/delivery_notes_r3_numbers.md`.
 - Design docs: `design/40_progression.md` §11 (fortune), §12 (Huashan readiness),
   §13 (multi-axis ending) record the formulas and the M1/M2/M3 measured curves.
 
-**Verification status (honest, 2026-09-01):** implementation verified by direct read;
-six red-first nails measured on the pre-fix tree (failing frame / first failing assert /
-observed error / greens before red) and green sidecar runs recorded per task; M1/M2/M3
-measurement tables recorded with their run labels. The official consolidated gate
-products (`compile_report.json` / `playtest_report.json` / `vision_report.json` /
-`test_report.json`) are downstream pipeline artifacts and do not exist at verification
-time — see `final/verify_report.json` for the itemized verdict.
+**Verification status (honest; Final Verifier pass 2026-09-02):** implementation verified
+by direct read of every touched file (ending_logic.gd + progression_math.gd NEW,
+battle_setup.gd derive_stats+readiness, trait_effects.gd fortune budget, player_profile
+deeds schema, map_data ENDING_TIERS/HUASHAN_BAR, cultivation reroll+deed+yield surfaces,
+ending.gd, roster_panel.gd, creation.gd honest fortune copy, i18n EN entries,
+project.godot event_reroll); six red-first nails measured on the pre-fix tree (failing
+frame / first failing assert / observed error / greens before red) with the two
+ending-nail scenario defects fixed e2e on 2026-09-02 (`fix_r3_ending_nails_e2e`:
+leg-A year-boundary month grammar + leg-B CULTIVATION assert before the debug action —
+zero game-code changes); M1/M2/M3 measurement tables recorded with their run labels.
+Still owed at delivery time: the official consolidated gate products
+(`compile_report.json` / `playtest_report.json` / `vision_report.json` /
+`test_report.json`) are downstream pipeline artifacts (5_compile / 5_test / 5_vision)
+and did not exist at verification time — the four fixes are code-verified and
+red-first-evidenced, and the official all-scenario green is the remaining acceptance
+evidence. `design/99_changelog.md`'s R3 row is pending the post-acceptance
+design-ledger fold. See `final/verify_report.json` for the itemized verdict.
 
 ## Round: jinyong-loop R2 — the monthly loop cannot stop, redemption cannot be infinite (previous round, 2026-09-01)
 
