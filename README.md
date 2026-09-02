@@ -86,6 +86,15 @@ measurements and rulings live in `design/40_progression.md` (M2'/M3' real-save t
    measured WIN. `[EVIDENCE: DIRECT-READ]` — unlock ruling + M3'' per-literal table in
    `final/unlock_record_r3b_huashan.md`; `[EVIDENCE: PENDING OFFICIAL RE-RUN]` — the
    scenario was 28/39 on the official run.
+   **Delivery defect (final verification, 2026-09-02): the scenario file
+   `playtest/huashan_winnable_normal_route.yaml` is ABSENT from the delivered tree.**
+   It remains registered in `playtest/_common.yaml` (`scenario_order`),
+   `tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS` and
+   `tests/test_ending_gate_pins.py`, so the next pytest/playtest run fails on the
+   registry-file mismatch until the file is restored (the 29/39 self-run version is in
+   git history / the previous step output). Until then this card's WIN-frame nail
+   (`current_state == "MAP"` + `health < max_health`, zero `debug_win_tutorial` in the
+   Huashan segment) and the C4 round-boundary nail have no on-disk carrier.
 6. **C6 — the receipt is on the screen** (`cultivation.gd::_render`): `last_yield_text`
    is drawn under the status block on every action month, with display names (根骨, not
    `bone`), guarded by the `last_yield_readable` property (no `_`, no raw ASCII id) and
@@ -109,10 +118,12 @@ findings UX-33…36 backlogged, record-only), `99_changelog.md` (append-only R3b
 `[EVIDENCE: DIRECT-READ]`.
 
 **New playtest scenarios**: `practice_target_receipt` (C2+C6), `ending_tiers_differentiate`
-(C3), `work_beats_idling` (C7); rewritten `huashan_winnable_normal_route` (C5) and
-rebaselined `huashan_readiness_warning` (C4) — all registered in both
-`playtest/_common.yaml` and `tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS`
-with anti-weakening doors. Protected surfaces untouched: the six-file lock, the three
+(C3), `work_beats_idling` (C7) — all present on disk; rebaselined
+`huashan_readiness_warning` (C4) — present on disk. `huashan_winnable_normal_route` (C5)
+is registered in both `playtest/_common.yaml` and
+`tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS` with anti-weakening doors, but
+**its yaml file is missing from the delivered tree** (see the C5 defect note above).
+Protected surfaces untouched: the six-file lock, the three
 verbatim gates, and the RNG op-order lifelines (all fixes are pure arithmetic).
 `[EVIDENCE: DIRECT-READ]`.
 
@@ -126,6 +137,21 @@ Compile 107/107; vision passed non-blind (93 scenes, 372 frames, Q6 93 good / 0 
 The unit-instrument layer (red-first four-values, M2'/M3' tables) is measured in-tree;
 the scenario-evidence layer is pending the official re-run after this fix round. No
 measured claim above cites a green the official gate run did not produce.
+
+**Final verification verdict (Step 5, 2026-09-02 — `final/verify_report.json`):
+`all_goals_met: false`, `ready_for_deploy: false`.** Verified green in-tree by direct
+read this step: the C1 vocabulary + production-key fixtures, C2 targeting, C3 tier
+data (150/120/0), C4 bands + defensive-prose removal, C6 receipt render, C7 curve +
+ratio-nail/guard regex sync, the i18n composite-key fix (`ending.gd:129` ↔
+`i18n.gd:433`), the C8 design records, and the C5 unlock levers within their granted
+scope (`battle_setup.gd` mp terms direct-read). Blocking findings: (1) the delivered
+tree is missing `playtest/huashan_winnable_normal_route.yaml` (registered in three
+contract files — restore it before any gate run); (2) C5's WON tail is measured red
+(29/39 — escalation honored, unlock granted, win not achieved); (3) C4's
+`huashan_readiness_warning` f260 rebaseline is red (20/21 — band conflict
+STOP-and-reported); (4) the five re-anchored scenarios and both pytest-gate fixes
+await the official re-run — compile/test/vision artifacts for the post-fix tree do
+not exist yet and are therefore not claimed.
 
 ## Previous round: R3 Meaningful Numbers — choices must shape the ending (2026-09-01)
 
