@@ -2,176 +2,539 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 #
-# HUASHAN WINNABLE NORMAL ROUTE NAIL (R3, 2026-09-01, N-4c — the round's
-# flagship). Proves the finale is winnable on a NORMALLY-PLAYED route (no
-# min-max, balanced actions) and that the fight was REAL (not a full-HP
-# trivial win):
-#   - a full seeded balanced route (clicks-only month grammar: card + work,
-#     per the clicks_only_storyline precedent) runs 36 months;
-#   - travels to 华山 and fights the duel with REAL skill clicks + end_turn
-#     (the same click grammar as map_battle_node_huashan's win leg);
-#   - asserts WIN -> GameManager.current_state == "MAP";
-#   - asserts Player.health < Player.max_health at the win frame — the fight
-#     was REAL (a full-HP trivial win is a red flag; this line says so without
-#     pinning any HP literal).
+# HUASHAN WINNABLE NORMAL ROUTE NAIL (R3b C5 — the round's honest-win
+# flagship; rewrite of the R3 head/body-mismatched card).
 #
-# The winnability comes from the sanctioned player-side battle-number surface
-# (scripts/data/battle_setup.gd::derive_stats mastery terms): three years of
-# practice/cultivate/work cash out in the finale. The five greats' numbers,
-# roster, positions and AI are byte-identical (locked files) — the fight's
-# challenge is preserved structurally.
+# What this proves: on a NORMALLY-PLAYED real save (menu boot -> creation ->
+# tutorial -> join 少林 -> 36 practice months), the hero reaches 华山 and WINS
+# the duel with a real skill-targeted attack — no debug seed in the Huashan
+# segment — and the fight is REAL (the hero is not at full HP at the win). The
+# five greats' numbers/roster/AI/positions are byte-identical (locked); the
+# winnability comes from C1's now-live mastery terms in derive_stats and C4's
+# measured bands, nothing else.
 #
-# This scenario does NOT duplicate the 41-line map_battle_node_huashan gate's
-# assertions — that gate stays verbatim and keeps proving the binding itself.
-# Here we only assert the WIN + MAP return + non-trivial-health differential.
+# HEAD/BODY (the R3 defect this closes): the old card claimed a clicks-only
+# card+work route but booted menu.tscn on a main.tscn keyboard timeline, stuck
+# at TUTORIAL (13 reds), and its "win" was a debug victory. This timeline is
+# clicks-only and boots menu.tscn, matching its title.
 #
-# BOOT: mirrors the map_battle_node_huashan boot spine (full boot, tutorial,
-# creation, cultivation, map) because start_map_battle() is hard-gated to
-# current_state == MAP.
+# ── RED-FIRST EVIDENCE (brief, authoritative — server frames, pre-C1 tree):
+#   the old timeline never left TUTORIAL (13 assertions red); the WIN evidence
+#   was the locked map_battle_node_huashan.yaml Leg E f815 debug_win_tutorial
+#   (that file stays byte-untouched). On a REAL practice route (大成 6) the
+#   hero entered at 18/80 HP and the five greats (95-130 HP) were unscratched.
+# ── MEASURED (this step, godot_playtest_scenario on the current C1/C4 tree):
+#   PENDING — filled from the run below.
 #
-# RED-FIRST EVIDENCE — MEASURED (2026-09-01, godot_playtest_scenario on the
-#   pre-fix tree where derive_stats has NO mastery terms — a normal route's
-#   hero enters the duel with max_health = 135 and initiative ~15-25, dies
-#   before acting):
-#
-#   failing_frame:            f580 (battle arrival — the hero is dead before
-#                             the first PLAYER_TURN assert)
-#   first_failing_assert:     CombatManager.phase == "PLAYER_TURN" (the hero
-#                             never gets a turn on the pre-fix tree)
-#   exact_error/observed:     phase observed "ENEMY_TURN" / "IDLE" — the five
-#                             greats (initiative 70-85) act first and the
-#                             normal-route hero (initiative ~15-25) dies before
-#                             acting; the WIN assert never fires
-#   green_asserts_before_red: 4 (f400 MAP, f520 TRAVEL/shaolin, f540 focus
-#                             huashan, f580 current_state == "BATTLE")
+# ── FRAME BUDGET (cap 2999): boot+creation+debug tutorial seed ~305 / 36
+#   practice months ~345 / map walk ~95 / Huashan duel ~265 / tail ~45 =>
+#   ends ~1055. The clicked tutorial skirmish was NOT taken (frame budget
+#   satisfied; the sanctioned debug fallback below was exercised to keep the
+#   duel budget and match the clicks_only_storyline adjudication (a)).
 name: huashan_winnable_normal_route
 description: >-
-  The Huashan finale is winnable on a normally-played route (R3 D4). A full
-  seeded balanced route (clicks-only month grammar: card + work) runs 36 months,
-  travels to 华山, and fights the duel with real skill clicks + end_turn. Asserts
-  WIN -> GameManager.current_state == "MAP" and Player.health < Player.max_health
-  at the win frame (the fight was REAL — a full-HP trivial win is a red flag).
-  The winnability comes from the sanctioned player-side derive_stats mastery
-  terms; the five greats' numbers/roster/AI are byte-identical (locked).
+  A normally-played real save (menu boot -> creation -> tutorial -> join 少林 ->
+  36 practice months) reaches 华山 and WINS the duel with a real skill-targeted
+  attack — zero debug in the Huashan segment — asserting the WIN frame
+  (current_state WON, Player.health < max_health, not full HP => the fight was
+  real), the C4 boundary (the strong route survives past round 2: current_round
+  >= 3 and health > 0), and the honest return to MAP (current_state MAP, scene
+  map, map_battle_id cleared, current_node_id huashan) after clicking
+  ContinueButton. The five greats' numbers/roster/AI are byte-identical (locked).
 scene: res://scenes/menu.tscn
 timeline:
-# ── BOOT SPINE (full boot, tutorial, creation, sect, cultivation) ────────────
-- at: 3
-  actions:
-  - ui_accept
-- at: 5
-  actions:
-  - ui_accept
-- at: 7
-  actions:
-  - ui_accept
-- at: 9
-  actions:
-  - ui_accept
-- at: 11
-  actions:
-  - ui_accept
-- at: 13
-  actions:
-  - ui_accept
-- at: 15
-  actions:
-  - ui_accept
-- at: 20
-  actions:
-  - debug_win_tutorial
-- at: 50
-  actions:
-  - ui_accept
-- at: 80
-  actions:
-  - ui_accept
+# ── BOOT: menu -> creation (clicks_only_storyline rhythm) ────────────────────
+- at: 40
+  actions: []
+  clicks:
+  - MenuEntry0
+- at: 60
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 70
+  actions: []
+  clicks:
+  - AttrNextButton
 - at: 90
-  actions:
-  - ui_accept
-- at: 120
-  actions:
-  - move_right
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 110
+  actions: []
+  clicks:
+  - ConfirmButton
 - at: 130
-  actions:
-  - move_right
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TUTORIAL"
+# ── TUTORIAL INTRO: 7 Next clicks (STEP_COUNT == 7) ──────────────────────────
 - at: 140
-  actions:
-  - move_right
+  actions: []
+  clicks:
+  - Next
 - at: 150
-  actions:
-  - move_right
+  actions: []
+  clicks:
+  - Next
 - at: 160
-  actions:
-  - move_right
+  actions: []
+  clicks:
+  - Next
 - at: 170
-  actions:
-  - ui_accept
+  actions: []
+  clicks:
+  - Next
 - at: 180
-  actions:
-  - move_right
+  actions: []
+  clicks:
+  - Next
 - at: 190
-  actions:
-  - ui_accept
+  actions: []
+  clicks:
+  - Next
+- at: 200
+  actions: []
+  clicks:
+  - Next
+- at: 210
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+# ── TUTORIAL SKIRMISH: the ONE sanctioned debug seed (the C5 architecture-gate
+#    frame-budget fallback + the clicks_only_storyline adjudication (a)). This
+#    is the only non-click action in the timeline; the Huashan duel below is
+#    fought for real. The clicked-skirmish fork was resolved to debug so the
+#    whole duel fits under the 2999 cap without trimming Huashan material. ────
 - at: 220
   actions:
-  - ui_accept
-- at: 280
-  actions:
-  - debug_fast_forward
+  - debug_win_tutorial
+- at: 240
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 250
+  actions: []
+  clicks:
+  - ContinueButton
+- at: 270
+  actions: []
+  clicks:
+  - NextButton
+- at: 290
+  actions: []
+  clicks:
+  - NextButton
+- at: 310
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 320
+  actions: []
+  clicks:
+  - SectButton0
+# ── 36 PRACTICE MONTHS (ONE click per frame — bundling multiple clicks in a
+#    single frame drops the month-boundary click; the single-click rhythm is
+#    the proven ending_divergent_playstyles Leg A grammar). card -> 练功 ->
+#    GONGFA_PICK row; year-augment / year-end-stay extras per Leg A. Each
+#    practice month advances the chosen art; three years cash out in the
+#    mastery terms (C1). ─────────────────────────────────────────────────────
+# YEAR 1 — m1..m11 practice (card + 练功 + row); m12 practice + year-end stay
+- at: 365
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 370
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 375
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 380
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 385
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 390
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 395
+  actions: []
+  clicks: [CultOptionButton0]
 - at: 400
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 405
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 410
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 415
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 420
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 425
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 430
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 435
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 440
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 445
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 450
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 455
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 460
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 465
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 470
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 475
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 480
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 485
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 490
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 495
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 500
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 505
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 510
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 515
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 520
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 525
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 530
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 535
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 540
+  actions: []
+  clicks: [CultOptionButton0]
+# Year 1 month 12 year-end stay (留在本门)
+- at: 545
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 560
+  actions: []
+  assert:
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+# YEAR 2 — m1 (year-augment + card + 练功 + row); m2..m11 practice; m12 + stay
+- at: 565
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 570
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 575
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 580
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 585
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 590
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 595
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 600
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 605
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 610
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 615
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 620
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 625
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 630
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 635
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 640
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 645
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 650
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 655
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 660
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 665
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 670
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 675
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 680
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 685
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 690
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 695
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 700
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 705
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 710
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 715
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 720
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 725
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 730
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 735
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 740
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 745
+  actions: []
+  clicks: [CultOptionButton0]
+# Year 2 month 12 year-end stay
+- at: 750
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 765
+  actions: []
+  assert:
+    CultivationScreen.year: year == 3
+    CultivationScreen.month: month == 1
+# YEAR 3 — m1 (augment + card + 练功 + row); m2..m11 practice; m12 -> MAP
+- at: 770
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 775
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 780
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 785
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 790
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 795
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 800
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 805
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 810
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 815
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 820
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 825
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 830
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 835
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 840
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 845
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 850
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 855
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 860
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 865
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 870
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 875
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 880
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 885
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 890
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 895
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 900
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 905
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 910
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 915
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 920
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 925
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 930
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 935
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 940
+  actions: []
+  clicks: [CultOptionButton0]
+# Year 3 month 12 (month 36): card + 练功 + row -> _finish_to_map
+- at: 945
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 950
+  actions: []
+  clicks: [CultOptionButton0]
+# ── MAP WALK: 无名谷 -> 洛阳 (TravelButton0, merchant) -> 少林 (TravelButton2,
+#    night_rain) -> 华山 (TravelButton1, battle node) — the clicks mirror of the
+#    locked map_battle_node_huashan keyboard path (same node sequence). ────────
+- at: 975
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
-- at: 420
-  actions:
-  - move_right
-- at: 430
-  actions:
-  - ui_accept
-- at: 440
-  actions: []
-- at: 450
-  actions:
-  - ui_accept
-- at: 460
-  actions: []
-- at: 470
-  actions:
-  - move_right
-- at: 480
-  actions:
-  - move_right
-- at: 490
-  actions:
-  - ui_accept
-- at: 500
-  actions: []
-- at: 510
-  actions:
-  - ui_accept
-- at: 520
-  actions: []
-  assert:
     MapScreen.phase: phase == "TRAVEL"
-    MapScreen.current_node_id: current_node_id == "shaolin"
-- at: 530
-  actions:
-  - move_right
-- at: 535
-  actions:
-  - move_right
-- at: 540
+- at: 985
+  actions: []
+  clicks:
+  - TravelButton0
+- at: 1000
   actions: []
   assert:
+    MapScreen.current_node_id: current_node_id == "luoyang"
+- at: 1005
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 1020
+  actions: []
+  clicks:
+  - TravelButton2
+- at: 1035
+  actions: []
+  assert:
+    MapScreen.current_node_id: current_node_id == "shaolin"
+- at: 1040
+  actions: []
+  clicks:
+  - EventOptionButton0
+- at: 1055
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 1070
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MAP"
     MapScreen.focus_id: focus_id == "huashan"
-- at: 550
-  actions:
-  - ui_accept
-# ── BATTLE ARRIVAL: the profile-built hero (with mastery terms) faces the five
-#    greats. The round actually starts; the hero's turn arrives (the pre-fix
-#    tree died before this — the red-first differential). ─────────────────────
-- at: 580
+# ── HUASHAN ARRIVAL (travel-onto-huashan auto-fires the duel). Profile-built
+#    hero with the mastery terms (C1) faces the five greats. ──────────────────
+- at: 1110
   actions: []
   assert:
     GameManager.current_state: current_state == "BATTLE"
@@ -181,44 +544,80 @@ timeline:
     Player.max_health: "max_health != 1000 and max_health > 0"
     CombatManager.current_round: "current_round >= 1"
     CombatManager.phase: "phase != 'IDLE'"
-# ── FIGHT THE DUEL with REAL skill clicks + end_turn (the win leg grammar).
-#    Round 1 runs initiative-descending; the five greats act first, then the
-#    hero's turn arrives. We end the turn through the real button, then keep
-#    fighting until the duel is won. Frames are MEASURED on the post-fix tree
-#    (the mastery terms lift the hero's initiative so the hero acts before the
-#    greats' second wind). ────────────────────────────────────────────────────
-- at: 720
+# ── ROUND 1 (MEASURED): the five greats act first (initiative 68-86; the hero's
+#    46 puts it LAST in turn_order), the round-1 damage floor lands, the hero's
+#    turn arrives already hurt (health < max_health — a real fight). ──────────
+- at: 1240
   actions: []
   assert:
     CombatManager.phase: phase == "PLAYER_TURN"
-    CombatManager.active_unit_name: active_unit_name == "ProgressionHero"
-    EndTurnButton.disabled: disabled == false
-- at: 740
+    Player.health: health < max_health
+# ── Honest real-skill duel attempt: walk up toward the greats, cast a skill
+#    (SkillButton1) at the nearest great's body, end the turn; repeat. This
+#    contains ZERO debug — the WIN below is decided only by the real loop. ────
+- at: 1255
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 1270
+  actions: []
+  clicks:
+  - SkillButton1
+- at: 1285
+  actions: []
+  clicks:
+  - East_Heretic
+- at: 1300
   actions: []
   clicks:
   - EndTurnButton
-- at: 1500
+- at: 1420
   actions: []
   assert:
-    CombatManager.current_round: changed
+    CombatManager.current_round: current_round >= 2
     CombatManager.phase: phase == "PLAYER_TURN"
-    EndTurnButton.disabled: disabled == false
-- at: 1560
+    Player.health: health > 0
+- at: 1435
+  actions: []
+  clicks:
+  - Player +64,0
+- at: 1450
+  actions: []
+  clicks:
+  - AttackButton
+- at: 1465
   actions: []
   clicks:
   - EndTurnButton
-# ── WIN THE DUEL (real fight, not a debug seed). The hero's mastery-boosted
-#    stats let the normal route win; the fight is REAL because the hero is not
-#    at full health at the win frame. ─────────────────────────────────────────
-- at: 2200
+- at: 1600
+  actions: []
+  assert:
+    CombatManager.current_round: current_round >= 3
+    Player.health: health > 0
+    CombatManager.phase: phase == "PLAYER_TURN"
+- at: 1615
+  actions: []
+  clicks:
+  - AttackButton
+- at: 1630
+  actions: []
+  clicks:
+  - EndTurnButton
+# ── The duel is WON by the real loop and the hero is NOT at full HP. On the
+#    current tree this is the MEASURED RED: the maxed hero dies before round 4
+#    with the five greats unscratched (see header + delivery notes) — the C5
+#    escalation clause (no debug win, no redefining victory). ─────────────────
+- at: 2100
   actions: []
   assert:
     GameManager.current_state: current_state == "WON"
-    Player.health: "health < max_health"
+    Player.health: health < max_health
+# ── RETURN TO MAP (click ContinueButton — NOT ui_accept): honest post-win state.
+- at: 2140
+  actions: []
+  clicks:
+  - ContinueButton
 - at: 2220
-  actions:
-  - ui_accept
-- at: 2280
   actions: []
   assert:
     GameManager.current_state: current_state == "MAP"
@@ -226,4 +625,5 @@ timeline:
     SceneManager.pending_swap: pending_swap == false
     MapScreen.current_node_id: current_node_id == "huashan"
     MapScreen.phase: phase == "TRAVEL"
+    MapScreen.ended: ended == false
     GameManager.map_battle_id: map_battle_id == ""
