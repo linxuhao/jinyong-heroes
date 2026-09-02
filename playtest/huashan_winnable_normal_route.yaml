@@ -9,9 +9,12 @@
 # tutorial -> join 少林 -> 36 practice months), the hero reaches 华山 and WINS
 # the duel with a real skill-targeted attack — no debug seed in the Huashan
 # segment — and the fight is REAL (the hero is not at full HP at the win). The
-# five greats' numbers/roster/AI/positions are byte-identical (locked); the
-# winnability comes from C1's now-live mastery terms in derive_stats and C4's
-# measured bands, nothing else.
+# five greats' HP/damage/range/roster/AI are byte-identical (locked); the
+# winnability comes from the owner-granted R3b C5 unlock (2026-09-02): the
+# Huashan spawn geometry (POSITIONS) and the five greats' initiative literals
+# moved under the ruling, and C1's now-live mastery terms feed attack_damage /
+# move_range in derive_stats. Per-literal 改前/改后 rows: design/40_progression.md
+# M3''.
 #
 # HEAD/BODY (the R3 defect this closes): the old card claimed a clicks-only
 # card+work route but booted menu.tscn on a main.tscn keyboard timeline, stuck
@@ -23,7 +26,7 @@
 #   was the locked map_battle_node_huashan.yaml Leg E f815 debug_win_tutorial
 #   (that file stays byte-untouched). On a REAL practice route (大成 6) the
 #   hero entered at 18/80 HP and the five greats (95-130 HP) were unscratched.
-# ── MEASURED (this step, godot_playtest_scenario on the current C1/C4 tree):
+# ── MEASURED (this step, godot_playtest_scenario on the post-unlock tree):
 #   PENDING — filled from the run below.
 #
 # ── FRAME BUDGET (cap 2999): boot+creation+debug tutorial seed ~305 / 36
@@ -541,15 +544,6 @@ timeline:
     Player.max_health: "max_health != 1000 and max_health > 0"
     CombatManager.current_round: "current_round >= 1"
     CombatManager.phase: "phase != 'IDLE'"
-# TEMPORARY RED-FIRST PROBES — DO NOT SHIP: print the real-save hero + field
-- at: 1085
-  actions: []
-  assert:
-    Player.max_health: max_health == -1
-    Player.health: health == -2
-    CombatManager.turn_order: "turn_order == ''"
-    East_Heretic.health: health == -3
-    South_Emperor.grid_pos: "grid_pos == ''"
 # ── ROUND 1: the greats act first (ladder 71-79 after the M3'' initiative
 #    rows; the practice-route hero acts last), the hero's turn arrives already
 #    hurt (health < max_health — a real fight). ───────────────────────────────
@@ -585,12 +579,6 @@ timeline:
     CombatManager.current_round: current_round >= 2
     CombatManager.phase: phase == "PLAYER_TURN"
     Player.health: health > 0
-# TEMPORARY PROBE — DO NOT SHIP
-- at: 1455
-  actions: []
-  assert:
-    South_Emperor.health: health == -4
-    Player.health: health == -5
 - at: 1465
   actions: []
   clicks:
@@ -681,13 +669,6 @@ timeline:
   actions: []
   clicks:
   - EndTurnButton
-# TEMPORARY PROBE — DO NOT SHIP
-- at: 2500
-  actions: []
-  assert:
-    Player.health: health == -6
-    CombatManager.current_round: current_round == -7
-    GameManager.current_state: current_state == "-8"
 # ── RETURN TO MAP (click ContinueButton — NOT ui_accept): honest post-win
 #    state, gated on the overlay being actually visible (the previous run's
 #    hard error was an aim at ContinueButton while the LOST overlay — whose
