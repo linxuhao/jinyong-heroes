@@ -36,6 +36,13 @@ const _ATTR_LABELS := {
 	"fortune": "福缘",
 }
 
+## Read-only mode (C4 battle/ending instances): when true the panel binds ZERO
+## equip pool buttons AND hides all twelve EquipButton0..11, so no 装上/卸下
+## button can ever render or write a profile slot. The 物品 section shows a
+## 只读 marker line. Default false -> cultivation/map instances keep interactive
+## equip byte-identical. Observable on the playtest surface.
+@export var read_only: bool = false
+
 var is_open: bool = false
 var body_text: String = ""
 ## Huashan readiness verdict line (R3 D4). Recomputed each refresh() from the
