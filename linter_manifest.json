@@ -1,10 +1,9 @@
 {
-  ".cfg": "basic",
-  ".json": "basic",
-  ".md": "basic",
   ".py": "ruff",
-  ".tres": "basic",
-  ".tscn": "basic",
+  ".md": "basic",
   ".yaml": "basic",
-  ".yml": "basic"
+  ".yml": "basic",
+  ".json": "basic",
+  ".tscn": "basic",
+  ".cfg": "basic"
 }
