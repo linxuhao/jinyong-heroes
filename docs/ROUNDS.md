@@ -1464,3 +1464,12 @@ results are transcribed into the design archive (`design/00_roadmap.md`,
   `final/delivery_notes_event_pool.md` +
   `final/delivery_notes_event_pool_playtest.md`)
 - `assets/` — placeholder textures, seed portraits, NotoSansSC font, audio
+
+## R3b close-out record (2026-09-03)
+
+R3b iteration-4 close-out (official run 91/93 green, hard gate passed, pytest 67/67, vision passed).
+- C5: honest LOST close per the 2026-09-03 owner re-scope ruling — WIN carried to the world-breadth round with the 36/48 baseline; post-edit sidecar 47/47.
+- trait_combat pin re-derived: verdict (b) real stat shift (mp = 6, move_range = 5); post-fix 22/22.
+- README manualized: 1727 → 72 lines; format pin 5/5 passed.
+
+Full record: `design/99_changelog.md` (2026-09-03 row) + `design/90_decisions.md` (2026-09-03 ruling).
