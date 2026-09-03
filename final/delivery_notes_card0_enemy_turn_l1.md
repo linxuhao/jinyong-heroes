@@ -163,6 +163,33 @@ NEVER fabricated web numbers.
 
 ---
 
+## 9a. Review-fix record (retry, 2026-09-03)
+
+The t_impl review (2026-09-03) flagged ONE blocking issue, now fixed:
+
+- **Finding:** `playtest/enemy_turn_wall_clock.yaml` f1100 assert block carried
+  TWO mapping entries with the same key
+  `CombatManager.debug_enemy_round_msec` (`> 0` and `<= 10000`). YAML collapses
+  duplicate keys and silently drops the first — the `> 0` anti-vacuity guard
+  would never be evaluated, leaving only `<= 10000`, which a never-triggered 0
+  would satisfy. Exactly the hole the scenario's own description guards against.
+- **Fix:** merged both bounds into ONE entry per the review's prescription:
+  `CombatManager.debug_enemy_round_msec: debug_enemy_round_msec > 0 and debug_enemy_round_msec <= 10000`
+  (single key, both guards preserved; header description updated to state the
+  merge reason). No other line of the scenario changed; the
+  `debug_enemy_turn_index` `changed` (f200) / `>= 5` (f1100) frame separation
+  was already correct and stands.
+- **Re-run evidence (godot_playtest_scenario, staged overlay, 2026-09-03):**
+  `[PASS] enemy_turn_wall_clock  5/5` (the merged guard now demonstrably
+  evaluated) and `[PASS] camera_transform_follows_unit  13/13` (untouched,
+  still green). hard gate passed: True.
+- All other reviewed items (observables + prints, wait shortening, camera snap
+  audit, _common.yaml appends, red-first records, measurements, web
+  not-measured path, pipeline verification) were confirmed correct by the
+  review and are unchanged by this retry.
+
+---
+
 ## 10. Boundary declaration (what was NOT touched)
 
 - No AI decision logic (`_evaluate_ai` and its return values are byte-identical)

@@ -27,7 +27,9 @@ description: >-
   frame). debug_enemy_round_msec > 0 proves the observable actually measured a
   completed enemy round (so the <= 10 s bound is never met vacuously by a 0 that
   never triggered). The `changed` differential and the `>= 5` bound live on
-  DIFFERENT frames because a YAML mapping cannot carry the same key twice.
+  DIFFERENT frames because a YAML mapping cannot carry the same key twice; the
+  round_msec floor (> 0) and ceiling (<= 10000) are merged into ONE mapping
+  entry (`> 0 and <= 10000`) for the same reason.
 timeline:
 # Boot to battle exactly as each_unit_acts_once_per_round_initiative_order does
 # (7x ui_accept through the menu/creation flow), player round-1 turn live at f20.
@@ -53,6 +55,5 @@ timeline:
   assert:
     CombatManager.phase: phase == "PLAYER_TURN"
     CombatManager.debug_enemy_turn_index: debug_enemy_turn_index >= 5
-    CombatManager.debug_enemy_round_msec: debug_enemy_round_msec > 0
-    CombatManager.debug_enemy_round_msec: debug_enemy_round_msec <= 10000
+    CombatManager.debug_enemy_round_msec: debug_enemy_round_msec > 0 and debug_enemy_round_msec <= 10000
     CombatManager.debug_enemy_turn_msec: debug_enemy_turn_msec <= 2000
