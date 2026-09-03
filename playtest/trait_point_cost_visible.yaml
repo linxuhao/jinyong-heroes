@@ -39,10 +39,9 @@ timeline:
   actions: []
   assert:
     CreationScreen.phase: phase == "ATTRS"
-    CreationScreen.attr_cost_text: 'attr_cost_text != ""'
+    CreationScreen.attr_cost_text: 'attr_cost_text != "" and attr_cost_text.contains(str(attr_step_cost)) == true and attr_cost_text.contains(str(points_left)) == true'
     CreationScreen.attr_step_cost: attr_step_cost == 1
     CreationScreen.points_left: points_left == 30
-    CreationScreen.attr_cost_text: 'attr_cost_text.contains(str(attr_step_cost)) == true and attr_cost_text.contains(str(points_left)) == true'
 - at: 40
   actions:
   - debug_click_creation_widget
@@ -53,7 +52,7 @@ timeline:
     CreationScreen.attrs: attrs.bone == 11
     CreationScreen.points_left: points_left == 29
     CreationScreen.attr_step_cost: attr_step_cost == 1
-    CreationScreen.attr_cost_text: 'attr_cost_text.contains(str(points_left)) == true'
+    CreationScreen.attr_cost_text: changed
 - at: 70
   actions:
   - move_left
@@ -63,6 +62,7 @@ timeline:
     CreationScreen.phase: phase == "ATTRS"
     CreationScreen.points_left: points_left == 30
     CreationScreen.attrs: attrs.bone == 10
-    CreationScreen.attr_cost_text: changed
+    CreationScreen.attr_step_cost: attr_step_cost == 1
+    CreationScreen.attr_cost_text: 'attr_cost_text.contains(str(points_left)) == true and attr_cost_text.contains(str(attr_step_cost)) == true'
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
