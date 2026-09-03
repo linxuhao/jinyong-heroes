@@ -30,6 +30,13 @@ var points_left: int = START_POINTS
 ## Surface: focused attr row index (0..4, PlayerProfile.ATTR_KEYS order).
 var attr_index: int = 0
 
+## Surface: composed per-row cost + remaining line for the focused row.
+## Format: tr("＋1 需 %d 点 · −1 退 %d 点 · 剩 %d") % [_step_cost(v), _step_cost(v-1), points_left].
+var attr_cost_text: String = ""
+
+## Surface: next-point cost of the focused row's current value = _step_cost(current_value).
+var attr_step_cost: int = 1
+
 ## Surface: the five attrs (PlayerProfile.ATTR_KEYS -> int).
 var attrs: Dictionary = {"bone": 10, "inner": 10, "agility": 10, "wisdom": 10, "fortune": 10}
 
@@ -656,6 +663,16 @@ func _render() -> void:
 		var row_label: Label = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrLabel" % i) as Label
 		if row_label != null:
 			row_label.text = "%s %2d" % [_attr_label(PlayerProfile.ATTR_KEYS[i]), int(attrs[PlayerProfile.ATTR_KEYS[i]])]
+		var cost_label: Label = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrCostLabel%d" % [i, i]) as Label
+		if cost_label != null:
+			var v: int = int(attrs[PlayerProfile.ATTR_KEYS[i]])
+			cost_label.visible = phase == "ATTRS"
+			if phase == "ATTRS":
+				cost_label.text = tr("＋1 需 %d 点 · −1 退 %d 点 · 剩 %d") % [_step_cost(v), _step_cost(v - 1), points_left]
+		if i == attr_index:
+			var fv: int = int(attrs[PlayerProfile.ATTR_KEYS[i]])
+			attr_step_cost = _step_cost(fv)
+			attr_cost_text = tr("＋1 需 %d 点 · −1 退 %d 点 · 剩 %d") % [_step_cost(fv), _step_cost(fv - 1), points_left]
 	for i in range(min(_traits.size(), 13)):
 		var toggle: Button = get_node_or_null("MouseBox/TraitBox/TraitToggle%d" % i) as Button
 		if toggle != null:
