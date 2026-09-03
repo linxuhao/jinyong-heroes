@@ -972,3 +972,25 @@ func _on_player_cooldowns_updated(cooldowns: Array) -> void:
 			if "_skill_data" in btn and btn._skill_data != null:
 				total = int(btn._skill_data.cooldown)
 			btn.update_cooldown(cooldown_remaining, total)
+
+
+# ---------------------------------------------------------------------------
+# CARD 0b — ACTING-UNIT MARKER MOUNT (APPEND-ONLY)
+#
+# Mount the acting-unit pulse ring (scenes/ui/acting_unit_marker.tscn) as a
+# child of this HUD Control — NOT inside the LOCKED scripts/battlefield.gd. It
+# rides the HUD CanvasLayer above the board. The marker is a self-driving poller
+# (its own _process resolves CombatManager.get_active_unit() fresh each frame,
+# positions the ring at the unit's foot anchor, and mirrors visibility back into
+# CombatManager.acting_marker_visible / acting_marker_unit_name). It is
+# MOUSE_FILTER_IGNORE, so it is never the interaction surface and eats no board
+# clicks during ENEMY_TURN (the SegmentHost STOP-filter defect class). No
+# existing HUD field, signal, method or ordering is touched: a NEW idempotent
+# _ready() (this file defines no prior _ready) is appended so a HUD that re-enters
+# the tree never double-instantiates the marker.
+# ---------------------------------------------------------------------------
+func _ready() -> void:
+	if get_node_or_null("ActingUnitMarker") != null:
+		return
+	var marker_scene: PackedScene = preload("res://scenes/ui/acting_unit_marker.tscn")
+	add_child(marker_scene.instantiate())

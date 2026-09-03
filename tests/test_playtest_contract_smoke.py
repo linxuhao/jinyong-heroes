@@ -35,6 +35,64 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[1]
 COMMON: Path = REPO_ROOT / "playtest" / "_common.yaml"
 PLAYTEST_DIR: Path = REPO_ROOT / "playtest"
 
+def test_enemy_turn_wall_clock_surface_contract() -> None:
+    """CARD 0b (R5) two-place sync + surface-sync pin for the wall-clock nail.
+
+    Hard pins, all property/shape based (no line numbers):
+
+      1. The five new CombatManager observables introduced by card 0b
+         (debug_enemy_move_msec / debug_enemy_attack_msec / debug_enemy_other_msec
+         / acting_marker_visible / acting_marker_unit_name) each appear EXACTLY
+         ONCE in the ``CombatManager`` surface block of
+         ``playtest/_common.yaml`` — ONLY-ADD, never removed or renamed;
+      2. the scenario name ``enemy_turn_wall_clock`` appears in BOTH registries
+         (``scenario_order`` in _common.yaml AND ``ROUND_SCENARIOS`` here) at the
+         same relative tail position;
+      3. the scenario file exists with ``name:`` equal to its basename and
+         carries the mandatory marker differential line
+         ``CombatManager.acting_marker_unit_name: changed``.
+
+    No existing surface entry is removed or renamed; this test reads the parsed
+    surface blocks only.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "CombatManager" in blocks, "surface has no CombatManager block"
+    cm_items = blocks["CombatManager"]
+    assert cm_items, "CombatManager surface block parsed empty (vacuous pass guard)"
+    for var in (
+        "debug_enemy_move_msec",
+        "debug_enemy_attack_msec",
+        "debug_enemy_other_msec",
+        "acting_marker_visible",
+        "acting_marker_unit_name",
+    ):
+        assert cm_items.count(var) == 1, (
+            "CombatManager.%s must appear exactly once on the surface (found %d)"
+            % (var, cm_items.count(var))
+        )
+
+    name = "enemy_turn_wall_clock"
+    order = _items_under(text, "scenario_order")
+    assert name in order, f"{name} not in _common.yaml scenario_order (two-place sync)"
+    assert name in ROUND_SCENARIOS, f"{name} not in ROUND_SCENARIOS (two-place sync)"
+    assert [n for n in order if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
+        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
+        "relative order"
+    )
+
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(
+        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+    ), f"{name}.yaml name: does not equal its basename"
+    assert "CombatManager.acting_marker_unit_name: changed" in ftext, (
+        f"{name}.yaml missing the mandatory acting_marker_unit_name: changed "
+        "differential line"
+    )
+
+
 ROUND_SCENARIOS: list[str] = [
     "battle_focus_arrow_keys",
     "click_move_to_tile",
@@ -91,6 +149,7 @@ ROUND_SCENARIOS: list[str] = [
     "work_beats_idling",
     "practice_target_receipt",
     "ending_tiers_differentiate",
+    "enemy_turn_wall_clock",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
