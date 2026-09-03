@@ -89,6 +89,16 @@ const PAUSE_DEBOUNCE_MS: int = 100
 ## case (round-frame budget arithmetic in the header above).
 const TWEEN_TIMEOUT_SEC: float = 0.25
 
+## Card 0b pacing: per-step move wait. _execute_move's movement tween runs
+## 0.15 s per tile; the enemy move path now waits ONE SceneTreeTimer of this
+## length per tile instead of polling process_frame under the 0.25 s watchdog
+## (on the nothreads web export tween.finished never fires, so the old poll
+## burned the full 0.25 s PER TILE and multi-tile moves accounted for the
+## 14-38 s invisible wait). The wait stays bounded (a SceneTreeTimer always
+## fires) so the never-hang guarantee is preserved; _await_tween_safe and
+## TWEEN_TIMEOUT_SEC remain untouched for every other await site.
+const MOVE_STEP_SEC: float = 0.15
+
 ## Fallback fa_hui_du when no GongfaData resource is available (tutorial arts
 ## keep their flat 1.3 via the staged-values short-circuit).
 const DEFAULT_FA_HUI_DU: float = 1.3
@@ -152,6 +162,23 @@ var debug_await_frames: int = 0
 var debug_enemy_turn_msec: int = 0
 var debug_enemy_round_msec: int = 0
 var debug_enemy_turn_index: int = 0
+
+## Card 0b (enemy-turn pacing instrument) — per-segment split of the most
+## recently COMPLETED enemy turn, same family and discipline as the trio above:
+## ints, overwritten per turn, NEVER reset to 0. move = execute_move_path wall
+## clock, attack = execute_action wall clock, other = turn_msec - move -
+## attack (AI decide, pause gate, turn handover). The authoritative evidence
+## is the web console 'enemy_turn_split' line, not any local run.
+var debug_enemy_move_msec: int = 0
+var debug_enemy_attack_msec: int = 0
+var debug_enemy_other_msec: int = 0
+
+## Card 0b acting-unit marker mirrors (written every frame by
+## scripts/ui/acting_unit_marker.gd, the HUD-layer ring on the acting unit;
+## "" / false pre-battle and after reset_battle()). Presentation-only — the
+## marker never reads or writes combat state.
+var acting_marker_visible: bool = false
+var acting_marker_unit_name: String = ""
 
 ## R4 enemy-action-feedback presentation counters (ADDITIVE ONLY; card0's
 ## debug_enemy_* observables above are byte-identical and untouched). These three
@@ -729,14 +756,20 @@ func _next_turn() -> void:
 				unit.fsm_state = fsm
 
 		if not move_path.is_empty():
+			# Card 0b: wall-clock the move segment for the split instrument.
+			var _move_start_msec: int = Time.get_ticks_msec()
 			await execute_move_path(unit, move_path)
+			debug_enemy_move_msec = Time.get_ticks_msec() - _move_start_msec
 			if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
 				return
 
 		if action != "" and action != "wait":
 			if params.is_empty() and action == "skill" and skill_index >= 0:
 				params = { skill_index = skill_index }
+			# Card 0b: wall-clock the attack segment for the split instrument.
+			var _attack_start_msec: int = Time.get_ticks_msec()
 			await execute_action(unit, action, target, params)
+			debug_enemy_attack_msec = Time.get_ticks_msec() - _attack_start_msec
 			if GameManager.get_state() == "WON" or GameManager.get_state() == "LOST":
 				return
 
@@ -747,6 +780,14 @@ func _next_turn() -> void:
 	# reached by an enemy turn. Additive observables + console surface only.
 	debug_enemy_turn_msec = Time.get_ticks_msec() - _enemy_turn_start_msec
 	debug_enemy_turn_index += 1
+	# Card 0b: publish the per-segment split (other = remainder of the turn —
+	# AI decide, pause gate, handover). Clamped at 0 so a stray timing skew can
+	# never publish a negative segment. The two existing line formats below are
+	# byte-stable (the web record was read from them); this line is additive.
+	debug_enemy_other_msec = max(debug_enemy_turn_msec
+			- debug_enemy_move_msec - debug_enemy_attack_msec, 0)
+	print("enemy_turn_split %s move=%d attack=%d other=%d" % [_name_of(unit),
+			debug_enemy_move_msec, debug_enemy_attack_msec, debug_enemy_other_msec])
 	print("enemy_turn %s %d" % [_name_of(unit), debug_enemy_turn_msec])
 	_fx_on_enemy_turn_end()  # R4: hide the acting marker (presentation only)
 	end_current_turn()
@@ -1276,7 +1317,18 @@ func execute_move_path(unit: Node, path: Array) -> void:
 			unit.moves_left = int(unit.moves_left) - 1
 		var tween: Tween = _execute_move(unit, { to = to_pos })
 		if tween != null:
-			await _await_tween_safe(tween)
+			# CARD 0b PACING FIX: wait ONE short SceneTreeTimer per step instead
+			# of the frame-counted _await_tween_safe poll. On the nothreads web
+			# export tween.finished does not fire, so the old poll cost the full
+			# TWEEN_TIMEOUT_SEC (0.25 s) PER TILE — 4 tiles ≈ 1 s of pure wait
+			# per move, and the published build measured 18-42 s turns. The
+			# timer bounds the wait at the tween's own duration (MOVE_STEP_SEC
+			# == the 0.15 s tween in _execute_move); the tween's own finished
+			# handler still clears is_moving, and the never-hang guarantee
+			# holds because a SceneTreeTimer always fires. The poll-based
+			# _await_tween_safe + its TWEEN_TIMEOUT_SEC watchdog remain in
+			# place, untouched, for every other await site.
+			await get_tree().create_timer(MOVE_STEP_SEC, true).timeout
 		moved_any = true
 		# 桃花迷阵: entering a zone tile slows the mover (except the caster).
 		if hazard_zones.has(to_pos) \
