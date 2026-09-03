@@ -741,6 +741,8 @@ duel 在锁定敌方数据上实测不可赢(最强档先攻 46 vs 五绝 68–8
 五绝满血),所有者解锁 `scripts/data/map_battle_data.gd` 前 (d) 无法转绿;不许改
 场景伪造胜利。M3' 表本身由无头仪器实测、不依赖该场景,5/5 × 三档的结论不受影响。
 
+**更新(post-fix 官方复跑,2026-09-02,5_design 补记)**:上述带冲突其后由所有者带裁决解决(下文 M3''' 表:P_fresh_max = 60、even = 61 = P_fresh_max + 1、strong = 124),f260 `战备不足` 字面**逐字成立**,post-fix 官方 93 场景复跑实测 `huashan_readiness_warning` **16/16 PASS**(硬闸门 `passed: true`、零 runtime error)——`40_ux_backlog.md` UX-38 闭合。C5 的战斗相关性钉仍由 `huashan_winnable_normal_route` 承载:该场景 **36/48**,WON 尾维持**许可红**(f1200 相位观测 `ENEMY_TURN`、f2100 `current_state` 观测 `LOST`),按 R3c WIN 裁决不冒充实测 WIN、不撤回解锁裁决;本节与 M3' / M3''' 表的仪器实测结论不受影响。
+
 > **2026-09-02 附注(fix_readiness_verdict_rebaseline,STOP-and-report)**:真实档 boot 的
 > 新档是**根骨 15**(f110–f150 五次 `move_right`、无行移动,`creation.gd:34` 默认五围 10 起),
 > mp=0、空装备 → `readiness_power = floor(75/5)+25+floor(10/2) = 45`,落 even 带 → 势均力敌,
@@ -941,6 +943,8 @@ tier 差分与 C7 的比率钉的**官方屏上证明未建立**,修场景后官
 一致;免费卡银两不计入 deeds 的杠杆在真实运行的历练轴 0.0 上可见。上文「回归」
 段所记 `work_beats_idling 重跑绿` 系交付时点自跑预期,被本官方运行取代(该场景
 本轮红,时序缺陷),以上段实测为准。
+
+**更新(post-fix 官方复跑,2026-09-02,5_design 补记)**:时间线/boot 重基线与表达式书写修正(`fix_scenario_boot_rebaseline`)落地后,post-fix 官方 93 场景复跑实测:`ending_tiers_differentiate` **27/27**、`work_beats_idling` **26/26**(同 run `practice_target_receipt` **43/43**、`ending_divergent_playstyles` **33/33**、`ending_last_month_choice` **38/38**;硬闸门 `passed: true`、零 runtime error)——C3 的 tier 差分与 C7 的比率钉的**官方屏上证明自此建立**(`40_ux_backlog.md` UX-37 / UX-39 闭合);上段 13/22 / 11/21 为 run #1 的实测红,保留作历史。
 
 ---
 

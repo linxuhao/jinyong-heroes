@@ -249,11 +249,12 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
 许可红),**下一轮先做队列第 0 项(R3b 场景收口)再开新卡**。后续队列如下:
 
 ```
-0. R3b 场景收口           —— 官方 9 红的修复:五条时间线/boot 时序重基线 +
-                             表达式书写修正(UX-37)、readiness 字面重基线(UX-38)、
-                             既有网两条红收口(UX-39);C5 待所有者解锁
-                             `map_battle_data.gd` 后 `huashan_winnable_normal_route`
-                             原样复跑(许可红,不许修场景伪造胜利)
+0. ✅ R3b 场景收口        —— 官方 9 红的修复已落:五条时间线/boot 时序重基线 +
+                             表达式书写修正(UX-37)、readiness 带裁决(UX-38)、
+                             既有网两条红收口(UX-39);post-fix 官方复跑(2026-09-02)
+                             八红转绿(30/30 · 44/44 · 16/16 · 33/33 · 38/38 ·
+                             26/26 · 43/43 · 27/27),C5 WON 尾维持许可红(36/48,
+                             不伪造胜利);复跑唯一新红 UX-40 另行排队
 1. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
 2. 回执/结算              —— 结局回顾与结算页(UX-30)
 3. 教程与目标             —— 教程页加「本关目标」提示
@@ -261,6 +262,21 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
 5. 地图有图              —— 大地图加背景图(terrain 已有占位)
 6. 非战斗美术             —— 六段非战斗屏的美术填充
 ```
+
+**官方复跑收口(2026-09-02,5_design 补记)**:队列第 0 项完成——修复轮
+(fix_scenario_boot_rebaseline / fix_gate_i18n_ending_copy / r3c 带裁决与华山场景
+恢复)之后,post-fix 官方 93 场景复跑实测:playtest 硬闸门 **`passed: true`**、
+零 runtime error,run #1 九红中八条转绿(`cultivation_changes_combat` 30/30、
+`action_yield_differential` 44/44、`huashan_readiness_warning` 16/16、
+`ending_divergent_playstyles` 33/33、`ending_last_month_choice` 38/38、
+`work_beats_idling` 26/26、`practice_target_receipt` 43/43、
+`ending_tiers_differentiate` 27/27);编译 **107/107** 零错误、视觉闸门 passed
+非盲(93 场景 372 帧,Q6 93 好 / 0 坏)。C5 `huashan_winnable_normal_route`
+**36/48**:WON 尾维持许可红(f2100 观测 LOST,按 R3c WIN 裁决不冒充实测 WIN)。
+复跑唯一**新**红:`trait_combat_effects_and_twelve_slots` **21/22**(f885
+`moves_left == 0` 实测 3;run #1 全绿之列、本轮首红,记 `40_ux_backlog.md`
+UX-40,诊断线索指向 C5 解锁杠杆 ③ 的 derive_stats move_range,根因未定)——
+**队列自第 1 项(外号)继续**,UX-40 随下一轮一并处理。
 
 ### Backlog(R3b 试玩发现,record-only,**本轮不做**;2026-09-02 已收进 `40_ux_backlog.md` UX-33..36 队列行,本表为发现时的原始快照)
 
