@@ -69,6 +69,45 @@
 #   empty branch (:235-238) or _cycle_focus (:181-184). Restore byte-identically
 #   (search scripts/segments/cultivation.gd for "TEMPORARY RED-FIRST REVERT" ->
 #   zero hits) and re-run GREEN.
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# R5 RE-DERIVATION (2026-09-03, jinyong-nav C2 — return + zero delta)
+#
+# The R5 ruling (brief C2 + 90_decisions "softlock = no way out, not month
+# frozen") REPLACES the burned-month semantics this nail pinned in R2. With no
+# trainable gongfa the practice screen now RETURNS to ACTION_PICK WITHOUT
+# advancing the month (cultivation.gd empty branch: phase="ACTION_PICK",
+# _action_focus=0, status_text="功法均已大成，已返回行动重选", _sync_surface()+
+# _render(), NO _after_action()). The R2 header above is preserved verbatim
+# (append-only history); only the exit asserts, the button-text assert, and the
+# description are re-derived. The empty-state asserts and the clicks-only boot
+# shape are kept byte-identical.
+#
+# Per-line change table (R5):
+#   f140 CultOptionButton0.text: "度过本月" -> "返回行动" (a return button must not
+#               call itself End-the-month; the empty-state button label changed in cultivation.gd)
+#   f140 empty-state asserts (phase==GONGFA_PICK, visible, mastered_count==gongfa_count,
+#               pressed_connected, cursor_markers_visible): kept verbatim
+#   f170 phase: "CARD_PICK" -> "ACTION_PICK" (the return target)
+#   f170 month: month == month_before_accept + 1 -> month == month_before_accept
+#               (zero delta — the month is NOT burned)
+#   f170 silver: NEW — silver == silver_before_accept (zero delta; silver_before_accept
+#               published at _on_accept start, whitelisted in _common.yaml)
+#   f170 status_text: status_text != "" kept (the player still sees why)
+#   f170 cursor_markers_visible == false kept
+#   clicks-only boot (menu.tscn + debug_seed_save + MenuEntry1 click, ZERO keyboard):
+#               byte-identical
+#
+# RED-FIRST (R5, measured on the UNFIXED tree before the C2 code fix landed,
+#   godot_playtest_scenario sidecar run — the unfixed tree still burned the month,
+#   so the new return/zero-delta asserts fail). Four values:
+#     failing_frame:            f140
+#     first_failing_assert:     CultOptionButton0.text
+#     exact_error/observed:     observed text == "度过本月" (unfixed tree's empty-state
+#                               button still said End-the-month, not 返回行动)
+#     green_asserts_before_red: 9 (f80: 6 + f110: 2 + f140 phase assert: 1 = 9)
+#   NOTE: the delivery notes record the exact per-nail four-value measurements
+#   from the godot_playtest_scenario runs against the unfixed tree.
 name: clicks_only_gongfa_empty_exit
 description: >-
   Clicks-only nail for the GONGFA_PICK empty-list dead-end. Boots menu.tscn,
@@ -80,8 +119,10 @@ description: >-
   CultOptionButton0 with text 返回行动, all owned arts mastered via the RELATIVE
   mastered_count == gongfa_count, the button wired via pressed_connected, no ▶
   cursor anywhere), then click CultOptionButton0 (返回行动) and assert the PHASE
-  actually changed GONGFA_PICK -> ACTION_PICK (the phase-diff is the nail; a
-  merely-present button does not satisfy it). ZERO keyboard actions.
+  actually changed GONGFA_PICK -> ACTION_PICK with ZERO state delta (phase ==
+  "ACTION_PICK", month == month_before_accept, silver == silver_before_accept,
+  status_text != "") — the phase-diff is the nail; a merely-present button does
+  not satisfy it. ZERO keyboard actions.
 scene: res://scenes/menu.tscn
 timeline:
 # ── MENU: seed a fresh no-sect CULTIVATION save (the one non-click action) ──
@@ -122,7 +163,7 @@ timeline:
   assert:
     CultivationScreen.phase: phase == "GONGFA_PICK"
     CultOptionButton0.visible: visible == true
-    CultOptionButton0.text: text == "度过本月"
+    CultOptionButton0.text: text == "返回行动"
     CultivationScreen.mastered_count: mastered_count == gongfa_count
     CultivationScreen.pressed_connected: pressed_connected["CultOptionButton0"] == true
     CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
@@ -130,11 +171,12 @@ timeline:
   actions: []
   clicks:
   - CultOptionButton0
-# ── GONGFA_PICK empty-branch click -> CARD_PICK (month advances; phase-diff nail) ──
+# ── GONGFA_PICK empty-branch click -> ACTION_PICK (return, zero delta) ────────
 - at: 170
   actions: []
   assert:
-    CultivationScreen.phase: phase == "CARD_PICK"
-    CultivationScreen.month: month == month_before_accept + 1
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.month: month == month_before_accept
+    CultivationScreen.silver: silver == silver_before_accept
     CultivationScreen.status_text: status_text != ""
     CultivationScreen.cursor_markers_visible: cursor_markers_visible == false

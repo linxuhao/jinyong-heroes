@@ -797,6 +797,7 @@ surface:
   - focused_option_text
   - focus_marker_active
   - month_before_accept
+  - silver_before_accept
   - status_text
   - last_action_kind
   - last_action_silver
@@ -1176,7 +1177,7 @@ scenario_order:
 - equipment_in_battle_diff
 - event_pool_new_event_resolved
 - theme_focus_marker_cultivation
-- softlock_empty_practice_month_advances
+- softlock_empty_practice_returns
 - facility_use_cap_exhausted_zero_delta
 - map_node_event_revisit_no_resettle
 - event_option_refused_no_charge

@@ -135,7 +135,7 @@ ROUND_SCENARIOS: list[str] = [
     "equipment_in_battle_diff",
     "event_pool_new_event_resolved",
     "theme_focus_marker_cultivation",
-    "softlock_empty_practice_month_advances",
+    "softlock_empty_practice_returns",
     "facility_use_cap_exhausted_zero_delta",
     "map_node_event_revisit_no_resettle",
     "event_option_refused_no_charge",
@@ -1315,34 +1315,38 @@ def test_ending_tiers_differentiate_nail_contract() -> None:
 
 
 def test_softlock_nail_contract() -> None:
-    """Static anti-weakening pins for the jinyong-loop soft-lock nail.
+    """Static anti-weakening pins for the jinyong-nav C2 soft-lock return nail.
 
-    The soft-lock nail (``softlock_empty_practice_month_advances``) is this
-    round's core deliverable: it must reach the empty-GONGFA state through
-    REAL player input (``debug_seed_save`` seed + ``ui_accept`` drive) and
-    assert the month advances differentially. Three hard pins:
+    The soft-lock nail (``softlock_empty_practice_returns``, re-derived from the
+    R2 ``softlock_empty_practice_month_advances``) is this round's core
+    deliverable: it must reach the empty-GONGFA state through REAL player input
+    (``debug_seed_save`` seed + ``ui_accept`` drive) and assert the practice
+    screen RETURNS to ACTION_PICK with ZERO state delta. Three hard pins:
 
-      1. the file MUST carry the differential line
-         ``month == month_before_accept + 1`` (the month-advance proof);
+      1. the file MUST carry the differential zero-delta line
+         ``CultivationScreen.month: month == month_before_accept`` (the
+         prefixed live-assert form — the preserved R2 header prose still
+         contains the bare substring ``month == month_before_accept``, so the
+         prefix is what makes the pin hit the live assert and not the header);
       2. the timeline MUST NOT USE ``debug_fast_forward`` in any action — the
-         existing 78 greens are green precisely because they bypass this path
-         via the debug twin, so a nail that reaches the state by fast-forward
-         would prove nothing;
-      3. each re-pointed soft-lock-era nail (``gongfa_pick_empty_keyboard_return``
+         existing greens are green precisely because they bypass this path via
+         the debug twin, so a nail that reaches the state by fast-forward would
+         prove nothing;
+      3. each re-derived soft-lock-era nail (``gongfa_pick_empty_keyboard_return``
          and ``clicks_only_gongfa_empty_exit``) must still carry its preserved
-         empty-state assert ``mastered_count == gongfa_count`` — the re-point
+         empty-state assert ``mastered_count == gongfa_count`` — the re-derivation
          changed only the exit-frame asserts, never the empty-state proof.
     """
-    name = "softlock_empty_practice_month_advances"
+    name = "softlock_empty_practice_returns"
     path = PLAYTEST_DIR / (name + ".yaml")
     assert path.is_file(), f"{name}.yaml missing"
     ftext = path.read_text(encoding="utf-8")
     assert re.search(
         rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
     ), f"{name}.yaml name: does not equal its basename"
-    assert "month == month_before_accept + 1" in ftext, (
-        f"{name}.yaml missing the differential month-advance line "
-        "`month == month_before_accept + 1`"
+    assert "CultivationScreen.month: month == month_before_accept" in ftext, (
+        f"{name}.yaml missing the differential zero-delta line "
+        "`CultivationScreen.month: month == month_before_accept`"
     )
     # The ban is scoped to the TIMELINE's actions, not the file's prose: the
     # file legitimately QUOTES the token in its header comments and description
