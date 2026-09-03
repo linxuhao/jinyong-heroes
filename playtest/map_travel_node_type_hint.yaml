@@ -1,5 +1,5 @@
-# One play-test scenario. Loaded by playtest/_common/_common.yaml's sibling
-# scan — scene / actions / surface live in _common.yaml, this file is only the
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live in _common.yaml, this file is only the
 # scenario. The basename must equal `name:`.
 #
 # R5 C1 (map travel node-type hint): the map's own footer HintLabel is the

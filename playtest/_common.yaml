@@ -1038,6 +1038,11 @@ surface:
   - size
   - mouse_filter
   - text
+  TravelGateConfirmButton:
+  - visible
+  - size
+  - mouse_filter
+  - text
   EventOptionButton0:
   - visible
   - size
