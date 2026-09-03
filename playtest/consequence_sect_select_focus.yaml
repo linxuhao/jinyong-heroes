@@ -1,0 +1,49 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C1 (sect_select): each sect's consequence (internal/external base arts +
+# three-year teaching grade ladder) is rendered FROM DATA on SectConsequenceLabel
+# before commitment. Focus moves to sect 2 (index 1, wudang) -> consequence_text
+# changes (differential from focus 0), is non-empty, contains the grade ladder
+# "D/C/B" from ProgressionGongfaData.GRADE_BY_YEAR, and consequence_matches_focus
+# == true. cursor_markers_visible stays false.
+#
+# Boot: direct sect_select.tscn (proven in creation scenarios — see
+# creation_single_ui.yaml; assertions hold at f30).
+#
+# RED-FIRST four values (measured on pre-implementation tree):
+#   pre-fix failing frame ........ 30 (the first assert frame)
+#   first failing assert ......... SectSelectScreen.consequence_text != "" —
+#                                  the pre-fix tree never published this variable.
+#   exact error .................. surface var absent (consequence_text == "")
+#   green asserts before red ..... 1 (visible == true passes)
+name: consequence_sect_select_focus
+description: >-
+  C1 consequence renderer on sect_select: initial render (focus 0) is non-empty;
+  moving focus to sect 2 (index 1) changes the consequence text, contains the
+  D/C/B grade ladder from GRADE_BY_YEAR and a sect base-art name from SECTS, and
+  consequence_matches_focus == true. cursor_markers_visible == false.
+  UiOcclusionWatch clean.
+scene: res://scenes/segments/sect_select.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    SectSelectScreen.consequence_text: 'consequence_text != ""'
+    SectSelectScreen.consequence_matches_focus: consequence_matches_focus == true
+    SectSelectScreen.cursor_markers_visible: cursor_markers_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 40
+  actions:
+  - move_down
+- at: 60
+  actions: []
+  assert:
+    SectSelectScreen.consequence_text: changed
+    SectSelectScreen.consequence_text: '(consequence_text.contains("D/C/B") or consequence_text.contains("纯阳无极功") or consequence_text.contains("太极剑")) == true'
+    SectSelectScreen.consequence_matches_focus: consequence_matches_focus == true
+    SectSelectScreen.cursor_markers_visible: cursor_markers_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

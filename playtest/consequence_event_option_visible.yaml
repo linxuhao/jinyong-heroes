@@ -1,0 +1,74 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C1 (cultivation EVENT): every event option now shows its cost+gain
+# consequence from EventData option effects BEFORE commitment. Focus moves to
+# option_b (index 1) -> consequence_text changes (differential), is non-empty,
+# and contains at least one effect marker token (银两 / 得「 / 修习 / attr names)
+# composed from the focused option's effects array.
+#
+# Boot: debug_seed_save + load -> CARD_PICK -> ui_accept (card 0) -> ACTION_PICK
+# -> move_down ×3 -> ui_accept (游历 index 3) -> EVENT -> move_down ×1 -> option_b.
+#
+# RED-FIRST four values (measured on pre-implementation tree):
+#   pre-fix failing frame ........ 130 (the first assert frame at EVENT)
+#   first failing assert ......... CultivationScreen.consequence_text != "" —
+#                                  the pre-fix tree never published this variable.
+#   exact error .................. surface var absent (consequence_text == "")
+#   green asserts before red ..... 2 (phase + current_state checks pass)
+name: consequence_event_option_visible
+description: >-
+  C1 consequence renderer on the EVENT phase: initial render (focus 0 = option_a)
+  is non-empty; moving focus to option_b (index 1) changes the consequence text,
+  and the new text contains at least one effect marker token (银两 / 得「 /
+  修习 / attr names) for any option effect combination. No EVENT input exit is
+  added (no-exit ruling reaffirmed — no ui_cancel). UiOcclusionWatch clean.
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+- at: 130
+  actions:
+  - ui_accept
+- at: 145
+  actions:
+  - move_down
+- at: 155
+  actions:
+  - move_down
+- at: 165
+  actions:
+  - move_down
+- at: 175
+  actions:
+  - ui_accept
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.consequence_text: 'consequence_text != ""'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+- at: 210
+  actions:
+  - move_down
+- at: 230
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.consequence_text: changed
+    CultivationScreen.consequence_text: '(consequence_text.contains("银两") or consequence_text.contains("得「") or consequence_text.contains("修习") or consequence_text.contains("根骨") or consequence_text.contains("内力") or consequence_text.contains("身法") or consequence_text.contains("悟性") or consequence_text.contains("福缘")) == true'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

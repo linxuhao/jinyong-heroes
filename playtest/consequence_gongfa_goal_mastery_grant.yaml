@@ -1,0 +1,124 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C1 (cultivation GONGFA_PICK mastery goal): the focused art's consequence
+# shows "大成需练度 N（当前 X/N）" composed from PRACTICE_TO_MASTER[grade].
+# For shaolin D-grade arts, N = 4. Focus moves to art index 1 (move_down ×1)
+# -> consequence_text changes and contains the required practice points.
+#
+# Boot: real-save via practice_target_receipt grammar (main.tscn -> tutorial 7×
+# Next -> AttackButton -> debug_win_tutorial -> Continue -> 2× NextButton ->
+# AttrNext -> TraitNext -> Confirm -> SectButton0 = shaolin -> CULTIVATION).
+# Shaolin grants 2 unmastered D arts (易筋经 + 罗汉拳), so GONGFA_PICK has >= 2.
+# Then: CARD_PICK ui_accept -> ACTION_PICK focus 0 (练功) ui_accept -> GONGFA_PICK.
+# move_down ×1 -> art index 1 (罗汉拳, grade D, PRACTICE_TO_MASTER[D]=4).
+#
+# RED-FIRST four values (measured on pre-implementation tree):
+#   pre-fix failing frame ........ 390 (first assert frame at GONGFA_PICK after move_down)
+#   first failing assert ......... CultivationScreen.consequence_text contains "4"
+#                                  — the pre-fix renderer did not exist.
+#   exact error .................. surface var absent (consequence_text == "")
+#   green asserts before red ..... 2 (phase + focus checks pass)
+name: consequence_gongfa_goal_mastery_grant
+description: >-
+  C1 consequence renderer on GONGFA_PICK: initial render (focus 0, first
+  unmastered art) is non-empty and data-bound; move_down to art index 1 changes
+  consequence_text to contain the PRACTICE_TO_MASTER[grade] requirement number
+  (4 for D-grade). consequence_matches_focus == true. UiOcclusionWatch clean.
+timeline:
+- at: 40
+  actions: []
+  clicks:
+  - Next
+- at: 50
+  actions: []
+  clicks:
+  - Next
+- at: 60
+  actions: []
+  clicks:
+  - Next
+- at: 70
+  actions: []
+  clicks:
+  - Next
+- at: 80
+  actions: []
+  clicks:
+  - Next
+- at: 90
+  actions: []
+  clicks:
+  - Next
+- at: 100
+  actions: []
+  clicks:
+  - Next
+- at: 110
+  actions: []
+  clicks:
+  - AttackButton
+- at: 125
+  actions:
+  - debug_win_tutorial
+- at: 155
+  actions: []
+  clicks:
+  - ContinueButton
+- at: 185
+  actions: []
+  clicks:
+  - NextButton
+- at: 215
+  actions: []
+  clicks:
+  - NextButton
+- at: 245
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 275
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 305
+  actions: []
+  clicks:
+  - ConfirmButton
+- at: 335
+  actions: []
+  clicks:
+  - SectButton0
+- at: 375
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.gongfa_count: gongfa_count == 2
+- at: 380
+  actions:
+  - ui_accept
+- at: 395
+  actions:
+  - ui_accept
+- at: 420
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultivationScreen.consequence_text: 'consequence_text != ""'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+- at: 430
+  actions:
+  - move_down
+- at: 450
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultivationScreen.option_focus: option_focus == 1
+    CultivationScreen.consequence_text: changed
+    CultivationScreen.consequence_text: 'consequence_text.contains("4") == true'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

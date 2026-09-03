@@ -1,0 +1,209 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C1 (cultivation YEAR_END 另投他派): at month 12, YEAR_END offers two rows
+# (留在本门 / 另投他派). The consequence renderer composes from
+# ProgressionGongfaData.GRADE_BY_YEAR — "保留已学功法；来年授艺品级来自新门派"
+# with the next-year grade letter (year 1 -> index 2 = "C" from GRADE_BY_YEAR).
+#
+# Boot: debug_seed_save + load -> month 1 CARD_PICK. Drive 11 months of
+# 做工 (ui_accept card + move_down ×2 + ui_accept action) to reach month 12.
+# On month 12's action completion YEAR_END appears. Focus defaults to 0 (留在本门).
+# move_down ×1 to focus 1 (另投他派), then assert consequence.
+#
+# RED-FIRST four values (measured on pre-implementation tree):
+#   pre-fix failing frame ........ 640 (first assert frame at YEAR_END)
+#   first failing assert ......... CultivationScreen.consequence_text != "" —
+#                                  the pre-fix renderer did not exist.
+#   exact error .................. surface var absent (consequence_text == "")
+#   green asserts before red ..... 1 (phase == "YEAR_END" passes)
+name: consequence_year_end_switch
+description: >-
+  C1 consequence renderer on YEAR_END 另投他派: at month 12, focus 0 shows
+  "留在本门" consequence; move to index 1 ("另投他派") changes consequence_text
+  to contain "保留" semantics + the next-year grade letter (D/C/B from
+  GRADE_BY_YEAR). consequence_matches_focus == true. UiOcclusionWatch clean.
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── DRIVE 11 MONTHS (做工 = index 2, 4 frames per month cycle) ────────────
+# Month 1 CARD_PICK at f130 -> f570 = month 12 CARD_PICK
+- at: 130
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - move_down
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_down
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - move_down
+- at: 230
+  actions:
+  - move_down
+- at: 240
+  actions:
+  - ui_accept
+- at: 250
+  actions:
+  - ui_accept
+- at: 260
+  actions:
+  - move_down
+- at: 270
+  actions:
+  - move_down
+- at: 280
+  actions:
+  - ui_accept
+- at: 290
+  actions:
+  - ui_accept
+- at: 300
+  actions:
+  - move_down
+- at: 310
+  actions:
+  - move_down
+- at: 320
+  actions:
+  - ui_accept
+- at: 330
+  actions:
+  - ui_accept
+- at: 340
+  actions:
+  - move_down
+- at: 350
+  actions:
+  - move_down
+- at: 360
+  actions:
+  - ui_accept
+- at: 370
+  actions:
+  - ui_accept
+- at: 380
+  actions:
+  - move_down
+- at: 390
+  actions:
+  - move_down
+- at: 400
+  actions:
+  - ui_accept
+- at: 410
+  actions:
+  - ui_accept
+- at: 420
+  actions:
+  - move_down
+- at: 430
+  actions:
+  - move_down
+- at: 440
+  actions:
+  - ui_accept
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions:
+  - move_down
+- at: 470
+  actions:
+  - move_down
+- at: 480
+  actions:
+  - ui_accept
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions:
+  - move_down
+- at: 510
+  actions:
+  - move_down
+- at: 520
+  actions:
+  - ui_accept
+- at: 530
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - move_down
+- at: 550
+  actions:
+  - move_down
+- at: 560
+  actions:
+  - ui_accept
+# ── MONTH 12: CARD_PICK -> ACTION_PICK -> 做工 -> YEAR_END ────────────────
+- at: 570
+  actions:
+  - ui_accept
+- at: 580
+  actions:
+  - move_down
+- at: 590
+  actions:
+  - move_down
+- at: 600
+  actions:
+  - ui_accept
+- at: 640
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_END"
+    CultivationScreen.month: month == 12
+    CultivationScreen.consequence_text: 'consequence_text != ""'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 650
+  actions:
+  - move_down
+- at: 670
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_END"
+    CultivationScreen.consequence_text: changed
+    CultivationScreen.consequence_text: '(consequence_text.contains("保留") == true and (consequence_text.contains("D") or consequence_text.contains("C") or consequence_text.contains("B")) == true)'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

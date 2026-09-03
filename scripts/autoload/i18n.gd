@@ -603,6 +603,29 @@ const EN: Dictionary = {
 	"胜券在握": "Strong",
 	"（战斗中只读）": "(Read-only in battle)",
 	"查看角色": "View Character",
+
+	# --- R5 C1 consequence renderer (cultivation.gd + sect_select.gd) ---------
+	"练功：本月在所选功法上 +%d 练度": "Train: +%d practice on the chosen art this month",
+	"做工：本月 银两 +%d": "Work: +%d silver this month",
+	"修习：任选属性 +1~3": "Study: pick any attribute +1~3",
+	"游历：遇事定夺，或掷重择": "Travel: face an event, or reroll your fate",
+	"存盘：把本月至此的进度写盘": "Save: write this month's progress to disk",
+	"读档：载入已存档的进度": "Load: restore a saved progress",
+	"删档：删除已有存档（再按一次确认）": "Delete: erase the existing save (press again to confirm)",
+	"功法均已大成": "All arts mastered",
+	"练功目标：大成需练度 %d（当前 %d/%d）": "Train goal: %d practice to master (current %d/%d)",
+	"留在本门：来年授艺品级 %s": "Stay: next-year teaching grade %s",
+	"另投他派：保留已学功法；来年授艺品级来自新门派（%s）": "Switch sects: keep learned arts; next-year teaching grade from new sect (%s)",
+	"%s：保留已学功法；来年授艺品级 %s": "%s: keep learned arts; next-year teaching grade %s",
+	"银两 +%d": "Silver +%d",
+	"得「%s」": "Gain \"%s\"",
+	"%s +%d": "%s +%d",
+	"修习 +%d": "Study +%d",
+	"顿悟": "Epiphany",
+	"神功": "Divine Art",
+	"，银两不足": ", not enough silver",
+	"%s：内功 %s · 外功 %s；三年授艺品级：%s": "%s: Internal %s / External %s; 3-year teaching grades: %s",
+	"做工（本月 银两 +%d）": "Work (this month Silver +%d)",
 }
 
 

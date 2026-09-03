@@ -1,0 +1,61 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C1 (cultivation ACTION_PICK work row): the 做工 button carries its exact
+# this-month income inline (always visible, touch path) and the consequence
+# renderer repeats the same data-composed number for focus. At work_months=0,
+# income = ProgressionMath.work_income(0) = 10. Both the consequence and the
+# button label contain "+10".
+#
+# Boot: debug_seed_save + load -> CARD_PICK -> ui_accept (card 0) -> ACTION_PICK
+# -> move_down ×2 (work = CultOptionButton2, index 2).
+#
+# RED-FIRST four values (measured on pre-implementation tree):
+#   pre-fix failing frame ........ 160 (the first assert frame at ACTION_PICK work)
+#   first failing assert ......... CultivationScreen.consequence_text contains "10"
+#                                  — the pre-fix renderer did not exist.
+#   exact error .................. surface var absent / text unchanged
+#   green asserts before red ..... 3 (phase + button visible checks pass)
+name: consequence_work_income_inline
+description: >-
+  C1 work-income inline + consequence renderer: at ACTION_PICK focus 2 (做工),
+  consequence_text contains "+10" (ProgressionMath.work_income(0) = 10 at a fresh
+  profile), CultOptionButton2.text (the 做工 button label) also contains "+10"
+  (inline suffix, always visible for touch), and consequence_matches_focus == true.
+  UiOcclusionWatch clean.
+scene: res://scenes/menu.tscn
+timeline:
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+- at: 130
+  actions:
+  - ui_accept
+- at: 145
+  actions:
+  - move_down
+- at: 155
+  actions:
+  - move_down
+- at: 170
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.option_focus: option_focus == 2
+    CultivationScreen.consequence_text: 'consequence_text.contains("+10") == true'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+    CultOptionButton2.text: 'text.contains("+10") == true'
+    CultOptionButton2.visible: visible == true
+    CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
