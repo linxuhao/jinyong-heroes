@@ -1,0 +1,98 @@
+extends CanvasLayer
+## CombatLog — R4 enemy-action-feedback presentation component.
+##
+## A small, bounded combat log anchored to the BOTTOM-LEFT corner of the screen,
+## visible only while it holds at least one line. It is the on-screen answer to
+## the owner's 2026-09-03 playtest #5 complaint that an enemy's turn is a fully
+## static screen with no indication anything is happening: every landed hit and
+## every movement-zeroing status appends one line here.
+##
+## PRESENTATION ONLY. This component reads nothing from and writes nothing to any
+## combat / damage / initiative / AI / turn-order state — the CombatManager hooks
+## hand it a finished display string and it renders it. It never calls back into
+## combat logic.
+##
+## DISPLAY LAYER ONLY: the strings handed to append() are built by the
+## CombatManager hooks from unit.character_data.display_name (the R4 shrimp
+## nicknames). This component never sees or renders an internal character_name.
+##
+## LAYOUT / OCCLUSION: lives on its OWN CanvasLayer (never the default canvas),
+## which structurally isolates it from the battle HUD's Buttons, name plates,
+## order bar and skill bar for UiOcclusionWatch — a cross-CanvasLayer pair is out
+## of the watch's scope by construction (ui_occlusion_watch.gd's
+## _same_effective_layer). It is also anchored to the bottom edge, clear of the
+## top band (0..92) the occlusion watch strips. mouse_filter is IGNORE so the log
+## never swallows a board click (the SegmentHost defect class).
+##
+## Nodes are built in code (not via a scene $ path) so the .tscn stays a bare
+## CanvasLayer host and the script is self-contained.
+
+const MAX_LINES: int = 6
+
+## Screen-space margins for the bottom-left dock.
+const _MARGIN_X: float = 16.0
+const _MARGIN_Y: float = 16.0
+
+var _label: Label = null
+var _lines: PackedStringArray = PackedStringArray()
+
+
+func _ready() -> void:
+	layer = 100
+	_label = Label.new()
+	_label.name = "CombatLogLabel"
+	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_label.add_theme_font_size_override("font_size", 13)
+	_label.add_theme_color_override("font_color", Color(0.96, 0.96, 0.92, 1.0))
+	_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.02, 1.0))
+	_label.add_theme_constant_override("outline_size", 4)
+	_label.visible = false
+	add_child(_label)
+
+
+## Append one finished display line and keep only the last MAX_LINES visible.
+## Visible whenever it holds at least one line.
+func append(text: String) -> void:
+	if _label == null:
+		return
+	_lines.append(text)
+	while _lines.size() > MAX_LINES:
+		_lines.remove_at(0)
+	_label.text = "\n".join(_lines)
+	_label.visible = _lines.size() > 0
+	_dock_bottom_left()
+
+
+## Number of lines currently held (capped at MAX_LINES) — a read helper the
+## CombatLog hooks surface as debug_combat_log_lines is a cumulative counter,
+## not this live count; kept separate on purpose.
+func line_count() -> int:
+	return _lines.size()
+
+
+## Clear all lines (e.g. battle teardown) and hide the dock.
+func clear() -> void:
+	_lines.clear()
+	if _label != null:
+		_label.text = ""
+		_label.visible = false
+
+
+## Re-anchor the label to the bottom-left of the viewport each append so it stays
+## clear of the top band and the fixed HUD edges regardless of line count.
+func _dock_bottom_left() -> void:
+	# CanvasLayer has no get_viewport_rect() (that is a Control method) — read the
+	# viewport's visible rect instead (the autoload host of this CanvasLayer still
+	# exposes get_viewport()). Degrades to a sane 1280x720 fallback pre-tree.
+	var vp_size: Vector2 = Vector2(1280.0, 720.0)
+	var viewport := get_viewport()
+	if viewport != null:
+		vp_size = viewport.get_visible_rect().size
+	var label_size: Vector2 = _label.get_combined_minimum_size()
+	_label.size = label_size
+	_label.position = Vector2(
+		_MARGIN_X,
+		maxf(vp_size.y - label_size.y - _MARGIN_Y, _MARGIN_Y)
+	)

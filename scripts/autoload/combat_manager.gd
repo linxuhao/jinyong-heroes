@@ -153,6 +153,26 @@ var debug_enemy_turn_msec: int = 0
 var debug_enemy_round_msec: int = 0
 var debug_enemy_turn_index: int = 0
 
+## R4 enemy-action-feedback presentation counters (ADDITIVE ONLY; card0's
+## debug_enemy_* observables above are byte-identical and untouched). These three
+## count the PRESENTATION actions the owner's playtest #5 asked for — the wait
+## must not look like a hang — and, like the debug_* pattern they follow, are
+## NEVER reset mid-battle so a playtest `changed` differential is meaningful.
+##   debug_combat_log_lines:       lines appended to the on-screen CombatLog
+##                                 (every landed hit + every movement-zeroing turn).
+##   debug_float_numbers_spawned:  floating damage numbers spawned on hits.
+##   debug_acting_marker_shown:    enemy turns that displayed the acting marker.
+var debug_combat_log_lines: int = 0
+var debug_float_numbers_spawned: int = 0
+var debug_acting_marker_shown: int = 0
+
+## Lazily-instantiated presentation components (CanvasLayer children of this
+## autoload). Untyped on purpose: they are duck-typed component hosts, never
+## combat state. The _fx_ hooks below add them to the tree the first time any hit
+## or enemy turn happens; no other file or scene needs to reference them.
+var _fx_log = null
+var _fx_floats = null
+
 ## Private timing state for the observables above (NOT surface-observable; these
 ## are only the scratch values used to compute the public ones). A contiguous
 ## run of enemy turns is bracketed by transitions player<->enemy in _next_turn()
@@ -673,6 +693,9 @@ func _next_turn() -> void:
 	if not _enemy_round_active:
 		_enemy_round_active = true
 		_enemy_round_start_msec = _enemy_turn_start_msec
+	# R4 enemy-action-feedback PRESENTATION hook (add-only): mark the acting enemy
+	# for the duration of its turn so the 2-33 s wait never reads as a hang.
+	_fx_on_enemy_turn_start(unit)
 	# Card 0 (wait-shortening): the pause gate polled one process_frame per
 	# iteration, so on the low-fps web build a pause burned wall-clock in
 	# frame-counted steps. A short SceneTreeTimer bounds the poll in wall-clock
@@ -725,6 +748,7 @@ func _next_turn() -> void:
 	debug_enemy_turn_msec = Time.get_ticks_msec() - _enemy_turn_start_msec
 	debug_enemy_turn_index += 1
 	print("enemy_turn %s %d" % [_name_of(unit), debug_enemy_turn_msec])
+	_fx_on_enemy_turn_end()  # R4: hide the acting marker (presentation only)
 	end_current_turn()
 
 
@@ -794,6 +818,7 @@ func begin_turn(unit: Node) -> void:
 	# "Next turn" restrictions apply for this turn.
 	if _has_status(unit, "no_move_next_turn"):
 		unit.moves_left = 0
+		_fx_on_no_move(unit)  # R4: explain the bare "移动 0" in the log
 	elif _has_status(unit, "move_minus_next_turn"):
 		unit.moves_left = max(move_range - 2, 0)
 
@@ -946,6 +971,11 @@ func apply_damage(target: Node, amount: int, source: Node = null,
 	damage_dealt.emit(target, amount, is_lethal)
 	if target.has_signal("health_changed"):
 		target.health_changed.emit(target.health, target.max_health)
+	# R4 enemy-action-feedback PRESENTATION hook (add-only): the single damage
+	# dispatch point, so every landed hit — basic / skill / DoT / counter /
+	# reflect — appends one log line and spawns one floating number here. Reads
+	# only, no combat value is touched (loss/remaining are already computed).
+	_fx_on_hit(target, source, loss, int(target.health))
 
 	# --- 一阳续命: one-time +78 when surviving a hit below 40% HP ---
 	if not is_lethal and int(target.health) > 0 \
@@ -2035,3 +2065,91 @@ func _set_phase(p: String) -> void:
 	if phase != p:
 		phase = p
 		phase_changed.emit(p)
+
+
+# ===========================================================================
+# R4 enemy-action-feedback PRESENTATION hooks (ADD-ONLY block).
+#
+# The owner's 2026-09-03 playtest #5: during an enemy's turn the screen is fully
+# static for 2-33 s with no indication anything is happening; the hero's bar just
+# changes and a bare "移动 0" appears with no reason. These hooks deliver
+# PRESENTATION ONLY — zero changes to damage / initiative / AI / turn order / any
+# number. Every path here degrades to a no-op if a component is missing, so the
+# hooks can never break combat. They are the only place the two new CanvasLayer
+# components (CombatLog, FloatingNumber) are instantiated, so no scene file and
+# no unit script needs to reference them.
+#
+# DISPLAY LAYER ONLY: names are resolved from unit.character_data.display_name
+# (the R4 shrimp nicknames), NEVER _name_of() (which returns the internal
+# character_name and is forbidden for on-screen text).
+# ===========================================================================
+
+## Lazily instantiate the two presentation components as children of this autoload.
+## A CanvasLayer renders regardless of its parent node type, so hosting them under
+## the (persistent) autoload keeps them alive across the whole battle with no
+## per-scene wiring and no null current_scene at boot. Never touches combat state.
+func _fx_ensure() -> void:
+	if _fx_log == null or not is_instance_valid(_fx_log):
+		var log_scene: PackedScene = load("res://scenes/ui/combat_log.tscn") as PackedScene
+		if log_scene != null:
+			_fx_log = log_scene.instantiate()
+			add_child(_fx_log)
+	if _fx_floats == null or not is_instance_valid(_fx_floats):
+		var float_scene: PackedScene = load("res://scenes/ui/floating_number.tscn") as PackedScene
+		if float_scene != null:
+			_fx_floats = float_scene.instantiate()
+			add_child(_fx_floats)
+
+
+## Resolve a unit's on-screen name from the display layer only. Falls back to the
+## neutral "侠客虾"? No — to an empty string, and callers substitute a neutral
+## label. NEVER returns the internal character_name / node name (that would put a
+## personal/internal identifier on screen and could redden the denylist pin).
+func _fx_display_name(unit: Node, fallback: String) -> String:
+	if unit != null and is_instance_valid(unit) \
+			and "character_data" in unit and unit.character_data != null \
+			and "display_name" in unit.character_data \
+			and str(unit.character_data.display_name) != "":
+		return str(unit.character_data.display_name)
+	return fallback
+
+
+## Damage hook — the SINGLE dispatch point (apply_damage). Appends the hit line
+## '<actor> → <target> −N (剩 M)' and spawns a floating number at the target.
+## loss is the HP actually removed; remaining is the target's post-hit HP.
+func _fx_on_hit(target: Node, source: Node, loss: int, remaining: int) -> void:
+	_fx_ensure()
+	if _fx_log != null:
+		var actor: String = _fx_display_name(source, "内力")
+		var victim: String = _fx_display_name(target, "对手")
+		_fx_log.append("%s → %s −%d (剩 %d)" % [actor, victim, loss, remaining])
+		debug_combat_log_lines += 1
+	if _fx_floats != null and loss > 0:
+		_fx_floats.spawn_number(target, "−%d" % loss)
+		debug_float_numbers_spawned += 1
+
+
+## Movement-zeroing hook — '<actor> 移动 0:<status reason>'. This is the status
+## that zeroes moves_left at the unit's own turn start (no_move_next_turn), the
+## "移动 0 with no reason" the owner flagged.
+func _fx_on_no_move(unit: Node) -> void:
+	_fx_ensure()
+	if _fx_log != null:
+		var actor: String = _fx_display_name(unit, "对手")
+		_fx_log.append("%s 移动 0:被点穴封身" % actor)
+		debug_combat_log_lines += 1
+
+
+## Enemy-turn start — show the pulsing acting marker at the acting unit.
+func _fx_on_enemy_turn_start(unit: Node) -> void:
+	_fx_ensure()
+	if _fx_floats != null:
+		_fx_floats.show_marker(unit)
+		debug_acting_marker_shown += 1
+
+
+## Enemy-turn end — hide the acting marker.
+func _fx_on_enemy_turn_end() -> void:
+	if _fx_floats != null and is_instance_valid(_fx_floats):
+		_fx_floats.hide_marker()
+

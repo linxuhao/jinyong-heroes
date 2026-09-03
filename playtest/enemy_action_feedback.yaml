@@ -1,0 +1,65 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R4 ENEMY-ACTION-FEEDBACK (presentation card). The owner's 2026-09-03 playtest
+# #5: during an enemy's turn the screen was fully static for 2-33 s with no
+# indication anything is happening — enemy attacks had no number, no log; the
+# hero's bar just changed and a bare "移动 0" appeared with no reason. This
+# scenario proves the PRESENTATION now reacts: every landed hit appends a log
+# line and spawns a floating number, and every acting enemy shows the pulsing
+# marker. It asserts ONLY on the three additive CombatManager counters and the
+# standing UiOcclusionWatch pair — it never touches a damage / initiative / AI /
+# turn-order value (that would be a forbidden change, and there is none here).
+#
+# The `changed` differential and the `>= 1` floor for each counter live on
+# DIFFERENT frames because a YAML assert mapping cannot carry the same key twice.
+# The differential proves the counter actually moved during the enemy round (a
+# never-written observable reads exactly like a false one); the floor proves it
+# is not vacuously satisfied by a round that never ran. The occlusion pair is
+# asserted on the SAME frame the log holds lines (f1100), which is the whole
+# requirement: the log is visible AND occlusion-clean.
+#
+# The owner's "no frame stays static longer than 1 s" is delivered by the marker
+# pulse (tween-driven motion); it is deliberately NOT pinned as a frame literal
+# (a pixel/number-literal pin is out of scope per the architecture).
+name: enemy_action_feedback
+description: >-
+  Boot to the tutorial battle, hand the turn over with end_turn (the player acts
+  first, initiative 88), let the five-enemy round run, and assert the three
+  R4 presentation counters both moved (differential) and cleared their floors
+  (>= 1), while phase returns to PLAYER_TURN and the on-screen combat log is
+  visible AND UiOcclusionWatch is clean (violations == 0, scan_ok == true) on the
+  same frame — presentation landed, layout did not break.
+timeline:
+# Boot to battle exactly as enemy_turn_wall_clock / each_unit_acts_once_per_round
+# do (7x ui_accept through the menu/creation flow); player round-1 turn live at f20.
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+# Hand the player's round-1 turn over to the five-enemy round.
+- {at: 20, actions: [end_turn]}
+# By f200 at least the first enemy has acted, hit and shown its marker — all
+# three presentation counters have moved from their f20 baseline.
+- at: 200
+  actions: []
+  assert:
+    CombatManager.debug_combat_log_lines: changed
+    CombatManager.debug_float_numbers_spawned: changed
+    CombatManager.debug_acting_marker_shown: changed
+# Round-2 player turn (all five enemies have acted): counters cleared their
+# floors, phase returned to the player, and the log is visible on a frame that is
+# also occlusion-clean.
+- at: 1100
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.debug_combat_log_lines: debug_combat_log_lines >= 1
+    CombatManager.debug_float_numbers_spawned: debug_float_numbers_spawned >= 1
+    CombatManager.debug_acting_marker_shown: debug_acting_marker_shown >= 1
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

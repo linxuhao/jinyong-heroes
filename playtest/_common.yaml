@@ -205,6 +205,9 @@ surface:
   - debug_death_classified_player
   - debug_dot_ticks_applied
   - debug_dot_last_tick
+  - debug_combat_log_lines
+  - debug_float_numbers_spawned
+  - debug_acting_marker_shown
   GameManager:
   - current_state
   - end_overlay_text
@@ -1183,3 +1186,4 @@ scenario_order:
 - practice_target_receipt
 - ending_tiers_differentiate
 - enemy_turn_wall_clock
+- enemy_action_feedback
