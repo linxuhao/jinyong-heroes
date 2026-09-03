@@ -110,6 +110,12 @@ var fast_forward_used: bool = false
 ## re-reads the profile's month on every call and would clobber the snapshot).
 var month_before_accept: int = 1
 
+## Surface: the silver captured at the very top of _on_accept() BEFORE any phase
+## match — the pre-accept silver for the zero-delta nail (R5 C2). Same shape and
+## assignment site as month_before_accept (only in _on_accept, never in
+## _sync_surface, so it survives as a snapshot).
+var silver_before_accept: int = 0
+
 ## Surface: an on-screen notice for the current accept ("", nothing to say).
 ## Rendered by _render() as an appended body line whenever non-empty. Cleared at
 ## the top of _on_accept() and written by the branches that need to explain
@@ -327,6 +333,7 @@ func _cycle_focus(dir: int) -> void:
 
 func _on_accept() -> void:
 	month_before_accept = month
+	silver_before_accept = silver
 	status_text = ""
 	_delete_armed = false
 	match phase:
@@ -375,17 +382,20 @@ func _on_accept() -> void:
 		"GONGFA_PICK":
 			var ids: Array[String] = _unmastered_ids()
 			if ids.is_empty():
-				# Soft-lock exit: no unmastered arts — burn the month and move
-				# on. Mirrors _fast_forward's transition (ATTR_PICK + advance)
-				# WITHOUT its free reward: NO _apply_action here (zero RNG ops,
-				# zero attribute gain — the seeded RNG stream's op order is the
-				# lifeline of event_travel_effects 19/19 and save_load_roundtrip
-				# 14/14). _after_action is the single month-advance path; month
-				# 12 -> YEAR_END and y3/m12 -> _finish_to_map inherit for free.
-				status_text = tr("无可修习的功法，本月照常过去")
-				phase = "ATTR_PICK"
-				_attr_focus = 0
-				_after_action()
+				# R5 C2 (soft-lock = no way out, not "month frozen"): with no
+				# unmastered art the practice screen RETURNS to ACTION_PICK and
+				# the month does NOT advance — the player re-picks an action
+				# instead of burning a month on a screen with nothing to do.
+				# Zero RNG ops, zero _after_action() call: the seeded stream's
+				# op order (event_travel_effects 19/19, save_load_roundtrip
+				# 14/14) stays intact. _action_focus = 0 lands on the 练功 entry
+				# (ACTION_PICK index 0) so the loop is visible. _sync_surface()
+				# then _render() mirror the accept path's publish order.
+				status_text = tr("功法均已大成，已返回行动重选")
+				phase = "ACTION_PICK"
+				_action_focus = 0
+				_sync_surface()
+				_render()
 				return
 			else:
 				var gid: String = ids[_gongfa_focus % ids.size()]
@@ -852,7 +862,7 @@ func _rebuild_options_box() -> void:
 				# Empty unmastered list: the single tappable exit. Its pressed
 				# path is the same _on_option_pressed -> _on_accept chain every
 				# other option uses — no forked phase logic.
-				labels.append(tr("度过本月"))
+				labels.append(tr("返回行动"))
 			for i in range(ids.size()):
 				var gid: String = ids[i]
 				var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
