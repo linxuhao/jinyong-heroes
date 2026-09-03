@@ -39,7 +39,7 @@ timeline:
     HealthBar.follow_delta: follow_delta <= 24
     HealthBar.fill_color: fill_color.g > 0.5 and fill_color.g > fill_color.r
     HealthBar.track_bg: track_bg.get_luminance() > 0.30
-    HealthBar.name_text: name_text == "杨过"
+    HealthBar.name_text: name_text == "独臂大虾"
     RoundIndicator.active_text: active_text.contains("移动") and active_text.ends_with("行动 ✓")
     SkillButton1.text: text.contains("…") == false
     SkillButton2.text: text.contains("…") == false

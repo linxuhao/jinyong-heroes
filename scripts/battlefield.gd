@@ -483,7 +483,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# Yang Guo (player)
 	var cd = CharacterData.new()
 	cd.character_name = "Yang Guo"
-	cd.display_name = "杨过"
+	cd.display_name = "独臂大虾"
 	cd.max_health = 1000
 	cd.move_range = 4
 	cd.attack_damage = 30
@@ -502,7 +502,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# East Heretic (东邪黄药师)
 	cd = CharacterData.new()
 	cd.character_name = "East Heretic"
-	cd.display_name = "黄药师"
+	cd.display_name = "东邪虾"
 	cd.max_health = 95
 	cd.move_range = 4
 	cd.attack_damage = 22
@@ -521,7 +521,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# West Poison (西毒欧阳锋)
 	cd = CharacterData.new()
 	cd.character_name = "West Poison"
-	cd.display_name = "欧阳锋"
+	cd.display_name = "西毒虾"
 	cd.max_health = 115
 	cd.move_range = 3
 	cd.attack_damage = 26
@@ -540,7 +540,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# South Emperor (南帝段智兴)
 	cd = CharacterData.new()
 	cd.character_name = "South Emperor"
-	cd.display_name = "段智兴"
+	cd.display_name = "南帝虾"
 	cd.max_health = 100
 	cd.move_range = 3
 	cd.attack_damage = 24
@@ -559,7 +559,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# North Beggar (北丐洪七公)
 	cd = CharacterData.new()
 	cd.character_name = "North Beggar"
-	cd.display_name = "洪七公"
+	cd.display_name = "北丐虾"
 	cd.max_health = 120
 	cd.move_range = 3
 	cd.attack_damage = 28
@@ -578,7 +578,7 @@ func _create_all_character_data(all_skills: Dictionary) -> Dictionary:
 	# Central Divine (中神通王重阳)
 	cd = CharacterData.new()
 	cd.character_name = "Central Divine"
-	cd.display_name = "王重阳"
+	cd.display_name = "中神通虾"
 	cd.max_health = 130
 	cd.move_range = 3
 	cd.attack_damage = 26

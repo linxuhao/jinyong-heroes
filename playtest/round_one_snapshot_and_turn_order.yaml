@@ -38,7 +38,7 @@ timeline:
     East_Heretic.turns_taken: 0
     RoundIndicator.visible: true
     RoundIndicator.current_round: 1
-    RoundIndicator.active_actor: active_actor == "杨过"
+    RoundIndicator.active_actor: active_actor == "独臂大虾"
 - at: 200
   actions: []
   assert:

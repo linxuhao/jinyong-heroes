@@ -119,8 +119,8 @@ const EN: Dictionary = {
 	"战斗开始！": "Battle Start!",
 	"继续 ▶": "Continue ▶",
 	"跳过教程": "Skip Tutorial",
-	"你是杨过。击败五大高手，夺得华山论剑的胜者！\n\n按「继续」或回车继续。":
-		"You are Yang Guo. Defeat the five grandmasters and claim victory at the Duel at Mount Hua!\n\nPress \"Continue\" or Enter to continue.",
+	"你是独臂大虾。击败五大高手，夺得华山论剑的胜者！\n\n按「继续」或回车继续。":
+		"You are the One-Armed Prawn. Defeat the five grandmaster shrimp and claim victory at the Duel at Mount Hua!\n\nPress \"Continue\" or Enter to continue.",
 	"WASD/方向键每次移动一格。每回合有 4 点移动力。\n\n现在就试试移动吧！":
 		"WASD / arrow keys move one tile at a time. You have 4 movement points per round.\n\nTry moving now!",
 	"移动到敌人身边，按 J（或鼠标左键）进行普通攻击。":
@@ -134,14 +134,20 @@ const EN: Dictionary = {
 		"Tutorial complete. Defeat the five grandmasters!\n\nPress \"Continue\" to start the battle.",
 
 	# --- Characters -------------------------------------------------------
-	"杨过": "Yang Guo",
-	"黄药师": "Huang Yaoshi",
-	"欧阳锋": "Ouyang Feng",
-	"段智兴": "Duan Zhixing",
-	"洪七公": "Hong Qigong",
-	"王重阳": "Wang Chongyang",
-	"侠客": "Wanderer",
-	"陪练弟子": "Sparring Disciple",
+	# R4 owner ruling: the display layer carries shrimp nicknames only — no
+	# personal name (and no personal-name transliteration on the EN side) may
+	# ever render. The zh key IS the on-screen string; the EN value is the
+	# coined nickname translation (personal-name-free).
+	"独臂大虾": "One-Armed Prawn",
+	"东邪虾": "East Heretic Shrimp",
+	"西毒虾": "West Poison Shrimp",
+	"南帝虾": "South Emperor Shrimp",
+	"北丐虾": "North Beggar Shrimp",
+	"中神通虾": "Central Divine Shrimp",
+	"侠客虾": "Wanderer Shrimp",
+	"陪练虾": "Sparring Shrimp",
+	# UI labels
+	"版本": "Build",
 
 	# --- Tutorial-battle skills (battlefield.gd) --------------------------
 	"重剑无锋": "Heavy Edge",

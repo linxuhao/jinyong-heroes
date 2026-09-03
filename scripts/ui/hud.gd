@@ -9,18 +9,24 @@ extends Control
 const SkillData = preload("res://scripts/data/skill_data.gd")
 const SkillButtonScript = preload("res://scripts/ui/skill_button.gd")
 
-## Display aliases for health-bar name labels: Chinese display names
-## (design §2.1 — every rendered string ships in Chinese; the names are short
-## enough to fit the 64 px label with no ellipsis).
+## Display aliases for health-bar name labels: Chinese shrimp-nickname display
+## names (R4 owner ruling — every rendered string ships in Chinese; no personal
+## name ever appears on screen). The nicknames are longer than the old personal
+## names, so readability is covered by the UiOcclusionWatch gate (violations == 0)
+## plus same-frame before/after comparisons — never a pixel-literal width pin.
 ## Only the health-bar display layer is affected — character_data.character_name,
 ## node names, turn-order names and order_names stay canonical and unchanged.
+## The two trailing entries close the raw-canonical leak seen on screen in the
+## 2026-09-02 pt2/pt3 frames (ProgressionHero / Sparring Partner rendered bare).
 const _DISPLAY_ALIASES := {
-	"Yang Guo": "杨过",
-	"East Heretic": "黄药师",
-	"West Poison": "欧阳锋",
-	"South Emperor": "段智兴",
-	"North Beggar": "洪七公",
-	"Central Divine": "王重阳",
+	"Yang Guo": "独臂大虾",
+	"East Heretic": "东邪虾",
+	"West Poison": "西毒虾",
+	"South Emperor": "南帝虾",
+	"North Beggar": "北丐虾",
+	"Central Divine": "中神通虾",
+	"ProgressionHero": "侠客虾",
+	"Sparring Partner": "陪练虾",
 }
 
 ## Default text of the skill description label — shown whenever no skill is

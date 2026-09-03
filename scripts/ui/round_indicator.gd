@@ -60,12 +60,14 @@ var _last_acted: bool = false
 ## `order_names` observable keeps the full canonical names — playtest asserts
 ## depend on them. Unknown names pass through unchanged.
 const _ORDER_TOKENS := {
-	"Yang Guo": "杨过",
-	"East Heretic": "黄药师",
-	"Central Divine": "王重阳",
-	"South Emperor": "段智兴",
-	"North Beggar": "洪七公",
-	"West Poison": "欧阳锋",
+	"Yang Guo": "独臂大虾",
+	"East Heretic": "东邪虾",
+	"Central Divine": "中神通虾",
+	"South Emperor": "南帝虾",
+	"North Beggar": "北丐虾",
+	"West Poison": "西毒虾",
+	"ProgressionHero": "侠客虾",
+	"Sparring Partner": "陪练虾",
 }
 
 # ---------------------------------------------------------------------------

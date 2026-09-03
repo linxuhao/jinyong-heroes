@@ -28,6 +28,13 @@ extends Control
 const ROW_COUNT: int = 5
 const STEP_DB: float = 3.0
 
+## R4 build stamp (review-mandated): a single constant so playtest reports can
+## be matched to the exact build across the local and web exports. Display layer
+## only — rendered by a programmatic Label in _ready() (settings_panel.tscn is
+## frozen); it is NOT enumerated in _refresh_title_overlap, so it can never flip
+## title_rows_overlap, and it sits outside the five option rows.
+const BUILD_STAMP: String = "R4 · 2026-09-03"
+
 ## Surface: currently focused row index (0..4) — keyboard/debug activation
 ## target.
 var focus_index: int = 0
@@ -61,6 +68,17 @@ func _ready() -> void:
 		)
 	# First render from the current SettingsManager mirrors (never cached).
 	_render()
+	# Build stamp (R4). Programmatic node — the scene is frozen — anchored
+	# bottom-wide beneath the option box in the free viewport band, centred.
+	# Deliberately kept out of _refresh_title_overlap's node list.
+	var stamp := Label.new()
+	stamp.name = "BuildStamp"
+	stamp.text = tr("版本") + " " + BUILD_STAMP
+	stamp.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	stamp.offset_top = -28.0
+	stamp.offset_bottom = -8.0
+	stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(stamp)
 
 
 func _unhandled_input(event: InputEvent) -> void:

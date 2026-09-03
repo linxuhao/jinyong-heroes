@@ -99,7 +99,7 @@ static func build_character(profile) -> Resource:
 	var stats: Dictionary = derive_stats(profile)
 	var cd = CharacterData.new()
 	cd.character_name = "ProgressionHero"
-	cd.display_name = "侠客"
+	cd.display_name = "侠客虾"
 	cd.max_health = int(stats.max_health)
 	cd.energy = int(stats.energy)
 	cd.move_range = int(stats.move_range)

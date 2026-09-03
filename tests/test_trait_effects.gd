@@ -201,7 +201,7 @@ static func _test_encounter_data(ok: bool) -> bool:
 	var p2 = EncounterData.sparring_partner()
 	ok = _expect(ok, p1 != p2, "two calls return distinct instances")
 	ok = _expect(ok, p1.character_name == "Sparring Partner", "character_name")
-	ok = _expect(ok, p1.display_name == "陪练弟子", "display_name")
+	ok = _expect(ok, p1.display_name == "陪练虾", "display_name")
 	ok = _expect(ok, p1.max_health == 60, "max_health 60")
 	ok = _expect(ok, p1.attack_damage == 12, "attack_damage 12")
 	ok = _expect(ok, p1.move_range == 2, "move_range 2")

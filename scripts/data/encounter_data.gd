@@ -12,7 +12,7 @@ const CharacterData = preload("res://scripts/data/character_data.gd")
 static func sparring_partner() -> Resource:
 	var cd = CharacterData.new()
 	cd.character_name = "Sparring Partner"
-	cd.display_name = "陪练弟子"
+	cd.display_name = "陪练虾"
 	cd.max_health = 60
 	cd.attack_damage = 12
 	cd.move_range = 2

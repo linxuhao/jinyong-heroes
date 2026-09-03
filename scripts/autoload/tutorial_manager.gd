@@ -100,7 +100,7 @@ const _STEP_TITLES: Dictionary = {
 ## Body strings (with BBCode) keyed by step id.
 const _STEP_BODIES: Dictionary = {
 	STEP_WELCOME: (
-		"你是杨过。击败五大高手，夺得华山论剑的胜者！\n\n"
+		"你是独臂大虾。击败五大高手，夺得华山论剑的胜者！\n\n"
 		+ "按「继续」或回车继续。"
 	),
 	STEP_MOVEMENT: (

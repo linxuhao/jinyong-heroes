@@ -194,7 +194,7 @@ static func run() -> bool:
 	ok = _expect(ok, gm != null, "Q4: GameManager autoload reachable in unit-test context")
 	if gm != null:
 		gm.set("_player", fake_player)
-		var t_active: String = ri._active_text("杨过")
+		var t_active: String = ri._active_text("Yang Guo")
 		gm.set("_player", null)
 		ok = _expect(ok, t_active.contains("移动"),
 				'Q4: active line contains "移动"')
@@ -204,7 +204,7 @@ static func run() -> bool:
 				'Q4: move_pips == "·".repeat(moves_left)')
 		fake_player.set("acted", true)
 		gm.set("_player", fake_player)
-		var t_done: String = ri._active_text("杨过")
+		var t_done: String = ri._active_text("Yang Guo")
 		gm.set("_player", null)
 		ok = _expect(ok, t_done.ends_with("结束"),
 				'Q4: acted active line ends "结束"')
