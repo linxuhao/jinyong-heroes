@@ -10,18 +10,14 @@ Mount Hua's summit, then fall from the sky, join a great sect, spend three in-ga
 years (36 cultivation periods) training, and finally walk the jianghu map to an
 ending. Visuals use placeholder art; UI text is Chinese (NotoSansSC, SIL OFL).
 
-## 本轮变更（R3b，2026-09-02）
+## 本轮变更（R4，2026-09-03）
 
-- **C1 — one grade vocabulary** (`progression_math.gd`): `GRADE_POINTS` derives its keys from `PRACTICE_TO_MASTER` (D/C/B/A), so mastery is non-zero on real saves.
-- **C2 — practice hits what you picked** (`event_logic.gd::add_practice`): the chosen art's row advances; the receipt shows its display name, not the raw id.
-- **C3 — endings actually tier** (`map_data.gd::ENDING_TIERS` 150/120/0): free-card silver no longer inflates the 历练 axis; do-nothing → 1, single → 2, strong → 3.
-- **C4 — Huashan readiness tells the truth** (`HUASHAN_BAR` {even: 61, strong: 124}): every creation-fresh profile reads 战备不足 by construction.
-- **C5 — winnable-route card matches its title** (`huashan_winnable_normal_route`): clicks-only, real skill clicks. Honest status: unlock granted, levers landed, WON overlay not reached — recorded LOST per the 2026-09-03 owner re-scope, not a measured WIN.
-- **C6 — the receipt is on the screen** (`cultivation.gd::_render`): `last_yield_text` drawn under the status block with display names, UiOcclusionWatch-clean.
-- **C7 — work out-earns idling** (`ProgressionMath.work_income = 10 + 3 × work_months`): the free card is untouched; 36×work silver > 1.5× 36×do-nothing.
-- **C8 — design records**: `40_progression.md` M2'/M3' tables, `90_decisions.md` two rulings, `00_roadmap.md` re-queued, `99_changelog.md` append-only R3b row.
-
-**Status (honest):** last official run (pre-iteration-4 tree) — hard gate green, 91/93 scenarios, pytest 67/67, vision passed. Iteration-4 (2026-09-03): the trait pin was re-derived as a differential (22/22 sidecar), the C5 tail was re-anchored to the honest measured LOST state per the 2026-09-03 owner re-scope (the WIN goal moves to the next round with its 36/48 baseline), README was manualized (1727 → 72 lines; round history lives in docs/ROUNDS.md). Zero game code changed since the 91/93 run; the 93-scenario official re-run of this tree is the remaining gate.
+- **Card 0 (L1) — enemy turns are fast.** Three wall-clock observables (`debug_enemy_turn_msec`, `debug_enemy_round_msec`, `debug_enemy_turn_index`) + `playtest/enemy_turn_wall_clock.yaml` pin a full 5-enemy round ≤ 10 s and a single enemy ≤ 2 s; measured variants 1792/1417/1600 ms round, 659/583/499 ms per enemy. Camera audit proved the follower is a snap (no clip). Web wall-clock ships via console prints — not fabricated in-round.
+- **江湖不称名,只称号 — shrimp nicknames on screen.** Display layer only: 杨过→独臂大虾, 五绝→东邪虾/西毒虾/南帝虾/北丐虾/中神通虾; walk-ons coined 侠客→侠客虾 (Wanderer Shrimp), 陪练弟子→陪练虾 (Sparring Shrimp), plus two `_DISPLAY_ALIASES`/`_ORDER_TOKENS` leak fixes for raw `ProgressionHero`/`Sparring Partner`. `character_name`, node names, `turn_order` tokens and the three verbatim gates untouched; exactly two gate literals flipped (`round_one_snapshot_and_turn_order.yaml:41`, `ui_geometry_readability.yaml:42`). Settings screen now shows a build stamp (`版本 R4 · 2026-09-03`).
+- **Denylist pin.** `tests/test_display_no_personal_names.py` scans display-layer strings in `scripts/`, `scenes/`, `design/20_content.md` for the six personal names (`.gd` comments stripped, internal keys out of scope); red-first against the pre-rename tree, green after the rename.
+- **Enemy-turn feedback (presentation only).** New `CombatLog`, `FloatingNumber`, acting-unit marker; wall-clock Tween fades, no frame-counted waits; three additive surface observables. No damage/AI/turn-order value changed.
+- **design/ ledger slimming.** `90_decisions.md` 97,131 → 7,152 B, `40_ux_backlog.md` 109,879 → 17,056 B; superseded/CLOSED content moved verbatim to `design/archive/`; `tests/test_design_ledger_budget.py` enforces the per-file and total (≤ 340 KB excl. append-only changelog) budgets.
+- **Roadmap record (record-only).** Owner's six 2026-09-02 playtest items logged verbatim in `design/00_roadmap.md` backlog + the R4→R5→R6 queue; line-3 broken link fixed to `01_process.md`.
 
 ## Requirements
 

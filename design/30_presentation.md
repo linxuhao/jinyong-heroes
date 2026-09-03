@@ -1,3 +1,16 @@
+> **Current presentation values / rules — quick reference (2026-09-03).** Skim this first; the
+> long log below is history, not the live contract.
+> - On-screen names are shrimp nicknames only: 独臂大虾 / 东邪虾 / 西毒虾 / 南帝虾 / 北丐虾 /
+>   中神通虾; walk-ons 侠客虾 (Wanderer Shrimp) / 陪练虾 (Sparring Shrimp). Internal
+>   `character_name` / node names / `turn_order` tokens are unchanged (display layer only).
+> - Settings screen shows a build stamp: `版本 R4 · 2026-09-03` (EN: `Build R4 · 2026-09-03`).
+> - Enemy-turn pacing: full 5-enemy round ≤ 10 000 ms, single enemy ≤ 2 000 ms. Camera follower
+>   is a snap (no serial pan) — top-row enemies are not clipped into the top bar.
+> - Enemy-turn action feedback is presentation-only: `CombatLog` (≤ 6 lines), `FloatingNumber`,
+>   acting-unit marker; all wall-clock Tween fades, no frame-counted waits.
+> - For the full enemy-turn wall-clock measurement and the web-vs-local note, see the section
+>   **"Card 0 — Enemy-turn wall-clock (2026-09-03)"** below (owned by card0_enemy_turn_l1).
+
 # Presentation
 
 ## 分辨率与拉伸

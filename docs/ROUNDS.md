@@ -4,6 +4,30 @@
 > first. Append new rounds at the top; never re-edit a moved body after it
 > lands. The manual lives in `README.md`.
 
+<!-- Append-only archive, newest first. "Latest round" names the round that wrote the entry; older "Latest round"/"Previous round" headings below are historical, not drift. -->
+
+## Latest round: R4 No names on screen — shrimp nicknames only, plus the enemy-turn timing cap (2026-09-03)
+
+R4 lands the owner's 江湖不称名 ruling: every on-screen character name becomes a shrimp-themed
+nickname (杨过→独臂大虾; 五绝→东邪虾/西毒虾/南帝虾/北丐虾/中神通虾; walk-ons 侠客→侠客虾,
+陪练弟子→陪练虾), editing **only the display layer** — `display_name`, `_DISPLAY_ALIASES`,
+`_ORDER_TOKENS`, tutorial copy, `i18n.gd` (zh keys + coined EN values), `design/20_content.md`.
+`character_name`, node names (`East_Heretic`…), `turn_order` tokens and the three verbatim gates
+(`facility_use_reusable`, `map_node_event_shaolin`, `map_battle_node_huashan`) stay byte-identical;
+only the two display-literal gate asserts moved (`round_one_snapshot_and_turn_order.yaml:41`,
+`ui_geometry_readability.yaml:42`, 杨过→独臂大虾). A new pytest denylist
+(`tests/test_display_no_personal_names.py`) scans display-layer strings for the six personal names.
+Card 0 (L1) instrumented enemy-turn wall-clock on `CombatManager` (`debug_enemy_*`) and pinned
+`playtest/enemy_turn_wall_clock.yaml` (round ≤ 10 000 ms, turn ≤ 2 000 ms; local variants
+1792/1417/1600 ms) — web wall-clock shipped via console prints, not measured in-round (honest
+record in `design/30_presentation.md`). Enemy action feedback (`CombatLog`, `FloatingNumber`,
+acting-unit marker) is presentation-only. The `design/` ledgers were slimmed
+(`90_decisions.md` 7,152 B, `40_ux_backlog.md` 17,056 B; superseded content moved verbatim to
+`design/archive/`, budget pinned by `tests/test_design_ledger_budget.py`), and the owner's six
+2026-09-02 playtest items were logged verbatim in `design/00_roadmap.md` with the R4→R5→R6 queue.
+Per-card evidence: `final/delivery_notes_card0_enemy_turn_l1.md`, `_rename_display_layer.md`,
+`_denylist_pin.md`, `_enemy_action_feedback.md`, `_ledger_slimming.md`, `_roadmap_record.md`.
+
 ## Latest round: R3b Numbers That Bind — the claimed numbers now hold on real saves (2026-09-02)
 
 R3b is a **no-new-systems fix pass**: every number R3 claimed (grade points, practice

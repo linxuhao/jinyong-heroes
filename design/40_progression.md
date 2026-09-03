@@ -1,3 +1,17 @@
+> **Current progression values / rules — quick reference (2026-09-03).** Skim this first; the
+> detail below is the derivation history, not the live contract.
+> - Grade vocabulary is one set: `ProgressionMath.GRADE_POINTS` derives D/C/B/A from
+>   `PRACTICE_TO_MASTER`, so mastery is non-zero on real saves.
+> - Work out-earns idling: `ProgressionMath.work_income = 10 + 3 × work_months`; the free card
+>   is untouched.
+> - Ending tiers: `MapData.ENDING_TIERS` 150 / 120 / 0 (do-nothing → 1, single → 2, strong → 3).
+> - Huashan readiness bars: `HUASHAN_BAR` {even: 61, strong: 124}; creation-fresh power reads
+>   战备不足 by construction.
+> - On-screen names in every progression receipt / panel use shrimp nicknames (独臂大虾,
+>   侠客虾, 陪练虾, 五绝虾) — display layer only; internal `character_name` unchanged.
+> - R4 touched no progression value: this is the post-R3b locked table. Any number change here
+>   would be out of scope (R3 results are frozen).
+
 # Progression — 第 2~6 段与全局公式
 
 > **本文件是「已决定、未实现」层。** `10_`/`20_`/`30_` 只写**已经跑起来**的
