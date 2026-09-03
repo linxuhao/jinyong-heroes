@@ -191,6 +191,9 @@ surface:
   - debug_await_total
   - debug_await_timeouts
   - debug_await_frames
+  - debug_enemy_turn_msec
+  - debug_enemy_round_msec
+  - debug_enemy_turn_index
   - debug_round_frame
   - debug_reflect_hits
   - tutorial_battle
@@ -1179,3 +1182,4 @@ scenario_order:
 - work_beats_idling
 - practice_target_receipt
 - ending_tiers_differentiate
+- enemy_turn_wall_clock

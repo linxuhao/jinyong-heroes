@@ -134,6 +134,34 @@ var debug_await_total: int = 0
 var debug_await_timeouts: int = 0
 var debug_await_frames: int = 0
 
+## Card 0 (enemy-turn timing, L1). Additive, NEVER-reset wall-clock observables
+## (same contract as debug_await_*), measured with Time.get_ticks_msec() around
+## the enemy-turn dispatch in _next_turn(). They exist so a playtest scenario —
+## and, in the web build, the browser devtools console via the print() lines
+## below (4b) — can prove a full enemy round stays within the owner's cap
+## without touching any AI decision or gameplay number. The local harness is
+## deterministic and fast, so these read small locally; the 20-40 s/enemy the
+## owner measured on the PUBLISHED web build is the red this card pins against.
+##   debug_enemy_turn_msec:  wall-clock ms of the most recently COMPLETED single
+##                            enemy turn (AI decide + move path + one action).
+##   debug_enemy_round_msec: wall-clock ms from the first enemy turn's START to
+##                            the last enemy turn's END within one contiguous
+##                            enemy run; 0 until one enemy round completes.
+##   debug_enemy_turn_index: count of COMPLETED enemy turns (proves all five
+##                            tutorial enemies acted).
+var debug_enemy_turn_msec: int = 0
+var debug_enemy_round_msec: int = 0
+var debug_enemy_turn_index: int = 0
+
+## Private timing state for the observables above (NOT surface-observable; these
+## are only the scratch values used to compute the public ones). A contiguous
+## run of enemy turns is bracketed by transitions player<->enemy in _next_turn()
+## or by _end_round(); _enemy_round_active guards the "first enemy of a run" edge
+## so a run's start is stamped exactly once.
+var _enemy_turn_start_msec: int = 0
+var _enemy_round_start_msec: int = 0
+var _enemy_round_active: bool = false
+
 ## Round-frame diagnostic: the process frame at which _begin_round most
 ## recently ran (set right after the re-entry guard). Lets downstream spec
 ## tasks re-time key presses against measured round boundaries.
@@ -623,6 +651,13 @@ func _next_turn() -> void:
 		return
 
 	if is_player_unit:
+		# Card 0: an enemy run just ended (initiative moved back to the player),
+		# so stamp + publish that run's wall-clock duration ONCE and clear the
+		# active-run flag. Additive only — the player's own turn is untouched.
+		if _enemy_round_active:
+			debug_enemy_round_msec = Time.get_ticks_msec() - _enemy_round_start_msec
+			_enemy_round_active = false
+			print("enemy_round %d" % debug_enemy_round_msec)
 		# Event-driven: wait for the player to press Space (end_current_turn).
 		_player_turn_done = false
 		while not _player_turn_done \
@@ -631,8 +666,20 @@ func _next_turn() -> void:
 		return  # end_current_turn() already continued the loop.
 
 	# --- Enemy turn: AI decides ONCE, then move path + one action. ---
+	# Card 0: stamp the start of this enemy turn (and, when this is the first
+	# enemy of a run, the start of the whole enemy round). Additive observables
+	# only; the AI still decides exactly once.
+	_enemy_turn_start_msec = Time.get_ticks_msec()
+	if not _enemy_round_active:
+		_enemy_round_active = true
+		_enemy_round_start_msec = _enemy_turn_start_msec
+	# Card 0 (wait-shortening): the pause gate polled one process_frame per
+	# iteration, so on the low-fps web build a pause burned wall-clock in
+	# frame-counted steps. A short SceneTreeTimer bounds the poll in wall-clock
+	# instead — the pause decision is the player's, not fixed pacing, so the
+	# condition check is unchanged (only the wait mechanism is).
 	while is_paused:
-		await get_tree().process_frame
+		await get_tree().create_timer(0.05, true).timeout
 
 	var decision: Dictionary = _evaluate_ai(unit)
 
@@ -672,11 +719,24 @@ func _next_turn() -> void:
 
 	if "acted" in unit:
 		unit.acted = true
+	# Card 0: this enemy turn is complete — publish its wall-clock duration and
+	# count it. The player branch returned earlier, so this point is only ever
+	# reached by an enemy turn. Additive observables + console surface only.
+	debug_enemy_turn_msec = Time.get_ticks_msec() - _enemy_turn_start_msec
+	debug_enemy_turn_index += 1
+	print("enemy_turn %s %d" % [_name_of(unit), debug_enemy_turn_msec])
 	end_current_turn()
 
 
 ## End the current round and begin the next one.
 func _end_round() -> void:
+	# Card 0: if the enemy run was the tail of the round (enemies acted last),
+	# the transition-to-player close never fired — close the run here so its
+	# wall-clock is published exactly once per enemy round.
+	if _enemy_round_active:
+		debug_enemy_round_msec = Time.get_ticks_msec() - _enemy_round_start_msec
+		_enemy_round_active = false
+		print("enemy_round %d" % debug_enemy_round_msec)
 	_set_phase("ROUND_END")
 	current_round += 1
 	_begin_round()
