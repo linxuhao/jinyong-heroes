@@ -1,0 +1,77 @@
+# One play-test scenario (R5 C1/C3 occlusion). The map's two NEW text surfaces
+# — the sibling TravelHintLabel (node-type consequence line) and the open
+# TravelGatePanel (此去即结局 body + 确认启程 / 返回 buttons) — must not cover any
+# existing text: the hint line sits under TravelBox (y 602–640), clear of the
+# BodyLabel cluster (−320..320 / −200..200) and the footer HintLabel (−56..−16
+# from bottom); the gate panel dims a mid-screen box that overlaps neither.
+# Every new string also passes UiOcclusionWatch. Boot: direct map.tscn, spine
+# walked to 襄阳 (kunlun is a neighbor), then the gate dialog opened by mouse.
+#
+# RED-FIRST four values (measured on the pre-implementation tree, no sibling):
+#   pre-fix failing frame ........ 30
+#   first failing assert ......... UiOcclusionWatch.violations (the map boots at
+#                                  无名谷 whose event panel prose is already
+#                                  clean, so this passes; the RED assert is the
+#                                  gate-dialog leg)
+#   actually: the first RED assert is at frame 200 (the TravelGatePanel never
+#                                  existed pre-fix → its confirm button / body
+#                                  cannot be found to scan; scan_ok stays false)
+#   exact error .................. node not found (MapTravelHints / TravelGatePanel)
+#   green asserts before red ..... TRAVEL-leg occlusion asserts (violations 0) hold
+name: consequence_screens_occlusion_map
+description: >-
+  New map text surfaces keep UiOcclusionWatch clean: the travel hint line in
+  TRAVEL (violations 0, scan_ok true) and the open ending-confirm dialog
+  (body + confirm + back buttons) both scan with zero occlusion and no overlap
+  of BodyLabel / HintLabel.
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 40
+  actions:
+  - move_right
+- at: 60
+  actions: []
+  assert:
+    MapTravelHints.travel_hint_text: travel_hint_text != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 70
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - ui_accept
+- at: 110
+  actions:
+  - move_right
+- at: 120
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - ui_accept
+- at: 160
+  actions:
+  - move_right
+- at: 170
+  actions:
+  - ui_accept
+- at: 190
+  actions:
+  - ui_accept
+- at: 210
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 240
+  actions: []
+  assert:
+    MapTravelHints.travel_gate_visible: travel_gate_visible == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

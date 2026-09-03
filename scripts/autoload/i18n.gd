@@ -478,6 +478,14 @@ const EN: Dictionary = {
 	"修炼有得（第 %d 次）：%s": "Cultivation gained (use #%d): %s",
 	"本月设施已用尽，下月再来": "Facility uses exhausted this month, come back next month",
 	"此事已有了结，不再重来": "This matter is already settled; it will not repeat",
+	# --- R5 map travel hints (C1 node type) + ending gate (C3) ---
+	"战斗": "Battle",
+	"门派设施": "Sect Facility",
+	"事件": "Event",
+	"此去即结局": "This road leads to the ending",
+	"此去即结局：踏上%s后，江湖故事将落幕。": "This road leads to the ending: once you set foot on %s, the jianghu story draws to a close.",
+	"确认启程": "Confirm Departure",
+	"%s — %s": "%s — %s",
 
 	# --- Cultivation ------------------------------------------------------
 	"方向键选择 · 回车执行": "Arrow keys to choose · Enter to act",

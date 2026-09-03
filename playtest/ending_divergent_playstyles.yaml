@@ -429,6 +429,10 @@ timeline:
   actions: []
   clicks:
   - TravelButton1
+- at: 625
+  actions: []
+  clicks:
+  - TravelGateConfirmButton
 # ── LEG A ENDING: capture the work-heavy evaluation record ───────────────────
 - at: 645
   actions: []

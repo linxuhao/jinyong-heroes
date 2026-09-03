@@ -620,6 +620,10 @@ timeline:
   actions: []
   clicks:
   - TravelButton1
+- at: 955
+  actions: []
+  clicks:
+  - TravelGateConfirmButton
 # ── ENDING → RESTART ───────────────────────────────────────────────────────
 - at: 975
   actions: []

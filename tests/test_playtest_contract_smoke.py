@@ -159,6 +159,9 @@ ROUND_SCENARIOS: list[str] = [
     "consequence_work_income_inline",
     "consequence_year_end_switch",
     "consequence_gongfa_goal_mastery_grant",
+    "map_travel_node_type_hint",
+    "travel_to_ending_needs_confirm",
+    "consequence_screens_occlusion_map",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen

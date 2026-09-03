@@ -1,0 +1,98 @@
+# One play-test scenario (R5 C3): travel to an END node requires a confirm.
+#
+# The MapTravelHints sibling arms a mouse shield over the end-node travel
+# button (昆仑's slot on the 襄阳 node). The FIRST press is swallowed by the
+# shield and opens a confirm dialog; nothing in map.gd runs, so
+# current_node_id / current_state are unchanged. Clicking 确认启程 re-dispatches
+# the covered button's public `pressed` signal and the same travel route lands
+# on the ENDING screen. The gate is CLICK-ONLY this round — the keyboard path is
+# deferred (VERDICT_B: child-blocks-parent == false), so this nail drives mouse
+# clicks, not ui_accept.
+#
+# Boot: direct map.tscn at 无名谷 (no debug teleport for the end node exists, so
+# the spine is walked by keyboard to 襄阳 where kunlun is an adjacent neighbor;
+# the gate itself is exercised by mouse). 无名谷→洛阳→武当→襄阳 = 3 moves; each
+# arrival opens that node's entry event, dismissed with ui_accept. 洛阳 / 武当 /
+# 襄阳 each bind a real EventData row (merchant / quanzhen_scripture /
+# dragon_scrap), so 3 accepts resolve them.
+#
+# RED-FIRST four values (measured on the pre-implementation tree, no sibling):
+#   pre-fix failing frame ........ 210
+#   first failing assert ......... MapTravelHints.travel_gate_armed == true
+#   exact error .................. node not found (no MapTravelHints node /
+#                                  gate observables before this round)
+#   green asserts before red ..... 6 (MapScreen.phase / focus_id / current_node_id
+#                                  all hold on the walked spine)
+name: travel_to_ending_needs_confirm
+description: >-
+  C3 ending-travel confirmation gate: walking the spine to 襄阳, the kunlun
+  travel button (neighbor index 1) is end-gated (travel_gate_armed true, dialog
+  closed). The first mouse press is swallowed — the confirm dialog opens and
+  neither current_node_id nor GameManager.current_state moved (zero delta). The
+  确认启程 button re-dispatches the covered button's press and the route lands on
+  the ENDING screen. UiOcclusionWatch clean.
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.current_node_id: current_node_id == "wuming_valley"
+    MapScreen.phase: phase == "TRAVEL"
+- at: 40
+  actions:
+  - move_right
+- at: 50
+  actions:
+  - ui_accept
+- at: 70
+  actions:
+  - ui_accept
+- at: 90
+  actions:
+  - move_right
+- at: 100
+  actions:
+  - ui_accept
+- at: 120
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - move_right
+- at: 150
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - ui_accept
+- at: 210
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.current_node_id: current_node_id == "xiangyang"
+    MapScreen.focus_id: focus_id == "xiangyang"
+    MapTravelHints.travel_gate_armed: travel_gate_armed == true
+    MapTravelHints.travel_gate_visible: travel_gate_visible == false
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 220
+  actions: []
+  clicks:
+  - TravelButton1
+- at: 240
+  actions: []
+  assert:
+    MapTravelHints.travel_gate_visible: travel_gate_visible == true
+    MapScreen.current_node_id: current_node_id == "xiangyang"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 250
+  actions: []
+  clicks:
+  - TravelGateConfirmButton
+- at: 285
+  actions: []
+  assert:
+    MapScreen.current_node_id: current_node_id == "kunlun"
+    MapScreen.ended: ended == true
+    MapTravelHints.travel_gate_visible: travel_gate_visible == false

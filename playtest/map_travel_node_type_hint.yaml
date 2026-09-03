@@ -1,0 +1,53 @@
+# One play-test scenario. Loaded by playtest/_common/_common.yaml's sibling
+# scan — scene / actions / surface live in _common.yaml, this file is only the
+# scenario. The basename must equal `name:`.
+#
+# R5 C1 (map travel node-type hint): the map's own footer HintLabel is the
+# OPERATION hint and stays untouched (map_hint_single pins it). This nail pins
+# the CONSEQUENCE hint the MapTravelHints sibling renders — each frame it
+# classifies the focused neighbor from MapData (end -> 此去即结局, active battle
+# -> 战斗, active facility -> 门派设施, active event -> 事件) and composes one line
+# 「<node name> — <type>」 into TravelHintLabel. Booting at 无名谷, focus starts on
+# the current node (no neighbor target) so the hint line is empty; pressing
+# move_right focuses neighbor 0 (洛阳, active-event slot) so the hint becomes
+# non-empty and contains the 洛阳 display name. touch-reachable: the line follows
+# focus, never hover-only.
+#
+# Boot: direct map.tscn (map_hint_single precedent — asserts hold at f30).
+#
+# RED-FIRST four values (measured on the pre-implementation tree, no sibling):
+#   pre-fix failing frame ........ 30 (the first assert frame)
+#   first failing assert ......... MapTravelHints.travel_hint_text — the node
+#                                  does not exist on the pre-implementation tree.
+#   exact error .................. node not found (surface block MapTravelHints
+#                                  has no live node to resolve)
+#   green asserts before red ..... 0 (this is the very first assert)
+name: map_travel_node_type_hint
+description: >-
+  C1 node-type consequence hint on the map screen: at boot (无名谷, focus on the
+  current node) the sibling's travel_hint_text is empty; a single move_right
+  focuses the first adjacent neighbor (洛阳) and the composed consequence line
+  becomes non-empty and carries that node's display name. The existing footer
+  HintLabel operation hint is untouched (map_hint_single keeps its pin).
+  UiOcclusionWatch clean.
+scene: res://scenes/segments/map.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapTravelHints.travel_hint_text: travel_hint_text == ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 40
+  actions:
+  - move_right
+- at: 60
+  actions: []
+  assert:
+    MapScreen.phase: phase == "TRAVEL"
+    MapScreen.focus_id: focus_id == "luoyang"
+    MapTravelHints.travel_hint_text: travel_hint_text != ""
+    MapTravelHints.travel_hint_text: travel_hint_text.contains("洛阳") == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

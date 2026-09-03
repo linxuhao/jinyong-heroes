@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/segments/map.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/ui/roster_panel.tscn" id="2"]
+[ext_resource type="Script" path="res://scripts/segments/map_travel_hints.gd" id="3"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_backdrop"]
 bg_color = Color(0.07, 0.07, 0.1, 1)
@@ -123,3 +124,62 @@ focus_mode = 0
 text = "离开"
 
 [node name="RosterPanel" parent="." instance=ExtResource("2")]
+
+[node name="MapTravelHints" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("3")
+
+[node name="TravelHintLabel" type="Label" parent="MapTravelHints"]
+offset_left = 60.0
+offset_top = 602.0
+offset_right = 620.0
+offset_bottom = 640.0
+mouse_filter = 2
+horizontal_alignment = 1
+text = ""
+
+[node name="TravelGateShield" type="Control" parent="MapTravelHints"]
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 2
+
+[node name="TravelGatePanel" type="Control" parent="MapTravelHints"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="TravelGateDim" type="ColorRect" parent="MapTravelHints/TravelGatePanel"]
+modulate = Color(1, 1, 1, 0.72)
+offset_left = 60.0
+offset_top = 200.0
+offset_right = 620.0
+offset_bottom = 440.0
+mouse_filter = 0
+color = Color(0.08, 0.08, 0.12, 1)
+
+[node name="TravelGateBodyLabel" type="Label" parent="MapTravelHints/TravelGatePanel/TravelGateDim"]
+offset_left = 20.0
+offset_top = 24.0
+offset_right = 540.0
+offset_bottom = 120.0
+autowrap_mode = 3
+text = ""
+
+[node name="TravelGateConfirmButton" type="Button" parent="MapTravelHints/TravelGatePanel/TravelGateDim"]
+offset_left = 40.0
+offset_top = 160.0
+offset_right = 240.0
+offset_bottom = 200.0
+text = "确认启程"
+
+[node name="TravelGateBackButton" type="Button" parent="MapTravelHints/TravelGatePanel/TravelGateDim"]
+offset_left = 360.0
+offset_top = 160.0
+offset_right = 560.0
+offset_bottom = 200.0
+text = "返回"

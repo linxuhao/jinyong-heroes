@@ -86,6 +86,10 @@ timeline:
   actions: []
   clicks:
   - TravelButton1
+- at: 390
+  actions: []
+  clicks:
+  - TravelGateConfirmButton
 # ── LEG A ENDING: capture the idle silver baseline ───────────────────────────
 - at: 410
   actions: []

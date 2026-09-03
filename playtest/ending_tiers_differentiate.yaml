@@ -101,6 +101,9 @@ timeline:
 - at: 380
   actions: []
   clicks: [TravelButton1]
+- at: 390
+  actions: []
+  clicks: [TravelGateConfirmButton]
 # ── LEG A ENDING: do-nothing lands below the top tier ─────────────────────────
 - at: 420
   actions: []
@@ -234,6 +237,9 @@ timeline:
 - at: 1055
   actions: []
   clicks: [TravelButton1]
+- at: 1065
+  actions: []
+  clicks: [TravelGateConfirmButton]
 # ── LEG B ENDING: the practice route lands on a DIFFERENT tier than the
 #    do-nothing route, and the mastery (武学) axis is > 0 (C1 scene nail). ─────
 - at: 1095
