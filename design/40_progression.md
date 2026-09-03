@@ -743,6 +743,15 @@ duel 在锁定敌方数据上实测不可赢(最强档先攻 46 vs 五绝 68–8
 
 **更新(post-fix 官方复跑,2026-09-02,5_design 补记)**:上述带冲突其后由所有者带裁决解决(下文 M3''' 表:P_fresh_max = 60、even = 61 = P_fresh_max + 1、strong = 124),f260 `战备不足` 字面**逐字成立**,post-fix 官方 93 场景复跑实测 `huashan_readiness_warning` **16/16 PASS**(硬闸门 `passed: true`、零 runtime error)——`40_ux_backlog.md` UX-38 闭合。C5 的战斗相关性钉仍由 `huashan_winnable_normal_route` 承载:该场景 **36/48**,WON 尾维持**许可红**(f1200 相位观测 `ENEMY_TURN`、f2100 `current_state` 观测 `LOST`),按 R3c WIN 裁决不冒充实测 WIN、不撤回解锁裁决;本节与 M3' / M3''' 表的仪器实测结论不受影响。
 
+**更新(iteration-4 + 官方复跑,2026-09-03,5_design 补记)**:C5 的 R3b 交付物按所有者
+2026-09-03 重划裁决(`90_decisions.md`「R3b C5 — 诚实-LOST 收口」)重锚为**诚实-LOST 钉**
+(`current_state == "LOST"` / `health < max_health` / `RetryButton.visible`),WIN 携
+36/48 基线移出 R3b 入 world-breadth 轮;post-iteration-4 树官方 93 场景复跑实测
+`huashan_winnable_normal_route` **47/47**、`huashan_readiness_warning` **16/16**
+(93/93 全 PASS、硬闸门 `passed: true`、零 runtime error)——上行「36/48 许可红」自此为
+历史记录。C4 的成长曲线缺陷(真实 36 月平衡路线 power 40 < even 61)保持 M3''' 诚实记录、
+交下一轮,**不降 even**。
+
 > **2026-09-02 附注(fix_readiness_verdict_rebaseline,STOP-and-report)**:真实档 boot 的
 > 新档是**根骨 15**(f110–f150 五次 `move_right`、无行移动,`creation.gd:34` 默认五围 10 起),
 > mp=0、空装备 → `readiness_power = floor(75/5)+25+floor(10/2) = 45`,落 even 带 → 势均力敌,

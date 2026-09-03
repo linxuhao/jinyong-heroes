@@ -254,7 +254,13 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
                              既有网两条红收口(UX-39);post-fix 官方复跑(2026-09-02)
                              八红转绿(30/30 · 44/44 · 16/16 · 33/33 · 38/38 ·
                              26/26 · 43/43 · 27/27),C5 WON 尾维持许可红(36/48,
-                             不伪造胜利);复跑唯一新红 UX-40 另行排队
+                             不伪造胜利);复跑唯一新红 UX-40 另行排队。
+                             iteration-4(2026-09-03):trait 钉按「数字即契约」
+                             重推导为差分钉(UX-40)、C5 尾按所有者重划裁决重锚为
+                             诚实-LOST 钉(WIN 携 36/48 基线移出 R3b);
+                             post-iteration-4 官方 93 场景复跑(2026-09-03)
+                             **93/93 全 PASS**(硬闸门 passed、零 runtime error):
+                             trait 22/22、huashan 47/47,零红
 1. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
 2. 回执/结算              —— 结局回顾与结算页(UX-30)
 3. 教程与目标             —— 教程页加「本关目标」提示
@@ -277,6 +283,22 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
 `moves_left == 0` 实测 3;run #1 全绿之列、本轮首红,记 `40_ux_backlog.md`
 UX-40,诊断线索指向 C5 解锁杠杆 ③ 的 derive_stats move_range,根因未定)——
 **队列自第 1 项(外号)继续**,UX-40 随下一轮一并处理。
+
+**iteration-4 + 官方复跑收口(2026-09-03,5_design 补记)**:iteration-4 落地
+(trait 钉重推导为差分钉 `moves_left == turn_start_moves_left - 2`、C5 尾按
+所有者 2026-09-03 重划裁决重锚为诚实-LOST 钉 `current_state == "LOST"` /
+`health < max_health` / `RetryButton.visible`,README 手册化 1727 → 72 行)
+之后,post-iteration-4 树的官方 93 场景复跑实测(本步 `5_compile` / `5_vision`
+产物):playtest 硬闸门 `passed: true`、零 runtime error、**93/93 场景全 PASS**
+——`trait_combat_effects_and_twelve_slots` **22/22**、
+`huashan_winnable_normal_route` **47/47**、`huashan_readiness_warning` 16/16、
+`ending_tiers_differentiate` 27/27、`work_beats_idling` 26/26、
+`practice_target_receipt` 43/43;编译 **107/107** 零错误;视觉闸门 passed
+非盲(93 场景 372 帧,Q6 93 好 / 0 坏)。`40_ux_backlog.md`
+**UX-40 → CLOSED(R3b numbers-bind)**。C5 的 WIN 移入 world-breadth 轮
+(携 36/48 基线);遗留两项 record-only(`playtest/huashan_readiness_warning.yaml:125`
+旧带算术注释、`battle_setup.gd:47` 注释 `floor(mp/3)` vs 代码 `:64`
+`floor(mp/2)`)留给下一轮 code-touching 步。**队列自第 1 项(外号)继续**。
 
 ### Backlog(R3b 试玩发现,record-only,**本轮不做**;2026-09-02 已收进 `40_ux_backlog.md` UX-33..36 队列行,本表为发现时的原始快照)
 
