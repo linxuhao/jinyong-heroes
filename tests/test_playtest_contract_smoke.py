@@ -150,6 +150,7 @@ ROUND_SCENARIOS: list[str] = [
     "practice_target_receipt",
     "ending_tiers_differentiate",
     "enemy_turn_wall_clock",
+    "trait_point_cost_visible",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -799,6 +800,55 @@ def test_creation_clarity_surface_contract() -> None:
                     f"{name}.yaml line {lineno} assert missing "
                     f"comparison operator: {line.strip()}"
                 )
+
+
+def test_creation_point_cost_surface_contract() -> None:
+    """Static contract pin for the R5 C1 creation point-cost card.
+
+    Pins the two new CreationScreen observables (attr_cost_text / attr_step_cost)
+    on the surface, and the new scenario file trait_point_cost_visible.yaml:
+    exists on disk, name: equals its basename, every timeline at: is a single
+    integer, and every 4-space dotted assert line carries a comparison operator
+    OR the differential token changed/unchanged (the repo's
+    no-bare-scalar-silent-false rule). Mirrors the shape of
+    test_creation_clarity_surface_contract. Additive — no existing test touched.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    creation_items = blocks.get("CreationScreen", [])
+    for var in ("attr_cost_text", "attr_step_cost"):
+        assert var in creation_items, (
+            f"CreationScreen.{var} not whitelisted on the surface"
+        )
+    name = "trait_point_cost_visible"
+    path = PLAYTEST_DIR / (name + ".yaml")
+    assert path.is_file(), f"{name}.yaml missing"
+    ftext = path.read_text(encoding="utf-8")
+    assert re.search(rf"^name:\s*{name}\s*$", ftext, re.MULTILINE), (
+        f"{name}.yaml name: does not equal its basename"
+    )
+    for lineno, line in enumerate(ftext.splitlines(), start=1):
+        m = re.search(r"\bat\s*:\s*([^,}\s]*)", line)
+        if m is not None:
+            assert m.group(1).isdigit(), (
+                f"{name}.yaml line {lineno}: non-integer timeline "
+                f"'at' value {m.group(1)!r}"
+            )
+        if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+            has_op = any(
+                op in line for op in ["==", "!=", "<", ">", "and", "or"]
+            )
+            has_diff = "changed" in line or "unchanged" in line
+            assert has_op or has_diff, (
+                f"{name}.yaml line {lineno} assert missing "
+                f"comparison operator: {line.strip()}"
+            )
+    # scenario_order (second registry place) lists the new name exactly once.
+    assert ftext.count(name) > 0
+    so = text.split("scenario_order:")[-1]
+    assert so.count(f"- {name}") == 1, (
+        f"scenario_order must list {name} exactly once"
+    )
 
 
 def test_readability_geometry_surface_contract() -> None:

@@ -760,6 +760,8 @@ surface:
   - trait_index
   - trait_hover_index
   - hover_connected
+  - attr_cost_text
+  - attr_step_cost
   SectSelectScreen:
   - focus_index
   - selected_sect_id
@@ -1193,3 +1195,4 @@ scenario_order:
 - ending_tiers_differentiate
 - enemy_turn_wall_clock
 - enemy_action_feedback
+- trait_point_cost_visible

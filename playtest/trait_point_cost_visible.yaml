@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C1 (playtest #5 red): on the creation attribute screen the cost of each
+# point was invisible — 「剩余点数 30」 was shown, but raising an attribute at
+# 15+ costs 2 points while 10–14 costs 1, and a decrement refunds the same,
+# and none of that appeared anywhere on screen. The only way to discover it was
+# trial and error. The AttrCostLabel rendered beside every +/- row now shows the
+# next-point cost, the refund and the remaining budget at rest — computed from
+# creation.gd::_step_cost (never hand-written). This is the touch path: the cost
+# is always visible, no hover required.
+#
+# Direct creation.tscn boot (proven scene-path capability — see
+# creation_attr_effect_info.yaml; assertions hold at f30). debug_click_creation_widget
+# drives the focused row's _on_attr_plus_pressed (bone 10->11, points 30->29).
+# move_left is the refund leg on the focused row (bone 11->10, points 29->30).
+#
+# RED-FIRST four values (full ledger in final/_red_first_5x.md):
+#   pre-fix failing frame ........ 30 (the first assert frame)
+#   first failing assert ......... CreationScreen.attr_cost_text != ""  — the
+#                                  pre-fix tree never published the variable and
+#                                  the AttrCostLabel node did not exist.
+#   exact error .................. "node not found" (AttrCostLabel0) /
+#                                  surface var absent (attr_cost_text == "" at rest).
+#   green asserts before red ..... 0 (attr_cost_text is the first assert of the
+#                                  first frame; the node itself is missing).
+# After the fix this scenario runs green; the red was then re-run once more.
+name: trait_point_cost_visible
+description: >-
+  C1 point-cost visibility on the creation attribute screen: at rest every +/-
+  row shows the next-point cost and the remaining budget, composed from
+  _step_cost (no literal). Pressing + on the focused row (bone 10->11) changes
+  the line and decrements points_left by exactly the pre-press step cost; the
+  - leg refunds it. UiOcclusionWatch clean on the open frame.
+scene: res://scenes/segments/creation.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attr_cost_text: 'attr_cost_text != ""'
+    CreationScreen.attr_step_cost: attr_step_cost == 1
+    CreationScreen.points_left: points_left == 30
+    CreationScreen.attr_cost_text: 'attr_cost_text.contains(str(attr_step_cost)) == true and attr_cost_text.contains(str(points_left)) == true'
+- at: 40
+  actions:
+  - debug_click_creation_widget
+- at: 60
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.attrs: attrs.bone == 11
+    CreationScreen.points_left: points_left == 29
+    CreationScreen.attr_step_cost: attr_step_cost == 1
+    CreationScreen.attr_cost_text: 'attr_cost_text.contains(str(points_left)) == true'
+- at: 70
+  actions:
+  - move_left
+- at: 90
+  actions: []
+  assert:
+    CreationScreen.phase: phase == "ATTRS"
+    CreationScreen.points_left: points_left == 30
+    CreationScreen.attrs: attrs.bone == 10
+    CreationScreen.attr_cost_text: changed
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

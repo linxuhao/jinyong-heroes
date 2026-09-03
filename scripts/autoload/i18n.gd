@@ -199,6 +199,7 @@ const EN: Dictionary = {
 	"上一步": "Previous",
 	"确认踏上江湖": "Begin the Journey",
 	"剩余点数 %d": "Points left: %d",
+	"＋1 需 %d 点 · −1 退 %d 点 · 剩 %d": "Raise +1: %d pts · Lower -1: %d pts · Left: %d",
 	"已选": "Chosen",
 	"当前气血 %d": "Current HP: %d",
 	"根骨": "Bone",
