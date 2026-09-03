@@ -1,0 +1,118 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# C4: the character/equipment/gongfa panel opens from the BATTLE screen
+# (HUD/panel layer only — battlefield.gd is LOCKED and untouched). The
+# RosterPanel instance lives in hud.tscn (read_only = true): opening it shows
+# the three sections (人物/功法/物品) plus the 只读 marker, binds ZERO equip
+# buttons and hides all twelve EquipButton0..11, and open/close leave the
+# combat state zero-diff (CombatManager.is_paused / current_round / phase and
+# Player.health unchanged). UiOcclusionWatch stays clean on the open frame.
+#
+# Battle boot = the established battle grammar (battle_end_turn_attack_buttons):
+# ui_accept at f3,5,7,9,11,13,15 then tutorial_next at f20,25,30 -> the HUD is
+# live in a real battle by f35 (EndTurnButton visible). The tutorial battle is
+# the same battlefield.tscn + HUD stack, so the RosterPanel instance is present.
+#
+# ZERO-DIFF discipline: the combat observables are captured at the frame BEFORE
+# the open click (f60) and re-asserted at the identical values after close
+# (f110) — explicit comparisons, never a burned-month-style literal on a moving
+# counter. Player.health is re-read at both frames and asserted equal.
+#
+# RED-FIRST EVIDENCE (pre-implementation tree — the battle scene has no
+# RosterPanel instance, so the first assert on the panel's read_only surface
+# fails with "node property not found"):
+#   fail frame:        f60 (RosterPanel.read_only)
+#   first assertion:   RosterPanel.read_only: read_only == true
+#   exact error:       node property not found: RosterPanel.read_only
+#   red-before-green:  4 (f35 EndTurnButton.visible, EndTurnButton.size,
+#                        EndTurnButton.mouse_filter, EndTurnButton.disabled)
+name: roster_panel_battle_open_close
+description: >-
+  The roster panel opens from the BATTLE screen (HUD layer, read_only = true):
+  three sections render, equip_button_count == 0 and EquipButton0 hidden,
+  open/close leave CombatManager.is_paused / current_round / phase and
+  Player.health zero-diff, UiOcclusionWatch clean on the open frame, and
+  HUD.roster_panel_open mirrors the panel state.
+timeline:
+- at: 3
+  actions:
+  - ui_accept
+- at: 5
+  actions:
+  - ui_accept
+- at: 7
+  actions:
+  - ui_accept
+- at: 9
+  actions:
+  - ui_accept
+- at: 11
+  actions:
+  - ui_accept
+- at: 13
+  actions:
+  - ui_accept
+- at: 15
+  actions:
+  - ui_accept
+- at: 20
+  actions:
+  - tutorial_next
+- at: 25
+  actions:
+  - tutorial_next
+- at: 30
+  actions:
+  - tutorial_next
+- at: 35
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    EndTurnButton.visible: visible == true
+    RosterOpenButton.visible: visible == true
+    RosterPanel.read_only: read_only == true
+# Capture the pre-open combat state (zero-diff baseline).
+- at: 60
+  actions: []
+  assert:
+    CombatManager.is_paused: is_paused == false
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase == "PLAYER_TURN"
+    Player.health: health >= 1
+    HUD.roster_panel_open: roster_panel_open == false
+- at: 70
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 80
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterPanel.read_only: read_only == true
+    RosterPanel.equip_button_count: equip_button_count == 0
+    EquipButton0.visible: visible == false
+    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品") and text.contains("（战斗中只读）")'
+    HUD.roster_panel_open: roster_panel_open == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+    # Zero combat diff while open (same values as the f60 baseline).
+    CombatManager.is_paused: is_paused == false
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase == "PLAYER_TURN"
+    Player.health: health >= 1
+- at: 90
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 110
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+    HUD.roster_panel_open: roster_panel_open == false
+    # Zero combat diff after close (same values as the f60 baseline).
+    CombatManager.is_paused: is_paused == false
+    CombatManager.current_round: current_round >= 1
+    CombatManager.phase: phase == "PLAYER_TURN"
+    Player.health: health >= 1

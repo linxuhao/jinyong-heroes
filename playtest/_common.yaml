@@ -183,6 +183,7 @@ actions:
 surface:
   CombatManager:
   - current_round
+  - is_paused
   - phase
   - active_unit_name
   - turn_order
@@ -430,6 +431,7 @@ surface:
   - hint_nameplate_overlap
   - nameplate_pairwise_overlap
   - undo_desc_overlap
+  - roster_panel_open
   MoveHintLabel:
   - state
   - text
@@ -851,6 +853,7 @@ surface:
   - visible
   - size
   - pressed_connected
+  - roster_panel_open
   Backdrop:
   - visible
   - size
@@ -1067,6 +1070,7 @@ surface:
   - equip_button_count
   - equip_pressed_connected
   - readiness_text
+  - read_only
   RosterOpenButton:
   - visible
   - size
@@ -1177,6 +1181,8 @@ scenario_order:
 - roster_panel_cultivation_open_close
 - roster_equip_free_action
 - equipment_in_battle_diff
+- roster_panel_battle_open_close
+- roster_panel_ending_open_close
 - event_pool_new_event_resolved
 - theme_focus_marker_cultivation
 - softlock_empty_practice_returns

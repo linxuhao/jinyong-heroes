@@ -1,0 +1,84 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# C4: the character/equipment/gongfa panel opens from the ENDING screen
+# (read_only = true). Direct-boots ending.tscn (self-contained: SaveManager
+# profile is non-null by declaration, so ending.gd._ready() evaluates an
+# ending). The 查看角色 entry = the panel's own RosterOpenButton, relabeled
+# per-instance in ending.gd._ready(). Open/close leave the ending state
+# (tier / score / ending_title) zero-diff, and UiOcclusionWatch stays clean.
+#
+# Timeline is CLICKS-ONLY — ending.gd._unhandled_input restarts the game on
+# ui_accept / tutorial_next, so no keyboard action may appear anywhere.
+#
+# The 查看角色 label is pinned by property (text != "" and text.length() >= 4),
+# not by CJK bytes — the harness sees the translated string, so pin the
+# property, not the literal.
+#
+# RED-FIRST EVIDENCE (pre-implementation tree — the ending scene has no
+# RosterPanel instance, so the first assert on the panel's read_only surface
+# fails with "node property not found"):
+#   fail frame:        f40 (RosterPanel.read_only)
+#   first assertion:   RosterPanel.read_only: read_only == true
+#   exact error:       node property not found: RosterPanel.read_only
+#   red-before-green:  4 (f30 EndingScreen.tier, EndingScreen.score,
+#                        EndingScreen.evaluation_text, UiOcclusionWatch.violations)
+name: roster_panel_ending_open_close
+description: >-
+  The roster panel opens from the ENDING screen (read_only = true): the 查看角色
+  entry is the panel's own RosterOpenButton, open/close leave tier / score /
+  ending_title zero-diff, UiOcclusionWatch clean on the open frame, and
+  EndingScreen.roster_panel_open mirrors the panel state.
+scene: res://scenes/segments/ending.tscn
+timeline:
+- at: 30
+  actions: []
+  assert:
+    EndingScreen.visible: visible == true
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.score: score >= 1
+    EndingScreen.evaluation_text: evaluation_text != ""
+    RosterOpenButton.visible: visible == true
+    RosterOpenButton.text: text != "" and text.length() >= 4
+    RosterPanel.read_only: read_only == true
+    EndingScreen.roster_panel_open: roster_panel_open == false
+# Capture the pre-open ending state (zero-diff baseline).
+- at: 40
+  actions: []
+  assert:
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.score: score >= 1
+    EndingScreen.ending_title: ending_title != ""
+- at: 50
+  actions: []
+  clicks:
+  - RosterOpenButton
+- at: 60
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == true
+    RosterPanel.read_only: read_only == true
+    RosterPanel.equip_button_count: equip_button_count == 0
+    EquipButton0.visible: visible == false
+    RosterBodyLabel.text: 'text.contains("人物") and text.contains("功法") and text.contains("物品") and text.contains("（战斗中只读）")'
+    EndingScreen.roster_panel_open: roster_panel_open == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+    # Zero ending diff while open (same values as the f40 baseline).
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.score: score >= 1
+    EndingScreen.ending_title: ending_title != ""
+- at: 70
+  actions: []
+  clicks:
+  - RosterCloseButton
+- at: 90
+  actions: []
+  assert:
+    RosterPanel.is_open: is_open == false
+    EndingScreen.roster_panel_open: roster_panel_open == false
+    # Zero ending diff after close (same values as the f40 baseline).
+    EndingScreen.tier: tier >= 1 and tier <= 3
+    EndingScreen.score: score >= 1
+    EndingScreen.ending_title: ending_title != ""

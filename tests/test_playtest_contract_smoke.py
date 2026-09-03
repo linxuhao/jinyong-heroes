@@ -133,6 +133,8 @@ ROUND_SCENARIOS: list[str] = [
     "roster_panel_cultivation_open_close",
     "roster_equip_free_action",
     "equipment_in_battle_diff",
+    "roster_panel_battle_open_close",
+    "roster_panel_ending_open_close",
     "event_pool_new_event_resolved",
     "theme_focus_marker_cultivation",
     "softlock_empty_practice_returns",
