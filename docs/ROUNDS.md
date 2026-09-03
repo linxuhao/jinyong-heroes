@@ -1,86 +1,422 @@
-# jinyong — Wuxia Crossover Tactics (Godot 4)
+# Round Archive (append-only)
 
-**▶ Play it in your browser: https://linxuhao.github.io/jinyong-heroes/**
-(中文/English — auto-detected from your browser language, switchable in 设置/Settings)
+> The round-by-round change log. Each round keeps one `## ` heading, newest
+> first. Append new rounds at the top; never re-edit a moved body after it
+> lands. The manual lives in `README.md`.
 
-A time-scrambled wuxia world: characters, sects and martial arts from different
-parallel timelines collide in one jianghu. You create your own nobody, borrow the
-fully mastered body of Yang Guo for a tutorial duel against the Five Masters on
-Mount Hua's summit, then fall from the sky, join a great sect, spend three in-game
-years (36 cultivation periods) training, and finally walk the jianghu map to an
-ending. Visuals use placeholder art; UI text is Chinese (NotoSansSC, SIL OFL).
+## Latest round: R3b Numbers That Bind — the claimed numbers now hold on real saves (2026-09-02)
 
-## 本轮变更（R3b，2026-09-02）
+R3b is a **no-new-systems fix pass**: every number R3 claimed (grade points, practice
+targeting, ending tiers, Huashan readiness, on-screen receipts, the work economy) is
+now bound to **real saves** (main.tscn → tutorial → creation → join sect), each fixed
+red-first against a measured failure and pinned by property nails (differentials,
+ratios, boundaries — never balance literals). Per-card evidence lives in
+`final/delivery_notes_fix_c1_grade_vocabulary.md` … `_fix_c8_design_records.md`; the
+measurements and rulings live in `design/40_progression.md` (M2'/M3' real-save tables),
+`design/90_decisions.md` (two rulings, both 2026-09-02) and the append-only
+`design/99_changelog.md` R3b row.
 
-- **C1 — one grade vocabulary** (`progression_math.gd`): `GRADE_POINTS` now derives
-  its keys from `PRACTICE_TO_MASTER` (D/C/B/A), so mastery is non-zero on real saves.
-- **C2 — practice hits what you picked** (`event_logic.gd::add_practice`): the chosen
-  art's row advances; the receipt shows its display name, not the raw id.
-- **C3 — endings actually tier** (`map_data.gd::ENDING_TIERS` 150/120/0): free-card
-  silver no longer inflates the 历练 axis; do-nothing → tier 1, single route → tier 2,
-  strong route → tier 3.
-- **C4 — Huashan readiness tells the truth** (`HUASHAN_BAR` {even: 61, strong: 124}):
-  every creation-fresh profile reads 战备不足 by construction; the defensive comment is gone.
-- **C5 — winnable-route card matches its title** (`huashan_winnable_normal_route`):
-  clicks-only, real skill clicks, WIN asserts MAP + health < max_health. Honest status:
-  unlock granted, levers landed, WON overlay not reached — recorded as LOST, not a measured WIN.
-- **C6 — the receipt is on the screen** (`cultivation.gd::_render`): `last_yield_text`
-  drawn under the status block with display names, UiOcclusionWatch-clean.
-- **C7 — work out-earns idling** (`ProgressionMath.work_income = 10 + 3 × work_months`):
-  the free card is untouched; 36×work silver > 1.5× 36×do-nothing.
-- **C8 — design records**: `40_progression.md` (M2'/M3' real-save tables), `90_decisions.md`
-  (two rulings), `00_roadmap.md` (re-queued), `99_changelog.md` (append-only R3b row).
+**Evidence legend** (every measured claim below carries one of these classes):
 
-**Status (honest):** official run — hard gate green, 91/93 scenarios, pytest 67/67,
-vision passed. C5 = honest LOST per the 2026-09-03 owner re-scope ruling in
-`design/90_decisions.md`; the trait regression is re-derived this round.
+- `[EVIDENCE: OFFICIAL GATE GREEN]` — green on the official gate re-run after this fix round (not yet re-run, so not used for any scenario nail this round)
+- `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — measured by the headless GDScript instrument (M2'/M3' tables, red-first four-values)
+- `[EVIDENCE: DIRECT-READ]` — verified in-tree by direct read of code / data / registries
+- `[EVIDENCE: PENDING OFFICIAL RE-RUN]` — the scenario nail was red on the official 93-scenario run; fixed, awaiting the official re-run
 
-## Requirements
+**The seven fixes (code/data verified in-tree by direct read; each claim below carries its evidence class — see the legend):**
 
-- Godot 4.x. No external dependencies, no build step.
+1. **C1 — one grade vocabulary** (`scripts/data/progression_math.gd:19`): `GRADE_POINTS`
+   was keyed 丁/丙/乙/甲 while every save writes D/C/B/A, so mastery was 0 on every real
+   save (武学轴 0, Huashan mastery term dead). Now Latin-keyed, its key set guarded
+   equal to `ProgressionGongfaData.PRACTICE_TO_MASTER.keys()`; test fixtures take keys
+   from production vocabulary. `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — `mastery_points > 0`
+   for every production grade, zero stray CJK grade literals. The practice route's ending
+   shows 武学 > 0 (`EndingScreen.mastery_axis > 0` nail in `ending_tiers_differentiate`
+   Leg B) `[EVIDENCE: PENDING OFFICIAL RE-RUN]` — `ending_tiers_differentiate` was 13/22
+   on the official run.
+2. **C2 — practice hits what you picked** (`event_logic.gd::add_practice(profile, amount,
+   target_id := "")`): the chosen art's row advances; empty/unknown/mastered targets fall
+   back to the first unmastered (a practice month is never silently dropped). Zero-diff
+   pins: the untouched rows' counters do not move (`last_practice_other_rows_unchanged`),
+   and the receipt shows the chosen art's **display name** (`罗汉拳`), not `shaolin_luohan_d`.
+   `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — red-first f560 `last_practice_target: changed`
+   observed `shaolin_yijin_d` on both months, green 12. `[EVIDENCE: PENDING OFFICIAL
+   RE-RUN]` — `practice_target_receipt` was 29/40 on the official run.
+3. **C3 — endings actually tier** (`map_data.gd::ENDING_TIERS` 150/120/0 + the
+   deed-composition lever): free-card silver no longer inflates the 历练 axis, so
+   do-nothing ×36 lands tier 1, a single practice route tier 2, a balanced/strong route
+   tier 3. `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — M2' 5 real-save seeds: do_nothing
+   110/tier1, all_practice 134/tier2, balanced ≥150/tier3. The nail pins the **tier**
+   differential, not text (`ending_tiers_differentiate`) `[EVIDENCE: PENDING OFFICIAL
+   RE-RUN]` — 13/22 on the official run.
+4. **C4 — Huashan readiness tells the truth** (`HUASHAN_BAR` {even: 61, strong: 124},
+   re-derived per the R3c owner band ruling; the old self-defensive comment is gone,
+   replaced by a pointer to the measured table): `P_fresh_max = 60` (the highest
+   readiness_power reachable by creation allocation alone — instrument enumeration,
+   mp=0, empty gear) so `even = P_fresh_max + 1 = 61` makes every profile leaving
+   creation read 战备不足 **by construction**; `strong = 124` (measured strong route,
+   must exceed even). The f260 战备不足 literal holds byte-identical and the scenario
+   self-runs 16/16. `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — M3''' honest record: a
+   real 36-month balanced route (power 40) still reads 战备不足 under even=61 — the
+   growth curve is flatter than the creation budget; recorded in
+   `design/40_progression.md` M3''', `even` NOT lowered, handed to the next round
+   (see `final/delivery_notes_r3c_readiness_bands.md`).
+   `[EVIDENCE: PENDING OFFICIAL RE-RUN]`.
+5. **C5 — the winnable-route card matches its title** (`huashan_winnable_normal_route`
+   rewritten: clicks-only, menu boot, real-save 36 practice months, real skill clicks in
+   the duel, WIN frame asserts `current_state == "MAP"` + `health < max_health`).
+   **Status: unlock ruling granted 2026-09-02, levers landed, WON overlay not reached —
+   recorded honestly (not claimed as a measured WIN).** The owner granted the
+   C5 escalation unlock (`design/90_decisions.md` "R3b C5 — 华山数据解锁裁决"): scope =
+   `map_battle_data.gd` POSITIONS/PLAYER_SPAWN, the five greats' `cd.initiative` literals
+   in `battlefield.gd:504-590`, and `battle_setup.gd` derive_stats mp terms (R3 D4
+   cancelled); prohibitions = no lowering any great's max_health/attack_damage/attack_range,
+   no reducing unit count, no AI edits, no redefining "win". Implemented by
+   `fix_huashan_route_honest_red`: `huashan_winnable_normal_route` progressed
+   23/42 → 29/39, the C4 boundary (`current_round >= 3 and health > 0`) is green, zero
+   CultOptionButton0 runtime errors, and the WON tail is still red — not claimed as a
+   measured WIN. `[EVIDENCE: DIRECT-READ]` — unlock ruling + M3'' per-literal table in
+   `final/unlock_record_r3b_huashan.md`; `[EVIDENCE: PENDING OFFICIAL RE-RUN]` — the
+   scenario was 28/39 on the official run.
+   **Restored (r3c_restore_huashan_scenario, 2026-09-02): the scenario file
+   `playtest/huashan_winnable_normal_route.yaml` is PRESENT in the delivered tree**
+   (866 lines, restored under its registered name; content source = commit 7b65843,
+   the compact practice-leg form, reconstructed and validated by a real run — see
+   `final/delivery_notes_r3c_restore_huashan_scenario.md`). It is registered in
+   `playtest/_common.yaml` (`scenario_order`), `tests/test_playtest_contract_smoke.py::
+   ROUND_SCENARIOS` and `tests/test_ending_gate_pins.py` (unmodified), so the
+   registry-file mismatch is closed. The WON tail remains a **permitted red** (36/48,
+   hard gate PASS, 0 runtime errors; first red f1200 phase observed ENEMY_TURN,
+   decisive red f2100 current_state observed LOST) — not claimed as a measured WIN.
+   The WIN-frame nail (`current_state == "MAP"` + `health < max_health`, zero
+   `debug_win_tutorial` in the Huashan segment) and the C4 round-boundary nail now
+   have their on-disk carrier.
+6. **C6 — the receipt is on the screen** (`cultivation.gd::_render`): `last_yield_text`
+   is drawn under the status block on every action month, with display names (根骨, not
+   `bone`), guarded by the `last_yield_readable` property (no `_`, no raw ASCII id) and
+   UiOcclusionWatch-clean on every touched frame. `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` —
+   red-first f620 BodyLabel.text lacked the receipt line, green 12; the official run
+   observed the receipt rendered (`修习：根骨 +2`, `练功：易筋经·入门 +2`).
+   `[EVIDENCE: PENDING OFFICIAL RE-RUN]` — `practice_target_receipt` was 29/40.
+7. **C7 — work out-earns idling** (`ProgressionMath.work_income = 10 + 3 × work_months`):
+   the free card 一袋碎银 is untouched; work now compounds, and the ratio nail
+   (`work_beats_idling`, same seed both legs) requires 36×work ending silver >
+   1.5× 36×do-nothing. `[EVIDENCE: UNIT-INSTRUMENT MEASURED]` — red-first ratio ≈1.12
+   (2248 vs ~2000); new curve ≈2.1×. `[EVIDENCE: PENDING OFFICIAL RE-RUN]` —
+   `work_beats_idling` was 11/21 on the official run.
 
-## Install
+**C8 — design records**: `40_progression.md` (C1 vocabulary section, work-curve section
+replaced, M2'/M3' real-save tables, old tables marked "measured on empty seeded profile,
+superseded 2026-09-02"), `90_decisions.md` (ruling: single grade-vocabulary source;
+ruling: M2/M3 must use real saves, with route definitions), `00_roadmap.md` (queue:
+外号 → 回执/结算 → 教程与目标 → 创建屏剩余点数 → 地图有图 → 非战斗美术; playtest
+findings UX-33…36 backlogged, record-only), `99_changelog.md` (append-only R3b row).
+`[EVIDENCE: DIRECT-READ]`.
 
-```bash
-git clone <this repo> jinyong && cd jinyong
-# open project.godot in the Godot 4 editor (import happens automatically)
-```
+**New playtest scenarios**: `practice_target_receipt` (C2+C6), `ending_tiers_differentiate`
+(C3), `work_beats_idling` (C7) — all present on disk; rebaselined
+`huashan_readiness_warning` (C4) — present on disk. `huashan_winnable_normal_route` (C5)
+is registered in both `playtest/_common.yaml` and
+`tests/test_playtest_contract_smoke.py::ROUND_SCENARIOS` with anti-weakening doors, and
+**its yaml file is present in the delivered tree** (restored under its registered name
+per `r3c_restore_huashan_scenario`; WON tail still a permitted red, not claimed — see
+the C5 note above).
+Protected surfaces untouched: the six-file lock, the three
+verbatim gates, and the RNG op-order lifelines (all fixes are pure arithmetic).
+`[EVIDENCE: DIRECT-READ]`.
 
-## Run
+**Verification status (honest):** the official playtest hard gate is `passed: false`
+(9/93 scenarios red, 85 runtime errors) — the nine reds are listed in
+`final/verify_report.json` and `design/40_ux_backlog.md` UX-37/38/39. Official greens on
+that run: `save_load_roundtrip` 14/14, `event_travel_effects` 19/19, the three verbatim
+gates (`facility_use_reusable` 49/49, `map_node_event_shaolin` 32/32,
+`map_battle_node_huashan` 41/41), `spine_to_ending` 42/42, `clicks_only_storyline` 47/47.
+Compile 107/107; vision passed non-blind (93 scenes, 372 frames, Q6 93 good / 0 bad).
+The unit-instrument layer (red-first four-values, M2'/M3' tables) is measured in-tree;
+the scenario-evidence layer is pending the official re-run after this fix round. No
+measured claim above cites a green the official gate run did not produce.
 
-Open the project in the Godot 4 editor and press Play — the game boots into the
-main menu (新的冒险 / 读取存档 / 设置 / 退出). Headless: `godot --path .`
+**Final verification verdict (Step 5, 2026-09-02 — `final/verify_report.json`):
+`all_goals_met: false`, `ready_for_deploy: false`.** Verified green in-tree by direct
+read this step: the C1 vocabulary + production-key fixtures, C2 targeting, C3 tier
+data (150/120/0), C4 bands + defensive-prose removal, C6 receipt render, C7 curve +
+ratio-nail/guard regex sync, the i18n composite-key fix (`ending.gd:129` ↔
+`i18n.gd:433`), the C8 design records, and the C5 unlock levers within their granted
+scope (`battle_setup.gd` mp terms direct-read). Blocking findings: (1) C5's WON tail is
+measured red (29/39 on the official run; the restored carrier now runs 36/48 hard-gate
+clean with the WON tail still a permitted red — escalation honored, unlock granted, win
+not achieved); (2) C4's f260 band conflict is RESOLVED in-tree (the r3c band ruling
+re-derived even = P_fresh_max + 1 = 61, strong = 124; f260 byte-identical, the scenario
+self-runs 16/16 — the official re-run is the remaining evidence); (3) the five
+re-anchored scenarios and both pytest-gate fixes await the official re-run —
+compile/test/vision artifacts for the post-fix tree do not exist yet and are therefore
+not claimed. The `playtest/huashan_winnable_normal_route.yaml` registry-file mismatch
+is CLOSED — the file is present in the delivered tree (restored per
+`r3c_restore_huashan_scenario`, provenance commit 7b65843).
 
-Flow: main menu → character creation (30-point budget, traits, confirm) → tutorial
-battle as Yang Guo vs the Five Masters → overlay → transition → sect choice →
-36-month cultivation → the jianghu map → tiered ending → restart. The whole
-storyline is playable with pointer/touch alone; keyboard paths sit alongside
-(camera follows the acting unit; left-click to move/attack, 结束回合 to end turn).
+## Previous round: R3 Meaningful Numbers — choices must shape the ending (2026-09-01)
 
-## Tests
+Progression/economy overhaul: the three-year loop now actually decides the ending.
+Before this round the ending tier was the flat sum of five attrs vs two thresholds
+(a growth route saturated tier 3 mid-journey and nothing after that mattered),
+`fortune` had zero consumers while the creation screen promised effects, `work` was
+a flat +10 silver dominated by a free monthly card, and the Huashan finale killed a
+normally-played hero before his first turn with no warning anywhere. All four are
+fixed and pinned by **choice-differential nails** (never balance literals), each with
+a measured red-first run recorded under `final/red_first_notes_r3_*.md` and the
+consolidated ledger `final/delivery_notes_r3_numbers.md`.
 
-`run_tests.sh` drives the full Godot gate through the `godot-builder` sidecar
-(compile check → headless playtest of all scenarios → GDScript unit suite).
+**The four fixes (all verified in the tree by direct read):**
 
-```bash
-GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
-python3 -m pytest tests/   # static playtest-contract smoke
-godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite
-```
+1. **Multi-axis ending evaluation** (`scripts/data/ending_logic.gd` NEW + `map_data.gd`):
+   `score = round(attrs×1.0 + mastery×2.0 + deeds)` where mastery = GRADE_POINTS over
+   mastered arts (丁1 丙2 乙3 甲4, `ProgressionMath`) and deeds = persisted in-run
+   choices (`travel_resolved×2.0 + silver_earned×0.05`). `ENDING_TIERS` scans
+   `min_score` 90/60/0 (values set by measurement M2, run "measured 2026-09-01, R3 M2").
+   The ending screen (`ending.gd`) evaluates fresh from the persisted profile and shows
+   the per-axis summary (属性/武学/历练). Because mastery and deeds keep growing by
+   construction, a month-36 choice still moves the score.
+2. **Fortune implemented, promise kept** (`trait_effects.gd::fortune_reroll_budget`,
+   `cultivation.gd`): the creation screen's promise is now literal — fortune sets the
+   yearly travel-event reroll budget (`1 + (fortune−10)/10 + 1 with 福缘深厚`). During a
+   travel event the new `EventRerollButton` (or the **R** key, action `event_reroll`)
+   re-draws the event; the exhausted press is inert (zero RNG, non-empty receipt).
+   The previously unreferenced `yearly_event_reroll` trait hook now has its reader.
+   The adjacent unimplemented `map_inquire` (江湖阅历) trait promise is honestly
+   recorded as a residual in `design/40_progression.md` §11 (out of scope this round).
+3. **Four monthly actions, four measured niches** (`cultivation.gd::_apply_action`,
+   `ProgressionMath.work_income`): 练功 practice = +2 into the player-CHOSEN art (the
+   only targeted advancement); 修习 cultivate = the only repeatable attribute source;
+   做工 work = `10 + 2 × mastered_count` silver — the only repeatable silver source that
+   compounds with the run (eventually beats the one-shot +30 card); 游历 travel = the
+   only item/event source and the only channel fortune acts on. Each action row shows
+   its effect on screen; per-action 36-month yield curves measured by
+   `tests/test_action_yield_curves.gd` (M1, run "measured 2026-09-01, R3 M1").
+4. **Huashan winnable and pre-warned, fight not nerfed** (`battle_setup.gd`): the five
+   greats' numbers are untouched (enemy side untouched — the six locked files stayed
+   byte-identical); instead the sanctioned player-side `derive_stats` gains a mastery
+   term (`max_health += 6×mp`, `energy += 4×mp`, `initiative += 3×mp`), so three years of
+   practice cash out in the finale. `BattleSetup.readiness()` warns in advance on the
+   roster panel (visible on map AND cultivation) with the 华山评估 verdict (战备不足 /
+   势均力敌 / 胜券在握) computed from the same formula the duel uses. Measurement M3
+   (seeds s1..s5, run "measured 2026-09-01, R3 M3"): a balanced normal route wins 5/5
+   while a creation-fresh profile loses 5/5; the winnable scenario also asserts
+   `health < max_health` at the win frame, so the fight stays real.
 
-## Key interfaces
+**Key surfaces / integration points (new this round):**
 
-- **GameManager** — scene flow, `get_player()`, `get_enemies_alive()`, end-game overlay.
-- **CombatManager** — battle state: `tutorial_battle`, `current_round`, `phase`, `is_player_turn()`.
-- **SaveManager** — profile, slots, `rng`, autosave.
-- **EventLogic** — pure statics over `EventData.TABLE`: `validate_option`, `apply_option_effects`, `add_practice`.
-- **BattleSetup** — `derive_stats`, `build_character`, `readiness()`.
-- **ProgressionMath** — `GRADE_POINTS`, `mastery_points`, `work_income`, `readiness_power`.
-- **UiOcclusionWatch** — per-frame `violations` / `scan_ok` over the live tree.
-- **ThemeManager** — `option_style(focused)`, `OPTION_FONT_FOCUS` / `OPTION_FONT_DIM`.
-- **MapBattleData** — `roster_ids(battle_id)`, `position_for(battle_id, name_key)`.
-- **Coord** — pure statics `world_to_screen` / `screen_to_world` over the canvas transform.
-- **GridManager** — grid / movement planning, `world_to_grid`, `grid_to_world`, `board_rect()`.
+- Persisted deeds: `PlayerProfile.deeds` (work_months / cultivate_months /
+  practice_months / travel_resolved / silver_earned / rerolls_used_this_year),
+  additive save schema with legacy-default repair (`save_load_roundtrip` stays green).
+- Observables: `CultivationScreen.{rerolls_left, last_action_kind, last_action_silver,
+  last_yield_text, last_practice_target, last_practice_amount}`, `EndingScreen.{score,
+  evaluation_text, diverged_from_first}`, `RosterPanel.readiness_text`.
+- Input: `event_reroll` (R key) added to `project.godot [input]`; all new UI strings
+  live in the EN dictionary of `scripts/autoload/i18n.gd`.
+- Six new differential scenarios registered in `playtest/_common.yaml` +
+  `tests/test_playtest_contract_smoke.py` (two-place sync): `ending_divergent_playstyles`,
+  `ending_last_month_choice`, `fortune_reroll_budget`, `action_yield_differential`,
+  `huashan_readiness_warning`, `huashan_winnable_normal_route` — with a stdlib
+  anti-weakening door `tests/test_ending_gate_pins.py` guarding their load-bearing lines.
+- Design docs: `design/40_progression.md` §11 (fortune), §12 (Huashan readiness),
+  §13 (multi-axis ending) record the formulas and the M1/M2/M3 measured curves.
+
+**Verification status (honest; Final Verifier pass 2026-09-02):** implementation verified
+by direct read of every touched file (ending_logic.gd + progression_math.gd NEW,
+battle_setup.gd derive_stats+readiness, trait_effects.gd fortune budget, player_profile
+deeds schema, map_data ENDING_TIERS/HUASHAN_BAR, cultivation reroll+deed+yield surfaces,
+ending.gd, roster_panel.gd, creation.gd honest fortune copy, i18n EN entries,
+project.godot event_reroll); six red-first nails measured on the pre-fix tree (failing
+frame / first failing assert / observed error / greens before red) with the two
+ending-nail scenario defects fixed e2e on 2026-09-02 (`fix_r3_ending_nails_e2e`:
+leg-A year-boundary month grammar + leg-B CULTIVATION assert before the debug action —
+zero game-code changes); M1/M2/M3 measurement tables recorded with their run labels.
+Still owed at delivery time: the official consolidated gate products
+(`compile_report.json` / `playtest_report.json` / `vision_report.json` /
+`test_report.json`) are downstream pipeline artifacts (5_compile / 5_test / 5_vision)
+and did not exist at verification time — the four fixes are code-verified and
+red-first-evidenced, and the official all-scenario green is the remaining acceptance
+evidence. `design/99_changelog.md`'s R3 row is pending the post-acceptance
+design-ledger fold. See `final/verify_report.json` for the itemized verdict.
+
+## Round: jinyong-loop R2 — the monthly loop cannot stop, redemption cannot be infinite (previous round, 2026-09-01)
+
+Bug-fix round on the loop's rule short-circuits: four rules existed but were short-circuited
+(the cultivation soft-lock, unlimited facility redemption, node-event effects re-settling on
+every revisit, purchases charging silver without delivering), plus one occlusion regression the
+theme round introduced on the sect-join screen. Zero balance numbers moved; the three
+verbatim-protected gates stayed byte-untouched and green.
+
+**The five fixes (all verified in the tree by direct read):**
+
+1. **Soft-lock eliminated** (`scripts/segments/cultivation.gd`): the empty-GONGFA accept no
+   longer dead-ends at ACTION_PICK — it sets `status_text` to 「无可修习的功法，本月照常过去」,
+   moves to ATTR_PICK and calls `_after_action()` (the single month-advance path, so
+   month-12 → YEAR_END and y3/m12 → the map inherit for free, exactly like `_fast_forward`).
+   The empty state renders 「功法均已大成，无可修习」 and its single button is relabeled
+   返回行动 → **度过本月** (it advances the month through the same
+   `_on_option_pressed → _on_accept` chain every option uses). New published surfaces
+   `CultivationScreen.month_before_accept` / `status_text`. The debug twin `_fast_forward`
+   is untouched — the escape hatch now exists on the player path too.
+2. **Facility monthly cap** (`scripts/segments/map.gd`): `FACILITY_MONTHLY_USE_CAP := 2` — a
+   RULE gate, not a balance number (no facility cost/effect value moved). The counter lives in
+   a GameManager session mirror (`facility_use_month` / `facility_use_count_this_month`, reset
+   on `profile_created`/`loaded`), so it survives the MapScreen rebuild on battle return. The
+   exhausted press refuses through the existing receipt channel — 「本月设施已用尽，下月再来」
+   — with no mutation, no count increment, no snapshot write. The gate-(a) property
+   (leave → return → use again) stays green because two uses per month are allowed.
+3. **Re-appear yes, re-settle no** (`map.gd` + `scripts/autoload/game_manager.gd`): every node
+   event still fires on every arrival (pinned by the two protected gates), but each
+   `(node_id, event_id)` pair applies its effects at most once per session
+   (`GameManager.settled_node_events`, same session-mirror lifecycle as
+   `map_events_resolved_count`). A re-resolve shows 「此事已有了结，不再重来」, applies
+   nothing, and STILL increments `events_resolved_count` (the count tracks RESOLUTIONS, not
+   settlements) — which is why both protected gates' 1→2→3 ladders stay byte-identical.
+4. **All-or-nothing purchases** (`scripts/data/event_logic.gd`): new pure-static
+   `validate_option(profile, opt)` (net silver capacity first, then item ownership; no
+   mutation, no RNG draw) and `apply_option_effects` is validate-then-apply returning
+   `{"ok": bool, "reason": ""|"silver"|"owned"}` — a refused option mutates NOTHING (the old
+   `maxi(..., 0)` clamp is gone: insufficient silver no longer buys "all you can afford").
+   Callers render the receipt — 「银两不足」 / 「此物已在行囊，无须再购」 — on both the map
+   TRAVEL and cultivation channels; the encounter still resolves and the month still advances,
+   so a refusal can never trap anyone.
+5. **Occlusion fixed presentation-only** (`scenes/segments/sect_select.tscn`,
+   `scenes/ui/tutorial_overlay.tscn`, `scenes/ui/roster_panel.tscn`): the theme round's taller
+   buttons (font 15 + content margins) had grown over fixed body text on three screens. The
+   sect body now wraps at 430 px (`offset_right` 320 → 110) with the button column moved right
+   (−120..120 → 130..370) — the Tang-Men row 「唐门 —— 内功 唐门心法(柔)· 外功 满天花雨(柔)」
+   renders fully again; the tutorial overlay's `Buttons` HBox had a broken anchor pair that
+   stretched 继续 into a 400×440 column over the body — completed to an honest 400×40 bottom
+   strip; the roster panel's 12 equip buttons moved into their own right-hand column clear of
+   the body label. Zero copy changes, zero font-scale changes, zero `.gd` changes in the fix
+   (`sect_select.gd` stayed byte-untouched).
+
+**The structural occlusion gate (new autoload):** `scripts/autoload/ui_occlusion_watch.gd`
+(registered as `UiOcclusionWatch` before the SceneManager-last entry) recomputes
+`violations` / `violations_text` every frame over the live tree: a visible Button drawn over a
+visible non-empty Label/RichTextLabel, same effective CanvasLayer, not ancestor/descendant,
+≥ 4 px overlap on both axes, residual visibility ≥ 0.5. The new scenario
+`occlusion_no_button_over_text.yaml` asserts `violations == 0` at the three
+historically-defective frames (red-first MEASURED: f158 `violations == 1`,
+`violations_text == "Next>Body"`, 5 greens).
+
+**Five new nails (differential, never tuned literals; all with MEASURED red-first four values
+consolidated in `final/delivery_notes_loop.md` §(a)):**
+
+| Nail | Pins | Red-first (frame / first assert / observed / greens before red) |
+|---|---|---|
+| `softlock_empty_practice_month_advances` | real-input boot (`debug_seed_save` seed + keyboard load + pure `ui_accept`, `debug_fast_forward` absent from the timeline) → `month == month_before_accept + 1`, `phase == "CARD_PICK"`, `status_text != ""` | f200 / month differential / observed `month == month_before_accept` / 9 |
+| `facility_use_cap_exhausted_zero_delta` | third press in one month: `silver == last_use_silver`, `attr_bone == last_use_attr_value`, `facility_use_count == 2`, receipt non-empty | f720 / `facility_use_count == 2` / observed 3 / 32 |
+| `map_node_event_revisit_no_resettle` | re-resolve of a settled pair: `attr_wisdom == last_apply_attr_value`, `last_effect_types` empty, count rung 4 (resolve → transit → re-resolve ×2; the count tracks RESOLUTIONS, not settlements), receipt non-empty | f200 / `last_effect_types` empty / observed `["silver", "item"]` / 29 |
+| `event_option_refused_no_charge` | owned-item purchase refused whole: `silver == event_open_silver`, `map_status_text != ""`, `last_effect_types` empty, count rung 1 (seeded via the whitelisted `debug_grant_equip` pipeline) | corrected-boot red: f470 / `last_effect_types.is_empty() == true` / observed `["silver", "item"]` with silver dipped exactly 20 (1830→1810) and no receipt, 8 greens before red → green 11/11 after the scene-boot fix |
+| `occlusion_no_button_over_text` | `UiOcclusionWatch.violations == 0` at the tutorial / sect-select / roster frames | f158 / `violations == 0` / observed 1 (`Next>Body`) / 5 |
+
+The two soft-lock-era nails that pinned the old dead-end (`gongfa_pick_empty_keyboard_return`,
+`clicks_only_gongfa_empty_exit` — not in the protected trio) were re-pointed with a documented
+change table (`final/delivery_notes_loop.md` §(b)): exit-frame asserts now expect CARD_PICK +
+the month differential + non-empty `status_text`; every other assert (incl. the empty-state
+proof `mastered_count == gongfa_count`) preserved verbatim. **No gate was weakened; the three
+protected yamls are byte-untouched** — gate (a) `facility_use_reusable` (0→1→2 across two
+entries, 49/49), gate (b) `map_node_event_shaolin` (its effect-bearing legs f460/f560 are
+first-time pairs `luoyang/merchant` and `shaolin/night_rain`; the repeat leg f630 asserts
+phase/count only — 32/32) and `map_battle_node_huashan` Leg F (41/41).
+
+**Verification status (honest, 2026-09-01, refreshed by the R2-fix consolidated layer):**
+implementation verified by direct read; per-scenario sidecar runs on the delivered tree are
+green (spine 42/42, gates (a)/(b) 49/49 / 32/32 / 41/41, all five new nails green after their
+measured reds — `final/gate_run_notes_loop.md`). **The surfaced guard conflict is RESOLVED
+(ruling applied, option (i): the ban is scoped to the timeline's actions):**
+`test_softlock_nail_contract` now parses the timeline with `yaml.safe_load` and asserts zero
+`debug_fast_forward` actions (the file's prose that legitimately quotes the token stays
+verbatim); the three index guards were repaired from an unsatisfiable absolute-index equality
+to the relative-order sync comparison `[n for n in order_names if n in ROUND_SCENARIOS] ==
+ROUND_SCENARIOS`; the purchase nail was re-booted to the contract-default `main.tscn`
+(corrected-boot red-first re-measured 8/11 → green 11/11); the `UiOcclusionWatch` crash root
+cause (`canvas_layer` read on a Control → 44,660 runtime errors in the CRASHED run, since
+SUPERSEDED by the reviewer) is fixed in-tree with the `scan_ok` / `scan_failed_frames`
+observables, so an unscanned frame can never read green. In-step pytest after the repairs
+measured 56/56 green. The consolidated 84-scenario single run, `compile_report.json`,
+`test_report.json` and `vision_report.json` (incl. the seven before/after occlusion frame
+pairs) remain downstream gate artifacts — pending, not counted as met.
+
+## Round: jinyong-theme — the UI finally looks designed (previous round, 2026-09-01)
+
+The theme layer existed only as a 7-line placeholder (`global_theme.tres`:
+default font + size 12) mounted globally at `project.godot:58`, so every screen
+outside the battle rendered engine-default buttons and left-aligned small text;
+three spots were measurably unreadable (roster panel fA/s4_frame_0052, tutorial
+page 1 fA/s2_frame_0158, battle hints + disabled 退回 fB/s2_frame_0210); and
+list focus was expressed only as a 2–3% brightness difference
+(`cultivation.gd:641`, modulate 1.0 vs 0.72).
+
+**What landed (presentation only — zero gameplay/copy/value changes, zero new
+art assets, zero i18n delta):**
+
+- **A real theme** (`assets/themes/global_theme.tres`, 124 lines,
+  `load_steps=8`): Button with four visually distinct StyleBoxFlat states plus
+  a cinnabar `draw_center=false` focus ring, all five font colors and size 15;
+  an **opaque** ink `Panel/styles/panel` (hairline paper-tan border, radius 3,
+  soft shadow, content margins) — which instantly gives the previously bare
+  `RosterBox` and tutorial `Panel` a real backing; Label color/size 14;
+  `RichTextLabel` default color; and two type variations for the hierarchy:
+  `TitleLabel` (26px warm gold) and `HintLabel` (12px muted + black outline,
+  the `hud.tscn` pattern hoisted into the theme). Every non-battle scene's
+  hint label now wears `HintLabel`; the tutorial title wears `TitleLabel`.
+- **压字 #1/#2 fixed structurally, not by alpha twiddling**: the opaque theme
+  panel is the information layer, and the scene dims were raised
+  (`roster_panel.tscn` RosterDim 0.55→0.85; `tutorial_overlay.tscn` Dim
+  0.5→0.88) so card buttons, blood bars and portraits stop bleeding through.
+  No z-order, layer, or coordinate changes anywhere.
+- **压字 #3**: `hud.tscn`'s two hint labels gained the `skill_button.tscn:48`
+  shadow pair verbatim (`font_shadow_color Color(0,0,0,0.85)` + offsets 1/1)
+  on top of their existing outlines; the theme's **opaque** disabled stylebox
+  plus a readable `font_disabled_color` make a disabled button read as
+  "unavailable", not "gone".
+- **A focus marker you can see**: `ThemeManager.option_style(focused)` returns
+  one of two cached, min-size-stable StyleBoxFlats (plain = the theme's
+  Button-normal geometry; focused = 3px cinnabar left bar + cinnabar border),
+  paired with `OPTION_FONT_FOCUS` / `OPTION_FONT_DIM`. The modulate ternary at
+  `cultivation.gd:641` is replaced by a stylebox+font-color swap in
+  `_rebuild_options_box`, and `sect_select.gd:84` adopts the same helper. New
+  published surface `CultivationScreen.focus_marker_active` + new differential
+  scenario `playtest/theme_focus_marker_cultivation.yaml` (the marker follows
+  the cursor; clicks still advance the phase; zero style/color literals), with
+  the measured red-first record (RED 12/14 at f110 `observed=false`,
+  greens-before-red 7; green 14/14 after byte-exact restore) in the scenario
+  header and `final/delivery_notes_theme.md` §2.
+
+Constraints honored: the six `jinyong-huashan` files stay untouched;
+script-styled battle widgets (skill buttons, health bars, round indicator)
+override the theme and keep every protected numeric surface. The frame-pair
+evidence table, alpha rationale and locked-file ledger are in
+`final/delivery_notes_theme.md`.
+
+**Official gate results + review fix (2026-09-01):** the official gates ran
+after implementation — compile **98/98 zero errors**; playtest hard gate
+`passed: true`, zero runtime errors, **78/79 PASS** with all five protected
+gates green (`ui_geometry_readability` 38/38, `skill_button_visual_states`
+9/9, `portrait_grid_alignment` 30/30, `spine_to_ending` 42/42,
+`equipment_in_battle_diff` 47/47) and the new differential nail
+`theme_focus_marker_cultivation` **14/14** (its red-first four-values are
+MEASURED: RED 12/14 at f110 `observed=false`, greens-before-red 7); the
+vision gate **passed** non-blind (79 scenarios / 316 frames, all six
+questions `failed: false`, Q6 78 good / 1 bad — the single bad answer on a
+non-theme battle frame). The one red, `creation_layout_readability` **21/22**
+(f90 `creation_box_fits` observed `false` — the D6-predicted global Label
+12→14 / Button 15 growth overflowing the fixed creation rect), was **fixed**
+by the review-prescribed fallback (`fix_creation_label_size_regression`):
+exactly 14 per-node `theme_override_font_sizes/font_size = 12` pins in
+`creation.tscn` (13 TraitToggles + TraitDescLabel; zero geometry, text, node
+or theme changes — the hierarchy is not shrunk globally), measured red-first
+**21/22 FAIL** → green **22/22** (same-frame pair: frame 90
+`creation_box_fits` false→true), then a full **79/79 PASS** re-run with zero
+runtime errors (`delivery_notes_theme.md` §7). Archive landed by 5_design
+from the gate artifacts: `40_ux_backlog` UX-22 → **CLOSED(jinyong-theme)**,
+UX-21 updated with its honest residual (`map.gd` locked + `creation.gd`
+Control rows), new **UX-31** tracks the regression and its fix;
+`99_changelog.md` carries exactly one appended jinyong-theme row. The
+post-fix official gate re-run (compile / playtest / vision / unit) is a
+downstream step product — see "Verification status (honest)".
 
 ## Round: jinyong-huashan — the Mount Hua summit duel is a real, fightable battle (previous round)
 
@@ -775,253 +1111,6 @@ zero keyboard):
   (creation-screen information layer), **jinyong-hud** (battle-HUD information
   layer), **jinyong-events** (event pool 4 → 16 rows), plus the owner's
   hand-added 华山 battle node. All recorded in `design/99_changelog.md`.
-
-## Requirements
-
-- Godot 4.x. No external dependencies, no build step.
-
-## Install
-
-```bash
-git clone <this repo> jinyong && cd jinyong
-# open project.godot in the Godot 4 editor (import happens automatically)
-```
-
-## Run
-
-Open the project in the Godot 4 editor and press Play — the game boots into
-the main menu (新的冒险 / 读取存档 / 设置 / 退出). Headless:
-
-```bash
-godot --path .
-```
-
-Flow: main menu → character creation (fixed 30-point budget: five attributes
-with live effect explanations and current HP; 13 innate trait/flaw toggles
-whose descriptions preview on hover; a confirm page listing the final values)
-→ tutorial battle as a fully mastered Yang Guo vs the Five Masters (you are
-meant to win) → tutorial-end overlay → transition → sect choice → 36-month
-cultivation → the jianghu map → tiered ending → restart. **The whole storyline
-is now playable with pointer/touch alone — every screen has a visible, tappable
-control** (main menu buttons; creation's plus/minus/toggle/nav buttons; the
-HUD's attack/end-turn/undo buttons; the overlay's 继续/重试; transition's 继续 ▶;
-the sect list; cultivation's option pool; the map's travel/event/facility
-buttons; the ending's 重新开始). The keyboard paths are unchanged and sit
-alongside: in battle the **camera follows the acting unit** and keeps it in the
-unobstructed band between the top bar and the action bar — left-click a
-highlighted empty tile to move, left-click an enemy (its own tile **or** the
-drawn portrait body of an enemy in reach) to attack, right-click **or the HUD
-「退回」 button** to retreat to the turn-start tile until you act (acting locks
-the move), 结束回合 to end the turn; each unit's nameplate rides at its portrait
-head and a gold ground marker marks the occupied tile; casting a move spends
-its inner-qi cost (内力: N in the top strip; a too-expensive move greys into
-「内力不足」; the free basic 重剑无锋 always stays available). On the map,
-左右/上下 cycle the adjacent nodes and 回车 travels (or tap `TravelButton{i}`);
-every mainline stop opens its node event on arrival (洛阳 车马过路 / 武当 全真抄经 /
-襄阳 降龙残谱; 无名谷 fires on the return trip; 少林 off the 洛阳 branch fires
-破庙夜雨) — resolve with 上下选择，回车定夺 or by tapping the option buttons. An event you
-have already resolved still re-appears on a return visit, but its effects settle once per
-session (the screen says 「此事已有了结，不再重来」); an option you cannot pay for, or whose
-item you already own, is refused whole — no silver moves and the screen explains why
-(「银两不足」 / 「此物已在行囊，无须再购」).
-**At 少林 and 武当 (the two sect nodes), press F — or tap the 进入设施 button — to
-enter the sect facility** (木人巷 / 紫霄静修): 回车 or the facility button uses it
-up to **2 uses per profile month** (pays silver, gains an attribute — the monthly
-counter resets with the calendar month; an exhausted attempt is refused on screen with
-「本月设施已用尽，下月再来」 and changes nothing),
-上下/离开 leaves. The travel hint shows a `门派设施：…（F 使用）` line when a
-facility is available at the current node. Entering 昆仑 routes straight to the
-tiered ending (end-node routing runs before entry content, so nothing can block
-it), and events fire only on travel — never on boot or load, so save/load
-roundtrips don't re-trigger.
-
-## Tests
-
-`run_tests.sh` drives the full Godot gate through the `godot-builder` sidecar
-(compile check → headless playtest of all scenarios → GDScript unit
-suite). It fails loudly when the sidecar is unreachable — the code then ships
-unverified, which is the intended behavior.
-
-```bash
-GODOT_BUILDER_URL=http://godot-builder:8080 ./run_tests.sh
-python3 -m pytest tests/   # static playtest-contract smoke (superset pin, copy-location guard with tr() call-site detection, keyboard-free pins incl. the gongfa empty-exit nail, touch surface contracts, loop-round nail contracts)
-godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite (28 files)
-godot --headless --path . -s res://tests/test_touch_option_surface_gate.gd  # property-based touch-coverage gate (traverses the cultivation/map/sect_select phase machines)
-godot --headless --path . -s res://tests/test_game_manager_fsm.gd  # SceneTree-style suites
-```
-
-## Key interfaces
-
-- **R2 loop rules** (jinyong-loop round): `EventLogic.validate_option(profile, opt) -> String`
-  (`""` deliverable / `"silver"` / `"owned"` — pure arithmetic, no mutation, no RNG draw) and
-  `EventLogic.apply_option_effects(...) -> Dictionary` (`{"ok", "reason"}`, validate-then-apply:
-  a refused option mutates nothing); `map.gd FACILITY_MONTHLY_USE_CAP = 2` with the GameManager
-  session mirrors `facility_use_month` / `facility_use_count_this_month` /
-  `settled_node_events` (plus `is_node_event_settled` / `settle_node_event`, reset on
-  `SaveManager.profile_created` / `loaded`); new observables
-  `CultivationScreen.month_before_accept` / `status_text`,
-  `MapScreen.map_status_text` / `event_open_silver` / `last_use_silver` /
-  `last_use_attr_value` / `last_apply_attr_value`, and `UiOcclusionWatch.violations` /
-  `violations_text`; the five new differential scenarios (`softlock_empty_practice_month_advances`,
-  `facility_use_cap_exhausted_zero_delta`, `map_node_event_revisit_no_resettle`,
-  `event_option_refused_no_charge`, `occlusion_no_button_over_text`) plus the two re-pointed
-  empty-exit nails; new strings keyed in the i18n EN dictionary.
-- **Theme layer & focus marker** (jinyong-theme round): the global theme
-  `assets/themes/global_theme.tres` (mounted at `project.godot:58`) defines
-  Button (normal/hover/pressed/disabled + focus overlay, 5 font colors),
-  Panel, Label, RichTextLabel, and the `TitleLabel`/`HintLabel` type
-  variations; `ThemeManager.option_style(focused: bool) -> StyleBoxFlat`
-  (two cached, never-mutated boxes with identical geometry so min-size is
-  stable) + `OPTION_FONT_FOCUS` / `OPTION_FONT_DIM` drive the script-cursor
-  marker in `cultivation.gd _rebuild_options_box` and `sect_select.gd`; new
-  observable `CultivationScreen.focus_marker_active` (true iff the focused row
-  wears the focused stylebox) in `playtest/_common.yaml`, exercised by the
-  differential scenario `theme_focus_marker_cultivation.yaml` and pinned in
-  `tests/test_playtest_contract_smoke.py`.
-- **Map-battle entry & decoupling** (jinyong-huashan round):
-  `GameManager.map_battle_id` (`get_map_battle_id()` / `set_map_battle_id()`) —
-  the build-source signal, decoupled from `battle_return_state` (which is now
-  the return target only); `GameManager.start_map_battle(battle_id)` writes the
-  id before any swap fires; `MapBattleData.roster_ids(battle_id)` /
-  `MapBattleData.position_for(battle_id, name_key)` resolve the opponent roster
-  and spawn tiles (`huashan_duel` → the five greats); `battlefield.
-  _setup_map_battle(bid)` is the profile-build sibling of
-  `_setup_encounter_battle` (guards → `tutorial_battle = false` →
-  `BattleSetup.build_character(SaveManager.profile)` → own-ai_map enemies →
-  sync HUD wire → deferred `begin_battle`); `GameManager.
-  map_events_resolved_count` mirrors MapScreen's session counter across the
-  battle swap (reset on `SaveManager.profile_created` / `loaded`); playtest
-  surface additions `map_battle_id` / `map_events_resolved_count`.
-- **Touch-single-surface controls & observables** (2026-08-30 round): buttons
-  are the sole option surface in cultivation / map / sect_select — selection is
-  the button's own `modulate` (bright focused / dim rest), arrow keys move the
-  focus var the highlight follows; `GONGFA_PICK` with an empty unmastered list
-  offers the single `CultOptionButton0` 「返回行动」 → the same
-  `_on_accept` empty branch → `ACTION_PICK`; observables
-  *(exit behavior superseded 2026-09-01 by the jinyong-loop R2 soft-lock fix: the empty
-  exit is now 「度过本月」 → ATTR_PICK + `_after_action()`, the month advances — see the
-  R2 loop-rules bullet above.)*
-  `cursor_markers_visible` (cultivation / map / sect_select), `option_focus` /
-  `focused_option_text` (cultivation); scenarios
-  `clicks_only_gongfa_empty_exit.yaml` (clicks-only, phase-diff nail) +
-  `gongfa_pick_empty_keyboard_return.yaml` (keyboard twin); coverage gate
-  `tests/test_touch_option_surface_gate.gd` (traverses the phase machines).
-- **Touch-reach controls & observables** (touch-reach round): overlay
-  `Panel/ContinueButton` / `Panel/RetryButton` in
-  `GameManager._show_end_game_overlay` (delegates to `request_continue` /
-  `request_retry`; keyboard branch byte-identical) with the
-  `GameManager.end_overlay_pressed_connected` observable; segment buttons
-  `NextButton` (transition), `SectButton0..4` (sect_select),
-  `CultOptionButton{i}` (cultivation, dynamic per-phase pool in `OptionsBox`),
-  `TravelButton{i}` / `EventOptionButton0/1` / `FacilityEnterButton` /
-  `FacilityUseButton` / `FacilityLeaveButton` (map), `RestartButton` (ending) —
-  each with `pressed_connected` published on its screen; every button is
-  `focus_mode = FOCUS_NONE` and delegates to the same handler its keyboard
-  shortcut calls.
-- **Equipment system** (jinyong-equipment-battle round): `PlayerProfile.equipped`
-  (three String-keyed slots) with `equipped_id(slot)` / `equip(slot, id)` /
-  `unequip_slot(slot)` — `equip` returns `false` unless the id is in
-  `inventory` and its category matches the slot; `scripts/data/equipment_data.gd`
-  (pure statics `slot_of` / `tier_of` / `bonuses_for` / `sum_bonuses`, five
-  category constants, defensive tier parse); `BattleSetup.derive_stats`
-  consumes `sum_bonuses(profile.get("equipped"))` so an empty/legacy profile
-  is bit-identical to the base formulas; `CharacterData.gear_*_bonus` mirrors
-  expose the bonuses to battle; RosterPanel publishes
-  `equipped_weapon/armor/boots`, `equip_button_count`,
-  `equip_pressed_connected` and drives the 装/卸 pool
-  (`EquipButton{i}`, `focus_mode = 0`); playtest surface: those RosterPanel
-  observables + `Player.gear_attack_bonus/gear_health_bonus/
-  gear_initiative_bonus/gear_move_bonus` in `playtest/_common.yaml`.
-- **Camera ownership** (`scripts/camera_follower.gd`, attached to the
-  `Camera` node of `main.tscn` / `menu.tscn`): follows
-  `CombatManager.get_active_unit()` during `STATE_BATTLE`, clamps to the
-  no-blank range derived from `GridManager.board_rect()` + viewport + HUD
-  rects, and publishes the playtest surface `Camera.camera_position`,
-  `camera_x_lo/hi`, `camera_y_lo/hi`, `hud_band_top/bottom`,
-  `active_unit_screen_y`, `active_unit_world_y`, `viewport_half_y`,
-  `follow_target_id`, `follow_target_is_active`.
-- **Coordinate mapping** (`scripts/coord.gd`, `class_name Coord`): pure
-  statics `world_to_screen(world, viewport)` / `screen_to_world(screen,
-  viewport)` over the **canvas** transform (the one that contains the
-  camera). The health-bar follow and the follower's published screen y both
-  go through it; click entries already map through
-  `get_canvas_transform().affine_inverse()`.
-- **Autoload singletons** (`scripts/autoload/`): `GameManager` (scene flow,
-  `get_player()`, `get_enemies_alive()`, the end-game overlay +
-  `end_overlay_pressed_connected`), `CombatManager` (battle state:
-  `tutorial_battle`, `current_round`, `phase`, `is_player_turn()`,
-  `get_active_unit()`, the qi spend path `spend_unit_energy(unit, cost)` +
-  the `debug_spend_player_qi()` drain fixture), `GridManager` (grid /
-  movement planning, `world_to_grid` / `grid_to_world` / **`board_rect()`**),
-  `SaveManager` (profile, slots, `rng`, autosave), `InputGate` (real-input
-  gate — inert unless the env var `AITELIER_INPUT_GATE_REPORT` is set).
-  `SceneManager` must stay the LAST autoload entry (compile ordering).
-- **Alignment observables** (`player.gd` / `enemy.gd`): `portrait_ink_rect`,
-  `ink_world_dx` / `ink_world_dy`, `camera_offset_y`, `sprite_top`,
-  `portrait_sprite_pos` / `portrait_tex_size` / `portrait_bar_pos` /
-  `health_bar_screen_y` / `health_bar_world_y`, plus the input-differential
-  counters (`debug_input_events`, `debug_click_events`,
-  `debug_right_input_events`, `debug_undo_events`, `debug_gui_eater`,
-  `Enemy.debug_click_target_fires`).
-- **Battle click priority**: `Player.resolve_click_step(...) -> int` and
-  `Player.attack_reach_covers(...) -> bool` — pure statics implementing the
-  5-step rule (own-tile enemy → attack; in-reach body → attack; reachable
-  empty tile → move; out-of-reach body → select/no-op; own tile no-op),
-  unit-pinned by `tests/test_click_priority.gd` against the unclamped
-  geometry.
-- **Floating health bar** (`scripts/ui/health_bar.gd`,
-  `scenes/ui/health_bar.tscn`): follows its unit through
-  `Coord.world_to_screen`; above-portrait anchor with a flip below the ink
-  bottom for top-band units; every node in the subtree is
-  `mouse_filter = IGNORE` so it can never eat a board click. Observables:
-  `bar_width/height/top/bottom`, `hp_text`, `hp_value`, `hp_max`,
-  `hp_text_width_ok`, `empty_area_px`, `empty_cap_px`.
-- **Ground markers** (`scripts/ui/tile_markers.gd`): click-inert Node2D
-  overlay painting one ellipse per living unit; observables
-  `tile_marker_count` / `tile_marker_visible`.
-- **Creation / map / events / qi costs / facility**: `creation.gd` (`phase`,
-  `points_left`, `attrs`, `trait_ids`, `trait_index`, `trait_hover_index`,
-  `hp_value`/`hp_text`, `confirm_summary_text`, `pressed_connected`);
-  `MapData.NODES` entry-content + `active_event_id` / `active_battle_id` /
-  `active_facility_id` / `declared_gap_types`, `MapScreen` EVENT + FACILITY
-  phase + `pressed_connected`; `EventLogic` pure statics over
-  `EventData.TABLE` (36 rows — 16 frozen + 20 added 2026-08-31;
-  `draw_unseen_id` draws unseen ids and only resets when the pool is
-  exhausted, so a 36-month all-roam journey never resets); `FacilityData.TABLE` (2 rows) +
-  `silver_cost()` / `for_node()` / `def(id)`; `SkillData.cost` /
-  `insufficient_energy` / `spend` with `Player.energy` / `energy_max`.
-- **i18n** (`scripts/autoload/i18n.gd`): the EN dictionary is the copy
-  contract — the overlay keys are the exact call-site literals
-  (`胜利！华山论剑的胜者！\n\n点击「继续」进入江湖` / `战败于华山论剑\n\n点击「重试」再战`)
-  and every new button label (重试 / 重新开始 / 进入设施 / 离开) is keyed;
-  `tests/test_i18n_coverage.py` keeps lookups honest.
-- **Playtest contract** (the project's test "API"): `playtest/_common.yaml`
-  declares the scene, the allowed actions (incl. debug injections and
-  `use_facility` / `debug_grant_silver` / `debug_grant_equip` /
-  `debug_seed_events_seen`), the
-  observable-surface whitelist
-  (incl. the twelve new touch-reach button blocks and the six
-  `pressed_connected` vars) and `scenario_order`; each `playtest/*.yaml` is
-  one scenario (name == basename, single-integer `at:`, a comparison operator
-  or changed/unchanged token on every assert line). `clicks:` entries are
-  `<Node>[ +dx,dy][ left|right|middle]` — a **true GUI hit test** (aim at the
-  control/unit body, never a `*_ClickTarget`); `hovers:` are motion-only.
-  84 scenarios (the theme round's 79 + this round's five loop nails), including the keyboard
-  spine `spine_to_ending.yaml`, the
-  clicks-only storyline spine `clicks_only_storyline.yaml`, the facility
-  click companion `map_facility_buttons_click.yaml`, and the no-repeat
-  proof `event_pool_new_event_resolved.yaml` (a NEW travel event drawn,
-  rendered, selected and resolved on screen).
-- **Unit tests**: GDScript files with a top-level `static func run() -> bool`
-  are collected by `tests/unit_test_runner.gd`'s explicit append-only `TESTS`
-  registry (28 files), run headless. SceneTree-extending integration suites
-  (`test_game_manager_fsm.gd` — extended this round with the overlay-button
-  wiring pins — and friends) are driven with their own `-s` invocation. The
-  pytest smoke (`tests/test_playtest_contract_smoke.py`) statically pins the
-  scenario contract, the two-place sync, the "assertions only added" rule,
-  the facility anti-deletion pin, the **keyboard-free pin** and the
-  **touch-reach surface contract**. `tests/test_facility_copy_location.py`
-  guards the §433 copy-location rule.
 
 ## Verification status (honest)
 
