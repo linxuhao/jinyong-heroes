@@ -910,8 +910,8 @@ PASS**(`map_battle_node_huashan` **41/41**;硬闸门 `passed: true`、`spec_used
 
 owner 裁定:屏幕上不再出现人名,所有角色一律用**带虾字的外号**。本块是唯一被
 允许引用旧人名的位置(denylist 钉子 `tests/test_display_no_personal_names.py`
-只跳过 `<!-- nickname-ruling-record -->` … `<!-- nickname-ruling-record-end -->`
-之间的行,故本块必须保持成对闭合,块外不得再出现任何旧人名)。
+只跳过本块首尾那对 HTML 注释标记(start/end marker)之间的行,故本块必须
+保持成对闭合,块外不得再出现任何旧人名)。
 
 zh 命名表(owner 逐字定,不外传、不改写):
 
