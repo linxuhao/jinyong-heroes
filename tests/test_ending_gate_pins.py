@@ -12,8 +12,11 @@ scenario proves a distinct "choices change the outcome" fact:
                                      grant (the other three are == 0)
   * `huashan_readiness_warning`    — the readiness verdict STRING differs after
                                      growth (never a power literal)
-  * `huashan_winnable_normal_route`— a normal route WINS the duel and the fight
-                                     was real (health < max_health)
+  * `huashan_winnable_normal_route`— a normal route fights the duel for real
+                                     (health < max_health) and the measured end
+                                     state is pinned honestly (LOST per the
+                                     2026-09-03 owner re-scope ruling); the WIN
+                                     is carried to the world-breadth round
 
 Differential assertions can be silently deleted — and the deletion itself must go
 red. This file is a pure text door in the same style as
@@ -70,9 +73,13 @@ SCENARIO_LOAD_BEARING_LINES: dict[str, tuple[str, ...]] = {
         'readiness_text != "华山评估：战备不足"',
     ),
     "huashan_winnable_normal_route": (
-        # WIN -> MAP return, and the fight was real (not a full-HP trivial win).
-        'current_state == "WON"',
+        # Honest-LOST end state (2026-09-03 owner re-scope ruling): the fight
+        # was real (health < max_health) and the measured end state is pinned
+        # honestly (LOST + RetryButton overlay). The WIN is carried to the
+        # world-breadth round with the 36/48 baseline.
+        'current_state == "LOST"',
         "health < max_health",
+        "RetryButton.visible",
     ),
 }
 

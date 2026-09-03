@@ -1058,6 +1058,23 @@ brief。**红 WIN 断言不可接受,诚实 LOST 钉可接受**;诚实-LOST 结�
 动机以更优方式满足(硬闸门 PASS + 0 runtime error,零断言改动)。依据见
 `final/delivery_notes_r3c_restore_huashan_scenario.md`。
 
+## R3b C5 — 诚实-LOST 收口(2026-09-03,项目所有者裁定,goal-loop iteration 4)
+
+**背景**:R3c WIN 裁决(上行)授予的解锁范围落地后仍不足以让玩家侧真实技能赢下华山
+——官方 2026-09-03 复跑实测 `huashan_winnable_normal_route` **36/48**(决定性红 f2100
+`current_state` 观测 `LOST`、`Player.health` 观测 0、`ContinueButton.visible` 观测 false;
+f1200 回合预测观测 `ENEMY_TURN` / West Poison / `EndTurnButton.disabled`;f1600 C4 边界
+表达式 `current_round >= 3 and Player.health > 0` 报 `Invalid named index 'Player'`;f2140/f2220
+MAP-return 断言观测 LOST / battlefield / `map_battle_id "huashan_duel"`;红前绿 35)。本裁决
+**追加**于 R3c WIN 裁决之后,按 goal-loop iteration 4 重划 C5 的 R3b 交付物,不改动既有行。
+
+**裁定**:C5 的 **WIN 由所有者重划出 R3b**;诚实 LOST 钉(英雄 HP、到达回合、哪位五绝、
+四个实测值)是 **R3b 的 C5 交付物**;WIN 携 **36/48 基线**移入 world-breadth 轮。场景的
+end-frame 断言钉**实测的 LOST 终态**(`current_state == "LOST"` + `health < max_health` +
+`RetryButton.visible`),`tests/test_ending_gate_pins.py` 中该场景的门条目**在同一改动里重推导**
+为诚实-LOST 形式;五绝数据与解锁杠杆保持锁定。红 WIN 断言不可留在文件里;诚实 LOST 钉是
+裁决的诚实形态,不是绿洗。
+
 ## R3c — 带裁决(C4,2026-09-02,项目所有者裁定,goal-loop iteration 3)
 
 **背景**:C4 验收 (a) 的「creation-fresh」此前被误读为 M3' 的五围 10 假设;实际创建
