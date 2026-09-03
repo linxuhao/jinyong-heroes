@@ -1131,3 +1131,56 @@ MAP(华山)战斗复用教程战场、从不调 `build_character(profile)`,差�
   共同承载七组修前/修后同帧对照(5 拜师 + 教程 s15_frame_0072 + 角色页
   s75_frame_0110)。`40_ux_backlog.md` **UX-32 → CLOSED(jinyong-loop)**。
 
+## Card 0 — Enemy-turn wall-clock (2026-09-03)
+
+### Instrumentation
+Three additive, never-reset observables added to `CombatManager`
+(`scripts/autoload/combat_manager.gd`):
+- `debug_enemy_turn_msec` — wall-clock ms of the most recently completed single enemy turn.
+- `debug_enemy_round_msec` — wall-clock ms from the first enemy turn's start to the last enemy turn's end within one contiguous enemy run.
+- `debug_enemy_turn_index` — count of completed enemy turns.
+
+Console prints (readable in the browser devtools of the HTML5 build without the
+playtest harness): `enemy_turn <character_name> <msec>` per turn,
+`enemy_round <msec>` per round. The label is the internal `character_name`
+(e.g. `East Heretic`), NOT the on-screen display name.
+
+### Wait-shortening (C5.4)
+The pause-gate poll in `_next_turn()`'s enemy branch was changed from
+`await get_tree().process_frame` (frame-counted; scales with web fps) to
+`await get_tree().create_timer(0.05, true).timeout` (wall-clock; does not
+scale). The `TWEEN_TIMEOUT_SEC = 0.25` watchdog and `_await_tween_safe()`
+mechanism are unchanged. No AI decision logic, no combat numbers, no second
+timing system.
+
+### Camera audit (C5.4)
+`scripts/camera_follower.gd` uses `position_smoothing_enabled = false` and
+`_snap()` on `turn_started` / `phase_changed` — the camera is a **snap, not a
+serial pan tween**. No parallelization is needed or possible; there is no pan
+tween to parallelize. This is recorded as the C5.4 audit conclusion.
+
+### Local measurements (deterministic harness)
+The harness is deterministic: SaveManager owns a single seeded
+`RandomNumberGenerator`; scenarios use fixed frame numbers with no per-scenario
+seed knob. Three natural variants were probed (not 3 seed runs):
+
+| Variant | end_turn frame | Observed round_msec | Observed turn_msec | Index |
+|---|---|---|---|---|
+| Round-1 handover | f20 | **1792 ms** | **659 ms** | 10 |
+| Round-2 handover | f400 | **1417 ms** | **583 ms** | 15 |
+| Post-skill handover (skill_1 then end_turn) | f30 | **1600 ms** | **499 ms** | 10 |
+
+All within the pin's bounds (round ≤ 10 000 ms, turn ≤ 2 000 ms). The local
+pin is green by construction (~240 frames ≈ 4 s at 60 fps); the 2026-09-02 web
+report (20–40 s/enemy) is the red evidence.
+
+### Web measurement
+**Web wall-clock not measured here; owner playtest will read the console.**
+The container has no Godot binary (run_tests.sh documents Godot lives only in
+the godot-builder sidecar), so an in-browser measurement is impossible in-round.
+The console prints ship in `combat_manager.gd` (committed); the publish pipeline
+(`.github/workflows/pages.yml`, trigger: push to master + workflow_dispatch,
+checkout: actions/checkout@v4 of the pushed ref, preset: "Web", export path:
+build/web/index.html) builds from HEAD on every push — pushing this round's
+commits to master publishes the fresh build containing the new timing code.
+

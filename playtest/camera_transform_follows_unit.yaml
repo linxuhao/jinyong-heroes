@@ -147,3 +147,19 @@ timeline:
     Camera.active_unit_screen_y: active_unit_screen_y - active_unit_world_y == viewport_half_y - camera_position.y
     Player.health_bar_screen_y: abs((health_bar_screen_y - health_bar_world_y) - camera_offset_y) <= 1.0
     Camera.camera_position: camera_position.y >= camera_y_lo and camera_position.y <= camera_y_hi
+# ── POST-PAN LEG (Card 0, 2026-09-03): hand the round to the enemy run and
+# prove that after the camera snaps onto a top-band enemy, UiOcclusionWatch
+# stays clean and the health bar's top-band flip is engaged. The camera is a
+# snap (position_smoothing_enabled=false, _snap() on turn_started — no serial
+# pan tween), so the first frame of the enemy turn is already the settled frame.
+# f270 is probed: a top-band enemy is the active unit (bar_anchors_below_portrait
+# == true proves the flip is engaged), the camera has snapped, and no UI element
+# is clipped. ──
+- {at: 160, actions: [end_turn]}
+- at: 270
+  actions: []
+  assert:
+    CombatManager.phase: phase == "ENEMY_TURN"
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+    HealthBar.bar_anchors_below_portrait: bar_anchors_below_portrait == true
