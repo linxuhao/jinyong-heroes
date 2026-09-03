@@ -178,6 +178,17 @@ var last_action_silver: int = 0
 ## Non-empty for all four kinds; tr() at the assignment site.
 var last_yield_text: String = ""
 
+## Surface: the data-composed consequence of the currently focused option
+## (C1: show the consequence BEFORE the choice is committed). Composed by
+## _consequence_text from CardData / EventData / ProgressionGongfaData /
+## ProgressionMath — never hand-written literals; republished by _render().
+var consequence_text: String = ""
+
+## Surface: computed boolean — true ONLY when consequence_text was actually
+## composed from the focused item's data fields (false for empty option
+## tables, unknown ids, and the neutral menu rows). Never unconditionally true.
+var consequence_matches_focus: bool = false
+
 ## Surface: the gongfa id the last 练功 action targeted ("" when none).
 var last_practice_target: String = ""
 
@@ -848,12 +859,16 @@ func _rebuild_options_box() -> void:
 	match phase:
 		"YEAR_AUGMENT":
 			for c in _yearly_cards:
-				labels.append(_card_button_label(c))
+				labels.append(_card_button_label_with_effects(c))
 		"CARD_PICK":
 			for c in _monthly_cards:
-				labels.append(_card_button_label(c))
+				labels.append(_card_button_label_with_effects(c))
 		"ACTION_PICK":
-			var action_labels: Array[String] = ["练功（+2 所选功法）", "修习（属性 +1~3）", "做工（银两随做工月数递增）", "游历（事件与物品）", "存盘", "读档", "删档"]
+			# C1: the 做工 row carries its EXACT this-month number, composed
+			# from ProgressionMath.work_income (input = the deed value BEFORE
+			# increment — the same source the action itself pays from).
+			var work_income_now: int = ProgressionMath.work_income(SaveManager.profile.get_deed("work_months"))
+			var action_labels: Array[String] = ["练功（+2 所选功法）", "修习（属性 +1~3）", tr("做工（本月 银两 +%d）") % work_income_now, "游历（事件与物品）", "存盘", "读档", "删档"]
 			for label in action_labels:
 				labels.append(tr(label))
 		"GONGFA_PICK":
@@ -937,6 +952,150 @@ func _card_button_label(card: Dictionary) -> String:
 		tr(str(card.get("display_name", ""))),
 		_category_label(str(card.get("category", ""))),
 	]
+
+
+## C1: card button label WITH the data-composed effect suffix, always visible
+## (the touch path — no hover needed). Composed from CardData fields only.
+func _card_button_label_with_effects(card: Dictionary) -> String:
+	var base: String = _card_button_label(card)
+	var eff: String = _card_effect_suffix(card)
+	return base + (" · " + eff if eff != "" else "")
+
+
+## Effect suffix for a card row, composed from its effect fields (the same
+## token set the consequence renderer emits: 银两 / 得「…」 / attr+N / 修习 /
+## 机缘 / 顿悟 / 神功). "" for an unrecognised effect_type.
+func _card_effect_suffix(card: Dictionary) -> String:
+	var t: String = str(card.get("effect_type", ""))
+	var v: int = int(card.get("effect_value", 0))
+	var target: String = str(card.get("effect_target", ""))
+	match t:
+		"silver":
+			return tr("银两 +%d") % v
+		"item":
+			var nm: String = CardData.display_name_of(target)
+			return tr("得「%s」") % (nm if nm != "" else target)
+		"attr":
+			return tr("%s +%d") % [_attr_label(target), v]
+		"practice":
+			return tr("修习 +%d") % v
+		"trait":
+			return tr("机缘")
+		"tech_unlock":
+			return tr("顿悟")
+		"shen_gong":
+			return tr("神功")
+	return ""
+
+
+## Event option effects line (cost + gain), composed from EventData option
+## effect fields. A negative silver delta shows as a COST, and when the cost
+## exceeds the current silver the 银两不足 warning is part of the consequence —
+## visible BEFORE the click (C1 red: the cost used to surface only on commit).
+func _event_effects_text(opt) -> String:
+	var parts: Array[String] = []
+	for eff in opt.get("effects", []):
+		var t: String = str(eff.get("type", ""))
+		var v: int = int(eff.get("value", 0))
+		var target: String = str(eff.get("target", ""))
+		match t:
+			"silver":
+				if v < 0:
+					var cost: String = tr("银两 −%d") % (-v)
+					if silver < -v:
+						cost += tr("，银两不足")
+					parts.append(cost)
+				else:
+					parts.append(tr("银两 +%d") % v)
+			"item":
+				var nm: String = CardData.display_name_of(target)
+				parts.append(tr("得「%s」") % (nm if nm != "" else target))
+			"attr":
+				parts.append(tr("%s +%d") % [_attr_label(target), v])
+			"practice":
+				parts.append(tr("修习 +%d") % v)
+	if parts.is_empty():
+		return ""
+	var out: String = parts[0]
+	for i in range(1, parts.size()):
+		out += " · " + parts[i]
+	return out
+
+
+## C1 renderer — composes the focused option's consequence FROM DATA ONLY.
+## Returns [text, data_bound]: data_bound feeds the computed boolean
+## consequence_matches_focus (true only when real data fields were read for
+## the focused item; false for the neutral menu rows / empty tables).
+func _consequence_result(p: String, index: int) -> Array:
+	match p:
+		"YEAR_AUGMENT", "CARD_PICK":
+			var pool: Array = _yearly_cards if p == "YEAR_AUGMENT" else _monthly_cards
+			if index < 0 or index >= pool.size():
+				return ["", false]
+			return [_card_effect_suffix(pool[index]), true]
+		"ACTION_PICK":
+			if index == 0:
+				return [tr("练功：本月在所选功法上 +%d 练度") % PRACTICE_ACTION_GAIN, true]
+			if index == 2:
+				return [tr("做工：本月 银两 +%d") % ProgressionMath.work_income(SaveManager.profile.get_deed("work_months")), true]
+			if index == 1:
+				return [tr("修习：任选属性 +1~3"), false]
+			if index == 3:
+				return [tr("游历：遇事定夺，或掷重择"), false]
+			if index == 4:
+				return [tr("存盘：把本月至此的进度写盘"), false]
+			if index == 5:
+				return [tr("读档：载入已存档的进度"), false]
+			if index == 6:
+				return [tr("删档：删除已有存档（再按一次确认）"), false]
+			return ["", false]
+		"GONGFA_PICK":
+			var ids: Array[String] = _unmastered_ids()
+			if ids.is_empty():
+				return [tr("功法均已大成"), false]
+			if index < 0 or index >= ids.size():
+				return ["", false]
+			var gid: String = ids[index]
+			var entry: Dictionary = SaveManager.profile.get_gongfa(gid)
+			var need: int = int(ProgressionGongfaData.PRACTICE_TO_MASTER.get(entry.get("grade", "D"), 4))
+			return [tr("练功目标：大成需练度 %d（当前 %d/%d）") % [need, int(entry.get("practice", 0)), need], true]
+		"EVENT":
+			var def = EventData.def(event_id)
+			if def == null:
+				return ["", false]
+			var opt = def.option_a if index == 0 else def.option_b
+			return [_event_effects_text(opt), true]
+		"YEAR_END":
+			var grades: Array = ProgressionGongfaData.GRADE_BY_YEAR
+			var next_grade: String = str(grades[mini(year + 1, grades.size()) - 1])
+			if index == 0:
+				return [tr("留在本门：来年授艺品级 %s") % next_grade, true]
+			if index == 1:
+				return [tr("另投他派：保留已学功法；来年授艺品级来自新门派（%s）") % next_grade, true]
+			return ["", false]
+		"SECT_SWITCH":
+			var rows: Array = ProgressionGongfaData.SECTS
+			if index < 0 or index >= rows.size():
+				return ["", false]
+			var row: Dictionary = rows[index]
+			var grades2: Array = ProgressionGongfaData.GRADE_BY_YEAR
+			var ng: String = str(grades2[mini(year + 1, grades2.size()) - 1])
+			return [tr("%s：保留已学功法；来年授艺品级 %s") % [tr(str(row["display_name"])), ng], true]
+	return ["", false]
+
+
+## Public-shaped wrapper (contract: _consequence_text(phase, index) -> String).
+func _consequence_text(p: String, index: int) -> String:
+	return str(_consequence_result(p, index)[0])
+
+
+## Republish the consequence observables from the CURRENT phase + focus. Called
+## at the tail of _render() — the single funnel every focus change goes through
+## (keyboard _cycle_focus and the initial CARD_PICK render included).
+func _sync_consequence() -> void:
+	var res: Array = _consequence_result(phase, _focused_index_for_phase())
+	consequence_text = str(res[0])
+	consequence_matches_focus = bool(res[1])
 
 
 # ---------------------------------------------------------------------------
@@ -1268,6 +1427,9 @@ func _render() -> void:
 	# including the box==null / empty-box paths, so this mirror stays in sync
 	# with the stylebox the focused row actually wears.
 	focus_marker_active = focused_option_text != ""
+	# C1: the consequence of the focused option is republished here because the
+	# keyboard nav path (_cycle_focus -> _render) never calls _sync_surface.
+	_sync_consequence()
 
 
 ## The active phase's focus index — the button row that is highlighted. A pure

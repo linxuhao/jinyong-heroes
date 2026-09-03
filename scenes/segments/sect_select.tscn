@@ -49,6 +49,21 @@ mouse_filter = 2
 horizontal_alignment = 1
 text = "上下选择 · 回车拜入"
 
+[node name="SectConsequenceLabel" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = 215.0
+offset_right = 110.0
+offset_bottom = 300.0
+mouse_filter = 2
+autowrap_mode = 3
+clip_text = true
+text = ""
+
 [node name="SectButton0" type="Button" parent="."]
 anchors_preset = 8
 anchor_left = 0.5

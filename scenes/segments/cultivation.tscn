@@ -56,4 +56,14 @@ offset_right = 950.0
 offset_bottom = 620.0
 mouse_filter = 2
 
+[node name="ConsequenceLabel" type="Label" parent="."]
+offset_left = 120.0
+offset_top = 578.0
+offset_right = 600.0
+offset_bottom = 644.0
+mouse_filter = 2
+autowrap_mode = 3
+clip_text = true
+text = ""
+
 [node name="RosterPanel" parent="." instance=ExtResource("2")]

@@ -765,6 +765,8 @@ surface:
   - attr_cost_text
   - attr_step_cost
   SectSelectScreen:
+  - consequence_text
+  - consequence_matches_focus
   - focus_index
   - selected_sect_id
   - visible
@@ -772,6 +774,8 @@ surface:
   - pressed_connected
   - cursor_markers_visible
   CultivationScreen:
+  - consequence_text
+  - consequence_matches_focus
   - year
   - month
   - sect_id
@@ -1005,6 +1009,11 @@ surface:
   - size
   - mouse_filter
   - text
+  CultOptionButton1:
+  - visible
+  - size
+  - mouse_filter
+  - text
   CultOptionButton2:
   - visible
   - size
@@ -1202,3 +1211,9 @@ scenario_order:
 - enemy_turn_wall_clock
 - enemy_action_feedback
 - trait_point_cost_visible
+- consequence_card_pick_focus
+- consequence_event_option_visible
+- consequence_sect_select_focus
+- consequence_work_income_inline
+- consequence_year_end_switch
+- consequence_gongfa_goal_mastery_grant

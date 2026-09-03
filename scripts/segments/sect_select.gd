@@ -17,6 +17,15 @@ var pressed_connected: Dictionary = {}
 ## (false means the duplicated keyboard-cursor option list is gone).
 var cursor_markers_visible: bool = false
 
+## Surface: the data-composed consequence of the focused sect (C1): the sect's
+## internal/external base arts + the three-year teaching grade ladder, composed
+## from ProgressionGongfaData.SECTS / GRADE_BY_YEAR — never hand-written.
+var consequence_text: String = ""
+
+## Surface: computed boolean — true only when the text was composed from the
+## focused sect's data row (false for an out-of-range focus).
+var consequence_matches_focus: bool = false
+
 
 func _ready() -> void:
 	_wire_sect_buttons()
@@ -88,3 +97,27 @@ func _render() -> void:
 			btn.add_theme_stylebox_override("normal", ThemeManager.option_style(focused))
 			btn.add_theme_color_override("font_color", ThemeManager.OPTION_FONT_FOCUS if focused else ThemeManager.OPTION_FONT_DIM)
 	cursor_markers_visible = body.text.contains("▶")
+	# C1: republish the focused sect's consequence (focus changes always route
+	# through _render(): _on_sect_pressed and move_up/move_down alike).
+	consequence_text = _consequence_text(focus_index)
+	consequence_matches_focus = consequence_text != ""
+
+
+## C1 renderer: consequence of the sect at focus_index, composed FROM DATA
+## ONLY — display_name / internal_base / external_base from
+## ProgressionGongfaData.SECTS, the three-year teaching grade ladder from
+## ProgressionGongfaData.GRADE_BY_YEAR. "" for an out-of-range focus.
+func _consequence_text(focus_index: int) -> String:
+	var rows: Array = ProgressionGongfaData.SECTS
+	if focus_index < 0 or focus_index >= rows.size():
+		return ""
+	var row: Dictionary = rows[focus_index]
+	var ladder: String = ""
+	for g in ProgressionGongfaData.GRADE_BY_YEAR:
+		ladder += ("/" if ladder != "" else "") + str(g)
+	return tr("%s：内功 %s · 外功 %s；三年授艺品级：%s") % [
+		tr(str(row["display_name"])),
+		tr(str(row["internal_base"])),
+		tr(str(row["external_base"])),
+		ladder,
+	]
