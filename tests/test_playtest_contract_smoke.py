@@ -153,6 +153,12 @@ ROUND_SCENARIOS: list[str] = [
     "ending_tiers_differentiate",
     "enemy_turn_wall_clock",
     "trait_point_cost_visible",
+    "consequence_card_pick_focus",
+    "consequence_event_option_visible",
+    "consequence_sect_select_focus",
+    "consequence_work_income_inline",
+    "consequence_year_end_switch",
+    "consequence_gongfa_goal_mastery_grant",
 ]
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
@@ -2433,3 +2439,69 @@ def test_work_beats_idling_ratio_nail_contract() -> None:
     assert "first_ending_silver" in blocks["SaveManager"], (
         "SaveManager.first_ending_silver not whitelisted on the surface"
     )
+
+
+def test_c1_consequence_surface_contract() -> None:
+    """Static contract pin for the R5 C1 consequence-renderer card.
+
+    Pins the five new surface observables (CultivationScreen.consequence_text /
+    consequence_matches_focus, SectSelectScreen.consequence_text /
+    consequence_matches_focus, CultOptionButton1) against
+    ``playtest/_common.yaml``, and the six consequence_* scenario names in
+    scenario_order AND ROUND_SCENARIOS (two-place sync, same relative tail
+    order). Each scenario file exists with ``name:`` equal to its basename and
+    carries at least one differential ``: changed`` line (the no-bare-scalar-
+    silent-false rule). Additive — no existing test touched.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+
+    # The five new surface observables are whitelisted.
+    cult_items = blocks.get("CultivationScreen", [])
+    for var in ("consequence_text", "consequence_matches_focus"):
+        assert var in cult_items, (
+            f"CultivationScreen.{var} not whitelisted on the surface"
+        )
+    sect_items = blocks.get("SectSelectScreen", [])
+    for var in ("consequence_text", "consequence_matches_focus"):
+        assert var in sect_items, (
+            f"SectSelectScreen.{var} not whitelisted on the surface"
+        )
+    assert "CultOptionButton1" in blocks, (
+        "CultOptionButton1 not whitelisted on the surface"
+    )
+
+    # Two-place sync: the six scenarios are in scenario_order AND ROUND_SCENARIOS.
+    order = _items_under(text, "scenario_order")
+    names = [
+        "consequence_card_pick_focus",
+        "consequence_event_option_visible",
+        "consequence_sect_select_focus",
+        "consequence_work_income_inline",
+        "consequence_year_end_switch",
+        "consequence_gongfa_goal_mastery_grant",
+    ]
+    for name in names:
+        assert name in order, (
+            f"{name} not in _common.yaml scenario_order (two-place sync)"
+        )
+        assert name in ROUND_SCENARIOS, (
+            f"{name} not in ROUND_SCENARIOS (two-place sync)"
+        )
+        path = PLAYTEST_DIR / (name + ".yaml")
+        assert path.is_file(), f"{name}.yaml missing"
+        ftext = path.read_text(encoding="utf-8")
+        assert re.search(
+            rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
+        ), f"{name}.yaml name: does not equal its basename"
+        has_diff = False
+        for line in ftext.splitlines():
+            if re.match(r"^    [A-Za-z_]\w*\.[A-Za-z_]\w*:", line):
+                has_op = any(
+                    op in line for op in ["==", "!=", "<", ">", "and", "or"]
+                )
+                has_diff = has_diff or ("changed" in line or "unchanged" in line)
+                assert has_op or "changed" in line or "unchanged" in line, (
+                    f"{name}.yaml assert missing comparison operator: {line.strip()}"
+                )
+        assert has_diff, f"{name}.yaml must carry a differential ': changed' line"
