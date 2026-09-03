@@ -21,7 +21,7 @@ ending. Visuals use placeholder art; UI text is Chinese (NotoSansSC, SIL OFL).
 - **C7 — work out-earns idling** (`ProgressionMath.work_income = 10 + 3 × work_months`): the free card is untouched; 36×work silver > 1.5× 36×do-nothing.
 - **C8 — design records**: `40_progression.md` M2'/M3' tables, `90_decisions.md` two rulings, `00_roadmap.md` re-queued, `99_changelog.md` append-only R3b row.
 
-**Status (honest):** official run — hard gate green, 91/93 scenarios, pytest 67/67, vision passed; the trait regression is re-derived this round.
+**Status (honest):** last official run (pre-iteration-4 tree) — hard gate green, 91/93 scenarios, pytest 67/67, vision passed. Iteration-4 (2026-09-03): the trait pin was re-derived as a differential (22/22 sidecar), the C5 tail was re-anchored to the honest measured LOST state per the 2026-09-03 owner re-scope (the WIN goal moves to the next round with its 36/48 baseline), README was manualized (1727 → 72 lines; round history lives in docs/ROUNDS.md). Zero game code changed since the 91/93 run; the 93-scenario official re-run of this tree is the remaining gate.
 
 ## Requirements
 
