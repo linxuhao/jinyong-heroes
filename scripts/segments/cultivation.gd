@@ -134,6 +134,32 @@ var _year_choice: int = 0
 var _switch_focus: int = 0
 var _delete_armed: bool = false
 
+## Private: two-press confirmation arm for the year-end SECT_SWITCH pick
+## (R5 C3). Mirrors the _delete_armed precedent: the FIRST press on a row arms
+## (focus + consequence render, ZERO writes — no sect_id change, no
+## _advance_year), the SECOND press on the SAME row commits through the existing
+## _resolve_sect_switch path byte-identically. Reset in _cycle_focus's
+## SECT_SWITCH branch and on back, exactly like _delete_armed.
+var _switch_confirm_armed: bool = false
+
+## Private: the _switch_focus index the arm was set for (R5 C3). The commit
+## happens only when the SAME row is pressed again; pressing a different row
+## re-arms to that row instead of committing the previously-armed one.
+var _switch_armed_focus: int = -1
+
+## Surface: the visible BackButton is on-screen exactly in the five backable
+## uncommitted phases (ATTR_PICK / GONGFA_PICK / CARD_PICK / YEAR_END /
+## SECT_SWITCH) and hidden in ACTION_PICK / EVENT (R5 C3).
+var back_button_visible: bool = false
+
+## Surface: the phase _on_back() returns to for the CURRENT phase ("" when the
+## phase is not backable — ACTION_PICK / EVENT). R5 C3.
+var back_target_phase: String = ""
+
+## Surface: mirror of _switch_confirm_armed for the year-end sect-switch
+## confirmation nail (R5 C3).
+var switch_confirm_armed: bool = false
+
 ## Surface: "CultOptionButton%d" -> pressed-signal wired (true iff the
 ## button's pressed signal has a live connection). Re-snapshotted on every
 ## OptionsBox rebuild, so the contract can assert the pool is WIRED, not just
@@ -233,6 +259,12 @@ func _ready() -> void:
 	# _on_load() (in-screen loads) and _ready() (fresh instances); the handler
 	# only re-syncs + re-renders.
 	SaveManager.loaded.connect(_on_loaded)
+	# R5 C3: wire the visible back button once (static scene node, not part of
+	# the per-render OptionsBox pool). focus_mode 0 in the .tscn keeps it from
+	# stealing built-in ui_up/ui_down before _unhandled_input.
+	var _back_btn: Button = get_node_or_null("CultBackButton") as Button
+	if _back_btn != null:
+		_back_btn.pressed.connect(_on_back)
 	_sync_surface()
 	# Year-start grant: entering (fresh or via load) at month 1 grants the
 	# sect's arts for the current year (year 1 -> 丁, 2 -> 丙, 3 -> 乙).
@@ -291,6 +323,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("event_reroll"):
 		get_viewport().set_input_as_handled()
 		_on_event_reroll()
+	elif event.is_action_pressed("ui_cancel"):
+		# R5 C3: every uncommitted selection screen returns with zero state
+		# delta. The EVENT phase is the ONE reaffirmed exception (the no-exit
+		# ruling — events are already drawn and RNG consumed; declining an
+		# option is the exit): ui_cancel is STILL consumed there, as a no-op, so
+		# nothing downstream receives it, but _on_back() is never called.
+		get_viewport().set_input_as_handled()
+		if phase != "EVENT":
+			_on_back()
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +358,54 @@ func _on_event_reroll() -> void:
 	status_text = tr("重掷：剩余 %d 次") % rerolls_left
 	_render()
 
+## R5 C3: return from an uncommitted selection screen with ZERO state delta —
+## ONLY phase + focus-index writes, never month/silver/profile/RNG. The
+## differential nails read month_before_accept / silver_before_accept (written
+## ONLY in _on_accept, never here), so those snapshots stay intact across a
+## back. YEAR_END backs to ACTION_PICK with the month still 12: _after_action's
+## month-12 branch re-enters YEAR_END WITHOUT advancing on the next committed
+## action, so backing out can never skip or re-stage the year-end. SECT_SWITCH
+## backs to its previous step YEAR_END and disarms any pending confirm.
+func _on_back() -> void:
+	match phase:
+		"GONGFA_PICK", "ATTR_PICK", "CARD_PICK":
+			phase = "ACTION_PICK"
+			_action_focus = 0
+		"YEAR_END":
+			phase = "ACTION_PICK"
+			_action_focus = 0
+		"SECT_SWITCH":
+			_switch_confirm_armed = false
+			_switch_armed_focus = -1
+			phase = "YEAR_END"
+			_year_choice = 1
+		_:
+			return
+	_sync_surface()
+	_render()
+
+
+## R5 C3: publish the navigation observables (back-button visibility + target,
+## sect-switch arm) and drive the visible CultBackButton. Called at the tail of
+## _render() — the single funnel every focus/phase change routes through
+## (keyboard _cycle_focus, click _on_option_pressed, initial render), mirroring
+## the _sync_consequence precedent. Pure reads + writes to surface vars / the
+## button's visible flag: zero RNG, zero profile writes.
+func _sync_nav_surface() -> void:
+	switch_confirm_armed = _switch_confirm_armed
+	match phase:
+		"GONGFA_PICK", "ATTR_PICK", "CARD_PICK", "YEAR_END":
+			back_target_phase = "ACTION_PICK"
+		"SECT_SWITCH":
+			back_target_phase = "YEAR_END"
+		_:
+			back_target_phase = ""
+	back_button_visible = back_target_phase != ""
+	var btn: Button = get_node_or_null("CultBackButton") as Button
+	if btn != null:
+		btn.visible = back_button_visible
+
+
 func _cycle_focus(dir: int) -> void:
 	_delete_armed = false
 	match phase:
@@ -336,6 +425,8 @@ func _cycle_focus(dir: int) -> void:
 		"YEAR_END":
 			_year_choice = 1 if dir > 0 else 0  # down -> 另投他派(1), up -> 留在本门(0)
 		"SECT_SWITCH":
+			_switch_confirm_armed = false
+			_switch_armed_focus = -1
 			_switch_focus = (_switch_focus + dir + 5) % 5
 		_:
 			return
@@ -426,6 +517,26 @@ func _on_accept() -> void:
 			_resolve_year_end(_year_choice)
 			return
 		"SECT_SWITCH":
+			# R5 C3: the sect-switch commit (sect_id write + _advance_year) is the
+			# irreversible write, so it requires a two-press confirmation. The arm
+			# lives HERE (not inside _resolve_sect_switch) because the debug
+			# _fast_forward / _debug_step_month legs call _resolve_sect_switch(0)
+			# DIRECTLY and must stay byte-identical. First press: arm (ZERO writes).
+			# Same-row second press: commit through the existing path. A different
+			# row re-arms to that row.
+			if not _switch_confirm_armed or _switch_armed_focus != _switch_focus:
+				_switch_confirm_armed = true
+				_switch_armed_focus = _switch_focus
+				var sids: Array[String] = ProgressionGongfaData.sect_ids()
+				var sname: String = ""
+				if _switch_focus >= 0 and _switch_focus < sids.size():
+					var srow: Dictionary = ProgressionGongfaData.SECTS[_switch_focus]
+					sname = tr(str(srow["display_name"]))
+				status_text = tr("⚠ 再按一次确认改投「%s」，本年授艺自此改宗") % sname
+				_render()
+				return
+			_switch_confirm_armed = false
+			_switch_armed_focus = -1
 			_resolve_sect_switch(_switch_focus)
 			return
 	_render()
@@ -1430,6 +1541,10 @@ func _render() -> void:
 	# C1: the consequence of the focused option is republished here because the
 	# keyboard nav path (_cycle_focus -> _render) never calls _sync_surface.
 	_sync_consequence()
+	# C3: the navigation observables (back button visibility / target / sect-switch
+	# arm) are republished here for the same reason — every focus/phase change
+	# routes through _render().
+	_sync_nav_surface()
 
 
 ## The active phase's focus index — the button row that is highlighted. A pure

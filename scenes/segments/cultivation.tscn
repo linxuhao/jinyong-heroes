@@ -67,3 +67,11 @@ clip_text = true
 text = ""
 
 [node name="RosterPanel" parent="." instance=ExtResource("2")]
+
+[node name="CultBackButton" type="Button" parent="."]
+focus_mode = 0
+offset_left = 40.0
+offset_top = 660.0
+offset_right = 180.0
+offset_bottom = 700.0
+text = "返回"

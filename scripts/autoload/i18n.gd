@@ -511,6 +511,8 @@ const EN: Dictionary = {
 		"度过本月": "End the month",
 		"功法均已大成，无可修习": "All arts mastered — nothing left to train",
 		"功法均已大成，已返回行动重选": "All arts mastered; returned to action pick",
+		"⚠ 再按一次确认改投「%s」，本年授艺自此改宗": "⚠ Press again to confirm switching to \"%s\"; this year's teaching follows the new sect",
+		"⚠ 再按一次确认拜入「%s」": "⚠ Press again to confirm joining \"%s\"",
 	"\n\n⚠ 再按一次确认删除存档": "\n\n⚠ Press again to confirm deleting the save",
 	"\n\n上下选择，回车执行": "\n\nUp/down to choose, Enter to act",
 	"【练功】\n": "[Training]\n",
