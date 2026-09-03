@@ -601,6 +601,8 @@ const EN: Dictionary = {
 	"战备不足": "Underprepared",
 	"势均力敌": "Even match",
 	"胜券在握": "Strong",
+	"（战斗中只读）": "(Read-only in battle)",
+	"查看角色": "View Character",
 }
 
 

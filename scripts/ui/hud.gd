@@ -759,6 +759,12 @@ func _process(_delta: float) -> void:
 	# frames where the player does not exist yet (before the null-check below).
 	_update_geometry_observables()
 
+	# C4 roster mirror: publish the panel's open state every frame, BEFORE the
+	# player null-check so it is readable pre-battle too. Reads panel.is_open
+	# (never RosterOpenButton.visible — the entry button is hidden while open,
+	# so reading it would report a false close).
+	roster_panel_open = _roster_is_open()
+
 	# Battle action buttons: disabled whenever the battle input gate is closed
 	# (not the player's turn, or paused). Must run BEFORE the player null-check
 	# so the state is readable every frame. A click on a disabled Button emits
@@ -1011,3 +1017,25 @@ func _ready() -> void:
 		ob.offset_right = -10.0
 		ob.offset_bottom = 84.0
 		ob.text = tr("角色")
+
+
+## C4 roster helpers: resolve the panel instance (null-safe) and its open state.
+func _roster_panel() -> Control:
+	return get_node_or_null("RosterPanel") as Control
+
+
+func _roster_is_open() -> bool:
+	var panel: Control = _roster_panel()
+	return panel != null and is_instance_valid(panel) and bool(panel.is_open)
+
+
+## C4 input shield: while the roster panel is open, consume ALL unhandled input
+## so keyboard never reaches the battle handlers through a panel the locked
+## battlefield host does not know about. NOTE (intentional, not a regression):
+## while the panel is open, Esc/keyboard CANNOT close it — close is touch/click
+## only (RosterCloseButton / tap-outside), per the brief's touch-reachability
+## requirement.
+func _unhandled_input(event: InputEvent) -> void:
+	if _roster_is_open():
+		get_viewport().set_input_as_handled()
+		return

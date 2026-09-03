@@ -52,6 +52,11 @@ var ending_title: String = ""
 ## Surface: button name -> pressed-signal wired.
 var pressed_connected: Dictionary = {}
 
+## C4 roster mirror: true while the RosterPanel overlay is open. Mirrored every
+## _process frame from panel.is_open (never from RosterOpenButton.visible — the
+## entry button is hidden while open, so reading it would report a false close).
+var roster_panel_open: bool = false
+
 
 func _ready() -> void:
 	_wire_restart_button()
@@ -60,6 +65,29 @@ func _ready() -> void:
 	tier = int(ev["tier"])
 	score = int(ev["score"])
 	_render()
+	# C4: relabel the panel's entry button to 查看角色 and widen it so the longer
+	# label fits in the top-right corner clear of BodyLabel (x[-320,320] centered)
+	# and RestartButton.
+	var ob: Button = get_node_or_null("RosterPanel/RosterOpenButton") as Button
+	if ob != null:
+		ob.anchor_left = 1.0
+		ob.anchor_right = 1.0
+		ob.offset_left = -170.0
+		ob.offset_top = 8.0
+		ob.offset_right = -10.0
+		ob.offset_bottom = 48.0
+		ob.text = tr("查看角色")
+
+
+## C4 roster helper: resolve the panel instance (null-safe) and its open state.
+func _roster_is_open() -> bool:
+	var panel: Control = get_node_or_null("RosterPanel") as Control
+	return panel != null and is_instance_valid(panel) and bool(panel.is_open)
+
+
+## C4 roster mirror: publish the panel's open state every frame.
+func _process(_delta: float) -> void:
+	roster_panel_open = _roster_is_open()
 
 
 func _wire_restart_button() -> void:
@@ -79,6 +107,16 @@ func _on_restart_pressed() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# C4 input shield FIRST: while the roster panel is open, consume ALL
+	# unhandled input so keyboard never reaches the restart path through a panel
+	# the host does not know about. NOTE (intentional, not a regression): while
+	# the panel is open, Esc/keyboard CANNOT close it — close is touch/click
+	# only (RosterCloseButton / tap-outside), per touch-reachability. If this
+	# shield were placed after the `done` check, opening the panel then pressing
+	# Enter would silently restart the run.
+	if _roster_is_open():
+		get_viewport().set_input_as_handled()
+		return
 	if done:
 		return
 	if event.is_action_pressed("ui_accept") or event.is_action_pressed("tutorial_next"):
