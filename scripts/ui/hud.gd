@@ -73,6 +73,11 @@ var hud_desc_overlap: bool = false
 ## keeps it false; asserted false while the HUD is visible.
 var undo_desc_overlap: bool = false
 
+## C4 roster mirror: true while the RosterPanel overlay is open. Mirrored every
+## _process frame from panel.is_open (never from RosterOpenButton.visible — the
+## entry button is hidden while open, so reading it would report a false close).
+var roster_panel_open: bool = false
+
 ## Round-2 top-strip observables (playtest surface under HUD.): the five top
 ## texts (RoundLabel / ActiveLabel / OrderLabel / EnergyLabel, plus
 ## ActionHintLabel ONLY while visible) must be pairwise non-overlapping and
@@ -994,3 +999,15 @@ func _ready() -> void:
 		return
 	var marker_scene: PackedScene = preload("res://scenes/ui/acting_unit_marker.tscn")
 	add_child(marker_scene.instantiate())
+	# C4 roster entry: reposition the panel's RosterOpenButton into the
+	# PauseButton(y8-44) <-> EndTurnButton(y96-132) gap (y48-84) so it does not
+	# collide with the top-right stack, and keep its label 角色.
+	var ob: Button = get_node_or_null("RosterPanel/RosterOpenButton") as Button
+	if ob != null:
+		ob.anchor_left = 1.0
+		ob.anchor_right = 1.0
+		ob.offset_left = -130.0
+		ob.offset_top = 48.0
+		ob.offset_right = -10.0
+		ob.offset_bottom = 84.0
+		ob.text = tr("角色")

@@ -135,6 +135,20 @@ func refresh() -> void:
 ## the pool cap keep text-only rendering. Node access is null-safe so a bare
 ## unit-test instance (no scene tree) is safe — the row map still builds.
 func _remap_equip_buttons(p: PlayerProfile) -> void:
+	# Read-only mode (C4 battle/ending): bind ZERO pool buttons AND hide all
+	# twelve EquipButton0..11 so no 装上/卸下 button can ever render or write a
+	# profile slot. Clear the row map first, then hide the FULL pool range
+	# (the tail loop below alone only covers the range when the array is already
+	# empty). equip_button_count / equip_pressed_connected read 0.
+	if read_only:
+		_equip_row_ids.clear()
+		equip_button_count = 0
+		equip_pressed_connected = 0
+		for k in range(MAX_EQUIP_BUTTONS):
+			var btn: Button = _equip_button_node(k)
+			if btn != null:
+				btn.visible = false
+		return
 	_equip_row_ids.clear()
 	for i in range(p.inventory.size()):
 		if _equip_row_ids.size() >= MAX_EQUIP_BUTTONS:
@@ -225,6 +239,10 @@ func _compose_gongfa(p: PlayerProfile) -> String:
 
 func _compose_items(p: PlayerProfile) -> String:
 	var lines: PackedStringArray = [tr("物品")]
+	# Read-only marker (C4 battle/ending): the equip section is display-only, so
+	# a 只读 line follows the header to make that explicit.
+	if read_only:
+		lines.append(tr("（战斗中只读）"))
 	if p.inventory.is_empty():
 		lines.append(tr("（无）"))
 	else:
