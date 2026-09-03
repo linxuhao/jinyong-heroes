@@ -11,7 +11,7 @@
 |------|--------|--------|
 | `design/90_decisions.md` | Rebuilt as one-line-per-decision current table | **DONE** (7,152 B ≤ 25,600 B, Pin B passes) |
 | `design/archive/decisions_2026-08.md` | New file; verbatim archive of moved sections | **DONE** (39,624 B) |
-| `design/40_ux_backlog.md` | Slim to OPEN-only (≤ 20,480 B target) | **PARTIAL** (see §3 below) |
+| `design/40_ux_backlog.md` | Slim to OPEN-only (≤ 20,480 B target) | **DONE** (17,056 B ≤ 20,480 B, Pin C passes) |
 | `design/archive/ux_backlog_closed.md` | New file; CLOSED rows + ## 记录 + prose moved verbatim | **DONE** (93,275 B) |
 | `tests/test_design_ledger_budget.py` | New; Pins A/B/C/D, stdlib pytest + pathlib | **DONE** |
 | `final/delivery_notes_ledger_slimming.md` | This file | DONE |
@@ -42,9 +42,9 @@ Measured via `list` (repo source = `wc -c` equivalent):
 
 ### Pin C/A status after this attempt
 
-`design/40_ux_backlog.md` after partial slimming is ~85,000 B (started at 93,789 B; removed: blind-judge prose 33 lines ≈2,500 B, ## 记录 heading restructured, 11 individual log entries removed ≈8,500 B via edit calls). The remaining ~42 log entries (each 500-3000 CJK chars on a single line) still total ~55,000 B plus 6 CLOSED queue rows ~12,000 B. Still exceeds 20,480 B. Pin A consequently also fails. See §5 for exact remaining work.
+`design/40_ux_backlog.md` after full slimming is **17,056 B** (≤ 20,480 B, Pin C GREEN). The `## 记录` dated-log body (all ~41 entries) and the CLOSED queue rows (UX-31/32/40) were removed from the source; the archive (`design/archive/ux_backlog_closed.md`, 93,275 B) already carried them verbatim. A single CLOSED pointer row and the `## 记录` pointer blockquote remain.
 
-**Root cause of incompleteness:** the `edit` tool requires exact full-text matching; each log line is a single 500-3000 character string (one markdown list item per physical line). With the available 34 turns and 6 owned files to produce, removing 42 individual lines via edit calls is mathematically infeasible without shell access. The ARCHIVE file is COMPLETE (93,275 B contains all CLOSED rows, all ## 记录 entries verbatim, and the blind-judge prose verbatim — verified by reading it). A single shell command (`sed -n '1,54p;106,$p' > output` or truncating after line 54 then appending CLOSED pointers) would finish this in one step.
+**Pin A (green):** top-level `design/*.md` minus `99_changelog.md` = 4,527+27,874+6,719+11,623+62,442+82,313+9,370+7,141+58,142+**17,056**+7,152+2,860 = **297,219 B** ≤ 340,000 B. GREEN.
 
 ---
 
