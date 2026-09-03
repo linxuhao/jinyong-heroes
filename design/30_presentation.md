@@ -1197,3 +1197,29 @@ checkout: actions/checkout@v4 of the pushed ref, preset: "Web", export path:
 build/web/index.html) builds from HEAD on every push — pushing this round's
 commits to master publishes the fresh build containing the new timing code.
 
+### Official gate evidence (2026-09-03, 5_design post-gate)
+Source: this round's gate products (`playtest_summary.md` / `vision_report.json`
+from 5_compile / 5_vision — not files under final/).
+- Playtest: **95/95 scenarios all PASS** (hard gate `passed: true`,
+  `spec_used: true`, 180 frames, zero runtime errors); compile **109/109**.
+  Card 0 pins officially green: `enemy_turn_wall_clock` **5/5** (real end_turn
+  keypress; full 5-enemy round inside the ≤ 10 000 ms / ≤ 2 000 ms bounds),
+  `camera_transform_follows_unit` **13/13** (post-pan `UiOcclusionWatch
+  violations == 0`, `scan_ok == true`, `HealthBar.bar_anchors_below_portrait`),
+  `enemy_action_feedback` **9/9**, `occlusion_no_button_over_text` **22/22**.
+- Renamed gate literals officially green on the post-rename tree:
+  `round_one_snapshot_and_turn_order` **14/14** and `ui_geometry_readability`
+  **38/38** (`active_actor == "独臂大虾"` / `name_text == "独臂大虾"` — the only
+  two lines the R4 rename was allowed to flip).
+- Nickname-length readability (the frame proof this round could not capture —
+  see `final/frames_r4/`): the vision gate judged 95 scenes / 380 frames
+  non-blind (`localqwen/qwen3`, `passed: true`); Q6 "no truncated text" scored
+  **77 good / 18 bad** with the question NOT failed (`failed: false`). The bad
+  answers observed in the batch answers cite bottom-edge text cut-off (screen
+  edge / bottom log area) — none cites the order bar or the name plates, so the
+  longer nicknames produced no measured truncation hit. The bottom-band
+  cut-offs stay covered by UX-34/UX-35 (OPEN, record-only).
+- Still owed (honest, unchanged): the six before/after PNG pairs and an HTML5
+  console read of the `enemy_turn` / `enemy_round` prints — both remain with
+  owner playtest / a future capture pass.
+

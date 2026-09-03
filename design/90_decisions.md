@@ -33,6 +33,9 @@
 | 2026-09-02 | R3c WIN 裁决 | WIN 尾为许可红(不冒充 WIN);红 WIN 断言不可接受,诚实 LOST 钉可接受;诚实分支须同改动重推导 ending gate pins | archive: decisions_2026-08.md §R3c WIN |
 | 2026-09-03 | C5 诚实-LOST 收口 | WIN 由所有者重划出 R3b;诚实 LOST 钉是 R3b 的 C5 交付物;WIN 携 36/48 基线移入 world-breadth 轮;五绝数据保持锁定 | `playtest_summary.md: huashan_winnable_normal_route 47/47`;`final/delivery_notes_r3c_restore_huashan_scenario.md` |
 | 2026-09-02 | 华山带裁决(C4) | `P_fresh_max`=仅靠创建分配可达最高 readiness_power(60);`even=P_fresh_max+1=61`;真实路线落 even 之下**不降 even**,成长曲线缺陷交下一轮 | `40_progression.md` §M3''';`final/delivery_notes_r3c_readiness_bands.md` |
+| 2026-09-03 | 外号裁定(江湖不称名,只称号,所有者裁定) | 屏上只出现带虾字的外号:杨过→独臂大虾、黄药师→东邪虾、欧阳锋→西毒虾、段智兴→南帝虾、洪七公→北丐虾、王重阳→中神通虾;路人按身份起带虾外号(侠客→侠客虾、陪练弟子→陪练虾);只改 display_name/_DISPLAY_ALIASES/_ORDER_TOKENS/教程文案/i18n(EN 译名本轮自拟 One-Armed Prawn / East Heretic Shrimp 等,非所有者裁定),character_name/节点名/turn_order 内部键不动;两条钉显示名字面量的既有闸门让位原地更新,三条 verbatim 闸门零改动 | `20_content.md` 附:R4 外号裁定记录;`tests/test_display_no_personal_names.py`;`playtest_summary.md: round_one_snapshot_and_turn_order 14/14、ui_geometry_readability 38/38`(2026-09-03 官方 95/95 全 PASS) |
+| 2026-09-03 | Card 0 敌方回合墙钟 | 只许缩短等待与并行化(帧计数轮询 → 0.05 s SceneTreeTimer),不改 AI 决策与数值;完整敌方回合 ≤ 10 s、单人 ≤ 2 s、镜头平移不把上排敌人切进顶栏;web 墙钟轮内未实测(诚实分支:console 打印 + FROM HEAD 管线;红证据 = 2026-09-02 web 报告 20–40 s/人) | `30_presentation.md` Card 0 节;`playtest_summary.md: enemy_turn_wall_clock 5/5、camera_transform_follows_unit 13/13`;`final/delivery_notes_card0_enemy_turn_l1.md` |
+| 2026-09-03 | design/ 预算偏差(记录) | brief 字面 `du -cb design/*.md ≤ 180 KB` 在「99_changelog.md 只增不删(164,501 B)+ 三文件内容冻结」约束下算术不可满足;重钉为除 99_changelog.md 外 design/*.md ≤ 340,000 B(实测 301,874 B),per-file 目标(≤ 25 KB / ≤ 20 KB)不变 | `tests/test_design_ledger_budget.py` docstring;`final/delivery_notes.md` §10.1 |
 
 <!-- 本节以下的旧长文已由 R4 ledger slimming (2026-09-03) 逐字归档至
      design/archive/decisions_2026-08.md;现行裁决表见本文件顶部,一行一条。 -->
