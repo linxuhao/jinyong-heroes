@@ -108,10 +108,16 @@ func _process(_delta: float) -> void:
 
 func _render_hint() -> void:
 	var host: Control = _host()
-	if host == null or _hint_label == null:
+	if host == null:
 		travel_hint_text = ""
-		_hint_label.text = "" if _hint_label != null else ""
-		_hint_label.visible = false if _hint_label != null else false
+		if _hint_label != null:
+			_hint_label.text = ""
+			_hint_label.visible = false
+		return
+	if _hint_label == null:
+		# Degradation path (Risk-5 null-safety): the label node is missing, so
+		# publish the empty observable but never dereference a null instance.
+		travel_hint_text = ""
 		return
 	var target: String = _focused_neighbor(host)
 	var line: String = _compose_hint(target)
@@ -254,8 +260,9 @@ func _open_panel() -> void:
 		_panel_body.text = tr("此去即结局：踏上%s后，江湖故事将落幕。") % tr(name)
 	_panel.visible = true
 	travel_gate_visible = true
-	if _confirm_button != null:
-		_confirm_button.grab_focus()
+	# No grab_focus(): the gate buttons carry focus_mode = 0 (matching the
+	# scene's other delegate buttons), so they are not keyboard-focusable and
+	# must not steal a focus ring from map.gd's own focus grammar.
 
 
 func _close_panel() -> void:

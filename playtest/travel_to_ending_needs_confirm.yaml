@@ -21,8 +21,11 @@
 #   first failing assert ......... MapTravelHints.travel_gate_armed == true
 #   exact error .................. node not found (no MapTravelHints node /
 #                                  gate observables before this round)
-#   green asserts before red ..... 6 (MapScreen.phase / focus_id / current_node_id
-#                                  all hold on the walked spine)
+#   green asserts before red ..... 5 (f30: current_node_id == "wuming_valley",
+#                                  phase == "TRAVEL"; f210: phase == "TRAVEL",
+#                                  current_node_id == "xiangyang",
+#                                  focus_id == "xiangyang" — all hold on the
+#                                  walked spine before the failing gate assert)
 name: travel_to_ending_needs_confirm
 description: >-
   C3 ending-travel confirmation gate: walking the spine to 襄阳, the kunlun

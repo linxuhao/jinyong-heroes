@@ -8,16 +8,15 @@
 # walked to 襄阳 (kunlun is a neighbor), then the gate dialog opened by mouse.
 #
 # RED-FIRST four values (measured on the pre-implementation tree, no sibling):
-#   pre-fix failing frame ........ 30
-#   first failing assert ......... UiOcclusionWatch.violations (the map boots at
-#                                  无名谷 whose event panel prose is already
-#                                  clean, so this passes; the RED assert is the
-#                                  gate-dialog leg)
-#   actually: the first RED assert is at frame 200 (the TravelGatePanel never
-#                                  existed pre-fix → its confirm button / body
-#                                  cannot be found to scan; scan_ok stays false)
-#   exact error .................. node not found (MapTravelHints / TravelGatePanel)
-#   green asserts before red ..... TRAVEL-leg occlusion asserts (violations 0) hold
+#   pre-fix failing frame ........ 60
+#   first failing assert ......... MapTravelHints.travel_hint_text != ""
+#   exact error .................. node not found (no MapTravelHints node /
+#                                  gate observables before this round)
+#   green asserts before red ..... 3 (f30: MapScreen.phase == "TRAVEL",
+#                                  UiOcclusionWatch.violations == 0,
+#                                  UiOcclusionWatch.scan_ok == true — all hold
+#                                  on the pre-fix tree, since the map boots
+#                                  clean and the sibling is simply absent)
 name: consequence_screens_occlusion_map
 description: >-
   New map text surfaces keep UiOcclusionWatch clean: the travel hint line in

@@ -175,6 +175,7 @@ offset_left = 40.0
 offset_top = 160.0
 offset_right = 240.0
 offset_bottom = 200.0
+focus_mode = 0
 text = "确认启程"
 
 [node name="TravelGateBackButton" type="Button" parent="MapTravelHints/TravelGatePanel/TravelGateDim"]
@@ -182,4 +183,5 @@ offset_left = 360.0
 offset_top = 160.0
 offset_right = 560.0
 offset_bottom = 200.0
+focus_mode = 0
 text = "返回"
