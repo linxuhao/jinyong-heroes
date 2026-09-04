@@ -7,8 +7,9 @@
 # state delta. Complements the C2 empty-path nails — this is the non-empty
 # regression twin.
 #
-# Boot: real-save boot (main.tscn -> tutorial -> creation -> SectButton0 ×2 =
-# shaolin, the two-press join arm) -> CULTIVATION with 2 unmastered D arts.
+# Boot: real-save boot (main.tscn -> tutorial -> creation -> one SectButton0
+# click = shaolin; fix_f4 restored the single-press join) -> CULTIVATION with 2
+# unmastered D arts.
 # Month 1: card, then 练功 (focus 0) -> GONGFA_PICK. Click CultBackButton ->
 # ACTION_PICK, assert month/silver zero delta.
 #
@@ -104,16 +105,12 @@ timeline:
   actions: []
   clicks:
   - ConfirmButton
-# ── SECT SELECT -> shaolin (two-press arm: first click arms, second commits) ─
+# ── SECT SELECT -> shaolin (single-press join; fix_f4 restored one-press) ──
 - at: 295
   actions: []
   assert:
     GameManager.current_state: current_state == "SECT_SELECTION"
 - at: 305
-  actions: []
-  clicks:
-  - SectButton0
-- at: 315
   actions: []
   clicks:
   - SectButton0

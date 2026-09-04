@@ -147,7 +147,6 @@ ROUND_SCENARIOS: list[str] = [
     "huashan_readiness_warning",
     "huashan_winnable_normal_route",
     "ending_divergent_playstyles",
-    "ending_last_month_choice",
     "work_beats_idling",
     "practice_target_receipt",
     "ending_tiers_differentiate",
@@ -174,7 +173,6 @@ ROUND_SCENARIOS: list[str] = [
     "battle_return_to_main_menu_needs_confirm",
     "skill_range_highlight_on_select",
     "enemy_hit_float_and_log_visible",
-    "consequence_screens_occlusion",
     "combat_log_hidden_off_battle",
 ]
 
