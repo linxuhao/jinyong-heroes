@@ -42,25 +42,34 @@ jianghu map to an ending. Visuals use placeholder art; UI text is Chinese
   `battlefield.gd` untouched) and closes with zero battle-state diff.
 - **Battle feedback.** Floating damage numbers + combat-log lines (attacker →
   target, damage, remaining HP; status-caused 移动 0 explained).
-- **Honest status.** Both main-round integration blockers are fixed on this
-  tree: F1 — the EVENT renderer reads the typed `opt.effects` (sidecar re-runs:
-  save_load_roundtrip 14/14, consequence_event_option_visible 9/9,
-  event_phase_no_exit_reaffirmed 8/8, event_travel_effects 19/19); F4 — the
-  initial sect join is single-press on every input path and the three verbatim
-  gates are back to byte-identical green (facility_use_reusable 49/49,
-  map_node_event_shaolin 32/32, map_battle_node_huashan 41/41), with the
-  re-derived sect nail `sect_join_needs_confirm` 8/8. Evidence = per-scenario
-  sidecar runs quoted in `final/delivery_notes_fix_f1_event_option_effects_read.md`
-  and `final/delivery_notes_fix_f4_sect_join_single_press.md`; the official
-  post-fix full sweep and the compile/vision/test gate reports are produced by
-  the downstream steps (5_compile / 5_vision / 5_test) and are not claimed here.
-  Known remaining reds (pre-R5 fixed-frame route pins, sidecar-measured
-  2026-09-04; owner decision requested in `design/90_decisions.md` Open
-  questions): `huashan_winnable_normal_route` 23/47,
-  `cultivation_year_end_stay` 5/8, `sect_switch_same_school_connects` 4/8
-  (needs one inserted confirm press), `ending_last_month_choice` 31/38 —
-  none is an R5 acceptance nail, but they keep the playtest hard gate red
-  until the owner rules on the fixed-frame click-path grammar.
+- **Honest status (post-review fix round, 2026-09-04).** The main-round
+  integration blockers are fixed on this tree: F1 — the EVENT renderer reads the
+  typed `opt.effects` (sidecar re-runs: save_load_roundtrip 14/14,
+  consequence_event_option_visible 9/9, event_phase_no_exit_reaffirmed 8/8,
+  event_travel_effects 19/19); F4 — the initial sect join is single-press on
+  every input path and the three verbatim gates are byte-identical green
+  (facility_use_reusable 49/49, map_node_event_shaolin 32/32,
+  map_battle_node_huashan 41/41), with the re-derived sect nail
+  `sect_join_needs_confirm` 8/8. The post-fix review's blockers are also
+  resolved: (a) both static-pin pytest reds cleared — the superseded
+  `## Open questions` heading no longer appears in `design/90_decisions.md`
+  (renamed; archive byte-untouched) and `tests/test_ending_gate_pins.py` drops
+  its two retired-scenario entries behind dated carve-outs; the dead i18n EN
+  key `⚠ 再按一次确认拜入「%s」` was removed. (b) The fixed-frame route reds
+  are resolved per the 2026-09-04 owner route-retirement ruling (feedback
+  round #6): `huashan_winnable_normal_route` and `ending_last_month_choice`
+  are retired (yamls + both registry lines deleted); `cultivation_year_end_stay`
+  and `sect_switch_same_school_connects` re-anchored with byte-identical assert
+  blocks — 8/8 each on staged sidecar runs, regression net green (verbatim
+  gates 49/49 · 32/32 · 41/41, RNG lifelines 14/14 · 19/19). Evidence:
+  `final/delivery_notes_fix_static_ledger_and_gate_pins.md`,
+  `final/delivery_notes_fix_route_timeline_anchors.md`,
+  `final/delivery_notes_fix_f1_event_option_effects_read.md`,
+  `final/delivery_notes_fix_f4_sect_join_single_press.md`. The official
+  post-fix full sweep (expected 118 scenarios, 0 runtime errors — all 27 prior
+  errors belonged to the retired huashan route) and the compile/vision/test
+  gate reports are produced by the downstream steps (5_compile / 5_vision /
+  5_test) and are not claimed here.
 
 ## Requirements
 
@@ -106,8 +115,11 @@ any display-layer string), `test_design_ledger_budget.py` (`90_decisions.md`
 ≤ 25 KB, `40_ux_backlog.md` ≤ 20 KB, `design/*.md` total ≤ 340 KB excl.
 append-only changelog), `test_readme_is_a_manual.py` (≤ 200 lines, one
 本轮变更 section, round headings verbatim in `docs/ROUNDS.md`). The R5
-occlusion net lives at `playtest/consequence_screens_occlusion.yaml` (62
-asserts) with the map leg in `playtest/consequence_screens_occlusion_map.yaml`.
+map-leg occlusion net lives at
+`playtest/consequence_screens_occlusion_map.yaml`; the multi-screen general
+net `consequence_screens_occlusion.yaml` was retired with the route-type
+scenarios per the 2026-09-04 owner ruling (per-screen nails +
+`playtest/occlusion_no_button_over_text.yaml` carry the rest).
 
 ## Key interfaces
 
