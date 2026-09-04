@@ -5,18 +5,19 @@ The R3 round's proof rests on six playtest scenarios whose load-bearing lines ar
 scenario proves a distinct "choices change the outcome" fact:
 
   * `ending_divergent_playstyles`  — two playstyles reach DIFFERENT evaluations
-  * `ending_last_month_choice`     — a month-36 action flip changes the evaluation
+  (carve-out 2026-09-04 owner route-retirement ruling: the month-36 last-month-choice
+   route scenario is retired — its fixed-frame yaml is deleted; the evaluation-differential
+   property carries on the owner's side branch. See the dated comment in the dict below.)
   * `fortune_reroll_budget`        — the fortune reroll spends its budget and the
                                      exhausted press is inert
   * `action_yield_differential`    — work is the only action with a > 0 silver
                                      grant (the other three are == 0)
   * `huashan_readiness_warning`    — the readiness verdict STRING differs after
                                      growth (never a power literal)
-  * `huashan_winnable_normal_route`— a normal route fights the duel for real
-                                     (health < max_health) and the measured end
-                                     state is pinned honestly (LOST per the
-                                     2026-09-03 owner re-scope ruling); the WIN
-                                     is carried to the world-breadth round
+  (carve-out 2026-09-04 owner route-retirement ruling: the huashan winnable-normal-route
+   scenario is retired — a fixed-frame click PATH, not a property; its yaml + registry lines
+   are deleted by sibling card fix_route_timeline_anchors this wave. The honest-LOST
+   end-state property carries on the owner's side branch. See the dated comment in the dict below.)
 
 Differential assertions can be silently deleted — and the deletion itself must go
 red. This file is a pure text door in the same style as
@@ -53,10 +54,13 @@ SCENARIO_LOAD_BEARING_LINES: dict[str, tuple[str, ...]] = {
         # this door is re-derived to the carrier that DOES — same property, new carrier.
         "EndingScreen.diverged_from_first: diverged_from_first == true",
     ),
-    "ending_last_month_choice": (
-        # Cross-leg differential: the month-36 action flip must change the eval.
-        "first_ending_evaluation != evaluation_text",
-    ),
+    # CARVE-OUT (2026-09-04 owner route-retirement ruling): the month-36 last-month-choice
+    # route scenario is retired — its playtest yaml was deleted (fixed-frame route-type
+    # scenarios pin a click PATH, not a property; the evaluation-differential property
+    # carries on the owner's side branch). Re-deriving a retired scenario is forbidden this
+    # run, and restoring the ~1585-frame timeline is impossible without fabrication. The
+    # load-bearing pin is removed here so the static door matches the retired scenario set
+    # (conflict record: final/delivery_notes_fix_static_ledger_and_gate_pins.md).
     "fortune_reroll_budget": (
         # Budget decrement (leg 1) and exhausted inertness (leg 2).
         "rerolls_left == 0",
@@ -72,15 +76,14 @@ SCENARIO_LOAD_BEARING_LINES: dict[str, tuple[str, ...]] = {
         # Verdict STRING differential (never a power literal).
         'readiness_text != "华山评估：战备不足"',
     ),
-    "huashan_winnable_normal_route": (
-        # Honest-LOST end state (2026-09-03 owner re-scope ruling): the fight
-        # was real (health < max_health) and the measured end state is pinned
-        # honestly (LOST + RetryButton overlay). The WIN is carried to the
-        # world-breadth round with the 36/48 baseline.
-        'current_state == "LOST"',
-        "health < max_health",
-        "RetryButton.visible",
-    ),
+    # CARVE-OUT (2026-09-04 owner route-retirement ruling): the huashan winnable-normal-route
+    # scenario is retired — a fixed-frame ~2200-frame click PATH (36 months + travel + duel)
+    # that any upstream screen change breaks; it pins a route, not a property. The scenario
+    # file and its playtest/_common.yaml scenario_order + test_playtest_contract_smoke.py
+    # ROUND_SCENARIOS registry lines are deleted by the sibling card
+    # fix_route_timeline_anchors this same wave (disjoint files); this card removes ONLY the
+    # static load-bearing pin here so the door no longer requires the retired yaml. The
+    # honest-LOST end-state property (health < max_health) carries on the owner's side branch.
 }
 
 # Every new surface must still be registered under the correct node in
