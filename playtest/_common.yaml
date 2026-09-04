@@ -215,6 +215,7 @@ surface:
   - debug_enemy_other_msec
   - acting_marker_visible
   - acting_marker_unit_name
+  - combat_log_visible
   GameManager:
   - current_state
   - end_overlay_text
@@ -1273,4 +1274,5 @@ scenario_order:
 - skill_range_highlight_on_select
 - enemy_hit_float_and_log_visible
 - consequence_screens_occlusion
+- combat_log_hidden_off_battle
 

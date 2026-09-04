@@ -331,6 +331,11 @@ func _begin_if_ready() -> void:
 		return
 	if GameManager.get_player() == null or GameManager.get_enemies_alive().is_empty():
 		return
+	# R5 combat-log-leak fix: a new battle begins here (the shared guarded
+	# kick-off for both the tutorial and encounter paths) — re-create the log
+	# empty so a second duel never shows the previous duel's lines. Placed AFTER
+	# the early-exit guards so a stray scene load never clears the log.
+	_fx_log_begin_battle()
 	current_round = 1
 	_begin_round()
 
@@ -2210,4 +2215,33 @@ func _fx_on_enemy_turn_start(unit: Node) -> void:
 func _fx_on_enemy_turn_end() -> void:
 	if _fx_floats != null and is_instance_valid(_fx_floats):
 		_fx_floats.hide_marker()
+
+
+# ===========================================================================
+# R5 combat-log leak (ADD-ONLY block).
+#
+# The CombatLog is a battle-scene surface hosted under this autoload, so it
+# survives scene changes and stays painted on every post-battle screen. The
+# fix is visibility-only + clear-at-battle-start (no new CanvasLayer, no layer
+# move, no node relocation):
+#   * combat_log_visible — a mirror var written every frame by
+#     scripts/ui/combat_log.gd (the acting_unit_marker.gd precedent), so the
+#     harness can assert the log's visibility without addressing the autoload
+#     child node directly. false pre-battle / off-battle.
+#   * _fx_log_begin_battle() — called from _begin_if_ready() at battle start;
+#     ensures the log node exists and clears it so a second duel never shows
+#     the previous duel's lines. Zero RNG operations.
+# ===========================================================================
+
+## Mirror of the CombatLog's visibility, written every frame by
+## scripts/ui/combat_log.gd. Presentation-only — never read by combat logic.
+var combat_log_visible: bool = false
+
+## Re-create the combat log empty at battle start. Ensures the node exists
+## (the R4 lazy _fx_ensure path) and clears any buffered lines from a previous
+## duel. No-op if the log cannot be created.
+func _fx_log_begin_battle() -> void:
+	_fx_ensure()
+	if _fx_log != null and is_instance_valid(_fx_log):
+		_fx_log.clear()
 

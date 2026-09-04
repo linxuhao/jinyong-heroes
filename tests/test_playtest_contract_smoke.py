@@ -175,6 +175,7 @@ ROUND_SCENARIOS: list[str] = [
     "skill_range_highlight_on_select",
     "enemy_hit_float_and_log_visible",
     "consequence_screens_occlusion",
+    "combat_log_hidden_off_battle",
 ]
 
 
@@ -207,6 +208,14 @@ R5_PAUSE_SURFACE_VARS: tuple[str, ...] = (
 # file (here, inside the tuple); the test body references the tuple NAME only.
 R5_YEAR_END_BASELINE_SURFACE_VARS: tuple[str, ...] = (
     "year_end_entry_silver",       # CultivationScreen (year-end back zero-delta baseline)
+)
+
+# The one observable the R5 combat-log-leak fix appends to the CombatManager
+# surface block (in playtest/_common.yaml), ONLY-ADD — never removed or
+# renamed. The var-name string literal appears EXACTLY ONCE in this file (here,
+# inside the tuple); the test body references the tuple NAME only.
+R5_COMBAT_LOG_SURFACE_VARS: tuple[str, ...] = (
+    "combat_log_visible",          # CombatManager (CombatLog visibility mirror)
 )
 
 
@@ -273,6 +282,33 @@ def test_year_end_baseline_surface_contract() -> None:
         assert var in cult_items, (
             f"CultivationScreen.{var} not whitelisted on the surface"
         )
+
+
+def test_combat_log_surface_contract() -> None:
+    """Static contract pin for the R5 combat-log-leak fix.
+
+    The var is whitelisted exactly once in the CombatManager surface block of
+    playtest/_common.yaml, and the new unit scenario exists with name==basename
+    and carries its mandatory in-battle baseline + post-battle hidden asserts.
+    The body references the tuple NAME only, never the var-name string literal,
+    so the literal appears exactly once in this file.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "CombatManager" in blocks, "surface has no CombatManager block"
+    cm_items = blocks["CombatManager"]
+    assert cm_items, "CombatManager surface block parsed empty (vacuous pass guard)"
+    for var in R5_COMBAT_LOG_SURFACE_VARS:
+        assert var in cm_items, (
+            f"CombatManager.{var} not whitelisted on the surface"
+        )
+    # The new unit scenario exists, is name==basename, and carries the mandatory
+    # in-battle baseline (log visible + empty) and post-battle hidden asserts.
+    ftext = (PLAYTEST_DIR / "combat_log_hidden_off_battle.yaml").read_text(encoding="utf-8")
+    assert "name: combat_log_hidden_off_battle" in ftext
+    assert "CombatManager.combat_log_visible: combat_log_visible == true" in ftext
+    assert "CombatManager.debug_combat_log_lines: debug_combat_log_lines == 0" in ftext
+    assert "CombatManager.combat_log_visible: combat_log_visible == false" in ftext
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
 # surface block (in playtest/_common.yaml), in the same order they are appended.

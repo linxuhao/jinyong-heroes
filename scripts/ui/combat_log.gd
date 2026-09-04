@@ -36,6 +36,15 @@ const _MARGIN_Y: float = 16.0
 var _label: Label = null
 var _lines: PackedStringArray = PackedStringArray()
 
+## R5 combat-log-leak fix: this log is a BATTLE-SCENE surface, but it is hosted
+## under the CombatManager autoload (so it survives scene changes). It must be
+## hidden whenever the game is not in the BATTLE state, and re-created empty at
+## battle start. `_in_battle` caches the state edge so a false->true transition
+## clears the buffered lines exactly once per new battle. Seeded in _ready() so
+## a log lazily created mid-battle (the R4 _fx_on_hit path) does not clear the
+## line it was just handed on its first _process frame.
+var _in_battle: bool = false
+
 ## Presentation-only mirror of the rendered log text (the same string the
 ## visible label shows, last MAX_LINES lines joined by "\n"). Published so the
 ## HUD can relay the content onto its own whitelisted surface (the CombatLog
@@ -57,6 +66,33 @@ func _ready() -> void:
 	_label.add_theme_constant_override("outline_size", 4)
 	_label.visible = false
 	add_child(_label)
+	# Seed the state edge from the CURRENT state so a log created mid-battle
+	# (R4 lazy _fx_ensure path) starts in-battle and never clears its first line.
+	_in_battle = (GameManager.current_state == "BATTLE")
+
+
+## Per-frame state sync: the log is a battle-scene surface, so it is visible
+## only while the game is in the BATTLE state. A false->true edge (a new battle
+## beginning) clears the buffered lines so a second duel never shows the
+## previous duel's lines. Visibility is state-based, not pause-based: during
+## BATTLE — including paused, pause menu open, roster panel open — the log
+## stays exactly as before (this project's pause is a boolean gate with no
+## Engine.time_scale, so _process keeps running while paused).
+func _process(_delta: float) -> void:
+	var in_battle: bool = (GameManager.current_state == "BATTLE")
+	if in_battle and not _in_battle:
+		clear()
+	_in_battle = in_battle
+	_set_battle_layer_visible(in_battle)
+
+
+## Set this CanvasLayer's visibility and mirror it onto the CombatManager host
+## (the acting_unit_marker.gd precedent: a presentation component writes its
+## visibility back to the autoload each frame so the harness can assert it).
+func _set_battle_layer_visible(value: bool) -> void:
+	self.visible = value
+	if "combat_log_visible" in CombatManager:
+		CombatManager.combat_log_visible = value
 
 
 ## Append one finished display line and keep only the last MAX_LINES visible.

@@ -1,0 +1,82 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 COMBAT-LOG-LEAK NAIL — the combat log is a BATTLE-SCENE surface and must
+# be hidden on every post-battle screen.
+#
+# UNIT SCENARIO (owner ruling 2026-09-04): boot straight into the battle state
+# with the harness's existing tutorial-battle seed (7x ui_accept, then
+# debug_win_tutorial) and keep the WHOLE timeline <= 200 frames. The
+# >= 800-frame multi-screen route-scenario class is RETIRED — this scenario
+# does not walk on to MAP/MENU/SECT_SELECTION/YEAR_END.
+#
+# ROOT CAUSE (measured): the CombatLog lives under the CombatManager autoload
+# (/root/CombatManager/CombatLog) — a battle-scene surface owned by an
+# autoload — so it survives scene changes and stays painted in the lower-left
+# of every later screen. consequence_screens_occlusion reported 62/62 green
+# because the log sits in empty space, not over another control: the occlusion
+# net cannot see this defect class.
+#
+# FIX (visibility-only + clear-at-battle-start): combat_log.gd hides its
+# CanvasLayer whenever GameManager.current_state != "BATTLE" and clears the
+# buffered lines on a false->true edge (a new battle beginning), mirroring its
+# visibility onto CombatManager.combat_log_visible each frame. During BATTLE —
+# including paused, pause menu open, roster panel open — the log stays exactly
+# as before (the rule is state-based, not pause-based).
+#
+# The in-battle baseline asserts the log is VISIBLE and EMPTY at battle open
+# (the re-created-empty half of the fix); after debug_win_tutorial the log
+# holds lines (the leak precondition) and is HIDDEN on every post-battle frame
+# the short tail reaches (WON, TRANSITION, and the post-transition segment).
+name: combat_log_hidden_off_battle
+description: >-
+  Boot to the tutorial battle, assert the log is visible and empty at battle
+  open, win via the short debug tail, then assert the log is hidden on every
+  post-battle frame the short tail reaches (WON, TRANSITION, and the
+  post-transition segment) — the combat log is a battle-scene surface and
+  must not persist off-battle.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+# Battle open: the log is visible (in-battle baseline) AND starts empty for the
+# new battle (the re-created-empty half of the fix). HUD relay is empty too.
+- at: 40
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+    CombatManager.combat_log_visible: combat_log_visible == true
+    CombatManager.debug_combat_log_lines: debug_combat_log_lines == 0
+    HUD.combat_log_text: combat_log_text == ""
+# Win via the established short tail (apply_damage -> _handle_death ->
+# end_battle(true) pipeline) — the log is written with several lines.
+- {at: 45, actions: [debug_win_tutorial]}
+# WON: the leak precondition holds (lines exist) and the log is hidden the
+# moment the state leaves BATTLE.
+- at: 70
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+    CombatManager.debug_combat_log_lines: debug_combat_log_lines >= 1
+    CombatManager.combat_log_visible: combat_log_visible == false
+# Continue press -> TRANSITION screen; log still hidden.
+- {at: 80, actions: [ui_accept]}
+- at: 110
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+    CombatManager.combat_log_visible: combat_log_visible == false
+# Walk the two transition pages (transition.gd PAGES) to the post-transition
+# segment; log still hidden there.
+- {at: 120, actions: [ui_accept]}
+- {at: 140, actions: [ui_accept]}
+- at: 190
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+    CombatManager.combat_log_visible: combat_log_visible == false
