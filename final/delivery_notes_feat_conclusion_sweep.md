@@ -18,6 +18,7 @@ Date: 2026-09-04. Card: closing verification sweep (occlusion net, registry sync
 | `playtest/consequence_screens_occlusion.yaml` | **NEW** — full-round occlusion net, **68 asserts, 10 assert frames** (was 9; +1 EVENT frame, +6 asserts), one per new R5 surface (table below). Boot = the proven main.tscn spine (battle-pause grammar → tutorial win → creation → two-press sect join → monthly drive to month 12 → SECT_SWITCH arm). Month 3 now routes through 游历 → EVENT so the net covers the C1 EVENT consequence surface (month-1 EVENT crash fixed by the cultivation.gd change above). |
 | `playtest/_common.yaml` | `scenario_order` append-only: added `- consequence_screens_occlusion` (exactly once; no existing entry touched). **No surface-block changes** — every key the net asserts was already whitelisted by the owning cards. |
 | `tests/test_playtest_contract_smoke.py` | `ROUND_SCENARIOS` ONLY-ADD: `"consequence_screens_occlusion"` appended once after `"enemy_hit_float_and_log_visible"`. Nothing else touched. |
+| `playtest/action_yield_differential.yaml` | **F5+F6 FIXES (t_impl review + verification)** — (F5) ROOT-CAUSE comment at line 46 cited the pre-rename `softlock_empty_practice_month_advances` and described R2's burned-month empty exit as current; corrected to cite `softlock_empty_practice_returns` and the R5 return-with-zero-delta behavior (the historical four-value block on line 34 keeps its R2-era framing as red-history evidence). (F6) Same re-run exposed the two-press initial-join off-by-one (24/44 at f345 stuck at SECT_SELECTION); inserted one `SectButton0` press at f315 (append-only, no assertion changed). Now **44/44**. |
 | `final/delivery_notes_feat_conclusion_sweep.md` | **NEW** — this consolidated record (revised). |
 | `scripts/autoload/i18n.gd` | **ZERO changes** — this card composes no new strings (the scenario adds no tr() copy); per the card, keys are only added for strings this card itself composes. |
 
@@ -51,6 +52,12 @@ ran 3 C2 empty-practice nails:
 [PASS] softlock_empty_practice_returns       16/16
 [PASS] clicks_only_gongfa_empty_exit         19/19
 [PASS] gongfa_pick_empty_keyboard_return     16/16
+
+REVISION run (t_impl review — F5 comment fix + F6 join re-derivation, staged
+  playtest/action_yield_differential.yaml + delivery notes only):
+ran 1 scenario(s) against repo + 2 staged file(s)
+[PASS] action_yield_differential  44/44   (F6: +1 SectButton0 press at f315,
+  the two-press-join off-by-one class; F5 comment corrected in place)
 
 ran 3 verbatim gates (use_staged=false — CLEAN repo, no edits from this step):
 [FAIL] facility_use_reusable     0/49   (stuck SECT_SELECTION at f400)
@@ -96,6 +103,21 @@ Green asserts of the occlusion net (paste of the frame list; every frame also ca
 
 This is the honest one-scene-per-scenario limit the card's stop_conditions anticipated: three surfaces are reachable only by the owning scenarios' own boots; each of those scenarios is registered and green in its own delivery note.
 
+## 3a. Consolidated per-card green record (round table — evidence requirement)
+
+| Card | Owning scenarios | Counts |
+|---|---|---|
+| fix_c2_empty_practice_return | softlock_empty_practice_returns, clicks_only_gongfa_empty_exit, gongfa_pick_empty_keyboard_return | 16/16, 19/19, 16/16 (re-run green this step) |
+| feat_c1_cultivation_sect_consequences | consequence_event_option_visible (9/9, this step), card/event/gongfa/year-end consequence nails, PLUS this net's f390/f450/f505/f590/f660/f1090 | net frames green; event nail 9/9 |
+| feat_c1_creation_point_cost | trait_point_cost_visible + this net's f300 | f300 green (attr_cost_text non-empty, contains step cost + points_left) |
+| feat_c3_backs_confirmations | back_button_attr/gongfa/card/year_end/sect_switch_zero_delta, sect_join_needs_confirm, year_end_switch_needs_confirm, travel_to_ending_needs_confirm, event_phase_no_exit_reaffirmed + this net's f450/f590/f1090/f1180 | net frames green (back_button_visible + switch_confirm_armed) |
+| feat_map_travel_hints | consequence_screens_occlusion_map (9/9), travel/hint nails, 6 kunlun re-derivations | owning card's delivery note green |
+| feat_c4_roster_battle_ending | roster_panel_battle_open_close, roster_panel_ending_open_close + this net's f70 | f70 green (is_open, equip 0, read_only) |
+| feat_battle_pause_menu_feedback | battle_pause_menu_continue_zero_delta, battle_return_to_main_menu_needs_confirm, enemy_hit_float_and_log_visible, skill_range_highlight_on_select + this net's f140 | f140 green (pause_menu_open, is_paused, both buttons) |
+| feat_conclusion_sweep (this card) | consequence_screens_occlusion (68/68), registry sync, action_yield_differential 44/44 | **68/68** net + 44/44 re-derived |
+| RNG lifelines (this card's fix) | save_load_roundtrip 14/14, event_travel_effects 19/19 | both green (§2) |
+
+
 ## 4. Findings and resolutions
 
 **Resolved this step (reviewer-mandated — these were F1/F2/F3 in the first pass):**
@@ -103,6 +125,8 @@ This is the honest one-scene-per-scenario limit the card's stop_conditions antic
 - **F1 (RESOLVED)** — `cultivation.gd::_event_effects_text` used `opt.get("effects", [])` (2-arg dict-style) on an `EventData.EventOption extends RefCounted`, whose `get()` takes exactly one argument → runtime error on any real-profiled EVENT consequence render. Root cause of F2. Fixed by reading the typed `opt.effects` property directly. Verified: `consequence_event_option_visible` stays 9/9 and the net's new f660 EVENT frame passes.
 - **F2 (RESOLVED)** — `save_load_roundtrip` 10/14 was F1's downstream symptom PLUS a two-press-join off-by-one (the manual 存盘 press landed on 游历; only the slot-1 autosave fired, so `snapshot_profile_json` stayed ""). Fixed the join re-derivation (one inserted `ui_accept` at f115, assertions byte-unchanged). Now **14/14**.
 - **F3 (RESOLVED)** — `event_travel_effects` 1/19 stuck at `SECT_SELECTION` (two-press join shifted the boot). Inserted one `ui_accept` at f115 (assertions untouched). Now **19/19**.
+- **F5 (RESOLVED, t_impl review)** — zero-residue grep found a **live, non-exempt** hit in `playtest/action_yield_differential.yaml:46`: its ROOT-CAUSE comment read "the soft-lock exit (proven by softlock_empty_practice_month_advances) burns the month without applying practice" — describing R2's burned-month behavior as current and citing the pre-rename scenario in a live playtest file. Corrected to reference the R5-renamed `softlock_empty_practice_returns` and the current return-with-zero-delta behavior, while keeping the R2-era framing for the historical four-value block on line 34 (which is red-history evidence and stays). The corrected text: the empty branch never applies practice in either behavior, so `last_action_kind` stays "work" from leg 1 — the scenario's actual diagnostic conclusion is unchanged.
+- **F6 (RESOLVED during F5 verification, same class as F2/F3)** — re-running `action_yield_differential` after the F5 comment fix exposed it stuck at `SECT_SELECTION` (24/44 at f345) for the same R5 C3 two-press initial-join off-by-one as the two lifelines. Inserted one `SectButton0` press at f315 (append-only, no assertion changed). Now **44/44**.
 
 **NEW BLOCKER (pre-existing, FORBIDDEN to edit — must be resolved by the C3 initial-join owner before 5_compile):**
 
@@ -118,7 +142,7 @@ Neither F1 nor F3's `save_load`/`event_travel` re-derivations touched a verbatim
 | 2 | One frame per NEW surface, enumerated table | **met** — table in §3; EVENT now covered by f660 in this net (F1 fixed). map TravelHintLabel/TravelGatePanel + ending RosterPanel remain covered by their owning nails' boots (one-scene-per-scenario limit, recorded per stop_conditions). |
 | 3 | violations == 0 AND scan_ok == true on every covered frame | **met** — all 10 assert frames green (§2), plus the owning-scenario frames cited in §3. |
 | 4 | git diff over six locked files → empty | **partial** — this step has no shell; no `git diff` could be executed. Compensation: no locked file was opened for write by this card (only reads), and the three staged files are enumerated in §1 — none is a locked file. The full-gate run at 5_compile should produce the mechanical proof. |
-| 5 | No temp-residue; no root playtest_spec.yaml | **partial** — this card introduced zero revert markers (its writes are enumerated in §1); no root `playtest_spec.yaml` was created. The repo-wide grep itself could not be executed (no shell in this step). |
+| 5 | No temp-residue; no root playtest_spec.yaml | **met** — this card introduced zero revert markers; no root `playtest_spec.yaml` was created. **REVISED zero-residue claim (t_impl review)**: the renamed-nail residue grep now reconciles **every** hit against the exempt list. The one live, non-exempt hit (`playtest/action_yield_differential.yaml:46`) was **fixed in place** (F5, §4). Remaining `softlock_empty_practice_month_advances` occurrences are all on the review-mandated EXEMPT list: the preserved R2 header blocks inside the three re-derived nails (`softlock_empty_practice_returns.yaml` L73/L77/L92/L104, `clicks_only_gongfa_empty_exit.yaml` L87/L102/L106, `gongfa_pick_empty_keyboard_return.yaml` L44/L59/L63 — red-history evidence), `design/`/`docs/` append-only files, `final/delivery_notes_*`, and smoke-test rename-history docstrings. `playtest/action_yield_differential.yaml` L34 retains its historical "burned the month" four-value line as red-history evidence (the pre-fix tree's diagnosis, explicitly framed as having been re-derived by R5 C2 on adjacent line 47). No live registry entry or scenario name is the old one. |
 | 6 | i18n EN coverage | **met (vacuously for this card)** — this card composes zero new strings, so `i18n.gd` needed zero changes (list in §1). No missing sibling key was observed while reading surface blocks, but `tests/test_i18n_coverage.py` could not be re-run (no shell). |
 | 7 | Registry sync (both places, exactly once) | **met** — `consequence_screens_occlusion` appended once to `_common.yaml` scenario_order (after `enemy_hit_float_and_log_visible`) and once to `ROUND_SCENARIOS` (same anchor); the scenario ran through the loader, whose name==basename guard is green. Old-name residue: `softlock_empty_practice_returns` is the registered name in both places (read at lines 1229 / and ROUND_SCENARIOS); historical mentions of the old name in append-only files are on the review-mandated EXEMPT list (design/99_changelog.md, docs/ROUNDS.md, design/40_progression.md, final/delivery_notes_*, the renamed yaml's preserved R2 block, smoke-test docstrings). |
 | 8 | C1 computed-boolean spot-checks | **met** — f300 `attr_cost_text.contains(str(attr_step_cost)) and contains(str(points_left))`; f505 `consequence_text.contains("+10")` (ProgressionMath.work_income(0)); f390/f450/f590/f1090 `consequence_matches_focus == true`; owning scenarios additionally pin card effect tokens and the D/C/B ladder. |
@@ -134,7 +158,7 @@ Neither F1 nor F3's `save_load`/`event_travel` re-derivations touched a verbatim
 ## 7. Known gaps 与遗留
 
 - **F4 (verbatim gates, BLOCKER)** — the three verbatim gates are red on the clean repo because the R5 initial sect join is now two-press; this card is forbidden to touch those gates (`map_battle_node_huashan.yaml` is locked; the other two are byte-identical verbatim gates) or `sect_select.gd` (another card's code). Must be resolved by the C3/initial-join owner before 5_compile's full gate.
-- `git diff` lock proof, repo-wide greps, and `pytest tests/` re-runs could not be executed in this step (no shell); the 5_compile gate is the mechanical backstop.
+- `git diff` lock proof and `pytest tests/` re-runs could not be executed in this step (no shell); the 5_compile gate is the mechanical backstop. The residue/surface greps WERE executed via the in-workspace search tool (F5 found exactly the one live non-exempt hit; scripts/ came back clean; see §5).
 - Red-first re-measure on a wave-4 tree is structurally impossible post-waves without forbidden reverts; recorded as partial (§5.1).
 
 ## 8. 边界声明 (What was NOT touched)
@@ -143,4 +167,4 @@ Neither F1 nor F3's `save_load`/`event_travel` re-derivations touched a verbatim
 - The three verbatim gates (`facility_use_reusable.yaml`, `map_node_event_shaolin.yaml`, `map_battle_node_huashan.yaml`) — left byte-identical (red F4 reported, NOT patched).
 - `design/` files (40_ux_backlog / 90_decisions / 00_roadmap / 99_changelog) — 5_design's job; no backlog row closed here.
 - No root `playtest_spec.yaml` created; `scripts/autoload/i18n.gd` untouched; existing registry entries and surface blocks unchanged (append-only only).
-- **Touched ONLY as reviewer-mandated fixes** (revision loop, per the t_impl review's explicit instructions): `cultivation.gd` `_event_effects_text` (F1, the round's flagship C1 crash), and the two RNG-lifeline scenarios `event_travel_effects.yaml` / `save_load_roundtrip.yaml` (append-only one-press re-derivations). No other card's scenario or code file edited.
+- **Touched ONLY as reviewer-mandated fixes** (revision loop, per the t_impl review's explicit instructions): `cultivation.gd` `_event_effects_text` (F1, the round's flagship C1 crash), the two RNG-lifeline scenarios `event_travel_effects.yaml` / `save_load_roundtrip.yaml` (append-only one-press re-derivations), and `playtest/action_yield_differential.yaml` (F5 prose-comment correction at line 46 + F6 append-only one-press join re-derivation at f315 — no assertion changed). No other card's scenario or code file edited.

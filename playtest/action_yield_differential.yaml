@@ -42,10 +42,14 @@
 #   green_asserts_before_red: 9 (f130 has 5 + f170 has 2 + f200 has 2 = 9)
 #
 #   ROOT CAUSE (diagnosed, not a game defect): debug_seed_save creates an empty
-#   profile (0 sects, 0 gongfa), so the practice leg's GONGFA_PICK is empty and
-#   the soft-lock exit (proven by softlock_empty_practice_month_advances) burns
-#   the month without applying practice. The scenario needs a profile WITH
-#   gongfa to demonstrate the practice niche — hence the real-save boot. The
+#   profile (0 sects, 0 gongfa), so the practice leg's GONGFA_PICK is empty. On
+#   the R2-era tree the empty branch burned the month without applying practice
+#   (proven then by softlock_empty_practice_month_advances); R5 C2 re-derived
+#   that nail to softlock_empty_practice_returns, which RETURNS to ACTION_PICK
+#   with the month unchanged instead of burning it — but in either behavior the
+#   empty branch never applies practice, so last_action_kind stays "work" from
+#   leg 1. The scenario needs a profile WITH gongfa to demonstrate the practice
+#   niche — hence the real-save boot. The
 #   ACTION_PICK focus also resets to 0 each month, so the original move_up ×2
 #   from a "persisted" focus 2 was wrong. No game-code change required.
 name: action_yield_differential
@@ -159,6 +163,15 @@ timeline:
   assert:
     GameManager.current_state: current_state == "SECT_SELECTION"
 - at: 305
+  actions: []
+  clicks:
+  - SectButton0
+# R5 C3 re-derivation (append-only, no assertion changed): the initial sect
+# join is now a two-press confirm (first press arms the sect, second commits —
+# same input-contract change as the kunlun travel-to-ending gate and the
+# event_travel_effects / save_load_roundtrip re-points). Insert one more
+# SectButton0 press so the join commits before the CULTIVATION assert at f345.
+- at: 315
   actions: []
   clicks:
   - SectButton0
