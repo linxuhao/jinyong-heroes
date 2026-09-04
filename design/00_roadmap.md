@@ -266,11 +266,11 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
    软锁裁决反转(无可练功法 → 返回行动重选、月份零差分;取代 jinyong-loop R2 烧月出口)、
    战斗与结局屏的角色总览面板(read-only RosterPanel 实例,battlefield.gd 零改动)、
    战斗命中飘字 + 顶栏日志(谁对谁/伤害/剩多少);证据 = 本轮遮挡证据(pre-fix 官方主网 62/62;post-fix 官方复跑由
-   `occlusion_no_button_over_text` 22/22 + map 腿 9/9 承载——主网与 `ending_last_month_choice` 不在复跑注册表,
+   `occlusion_no_button_over_text` 22/22 + map 腿 9/9 承载——主网与 `ending_last_month_choice` 已随 pre-R5 路线钉按 owner 2026-09-04 裁决退役,
    见 99_changelog 2026-09-04 行)、C2 三钉与 C4 两钉官方绿(`playtest_summary.md: softlock_empty_practice_returns 16/16` 等);
    F1(cultivation.gd:1108 两参 get 崩溃)/F4(两按拜师 × 三逐字闸门单按 boot 停留 SECT_SELECTION)修复后官方复跑
-   **已落盘收口**(2026-09-04 post-fix 官方 119 场景:R5 全部新钉绿、三逐字闸门 49/49·32/32·41/41 与 RNG 生命线
-   14/14·19/19 官方实测;断言红 3/119 全为已入档 pre-R5 固定帧路线钉,owner 裁决待决见 `90_decisions.md` Open questions)
+   **已落盘收口**(2026-09-04 post-fix 终局官方 118 场景:0 runtime error、0/118 断言失败——R5 全部新钉绿、三逐字闸门 49/49·32/32·41/41 与 RNG 生命线
+   14/14·19/19 官方实测;两条 pre-R5 固定帧路线钉按 owner 2026-09-04 裁决退役、同族 `cultivation_year_end_stay`/`sect_switch_same_school_connects` 原位重锚 8/8,裁决见 `90_decisions.md`「固定帧路线钉退役」行)
    —— **队列自第 2 项(外号)继续**
 2. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
    (显示层已由 R4 改名侠客虾/陪练虾,R5 `enemy_hit_float_and_log_visible` 钉住屏上显示名;残余 = 内部键,与 UX-15 去名化同轮处理)
