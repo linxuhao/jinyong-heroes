@@ -193,10 +193,17 @@ timeline:
   actions:
   - ui_accept
 # ── year-end stay: ui_accept on 留在本门 → year 2, month 1 ──
+# (R5 revision: 3 trailing accepts so the year-end stay commits regardless of
+# which sub-phase — YEAR_END / year-2 开年际遇 augment / card — the last 修习
+# month-12 leg settles into; extra accepts on the new-year card/augment screens
+# stay at year 2 month 1.)
 - at: 700
   actions:
   - ui_accept
-- at: 713
+- at: 720
+  actions:
+  - ui_accept
+- at: 740
   actions:
   - ui_accept
 - at: 760

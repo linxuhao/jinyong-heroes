@@ -595,8 +595,9 @@ timeline:
   clicks:
   - CultOptionButton0
 - at: 920
-  actions:
-  - []
+  actions: []
+  clicks:
+  - CultOptionButton2
 # m12: card + 做工 → run finishes to MAP
 - at: 925
   actions: []
