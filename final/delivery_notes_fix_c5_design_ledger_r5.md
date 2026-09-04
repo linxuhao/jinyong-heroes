@@ -11,7 +11,9 @@
 |---|---|
 | `design/99_changelog.md` | APPEND-ONLY: one fix-round row after the existing R5 row (line 150). No existing row edited/reordered. |
 | `design/00_roadmap.md` | Current-position block (:18) updated to R5-done + next = 外号; queue prose line (:331) advanced. Numbered queue list (:251-278) NOT rewritten. |
-| `design/40_ux_backlog.md` | UX-41 status cell OPEN → CLOSED(R5 fix round) with post-fix counts; one NEW dated record line appended to `## 记录`. Existing 2026-09-04 record row byte-untouched. UX-14 stays OPEN. |
+
+| `design/40_ux_backlog.md` | UX-41 status cell OPEN → CLOSED(R5 fix round) with post-fix counts; one NEW dated record line appended to `## 记录`; **review fix**: CLOSED rows UX-36/37/38/39/41 moved out of the OPEN-only queue table (full text archived verbatim) to satisfy Pin C. Existing 2026-09-04 record row byte-untouched. UX-14 stays OPEN. |
+| `design/archive/ux_backlog_closed.md` | **Review fix (reviewer-sanctioned route)**: the five CLOSED rows UX-36 / UX-37 / UX-38 / UX-39 / UX-41 appended **verbatim** to the archive's CLOSED-queue table, with a dated move note. This archive edit deviates from the card's "design/archive/* byte-untouched" boundary and was done on the explicit instruction of the t_impl_review verdict (primary sanctioned trim route); documented here and in the boundary section. |
 | `design/90_decisions.md` | APPEND-ONLY: one new 2026-09-04 F4 ruling row after the four existing R5 rows. |
 | `final/delivery_notes_fix_c5_design_ledger_r5.md` | This file. |
 
@@ -36,7 +38,7 @@
 
 ### 2.3 `design/40_ux_backlog.md`
 - **Before:** 58 lines. UX-41 row = line 48 (status `**OPEN** — 2026-09-04 官方闸门红入档…`). `## 记录` at :51; existing 2026-09-04 record row at :56. UX-14 at :28 (OPEN).
-- **After:** 59 lines. UX-41 status cell changed to `**CLOSED(R5 fix round)**` with post-fix counts appended to the 看见什么 cell. One NEW record line appended after the existing 2026-09-04 row. UX-14 unchanged (OPEN).
+- **After (review fix applied):** the OPEN-only queue table keeps one short CLOSED pointer row per closed id; the five full CLOSED rows (UX-36 / UX-37 / UX-38 / UX-39 / UX-41) moved **verbatim** into `design/archive/ux_backlog_closed.md` (with a dated move note). UX-41 keeps a condensed but complete row in the current file: `**CLOSED(R5 fix round)**` status cell + the three post-fix counts (`save_load_roundtrip` **14/14**, `consequence_event_option_visible` **9/9**, `event_phase_no_exit_reaffirmed` **8/8**, plus `event_travel_effects` **19/19**), each labeled with its source. One NEW record line appended after the existing 2026-09-04 row (condensed in the review fix — the full detail lives in the changelog fix-round row). UX-14 unchanged (OPEN).
 - **UX-41 status cell now reads (quoted):**
   `**CLOSED(R5 fix round)** — 2026-09-04 官方闸门红入档(sweep REV2 实测;归 owning C1 卡修,修复落树后 EVENT 后果面须并入遮挡网);**post-fix 实测已落**(来源 `final/delivery_notes_fix_f1_event_option_effects_read.md` sidecar 复跑):`save_load_roundtrip` **14/14**、`consequence_event_option_visible` **9/9**、`event_phase_no_exit_reaffirmed` **8/8**、`event_travel_effects` **19/19**`
 - **Appended record line (quoted in full):**
@@ -59,9 +61,14 @@ UX-41 (opened for F1, the EVENT-option consequence crash) is CLOSED by the F1 fi
 
 Quoted in §2.4 above. All five required content elements present.
 
-## 5. Budget test
+## 5. Budget test (review fix — honest state, measured)
 
-`python3 -m pytest tests/test_design_ledger_budget.py -q` — **output unavailable in-harness**: this implementer has no shell tool, so the pytest command could not be literally executed. Per the review suggestion and the plan's fallback language, the pytest output is recorded as **unavailable** rather than fabricated. The budget is satisfiable by construction: the appends are small (one table row each; the changelog is excluded from Pin A; 90_decisions and 40_ux_backlog each gain one row well under their per-file caps — 90_decisions was 7,152 B at R4 slimming, 40_ux_backlog 17,056 B, both far below 25,600 / 20,480). The budget test must be run at 5_compile; if it fails, the fix is to trim prose in the non-changelog files (never the changelog), which this card did not need.
+**Before the review fix the budget pin was RED and the first delivery note's §5 misstated it.** Measured facts (per the t_impl_review verdict, which measured the delivered tree):
+
+- `tests/test_design_ledger_budget.py` Pin C caps `design/40_ux_backlog.md` at **20,480 B** (UX_BACKLOG_MAX, test file line 41). The file was **22,819 B — over by 2,339 B** (Pin A ≈ 318,431 ≤ 340,000 passed; Pin B `90_decisions.md` 12,578 ≤ 25,600 passed; **Pin C failed**). The earlier "17,056 B, well under cap" claim in this note cited the stale R4-slimming figure and was wrong — the t_impl appends (UX-41 status-cell expansion + ~2.2 KB record line) pushed the file over.
+- **Trim action taken (reviewer-sanctioned route):** per the file's own rule ("本文件只保留 OPEN 项") the five CLOSED rows UX-36 / UX-37 / UX-38 / UX-39 / UX-41 were moved **verbatim** into `design/archive/ux_backlog_closed.md` (review fix note appended there); the OPEN file keeps short pointer rows, and the UX-41 row keeps its CLOSED status + post-fix counts + sources in condensed form. The appended fix-round record line was also condensed (it duplicated the changelog fix-round row). Estimated removal ≈ 6 KB from the OPEN file (five full rows) — comfortably under the 20,480 B cap.
+- **Pytest output: UNAVAILABLE in-harness.** This implementer has no shell tool, so `python3 -m pytest tests/test_design_ledger_budget.py -q` could not be literally executed, and no green output is fabricated. The pin is satisfiable by construction after the trim (archive files are not counted by the top-level Pin A; the OPEN backlog file's remaining content is well under Pin C), but **the test must be run at 5_compile**; if it still fails, the sanctioned fix is to trim prose in the non-changelog file further (never the changelog).
+- Prior §5's claim of a green budget is **retracted** by this section; the real before/after is recorded here and above in §2.3.
 
 ## 6. 决策记录 (decisions made)
 
@@ -76,10 +83,18 @@ Quoted in §2.4 above. All five required content elements present.
 ## 8. 边界声明 (what was NOT touched)
 
 - No code / scenario / test / registry file changed.
-- `design/archive/*` byte-untouched (verified by construction — never edited).
+- `design/archive/*` — see §1: the ONE sanctioned deviation is the verbatim move of the five CLOSED backlog rows into `design/archive/ux_backlog_closed.md` (reviewer-instructed); nothing else in archive touched.
 - The four existing R5 decision rows (90_decisions :39-42) byte-untouched.
 - The existing 2026-09-04 backlog record row (40_ux_backlog :56) byte-untouched.
 - UX-14 status unchanged (OPEN).
 - The three verbatim gate files byte-untouched.
 - No root `playtest_spec.yaml` created.
 - The numbered roadmap queue list (:251-278) not rewritten.
+
+## 9. Review fix (t_impl_review verdict, 2026-09-04)
+
+The review verdict found one verified failure: the budget pin Pin C was RED on the delivered tree (`design/40_ux_backlog.md` 22,819 B > 20,480 B cap, over by 2,339 B) while this note's §5 asserted the file was "well under cap" using the stale 17,056 B R4-slimming figure. Fixes applied in this revision:
+
+1. **Trim executed** (research_notes §6 / plan §6 mandated route): CLOSED rows UX-36 / UX-37 / UX-38 / UX-39 / UX-41 moved **verbatim** out of the OPEN-only queue table into `design/archive/ux_backlog_closed.md` (reviewer-sanctioned primary route; a dated move note was appended there — the sole archive edit, see §1/§8); the OPEN file keeps short pointer rows; UX-41 keeps its CLOSED status, the three post-fix counts, and their source label in condensed form; the appended fix-round record line was condensed (full detail remains in the `design/99_changelog.md` fix-round row).
+2. **Delivery note corrected**: §5 now records the real measured before-state (22,819 B, Pin C failing, Pin A/Pin B passing) instead of the stale figure; the pytest green output is recorded as **unavailable in-harness** (no shell), with the test to be run at 5_compile — no fabricated output, no false green claim.
+3. Everything the review listed as correct was NOT redone: the F4 ruling row, UX-41 close counts, roadmap :18/:331 edits, the single fix-round changelog row, and all source labels stand as delivered in t_impl.
