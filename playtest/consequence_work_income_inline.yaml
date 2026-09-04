@@ -17,6 +17,12 @@
 #                                  — the pre-fix renderer did not exist.
 #   exact error .................. surface var absent / text unchanged
 #   green asserts before red ..... 3 (phase + button visible checks pass)
+#
+# R5 2026-09-04 change-table (append-only):
+#   +1 differential assert  CultivationScreen.consequence_text: changed
+#     at new frame 160 — genuine vs frame-0 menu baseline (consequence_text
+#     empty, CultivationScreen unloaded); value at 160 is the non-empty
+#     work-income line "+10…". Existing 9 asserts byte-identical; count 9/9 -> 10/10.
 name: consequence_work_income_inline
 description: >-
   C1 work-income inline + consequence renderer: at ACTION_PICK focus 2 (做工),
@@ -59,3 +65,7 @@ timeline:
     CultivationScreen.cursor_markers_visible: cursor_markers_visible == false
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 160
+  actions: []
+  assert:
+    CultivationScreen.consequence_text: changed

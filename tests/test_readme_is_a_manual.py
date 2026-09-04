@@ -81,8 +81,8 @@ def test_no_round_headings() -> None:
 
 
 def test_round_change_heading_exists() -> None:
-    assert "## 本轮变更（R4，2026-09-03）" in _readme_text(), (
-        "README.md must carry exactly the 本轮变更（R4，2026-09-03） section."
+    assert "## 本轮变更（R5，2026-09-04）" in _readme_text(), (
+        "README.md must carry exactly the 本轮变更（R5，2026-09-04） section."
     )
 
 
