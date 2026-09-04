@@ -1105,7 +1105,7 @@ func _card_effect_suffix(card: Dictionary) -> String:
 ## visible BEFORE the click (C1 red: the cost used to surface only on commit).
 func _event_effects_text(opt) -> String:
 	var parts: Array[String] = []
-	for eff in opt.get("effects", []):
+	for eff in opt.effects:
 		var t: String = str(eff.get("type", ""))
 		var v: int = int(eff.get("value", 0))
 		var target: String = str(eff.get("target", ""))

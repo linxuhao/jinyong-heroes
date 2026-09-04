@@ -17,8 +17,9 @@
 #   cultivation ConsequenceLabel ACTION_PICK work ....... W2 ......... f505
 #   cultivation ConsequenceLabel GONGFA_PICK ... W2 .................. f590
 #   cultivation ConsequenceLabel EVENT ..... W2 (owning nail only — see note
-#     at month 1; this net's months route 做工 so the reverted F1 crash cannot
-#     fire here)
+#     at month 1; this net's months route 做工 4-frame cycle, so a travel month
+#     would shift the YEAR_END frame and break f1090/f1180 — honest
+#     one-scene-per-scenario limit, EVENT framed by consequence_event_option_visible)
 #   cultivation YEAR_END consequence + SECT_SWITCH arm status .... f1090/f1180
 #   map TravelHintLabel + TravelGatePanel ... covered by
 #     consequence_screens_occlusion_map (map.tscn cannot be booted from the
@@ -199,11 +200,11 @@ timeline:
 # ── MONTH 1: 做工 (focus already 2) -> month 2 ─────────────────────────────
 # NOTE (scope correction, 2026-09-04): the EVENT consequence surface is NOT
 # framed by this net — the cultivation.gd EVENT renderer crash (Finding F1,
-# `_event_effects_text` dict-2-arg Object.get on a RefCounted EventOption)
-# belongs to the owning card feat_c1_cultivation_sect_consequences and was
-# REVERTED from this step's tree per the t_impl review. The EVENT surface is
-# covered by the owning W2 nail consequence_event_option_visible (9/9 on the
-# owning card's tree). Months 3–12 all route the proven 做工 4-frame cycle.
+# `_event_effects_text` dict-2-arg Object.get on a RefCounted EventOption) is
+# fixed by fix_f1_event_option_effects_read (opt.get("effects", []) -> opt.effects),
+# and the EVENT surface is covered by the owning W2 nail consequence_event_option_visible
+# (9/9 on the owning card's tree). Months 3–12 all route the proven 做工 4-frame cycle;
+# inserting a travel month would shift the YEAR_END frame and break f1090/f1180.
 - at: 510
   actions:
   - ui_accept
