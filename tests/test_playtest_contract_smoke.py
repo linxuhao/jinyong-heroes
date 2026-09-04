@@ -174,7 +174,9 @@ ROUND_SCENARIOS: list[str] = [
     "battle_return_to_main_menu_needs_confirm",
     "skill_range_highlight_on_select",
     "enemy_hit_float_and_log_visible",
+    "consequence_screens_occlusion",
 ]
+
 
 # The 4 observables the jinyong-nav R5 C3 back/confirm round appends to the
 # SectSelectScreen / CultivationScreen surface blocks (in playtest/_common.yaml),
