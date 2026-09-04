@@ -778,6 +778,8 @@ surface:
   - hover_connected
   - attr_cost_text
   - attr_step_cost
+  - ink_cluster_center_x
+  - ink_cluster_width
   SectSelectScreen:
   - consequence_text
   - consequence_matches_focus

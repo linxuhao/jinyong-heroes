@@ -915,6 +915,12 @@ def test_creation_point_cost_surface_contract() -> None:
         assert var in creation_items, (
             f"CreationScreen.{var} not whitelisted on the surface"
         )
+    # R5 layout-fix follow-up: the two ink-cluster diagnostics appended to the
+    # surface by fix_r5_creation_layout_regression must also be whitelisted.
+    for var in ("ink_cluster_center_x", "ink_cluster_width"):
+        assert var in creation_items, (
+            f"CreationScreen.{var} not whitelisted on the surface"
+        )
     name = "trait_point_cost_visible"
     path = PLAYTEST_DIR / (name + ".yaml")
     assert path.is_file(), f"{name}.yaml missing"

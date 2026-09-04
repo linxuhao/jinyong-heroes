@@ -33,6 +33,7 @@ timeline:
     CreationScreen.nav_cluster_center_ok: nav_cluster_center_ok == true
     CreationScreen.desc_center_ok: desc_center_ok == true
     CreationScreen.desc_alignment_ok: desc_alignment_ok == true
+    CreationScreen.ink_cluster_center_x: ink_cluster_center_x >= 474 and ink_cluster_center_x <= 486
 - at: 40
   actions: []
   clicks:

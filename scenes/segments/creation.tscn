@@ -61,7 +61,10 @@ theme_override_constants/separation = 14
 [node name="AttrRow0" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
-	size_flags_horizontal = 4
+	size_flags_horizontal = 2
+[node name="AttrCostSpacer0" type="Control" parent="MouseBox/AttrBox/AttrRow0"]
+	custom_minimum_size = Vector2(190, 0)
+	mouse_filter = 2
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow0"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
@@ -75,13 +78,16 @@ custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 [node name="AttrCostLabel0" type="Label" parent="MouseBox/AttrBox/AttrRow0"]
-custom_minimum_size = Vector2(0, 0)
+custom_minimum_size = Vector2(240, 0)
 text = ""
 
 [node name="AttrRow1" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
-	size_flags_horizontal = 4
+	size_flags_horizontal = 2
+[node name="AttrCostSpacer1" type="Control" parent="MouseBox/AttrBox/AttrRow1"]
+	custom_minimum_size = Vector2(190, 0)
+	mouse_filter = 2
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow1"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
@@ -95,13 +101,16 @@ custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 [node name="AttrCostLabel1" type="Label" parent="MouseBox/AttrBox/AttrRow1"]
-custom_minimum_size = Vector2(0, 0)
+custom_minimum_size = Vector2(240, 0)
 text = ""
 
 [node name="AttrRow2" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
-	size_flags_horizontal = 4
+	size_flags_horizontal = 2
+[node name="AttrCostSpacer2" type="Control" parent="MouseBox/AttrBox/AttrRow2"]
+custom_minimum_size = Vector2(190, 0)
+mouse_filter = 2
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow2"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
@@ -115,13 +124,16 @@ custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 [node name="AttrCostLabel2" type="Label" parent="MouseBox/AttrBox/AttrRow2"]
-custom_minimum_size = Vector2(0, 0)
+custom_minimum_size = Vector2(240, 0)
 text = ""
 
 [node name="AttrRow3" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
-	size_flags_horizontal = 4
+	size_flags_horizontal = 2
+[node name="AttrCostSpacer3" type="Control" parent="MouseBox/AttrBox/AttrRow3"]
+custom_minimum_size = Vector2(190, 0)
+mouse_filter = 2
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow3"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
@@ -135,13 +147,16 @@ custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 [node name="AttrCostLabel3" type="Label" parent="MouseBox/AttrBox/AttrRow3"]
-custom_minimum_size = Vector2(0, 0)
+custom_minimum_size = Vector2(240, 0)
 text = ""
 
 [node name="AttrRow4" type="HBoxContainer" parent="MouseBox/AttrBox"]
 	custom_minimum_size = Vector2(0, 44)
 	theme_override_constants/separation = 6
-	size_flags_horizontal = 4
+	size_flags_horizontal = 2
+[node name="AttrCostSpacer4" type="Control" parent="MouseBox/AttrBox/AttrRow4"]
+custom_minimum_size = Vector2(190, 0)
+mouse_filter = 2
 [node name="AttrLabel" type="Label" parent="MouseBox/AttrBox/AttrRow4"]
 	horizontal_alignment = 2
 	size_flags_horizontal = 3
@@ -155,7 +170,7 @@ custom_minimum_size = Vector2(44, 34)
 text = "+"
 focus_mode = 0
 [node name="AttrCostLabel4" type="Label" parent="MouseBox/AttrBox/AttrRow4"]
-custom_minimum_size = Vector2(0, 0)
+custom_minimum_size = Vector2(240, 0)
 text = ""
 
 [node name="AttrDescLabel" type="Label" parent="MouseBox/AttrBox"]

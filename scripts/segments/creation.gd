@@ -9,6 +9,17 @@ extends Control
 const START_POINTS: int = 30
 const ATTR_MIN: int = 10
 const ATTR_MAX: int = 20
+## Layout constant: the equal-width cost cell shared by each row's
+## AttrCostSpacer{i} FIRST child and AttrCostLabel{i} LAST child, so the cost
+## text-width changes cancel symmetrically and the measured ink cluster
+## (AttrLabel text ∪ AttrMinus ∪ AttrPlus) stays centered at the viewport
+## center. Floor only (custom_minimum_size never clips text). The 560px
+## AttrBox must fit 2×cell + cluster(≈147) + 4×separation(24) so both slots
+## plus the measured cluster sit inside the box while the row stays shrink-
+## centered — 190 keeps a ≤560px row (2×190+147+24 = 551), leaving the long
+## cost line to grow past the floor into the cell (text overflow is absorbed
+## by the symmetric slot, never occluding the cluster).
+const _ATTR_COST_CELL: int = 190
 
 ## Chinese descriptions per attribute, keyed by PlayerProfile.ATTR_KEYS.
 ## Formulas verbatim from design/40_progression.md §7.1, meanings from
@@ -36,6 +47,14 @@ var attr_cost_text: String = ""
 
 ## Surface: next-point cost of the focused row's current value = _step_cost(current_value).
 var attr_step_cost: int = 1
+
+## Surface (layout, append-only): x-center and width of the ATTRS first-row
+## ink cluster (AttrLabel text rect ∪ AttrMinus ∪ AttrPlus) via _row_ink_union.
+## ATTRS-gated: updated each ATTRS frame, last value kept otherwise (the same
+## phase-gated convention as the other layout facts). Zero-size union keeps the
+## previous value so a transient lookup gap never fakes a verdict.
+var ink_cluster_center_x: float = 0.0
+var ink_cluster_width: float = 0.0
 
 ## Surface: the five attrs (PlayerProfile.ATTR_KEYS -> int).
 var attrs: Dictionary = {"bone": 10, "inner": 10, "agility": 10, "wisdom": 10, "fortune": 10}
@@ -146,10 +165,23 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	# Equal-width cost-cell sync every frame so the measured cluster geometry is
+	# stable BEFORE the layout facts are computed (the container reflows at the
+	# end of the frame). Purely additive — the measurement code below is byte-identical.
+	_sync_attr_cost_cells()
 	# Round-2 geometry observables: computed every frame (cheap rect reads) so
 	# the playtest gate can assert them at any deterministic frame. Runs before
 	# the DEBUG branch; the branch below is unchanged.
 	_update_geometry_observables()
+	# ATTRS-gated leaf-ink layout diagnostics (surface, append-only): fill from
+	# the SAME _row_ink_union the facts read, so a green ink_cluster_center_x
+	# here is a first-class observed value, not a re-derivation. Zero-size union
+	# (= missing node / not ATTRS) keeps the previous value instead of writing 0.
+	if phase == "ATTRS":
+		var u: Rect2 = _row_ink_union(0)
+		if u.size != Vector2.ZERO:
+			ink_cluster_center_x = u.get_center().x
+			ink_cluster_width = u.size.x
 	# Harness-only DEBUG action (defined by project.godot [input]; an absent
 	# action just returns false from is_action_just_pressed — never crashes).
 	# debug_click_creation_widget drives the SAME _on_attr_plus_pressed the
@@ -392,6 +424,26 @@ func _label_text_rect(l: Label) -> Rect2:
 			return Rect2(lr.position.x + (lr.size.x - sz.x) * 0.5, lr.position.y + (lr.size.y - sz.y) * 0.5, sz.x, sz.y)
 		_:  # LEFT (0) and anything unknown: text starts at the rect origin.
 			return Rect2(lr.position, sz)
+
+
+## Sync each row's cost-label cell width to its equal-width spacer, so cost-text
+## width changes cancel symmetrically and the measured cluster (AttrLabel text
+## rect ∪ AttrMinus ∪ AttrPlus) stays centered at the viewport center regardless
+## of "剩 %d" digit / tier differences. Runs every frame BEFORE the layout facts
+## are computed. Only writes a spacer when its width actually changed (avoids
+## re-triggering the container layout pass every frame). Null-safe: any missing
+## row node is skipped.
+func _sync_attr_cost_cells() -> void:
+	for i in 5:
+		var label: Control = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrCostLabel%d" % [i, i]) as Control
+		var spacer: Control = get_node_or_null("MouseBox/AttrBox/AttrRow%d/AttrCostSpacer%d" % [i, i]) as Control
+		if label == null or spacer == null:
+			continue
+		if label.custom_minimum_size.x != _ATTR_COST_CELL:
+			label.custom_minimum_size = Vector2(_ATTR_COST_CELL, 0.0)
+		var sp: float = label.get_combined_minimum_size().x
+		if spacer.custom_minimum_size.x != sp:
+			spacer.custom_minimum_size = Vector2(sp, 0.0)
 
 
 ## Ink union of attr row i: label TEXT rect ∪ AttrMinus{i} rect ∪ AttrPlus{i}
