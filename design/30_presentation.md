@@ -305,6 +305,16 @@ harness 侧读 Node2D 点击锚用 `get_global_transform_with_canvas().origin`(�
 | 事件面板:选择 / 定夺 | 上下 / Enter | move_up / move_down / ui_accept |
 | 注入银两(调试) | —(debug-only) | `debug_grant_silver`(经 `EventLogic.apply_option_effects` 正常管线,不直改字段) |
 
+### 养成段返回与确认(2026-09-04 R5 补记)
+
+| 动作 | 键 | Godot action |
+|---|---|---|
+| 返回上一屏(ATTR/GONGFA/CARD/YEAR_END/SECT_SWITCH) | Esc / 可见「返回」按钮 | ui_cancel(EVENT 相位显式早退,零差分——无离开键重申) |
+| 两按确认(拜入门派 / 年末改投 / 通往结局的行程 / 战斗回主菜单) | 同键再按一次 | 首按武装(零写入零 RNG),再按提交 |
+| 暂停菜单(战斗) | Escape | pause_game → 弹菜单:继续 / 返回主菜单(二次确认) |
+| 行程终点闸(通往昆仑=结局的节点) | 启程键(Enter) | 首按弹「此去即结局」确认(确认启程/返回),再按才启程 |
+| 节点类型提示(常显) | — | 场景层兄弟节点渲染(华山=战斗 · 少林/武当=门派设施 · 事件 · 此去即结局) |
+
 ### 战斗命中的 5 步优先级规则(2026-08-28,interaction-defects)
 
 左键点击世界点 `P` 在 `player.gd::handle_world_click` 内按以下顺序解算:

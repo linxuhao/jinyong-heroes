@@ -261,12 +261,20 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
                              post-iteration-4 官方 93 场景复跑(2026-09-03)
                              **93/93 全 PASS**(硬闸门 passed、零 runtime error):
                              trait 22/22、huashan 47/47,零红
-1. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
-2. 回执/结算              —— 结局回顾与结算页(UX-30)
-3. 教程与目标             —— 教程页加「本关目标」提示
-4. 创建屏剩余点数         —— 捏人屏未用完点数显示
-5. 地图有图              —— 大地图加背景图(terrain 已有占位)
-6. 非战斗美术             —— 六段非战斗屏的美术填充
+1. ✅ R5 navigation-and-consequence(2026-09-04 落地)—— 点之前知道后果(每盲选屏后果由数据渲染)、
+   未提交选择屏可返回(五相位返回按钮 + ui_cancel,零差分)、不可逆提交两按确认(拜师/年末改投/结局行程/战斗回主菜单)、
+   软锁裁决反转(无可练功法 → 返回行动重选、月份零差分;取代 jinyong-loop R2 烧月出口)、
+   战斗与结局屏的角色总览面板(read-only RosterPanel 实例,battlefield.gd 零改动)、
+   战斗命中飘字 + 顶栏日志(谁对谁/伤害/剩多少);证据 = 本轮 62/62 遮挡网、C2 三钉与 C4 两钉官方绿
+   (`playtest_summary.md: softlock_empty_practice_returns 16/16` 等);F1(cultivation.gd:1108 两参 get 崩溃)/
+   F4(两按拜师 × 三逐字闸门单按 boot 停留 SECT_SELECTION)修复后官方复跑收口 —— **队列自第 2 项(外号)继续**
+2. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
+   (显示层已由 R4 改名侠客虾/陪练虾,R5 `enemy_hit_float_and_log_visible` 钉住屏上显示名;残余 = 内部键,与 UX-15 去名化同轮处理)
+3. 回执/结算              —— 结局回顾与结算页(UX-30)
+4. 教程与目标             —— 教程页加「本关目标」提示
+5. 创建屏剩余点数         —— 捏人屏未用完点数显示(R5 已把加/减点成本常显,本条余「未用完点数」提示)
+6. 地图有图              —— 大地图加背景图(terrain 已有占位)
+7. 非战斗美术             —— 六段非战斗屏的美术填充
 ```
 
 **官方复跑收口(2026-09-02,5_design 补记)**:队列第 0 项完成——修复轮

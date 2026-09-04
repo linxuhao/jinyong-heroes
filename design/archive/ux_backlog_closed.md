@@ -113,6 +113,14 @@
 4. 属性页的说明是一段挤在一起的长句(`Bone:HP = Bone × 5 · Qi:Qi pool = ...`),
    没有分行分组。
 
+### R4 收尾记录行(2026-09-04 R5 收尾时移入,逐字保留)
+
+> 移入原因:`40_ux_backlog.md` 的 per-file 预算钉(Pin C ≤ 20,480 B)在 R5 新增
+> UX-41 行与 2026-09-04 记录行后越界;按 R4 Card N+2 同款纪律,把已收口的旧轮
+> 记录行逐字搬入本归档,现场文件留一行指针。
+
+- 2026-09-03 `R4 外号轮`(post-gate 收尾,5_design 证据步骤;证据取自本步上下文中的本轮 `5_compile` / `5_vision` 产物,非 `final/` 仓库文件):本轮官方闸门实测——编译 **109/109** 零错误;playtest **95/95 场景全 PASS**(硬闸门 `passed: true`、`spec_used: true`、180 帧、零 runtime error),改名后两条字面量闸门 `round_one_snapshot_and_turn_order` **14/14**、`ui_geometry_readability` **38/38**,Card 0 新钉 `enemy_turn_wall_clock` **5/5**、`enemy_action_feedback` **9/9**、相机后段遮挡 `camera_transform_follows_unit` **13/13**、`occlusion_no_button_over_text` **22/22**;视觉闸门 passed 非盲(`localqwen/qwen3`,95 场景 380 帧,六问全部 `failed: false`,Q6 **77 好 / 18 坏**——坏答所见理由均为屏底边缘文字被切,无一条指名顺序条或名牌截断)。**本轮关闭:无、新开:无**,逐项裁定:UX-36 修复已落(R4 外号轮别名补漏 + 改名,行内已注记)但无场景钉屏上侠客虾/陪练虾,按规矩 2 保持 OPEN 待一条屏上场景钉;UX-15(资源去名化)保持 OPEN——R4 只改显示层,`assets/seed_manifest.json` 资产清单项在 denylist 范围外;UX-19 的 `侠客` 两条命中被外号轮顺带解决(行内已注记),其余人形泛词未动、保持 OPEN;UX-34/UX-35 与视觉 Q6 的 18 条屏底截断坏答同域,按规矩 3 归入其下待人工筛,不另开卡;其余 OPEN 项本轮无指向动作,状态不变。所有者 2026-09-02 试玩六条反馈按 roadmap 卡(record-only)落在 `00_roadmap.md` backlog/队列(R5/R6),按规矩 3 不自动开卡、待人工筛;Card 0(敌方回合 20–40 s/人,2026-09-02 owner 试玩发现)经 L1 卡直接修复并以 `enemy_turn_wall_clock` 5/5 钉住,不再入列。
+
 ### 一条与语言有关的观察
 
 抽样帧里满屏英文中夹着一个中文「退回」按钮(战斗屏右侧)。i18n 有覆盖缺口——
