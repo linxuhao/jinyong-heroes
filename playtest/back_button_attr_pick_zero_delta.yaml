@@ -1,0 +1,77 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (cultivation back channel): ATTR_PICK gets a visible BackButton + ui_cancel
+# that return to ACTION_PICK with ZERO state delta (phase restored, month/silver
+# unchanged). Enter ATTR_PICK via 练习->修习, assert the back affordance, click
+# CultBackButton, assert phase == ACTION_PICK and the differential snapshots
+# month_before_accept / silver_before_accept are unchanged.
+#
+# Boot: debug_seed_save + load (no-sect empty profile, month 1) -> CARD_PICK
+# f130. ui_accept (card) -> ACTION_PICK; move_down ×1 (修习, index 1); ui_accept
+# -> ATTR_PICK.
+#
+# RED-FIRST four values (measured on pre-implementation tree — no back channel):
+#   pre-fix failing frame ........ 190 (the first assert frame at ATTR_PICK)
+#   first failing assert ......... CultivationScreen.back_button_visible == true —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (back_button_visible == false)
+#   green asserts before red ..... 2 (phase + month pass at ATTR_PICK)
+name: back_button_attr_pick_zero_delta
+description: >-
+  C3 back from ATTR_PICK: 练习->修习 -> ATTR_PICK shows CultBackButton visible and
+  back_button_visible true with back_target_phase "ACTION_PICK"; clicking
+  CultBackButton returns to ACTION_PICK with month == month_before_accept and
+  silver == silver_before_accept (zero delta). CultBackButton hidden after back.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (no-sect fresh profile, month 1) ────────────────────
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+- at: 140
+  actions:
+  - ui_accept
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - ui_accept
+# ── ATTR_PICK: back affordance visible + target ────────────────────────────
+- at: 190
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ATTR_PICK"
+    CultivationScreen.back_button_visible: back_button_visible == true
+    CultivationScreen.back_target_phase: back_target_phase == "ACTION_PICK"
+    CultBackButton.visible: visible == true
+# ── BACK: click CultBackButton -> ACTION_PICK, zero delta ──────────────────
+- at: 200
+  actions: []
+  clicks:
+  - CultBackButton
+- at: 230
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.month: month == month_before_accept
+    CultivationScreen.silver: silver == silver_before_accept
+    CultivationScreen.back_button_visible: back_button_visible == false

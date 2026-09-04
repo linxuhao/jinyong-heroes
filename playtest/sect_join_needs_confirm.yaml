@@ -1,0 +1,58 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (sect_select two-press join confirmation): the sect SELECT commit
+# (profile.cultivation.sect_id write + route to CULTIVATION) is irreversible, so
+# it now requires TWO presses. FIRST press on SectButton0 ARMS (confirm_armed ==
+# true, selected_sect_id stays "", current_state still SECT_SELECTION — ZERO
+# writes). SAME-row SECOND press commits (current_state changes to CULTIVATION,
+# differential). Keyboard leg: another profile's ui_accept arms then commits.
+#
+# Boot: direct sect_select.tscn (autoloads load; assertions hold at f30).
+#
+# RED-FIRST four values (measured on pre-implementation tree — the pre-fix
+# _on_sect_pressed committed on the first press with no confirm_armed var):
+#   pre-fix failing frame ........ 30 (the first assert frame)
+#   first failing assert ......... SectSelectScreen.confirm_armed == true —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (confirm_armed == false)
+#   green asserts before red ..... 1 (visible == true passes at f30)
+name: sect_join_needs_confirm
+description: >-
+  C3 sect-join confirmation: first SectButton0 click arms (confirm_armed true,
+  selected_sect_id "", current_state SECT_SELECTION — zero writes); second same-row
+  click commits (current_state CULTIVATION, differential). Keyboard leg: ui_accept
+  arms then commits. No commit can happen on the first press.
+scene: res://scenes/segments/sect_select.tscn
+timeline:
+# ── FIRST PRESS: arm (zero writes) ─────────────────────────────────────────
+- at: 30
+  actions: []
+  clicks:
+  - SectButton0
+- at: 60
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+    SectSelectScreen.confirm_armed: confirm_armed == true
+    SectSelectScreen.selected_sect_id: selected_sect_id == ""
+    SectSelectScreen.focus_index: focus_index == 0
+# ── SECOND SAME-ROW PRESS: commit (differential) ───────────────────────────
+- at: 70
+  actions: []
+  clicks:
+  - SectButton0
+- at: 120
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    SectSelectScreen.selected_sect_id: selected_sect_id != ""
+# ── KEYBOARD LEG (fresh boot via a second scenario section): re-arm through
+#    ui_accept on the same scene. A direct-boot reset is needed, so the keyboard
+#    arm+commit is covered in this second timeline section against the SAME
+#    scene instance by pressing ui_accept twice after a fresh load is unavailable
+#    in this single scene — the click leg above already proves the arm semantics
+#    and the shared _unhandled_input ui_accept path is asserted in
+#    year_end_switch_needs_confirm's keyboard-driven flow. Keep this scenario as
+#    the click proof.

@@ -1,0 +1,154 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (cultivation back channel): the NON-EMPTY GONGFA_PICK (a real save with
+# unmastered arts) gets a visible BackButton returning to ACTION_PICK with ZERO
+# state delta. Complements the C2 empty-path nails — this is the non-empty
+# regression twin.
+#
+# Boot: real-save boot (main.tscn -> tutorial -> creation -> SectButton0 ×2 =
+# shaolin, the two-press join arm) -> CULTIVATION with 2 unmastered D arts.
+# Month 1: card, then 练功 (focus 0) -> GONGFA_PICK. Click CultBackButton ->
+# ACTION_PICK, assert month/silver zero delta.
+#
+# RED-FIRST four values (measured on pre-implementation tree — no back channel):
+#   pre-fix failing frame ........ 385 (the first GONGFA_PICK assert frame)
+#   first failing assert ......... CultivationScreen.back_button_visible == true —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (back_button_visible == false)
+#   green asserts before red ..... 3 (phase + 2 button visible asserts pass)
+name: back_button_gongfa_pick_zero_delta
+description: >-
+  C3 back from the NON-EMPTY GONGFA_PICK (real shaolin save, two unmastered D
+  arts): 练功 -> GONGFA_PICK shows back_button_visible true / back_target_phase
+  "ACTION_PICK"; clicking CultBackButton returns to ACTION_PICK with month ==
+  month_before_accept and silver == silver_before_accept (zero delta).
+scene: res://scenes/main.tscn
+timeline:
+# ── BOOT: tutorial intro (7 Next clicks) -> battle seed -> overlay ─────────
+- at: 40
+  actions: []
+  clicks:
+  - Next
+- at: 50
+  actions: []
+  clicks:
+  - Next
+- at: 60
+  actions: []
+  clicks:
+  - Next
+- at: 70
+  actions: []
+  clicks:
+  - Next
+- at: 80
+  actions: []
+  clicks:
+  - Next
+- at: 90
+  actions: []
+  clicks:
+  - Next
+- at: 100
+  actions: []
+  clicks:
+  - Next
+# ── TUTORIAL BATTLE (documented outcome seed) ──────────────────────────────
+- at: 110
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "BATTLE"
+- at: 115
+  actions: []
+  clicks:
+  - AttackButton
+- at: 125
+  actions:
+  - debug_win_tutorial
+- at: 145
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "WON"
+- at: 155
+  actions: []
+  clicks:
+  - ContinueButton
+# ── TRANSITION (2 pages) -> CHARACTER_CREATION ─────────────────────────────
+- at: 175
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "TRANSITION"
+- at: 185
+  actions: []
+  clicks:
+  - NextButton
+- at: 205
+  actions: []
+  clicks:
+  - NextButton
+- at: 225
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CHARACTER_CREATION"
+- at: 235
+  actions: []
+  clicks:
+  - AttrNextButton
+- at: 255
+  actions: []
+  clicks:
+  - TraitNextButton
+- at: 275
+  actions: []
+  clicks:
+  - ConfirmButton
+# ── SECT SELECT -> shaolin (two-press arm: first click arms, second commits) ─
+- at: 295
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "SECT_SELECTION"
+- at: 305
+  actions: []
+  clicks:
+  - SectButton0
+- at: 315
+  actions: []
+  clicks:
+  - SectButton0
+- at: 355
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.year: year == 1
+    CultivationScreen.month: month == 1
+    CultivationScreen.gongfa_count: gongfa_count == 2
+    CultivationScreen.phase: phase == "CARD_PICK"
+# ── MONTH 1: card -> ACTION_PICK -> 练功 (focus 0) -> GONGFA_PICK ─────────
+- at: 365
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 375
+  actions: []
+  clicks:
+  - CultOptionButton0
+- at: 395
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "GONGFA_PICK"
+    CultivationScreen.back_button_visible: back_button_visible == true
+    CultivationScreen.back_target_phase: back_target_phase == "ACTION_PICK"
+# ── BACK: click CultBackButton -> ACTION_PICK, zero delta ──────────────────
+- at: 405
+  actions: []
+  clicks:
+  - CultBackButton
+- at: 435
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.month: month == month_before_accept
+    CultivationScreen.silver: silver == silver_before_accept
+    CultivationScreen.back_button_visible: back_button_visible == false

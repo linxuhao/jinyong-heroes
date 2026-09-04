@@ -162,7 +162,25 @@ ROUND_SCENARIOS: list[str] = [
     "map_travel_node_type_hint",
     "travel_to_ending_needs_confirm",
     "consequence_screens_occlusion_map",
+    "back_button_attr_pick_zero_delta",
+    "back_button_gongfa_pick_zero_delta",
+    "back_button_card_pick_zero_delta",
+    "back_button_year_end_zero_delta",
+    "back_button_sect_switch_zero_delta",
+    "sect_join_needs_confirm",
+    "year_end_switch_needs_confirm",
+    "event_phase_no_exit_reaffirmed",
 ]
+
+# The 4 observables the jinyong-nav R5 C3 back/confirm round appends to the
+# SectSelectScreen / CultivationScreen surface blocks (in playtest/_common.yaml),
+# ONLY-ADD — never removed or renamed.
+R5_C3_SURFACE_VARS: tuple[str, ...] = (
+    "confirm_armed",               # SectSelectScreen (sect join two-press arm)
+    "back_button_visible",         # CultivationScreen (back channel)
+    "back_target_phase",           # CultivationScreen (back target)
+    "switch_confirm_armed",        # CultivationScreen (year-end sect-switch arm)
+)
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
 # surface block (in playtest/_common.yaml), in the same order they are appended.

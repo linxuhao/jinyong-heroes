@@ -1,0 +1,222 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (year-end sect-switch two-press confirmation): the SECT_SWITCH commit
+# (sect_id write + _advance_year) is irreversible, so it requires a two-press arm.
+# FIRST press on the focused row ARMS (switch_confirm_armed == true, sect_id/year
+# unchanged — ZERO writes). SAME-row SECOND press commits (year advances — the
+# differential).
+#
+# Boot: debug_seed_save + load -> drive 11 months of 做工 to reach month 12's
+# YEAR_END -> move_down (另投他派) -> ui_accept -> SECT_SWITCH. First SECT_SWITCH
+# accept arms (zero writes); second same-row accept commits (_advance_year ->
+# year 2).
+#
+# RED-FIRST four values (measured on pre-implementation tree — no switch arm):
+#   pre-fix failing frame ........ 700 (the first SECT_SWITCH arm assert frame)
+#   first failing assert ......... CultivationScreen.switch_confirm_armed == true —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (switch_confirm_armed == false)
+#   green asserts before red ..... 4 (phase + month + year + back checks pass)
+name: year_end_switch_needs_confirm
+description: >-
+  C3 year-end sect-switch confirmation: at month 12 YEAR_END 另投他派 -> SECT_SWITCH;
+  first ui_accept arms (switch_confirm_armed true, sect_id/year/month unchanged —
+  zero writes); second same-row ui_accept commits (_advance_year: year becomes 2,
+  differential). No commit can happen on the first press.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── DRIVE 11 MONTHS (做工 = index 2, 4 frames per month cycle) ────────────
+- at: 130
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - move_down
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_down
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - move_down
+- at: 230
+  actions:
+  - move_down
+- at: 240
+  actions:
+  - ui_accept
+- at: 250
+  actions:
+  - ui_accept
+- at: 260
+  actions:
+  - move_down
+- at: 270
+  actions:
+  - move_down
+- at: 280
+  actions:
+  - ui_accept
+- at: 290
+  actions:
+  - ui_accept
+- at: 300
+  actions:
+  - move_down
+- at: 310
+  actions:
+  - move_down
+- at: 320
+  actions:
+  - ui_accept
+- at: 330
+  actions:
+  - ui_accept
+- at: 340
+  actions:
+  - move_down
+- at: 350
+  actions:
+  - move_down
+- at: 360
+  actions:
+  - ui_accept
+- at: 370
+  actions:
+  - ui_accept
+- at: 380
+  actions:
+  - move_down
+- at: 390
+  actions:
+  - move_down
+- at: 400
+  actions:
+  - ui_accept
+- at: 410
+  actions:
+  - ui_accept
+- at: 420
+  actions:
+  - move_down
+- at: 430
+  actions:
+  - move_down
+- at: 440
+  actions:
+  - ui_accept
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions:
+  - move_down
+- at: 470
+  actions:
+  - move_down
+- at: 480
+  actions:
+  - ui_accept
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions:
+  - move_down
+- at: 510
+  actions:
+  - move_down
+- at: 520
+  actions:
+  - ui_accept
+- at: 530
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - move_down
+- at: 550
+  actions:
+  - move_down
+- at: 560
+  actions:
+  - ui_accept
+# ── MONTH 12: CARD -> ACTION -> 做工 -> YEAR_END -> 另投他派 -> SECT_SWITCH ─
+- at: 570
+  actions:
+  - ui_accept
+- at: 580
+  actions:
+  - move_down
+- at: 590
+  actions:
+  - move_down
+- at: 600
+  actions:
+  - ui_accept
+- at: 640
+  actions:
+  - move_down
+- at: 660
+  actions:
+  - ui_accept
+- at: 690
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "SECT_SWITCH"
+    CultivationScreen.month: month == 12
+    CultivationScreen.year: year == 1
+# ── FIRST SECT_SWITCH ACCEPT: arm (zero writes) ────────────────────────────
+- at: 700
+  actions:
+  - ui_accept
+- at: 730
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "SECT_SWITCH"
+    CultivationScreen.switch_confirm_armed: switch_confirm_armed == true
+    CultivationScreen.year: year == 1
+    CultivationScreen.month: month == 12
+# ── SECOND SAME-ROW ACCEPT: commit (_advance_year, differential) ───────────
+- at: 740
+  actions:
+  - ui_accept
+- at: 790
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_AUGMENT"
+    CultivationScreen.year: year == 2
+    CultivationScreen.month: month == 1
+    CultivationScreen.switch_confirm_armed: switch_confirm_armed == false

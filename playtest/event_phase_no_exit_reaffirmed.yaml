@@ -1,0 +1,74 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (EVENT no-exit ruling REAFFIRMED in code): the event phase has NO exit key.
+# ui_cancel during EVENT is consumed as a no-op (phase stays EVENT, month/silver
+# unchanged) and the back button is NOT visible (back_button_visible == false).
+# Declining an option (the existing EVENT ui_accept) remains the only exit.
+#
+# Boot: debug_seed_save + load -> CARD_PICK -> ui_accept (card) -> ACTION_PICK ->
+# move_down ×3 -> ui_accept (游历 index 3) -> EVENT. Assert EVENT, then ui_cancel
+# -> phase stays EVENT, month/silver unchanged, back_button_visible == false.
+#
+# RED-FIRST four values (measured on pre-implementation tree — no back channel):
+#   pre-fix failing frame ........ 200 (the first EVENT assert frame)
+#   first failing assert ......... CultivationScreen.back_button_visible == false —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (back_button_visible == false)
+#   green asserts before red ..... 3 (phase + consequence + month checks pass)
+name: event_phase_no_exit_reaffirmed
+description: >-
+  C3 EVENT no-exit ruling REAFFIRMED: in EVENT, ui_cancel is consumed as a no-op
+  (phase stays EVENT, month/silver unchanged) and CultBackButton is hidden
+  (back_button_visible == false). Declining an option remains the only exit —
+  the archived EVENT no-exit ruling is reaffirmed, not overturned.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── LOAD -> CULTIVATION (month 1 CARD_PICK) -> card -> ACTION_PICK ─────────
+- at: 130
+  actions:
+  - ui_accept
+- at: 145
+  actions:
+  - move_down
+- at: 155
+  actions:
+  - move_down
+- at: 165
+  actions:
+  - move_down
+- at: 175
+  actions:
+  - ui_accept
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.consequence_text: 'consequence_text != ""'
+    CultivationScreen.back_button_visible: back_button_visible == false
+    CultBackButton.visible: visible == false
+# ── ui_cancel in EVENT: consumed as a no-op — phase/month/silver unchanged ─
+- at: 210
+  actions:
+  - ui_cancel
+- at: 240
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.month: month == month_before_accept
+    CultivationScreen.silver: silver == silver_before_accept
+    CultivationScreen.back_button_visible: back_button_visible == false

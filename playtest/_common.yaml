@@ -180,6 +180,7 @@ actions:
 - debug_grant_silver
 - debug_seed_events_seen
 - event_reroll
+- ui_cancel
 surface:
   CombatManager:
   - current_round
@@ -773,6 +774,7 @@ surface:
   - size
   - pressed_connected
   - cursor_markers_visible
+  - confirm_armed
   CultivationScreen:
   - consequence_text
   - consequence_matches_focus
@@ -816,6 +818,9 @@ surface:
   - last_practice_target_increased
   - rerolls_left
   - last_yield_readable
+  - back_button_visible
+  - back_target_phase
+  - switch_confirm_armed
   MapScreen:
   - current_node_id
   - focus_id
@@ -1019,6 +1024,11 @@ surface:
   - mouse_filter
   - text
   CultOptionButton2:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  CultBackButton:
   - visible
   - size
   - mouse_filter
@@ -1229,3 +1239,11 @@ scenario_order:
 - map_travel_node_type_hint
 - travel_to_ending_needs_confirm
 - consequence_screens_occlusion_map
+- back_button_attr_pick_zero_delta
+- back_button_gongfa_pick_zero_delta
+- back_button_card_pick_zero_delta
+- back_button_year_end_zero_delta
+- back_button_sect_switch_zero_delta
+- sect_join_needs_confirm
+- year_end_switch_needs_confirm
+- event_phase_no_exit_reaffirmed

@@ -1,0 +1,222 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (cultivation back channel): YEAR_END gets a visible BackButton + ui_cancel
+# returning to ACTION_PICK with the month STILL 12 (zero delta on month — the
+# year-end is NOT skipped or re-staged). _after_action's month-12 branch re-enters
+# YEAR_END on the next committed action, so backing out is safe.
+#
+# Boot: debug_seed_save + load -> month 1 CARD_PICK. Drive 11 months of 做工
+# (the consequence_year_end_switch grammar) to reach month 12's YEAR_END. Click
+# CultBackButton -> ACTION_PICK with month still 12. Second leg: commit an action
+# (做工) -> _after_action re-enters YEAR_END (month 12, year-end re-offered).
+#
+# RED-FIRST four values (measured on pre-implementation tree — no back channel):
+#   pre-fix failing frame ........ 620 (the first YEAR_END assert frame)
+#   first failing assert ......... CultivationScreen.back_button_visible == true —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (back_button_visible == false)
+#   green asserts before red ..... 3 (phase + month + consequence checks pass)
+name: back_button_year_end_zero_delta
+description: >-
+  C3 back from YEAR_END: at month 12 the year-end screen shows back_button_visible
+  true / back_target_phase "ACTION_PICK"; clicking CultBackButton returns to
+  ACTION_PICK with month == 12 unchanged and silver == silver_before_accept (zero
+  delta). Second leg: one committed 做工 action re-enters YEAR_END (month 12,
+  year-end re-offered — proving backing out cannot skip it).
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── DRIVE 11 MONTHS (做工 = index 2, 4 frames per month cycle) ────────────
+- at: 130
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - move_down
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_down
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - move_down
+- at: 230
+  actions:
+  - move_down
+- at: 240
+  actions:
+  - ui_accept
+- at: 250
+  actions:
+  - ui_accept
+- at: 260
+  actions:
+  - move_down
+- at: 270
+  actions:
+  - move_down
+- at: 280
+  actions:
+  - ui_accept
+- at: 290
+  actions:
+  - ui_accept
+- at: 300
+  actions:
+  - move_down
+- at: 310
+  actions:
+  - move_down
+- at: 320
+  actions:
+  - ui_accept
+- at: 330
+  actions:
+  - ui_accept
+- at: 340
+  actions:
+  - move_down
+- at: 350
+  actions:
+  - move_down
+- at: 360
+  actions:
+  - ui_accept
+- at: 370
+  actions:
+  - ui_accept
+- at: 380
+  actions:
+  - move_down
+- at: 390
+  actions:
+  - move_down
+- at: 400
+  actions:
+  - ui_accept
+- at: 410
+  actions:
+  - ui_accept
+- at: 420
+  actions:
+  - move_down
+- at: 430
+  actions:
+  - move_down
+- at: 440
+  actions:
+  - ui_accept
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions:
+  - move_down
+- at: 470
+  actions:
+  - move_down
+- at: 480
+  actions:
+  - ui_accept
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions:
+  - move_down
+- at: 510
+  actions:
+  - move_down
+- at: 520
+  actions:
+  - ui_accept
+- at: 530
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - move_down
+- at: 550
+  actions:
+  - move_down
+- at: 560
+  actions:
+  - ui_accept
+# ── MONTH 12: CARD_PICK -> ACTION_PICK -> 做工 -> YEAR_END ────────────────
+- at: 570
+  actions:
+  - ui_accept
+- at: 580
+  actions:
+  - move_down
+- at: 590
+  actions:
+  - move_down
+- at: 600
+  actions:
+  - ui_accept
+- at: 640
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_END"
+    CultivationScreen.month: month == 12
+    CultivationScreen.back_button_visible: back_button_visible == true
+    CultivationScreen.back_target_phase: back_target_phase == "ACTION_PICK"
+# ── BACK: click CultBackButton -> ACTION_PICK, month still 12, zero delta ──
+- at: 650
+  actions: []
+  clicks:
+  - CultBackButton
+- at: 690
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "ACTION_PICK"
+    CultivationScreen.month: month == 12
+    CultivationScreen.silver: silver == silver_before_accept
+    CultivationScreen.back_button_visible: back_button_visible == false
+# ── SECOND LEG: one committed 做工 action re-enters YEAR_END (month stays 12) ─
+- at: 700
+  actions:
+  - move_down
+- at: 710
+  actions:
+  - move_down
+- at: 720
+  actions:
+  - ui_accept
+- at: 770
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_END"
+    CultivationScreen.month: month == 12

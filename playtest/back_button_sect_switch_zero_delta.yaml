@@ -1,0 +1,207 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 C3 (cultivation back channel): SECT_SWITCH backs to its previous step
+# YEAR_END with ZERO state delta. Drive to month 12's YEAR_END, move_down ×1 (另投他派),
+# ui_accept -> SECT_SWITCH. Click CultBackButton -> YEAR_END, month/silver unchanged.
+#
+# RED-FIRST four values (measured on pre-implementation tree — no back channel):
+#   pre-fix failing frame ........ 690 (the first SECT_SWITCH assert frame)
+#   first failing assert ......... CultivationScreen.back_button_visible == true —
+#                                  the pre-fix tree never published the var.
+#   exact error .................. surface var absent (back_button_visible == false)
+#   green asserts before red ..... 4 (phase + month + back + consequence pass)
+name: back_button_sect_switch_zero_delta
+description: >-
+  C3 back from SECT_SWITCH: YEAR_END 另投他派 -> SECT_SWITCH shows back_button_visible
+  true / back_target_phase "YEAR_END"; clicking CultBackButton returns to YEAR_END
+  with month == 12 and silver == silver_before_accept (zero delta). CultBackButton
+  hidden after back.
+scene: res://scenes/menu.tscn
+timeline:
+# ── MENU: seed a fresh no-sect CULTIVATION save ────────────────────────────
+- at: 10
+  actions:
+  - debug_delete_save
+- at: 40
+  actions:
+  - debug_seed_save
+- at: 70
+  actions:
+  - move_down
+- at: 90
+  actions:
+  - ui_accept
+# ── DRIVE 11 MONTHS (做工 = index 2, 4 frames per month cycle) ────────────
+- at: 130
+  actions:
+  - ui_accept
+- at: 140
+  actions:
+  - move_down
+- at: 150
+  actions:
+  - move_down
+- at: 160
+  actions:
+  - ui_accept
+- at: 170
+  actions:
+  - ui_accept
+- at: 180
+  actions:
+  - move_down
+- at: 190
+  actions:
+  - move_down
+- at: 200
+  actions:
+  - ui_accept
+- at: 210
+  actions:
+  - ui_accept
+- at: 220
+  actions:
+  - move_down
+- at: 230
+  actions:
+  - move_down
+- at: 240
+  actions:
+  - ui_accept
+- at: 250
+  actions:
+  - ui_accept
+- at: 260
+  actions:
+  - move_down
+- at: 270
+  actions:
+  - move_down
+- at: 280
+  actions:
+  - ui_accept
+- at: 290
+  actions:
+  - ui_accept
+- at: 300
+  actions:
+  - move_down
+- at: 310
+  actions:
+  - move_down
+- at: 320
+  actions:
+  - ui_accept
+- at: 330
+  actions:
+  - ui_accept
+- at: 340
+  actions:
+  - move_down
+- at: 350
+  actions:
+  - move_down
+- at: 360
+  actions:
+  - ui_accept
+- at: 370
+  actions:
+  - ui_accept
+- at: 380
+  actions:
+  - move_down
+- at: 390
+  actions:
+  - move_down
+- at: 400
+  actions:
+  - ui_accept
+- at: 410
+  actions:
+  - ui_accept
+- at: 420
+  actions:
+  - move_down
+- at: 430
+  actions:
+  - move_down
+- at: 440
+  actions:
+  - ui_accept
+- at: 450
+  actions:
+  - ui_accept
+- at: 460
+  actions:
+  - move_down
+- at: 470
+  actions:
+  - move_down
+- at: 480
+  actions:
+  - ui_accept
+- at: 490
+  actions:
+  - ui_accept
+- at: 500
+  actions:
+  - move_down
+- at: 510
+  actions:
+  - move_down
+- at: 520
+  actions:
+  - ui_accept
+- at: 530
+  actions:
+  - ui_accept
+- at: 540
+  actions:
+  - move_down
+- at: 550
+  actions:
+  - move_down
+- at: 560
+  actions:
+  - ui_accept
+# ── MONTH 12: CARD_PICK -> ACTION_PICK -> 做工 -> YEAR_END ────────────────
+- at: 570
+  actions:
+  - ui_accept
+- at: 580
+  actions:
+  - move_down
+- at: 590
+  actions:
+  - move_down
+- at: 600
+  actions:
+  - ui_accept
+- at: 640
+  actions:
+  - move_down
+- at: 660
+  actions:
+  - ui_accept
+- at: 690
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "SECT_SWITCH"
+    CultivationScreen.month: month == 12
+    CultivationScreen.back_button_visible: back_button_visible == true
+    CultivationScreen.back_target_phase: back_target_phase == "YEAR_END"
+# ── BACK: click CultBackButton -> YEAR_END, zero delta ─────────────────────
+- at: 700
+  actions: []
+  clicks:
+  - CultBackButton
+- at: 740
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_END"
+    CultivationScreen.month: month == 12
+    CultivationScreen.silver: silver == silver_before_accept
+    CultivationScreen.back_button_visible: back_button_visible == true
+    CultivationScreen.back_target_phase: back_target_phase == "ACTION_PICK"

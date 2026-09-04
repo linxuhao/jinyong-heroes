@@ -26,6 +26,17 @@ var consequence_text: String = ""
 ## focused sect's data row (false for an out-of-range focus).
 var consequence_matches_focus: bool = false
 
+## Surface (R5 C3): true when the CURRENT focus_index row is ARMED for the
+## two-press join confirmation — first press on a row arms (ZERO writes:
+## selected_sect_id stays ""), the SAME row's second press commits. A different
+## row press or a move re-arms to that row (confirm_armed becomes false until
+## re-armed). Published by _render().
+var confirm_armed: bool = false
+
+## Private: the focus_index the join arm was set for (R5 C3). The commit only
+## happens on the SAME row's second press; pressing a different row re-arms.
+var _armed_index: int = -1
+
 
 func _ready() -> void:
 	_wire_sect_buttons()
@@ -41,23 +52,62 @@ func _wire_sect_buttons() -> void:
 		pressed_connected["SectButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
 
 
+## R5 C3: two-press join confirmation. FIRST press on a row: focus + render +
+## arm (ZERO writes — selected_sect_id stays ""). SAME-row SECOND press: commit
+## through the existing _pick() path byte-identically. A different row press
+## re-arms to that row.
 func _on_sect_pressed(i: int) -> void:
 	focus_index = i
 	_render()
+	if not confirm_armed or _armed_index != focus_index:
+		confirm_armed = true
+		_armed_index = focus_index
+		var ids: Array[String] = ProgressionGongfaData.sect_ids()
+		var sname: String = ""
+		if focus_index >= 0 and focus_index < ids.size():
+			var row: Dictionary = ProgressionGongfaData.SECTS[focus_index]
+			sname = tr(str(row["display_name"]))
+		var body: Label = get_node_or_null("BodyLabel") as Label
+		if body != null:
+			body.text = body.text + "\n" + tr("⚠ 再按一次确认拜入「%s」") % sname
+		return
+	confirm_armed = false
+	_armed_index = -1
 	_pick()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
 		get_viewport().set_input_as_handled()
+		# Keyboard mirrors the press logic symmetrically: first accept arms
+		# (zero writes), same-row second accept commits.
+		if not confirm_armed or _armed_index != focus_index:
+			confirm_armed = true
+			_armed_index = focus_index
+			var ids: Array[String] = ProgressionGongfaData.sect_ids()
+			var sname: String = ""
+			if focus_index >= 0 and focus_index < ids.size():
+				var row: Dictionary = ProgressionGongfaData.SECTS[focus_index]
+				sname = tr(str(row["display_name"]))
+			var body: Label = get_node_or_null("BodyLabel") as Label
+			if body != null:
+				body.text = body.text + "\n" + tr("⚠ 再按一次确认拜入「%s」") % sname
+			return
+		confirm_armed = false
+		_armed_index = -1
 		_pick()
 	elif event.is_action_pressed("move_up"):
 		get_viewport().set_input_as_handled()
 		focus_index = (focus_index - 1 + 5) % 5
+		# A move re-arms to the moved row: the old row is no longer armed.
+		confirm_armed = false
+		_armed_index = -1
 		_render()
 	elif event.is_action_pressed("move_down"):
 		get_viewport().set_input_as_handled()
 		focus_index = (focus_index + 1) % 5
+		confirm_armed = false
+		_armed_index = -1
 		_render()
 
 
