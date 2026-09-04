@@ -2,57 +2,78 @@
 # scene / actions / surface live there, this file is only the scenario.
 # The basename must equal `name:`.
 #
-# R5 C3 (sect_select two-press join confirmation): the sect SELECT commit
-# (profile.cultivation.sect_id write + route to CULTIVATION) is irreversible, so
-# it now requires TWO presses. FIRST press on SectButton0 ARMS (confirm_armed ==
-# true, selected_sect_id stays "", current_state still SECT_SELECTION — ZERO
-# writes). SAME-row SECOND press commits (current_state changes to CULTIVATION,
-# differential). Keyboard leg: another profile's ui_accept arms then commits.
+# F4 (owner ruling at the step-3 checkpoint): the sect SELECT commit is a
+# SINGLE PRESS on every input path again — the three verbatim gates pin the
+# one-press join as an iron law FOR THE GAME. The press is made safe by the
+# two owner rulings that DO apply to this screen: (a) C1 — the consequence
+# preview (SectSelectScreen.consequence_text) is visible BEFORE the press and
+# tracks focus; (b) C3 — SectBackButton is on screen while nothing is
+# committed, and clicking it routes to the main menu with NOTHING committed
+# (GameManager.enter_menu() — public, guard-free, zero-write). The one-press
+# join commit itself stays pinned where it has always been pinned: the three
+# verbatim gates (facility_use_reusable / map_node_event_shaolin /
+# map_battle_node_huashan) join with ONE SectButton press in-flow and land
+# CULTIVATION byte-identically.
 #
 # Boot: direct sect_select.tscn (autoloads load; assertions hold at f30).
+# Known direct-boot quirk: GameManager.current_state can read TUTORIAL at
+# early frames on a direct boot; the back-landing assert is differential-shaped
+# (after the back click the state MUST read "MENU" — enter_menu() is
+# guard-free, so the direct-boot leak cannot break it).
 #
-# RED-FIRST four values (measured on pre-implementation tree — the pre-fix
-# _on_sect_pressed committed on the first press with no confirm_armed var):
-#   pre-fix failing frame ........ 30 (the first assert frame)
-#   first failing assert ......... SectSelectScreen.confirm_armed == true —
-#                                  the pre-fix tree never published the var.
-#   exact error .................. surface var absent (confirm_armed == false)
-#   green asserts before red ..... 1 (visible == true passes at f30)
+# ── Per-line change table (F4 re-derivation in place; append-only) ──────────
+# | # | Old (R5 C3 two-press nail) | New (F4) | Why |
+# | 1 | description: two-press arm semantics | rewritten: single-press join + preview-before-press + back | prose/assert consistency under the F4 ruling |
+# | 2 | f30 click SectButton0 (first press ARMS) | deleted click; f30 is a REST frame | the arm is gone — the first press JOINS (gates' iron law) |
+# | 3 | f60 assert confirm_armed == true | DELETED (arm-semantics assert of the initial join, ordered deleted by the ruling) | grep-proven: zero `confirm_armed` in this file |
+# | 4 | f60 assert current_state == "SECT_SELECTION" | DELETED (leaked TUTORIAL on direct boot, f60 measured TUTORIAL) | replaced by the back-landing differential (row 8) |
+# | 5 | f60 asserts selected_sect_id == "" / focus_index == 0 | re-homed: f30 rest asserts selected_sect_id == "" + SectBackButton.visible == true + back_button_visible == true + consequence_text != "" | back available with zero state delta; preview visible before any press |
+# | 6 | f70/f120 two-press commit block | replaced by f40 move_down → f60 differential: consequence_text changed + consequence_matches_focus == true + selected_sect_id still "" | the preview tracks focus BEFORE the join press (C1) |
+# | 7 | f70 second same-row click commits | deleted (commit stays pinned by the three verbatim gates, one press) | no arm to confirm |
+# | 8 | (absent) | f70 click SectBackButton → f120 assert GameManager.current_state == "MENU" | the back-zero-delta proof: a join press can never land MENU |
+# | 9 | keyboard-leg prose block (no asserts) | removed with the arm; ui_accept shares the same _pick() path | single shared commit path |
+#
+# RED-FIRST (measured, this cycle's 5_compile playtest_summary.md — quoted
+# verbatim as the red record): sect_join_needs_confirm 4/6 — f60
+# `GameManager.current_state == "SECT_SELECTION"` observed TUTORIAL, f120
+# observed TUTORIAL (the two-press arm blocked the single join press in the
+# gates' scenarios too: facility_use_reusable 0/49, map_node_event_shaolin
+# 1/32, map_battle_node_huashan 5/41, event_travel_effects 1/19,
+# action_yield_differential 24/44; hard gate 344 runtime errors / 180 frames).
 name: sect_join_needs_confirm
 description: >-
-  C3 sect-join confirmation: first SectButton0 click arms (confirm_armed true,
-  selected_sect_id "", current_state SECT_SELECTION — zero writes); second same-row
-  click commits (current_state CULTIVATION, differential). Keyboard leg: ui_accept
-  arms then commits. No commit can happen on the first press.
+  F4 sect-select screen: the consequence preview is visible BEFORE any press
+  and tracks focus (move_down -> consequence_text changed, matches focus, still
+  nothing committed); SectBackButton is visible at rest, and clicking it routes
+  to the main menu with NOTHING committed (current_state == "MENU" — a join
+  press can never land MENU). The one-press join commit itself is pinned by the
+  three verbatim gates (single SectButton press lands CULTIVATION).
 scene: res://scenes/segments/sect_select.tscn
 timeline:
-# ── FIRST PRESS: arm (zero writes) ─────────────────────────────────────────
+# ── REST: back available, nothing committed, preview already rendered ──────
 - at: 30
   actions: []
-  clicks:
-  - SectButton0
+  assert:
+    SectBackButton.visible: visible == true
+    SectSelectScreen.back_button_visible: back_button_visible == true
+    SectSelectScreen.selected_sect_id: selected_sect_id == ""
+    SectSelectScreen.consequence_text: consequence_text != ""
+# ── FOCUS MOVE: the preview tracks focus BEFORE any join press ──────────────
+- at: 40
+  actions:
+  - move_down
 - at: 60
   actions: []
   assert:
-    GameManager.current_state: current_state == "SECT_SELECTION"
-    SectSelectScreen.confirm_armed: confirm_armed == true
+    SectSelectScreen.consequence_text: changed
+    SectSelectScreen.consequence_matches_focus: consequence_matches_focus == true
     SectSelectScreen.selected_sect_id: selected_sect_id == ""
-    SectSelectScreen.focus_index: focus_index == 0
-# ── SECOND SAME-ROW PRESS: commit (differential) ───────────────────────────
+# ── BACK: route to the main menu with NOTHING committed (differential) ──────
 - at: 70
   actions: []
   clicks:
-  - SectButton0
+  - SectBackButton
 - at: 120
   actions: []
   assert:
-    GameManager.current_state: current_state == "CULTIVATION"
-    SectSelectScreen.selected_sect_id: selected_sect_id != ""
-# ── KEYBOARD LEG (fresh boot via a second scenario section): re-arm through
-#    ui_accept on the same scene. A direct-boot reset is needed, so the keyboard
-#    arm+commit is covered in this second timeline section against the SAME
-#    scene instance by pressing ui_accept twice after a fresh load is unavailable
-#    in this single scene — the click leg above already proves the arm semantics
-#    and the shared _unhandled_input ui_accept path is asserted in
-#    year_end_switch_needs_confirm's keyboard-driven flow. Keep this scenario as
-#    the click proof.
+    GameManager.current_state: current_state == "MENU"

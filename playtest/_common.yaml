@@ -787,7 +787,7 @@ surface:
   - size
   - pressed_connected
   - cursor_markers_visible
-  - confirm_armed
+  - back_button_visible
   CultivationScreen:
   - consequence_text
   - consequence_matches_focus
@@ -1022,6 +1022,11 @@ surface:
   - mouse_filter
   - text
   SectButton4:
+  - visible
+  - size
+  - mouse_filter
+  - text
+  SectBackButton:
   - visible
   - size
   - mouse_filter

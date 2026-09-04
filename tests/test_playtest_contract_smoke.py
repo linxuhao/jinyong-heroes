@@ -178,12 +178,17 @@ ROUND_SCENARIOS: list[str] = [
 ]
 
 
-# The 4 observables the jinyong-nav R5 C3 back/confirm round appends to the
-# SectSelectScreen / CultivationScreen surface blocks (in playtest/_common.yaml),
-# ONLY-ADD — never removed or renamed.
+# The F4 single-press sect-join fix REMOVED SectSelectScreen.confirm_armed
+# (grep-proven dead after the two-press arm was deleted on all input paths).
+# The remaining observables the jinyong-nav R5 C3 round appended to the
+# SectSelectScreen / CultivationScreen surface blocks (in
+# playtest/_common.yaml) stay whitelisted — never removed or renamed.
+# back_button_visible is whitelisted in BOTH blocks: CultivationScreen (the
+# cultivation back channel) and SectSelectScreen (the F4 SectBackButton
+# mirror); switch_confirm_armed is CultivationScreen's year-end sect-switch
+# arm and is a DIFFERENT variable from the removed sect-join confirm_armed.
 R5_C3_SURFACE_VARS: tuple[str, ...] = (
-    "confirm_armed",               # SectSelectScreen (sect join two-press arm)
-    "back_button_visible",         # CultivationScreen (back channel)
+    "back_button_visible",         # CultivationScreen + SectSelectScreen
     "back_target_phase",           # CultivationScreen (back target)
     "switch_confirm_armed",        # CultivationScreen (year-end sect-switch arm)
 )
@@ -2178,6 +2183,7 @@ def test_touch_reach_surface_contract() -> None:
                          "disabled", "focus_mode"]),
         ("NextButton", ["visible", "size", "mouse_filter", "text"]),
         ("SectButton0", ["visible", "size", "mouse_filter", "text"]),
+        ("SectBackButton", ["visible", "size", "mouse_filter", "text"]),
         ("CultOptionButton0", ["visible", "size", "mouse_filter", "text"]),
         ("CultOptionButton2", ["visible", "size", "mouse_filter", "text"]),
         ("TravelButton0", ["visible", "size", "mouse_filter", "text"]),

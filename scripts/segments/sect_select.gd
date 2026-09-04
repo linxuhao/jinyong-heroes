@@ -26,20 +26,18 @@ var consequence_text: String = ""
 ## focused sect's data row (false for an out-of-range focus).
 var consequence_matches_focus: bool = false
 
-## Surface (R5 C3): true when the CURRENT focus_index row is ARMED for the
-## two-press join confirmation — first press on a row arms (ZERO writes:
-## selected_sect_id stays ""), the SAME row's second press commits. A different
-## row press or a move re-arms to that row (confirm_armed becomes false until
-## re-armed). Published by _render().
-var confirm_armed: bool = false
-
-## Private: the focus_index the join arm was set for (R5 C3). The commit only
-## happens on the SAME row's second press; pressing a different row re-arms.
-var _armed_index: int = -1
+## Surface (F4): true iff the back button is on screen. The back is available
+## while nothing is committed (selected_sect_id == ""); a committed join routes
+## away from this screen, so the button never becomes a rollback path.
+## Published by _render().
+var back_button_visible: bool = true
 
 
 func _ready() -> void:
 	_wire_sect_buttons()
+	var back: Button = get_node_or_null("SectBackButton") as Button
+	if back != null:
+		back.pressed.connect(_on_back)
 	_render()
 
 
@@ -52,63 +50,47 @@ func _wire_sect_buttons() -> void:
 		pressed_connected["SectButton%d" % i] = btn.get_signal_connection_list("pressed").size() > 0
 
 
-## R5 C3: two-press join confirmation. FIRST press on a row: focus + render +
-## arm (ZERO writes — selected_sect_id stays ""). SAME-row SECOND press: commit
-## through the existing _pick() path byte-identically. A different row press
-## re-arms to that row.
+## Join is SINGLE-PRESS on EVERY input path (click and keyboard ui_accept share
+## the same _pick() commit). Owner F4 ruling: the three verbatim gates pin the
+## one-press join as an iron law FOR THE GAME, not for one input path — the
+## two-press arm from R5 is gone. The press is made safe by the owner's two
+## actual rulings, both kept: (a) C1 — the consequence preview
+## (consequence_text, rendered in _render()) shows what joining gives BEFORE
+## the press; (b) C3 — SectBackButton is on screen while nothing is committed.
+## The year-end SECT SWITCH keeps its two-press confirm (cultivation.gd, a
+## different file and a real switch with a cost — no gate pins that join).
 func _on_sect_pressed(i: int) -> void:
 	focus_index = i
 	_render()
-	if not confirm_armed or _armed_index != focus_index:
-		confirm_armed = true
-		_armed_index = focus_index
-		var ids: Array[String] = ProgressionGongfaData.sect_ids()
-		var sname: String = ""
-		if focus_index >= 0 and focus_index < ids.size():
-			var row: Dictionary = ProgressionGongfaData.SECTS[focus_index]
-			sname = tr(str(row["display_name"]))
-		var body: Label = get_node_or_null("BodyLabel") as Label
-		if body != null:
-			body.text = body.text + "\n" + tr("⚠ 再按一次确认拜入「%s」") % sname
-		return
-	confirm_armed = false
-	_armed_index = -1
 	_pick()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
 		get_viewport().set_input_as_handled()
-		# Keyboard mirrors the press logic symmetrically: first accept arms
-		# (zero writes), same-row second accept commits.
-		if not confirm_armed or _armed_index != focus_index:
-			confirm_armed = true
-			_armed_index = focus_index
-			var ids: Array[String] = ProgressionGongfaData.sect_ids()
-			var sname: String = ""
-			if focus_index >= 0 and focus_index < ids.size():
-				var row: Dictionary = ProgressionGongfaData.SECTS[focus_index]
-				sname = tr(str(row["display_name"]))
-			var body: Label = get_node_or_null("BodyLabel") as Label
-			if body != null:
-				body.text = body.text + "\n" + tr("⚠ 再按一次确认拜入「%s」") % sname
-			return
-		confirm_armed = false
-		_armed_index = -1
+		# Same single-press commit path as the click handler above.
 		_pick()
+	elif event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_on_back()
 	elif event.is_action_pressed("move_up"):
 		get_viewport().set_input_as_handled()
 		focus_index = (focus_index - 1 + 5) % 5
-		# A move re-arms to the moved row: the old row is no longer armed.
-		confirm_armed = false
-		_armed_index = -1
 		_render()
 	elif event.is_action_pressed("move_down"):
 		get_viewport().set_input_as_handled()
 		focus_index = (focus_index + 1) % 5
-		confirm_armed = false
-		_armed_index = -1
 		_render()
+
+
+## C3 back (F4): route to the main menu ONLY while nothing is committed.
+## GameManager.enter_menu() is the documented public, guard-free, zero-write
+## route (enter_segment cannot express MENU; restart_game() would reset the
+## profile). Zero profile writes, zero RNG ops, zero saves.
+func _on_back() -> void:
+	if selected_sect_id != "" or SceneManager.pending_swap:
+		return
+	GameManager.enter_menu()
 
 
 func _pick() -> void:
@@ -151,6 +133,8 @@ func _render() -> void:
 	# through _render(): _on_sect_pressed and move_up/move_down alike).
 	consequence_text = _consequence_text(focus_index)
 	consequence_matches_focus = consequence_text != ""
+	var back: Button = get_node_or_null("SectBackButton") as Button
+	back_button_visible = back != null and back.visible
 
 
 ## C1 renderer: consequence of the sect at focus_index, composed FROM DATA
