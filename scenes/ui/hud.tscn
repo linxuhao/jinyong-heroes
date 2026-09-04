@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/pause_button.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/ui/round_indicator.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/ui/move_hint_label.gd" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/ui/roster_panel.tscn" id="5"]
+[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="6"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_topstrip"]
 bg_color = Color(0.07, 0.07, 0.1, 0.6)
@@ -188,3 +189,36 @@ script = ExtResource("4")
 
 [node name="RosterPanel" parent="." instance=ExtResource("5")]
 read_only = true
+
+[node name="PauseMenu" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+visible = false
+script = ExtResource("6")
+
+[node name="PauseStatus" type="Label" parent="PauseMenu"]
+offset_left = 400.0
+offset_top = 260.0
+offset_right = 880.0
+offset_bottom = 300.0
+horizontal_alignment = 1
+clip_text = false
+text = ""
+
+[node name="PauseContinueButton" type="Button" parent="PauseMenu"]
+offset_left = 500.0
+offset_top = 320.0
+offset_right = 780.0
+offset_bottom = 360.0
+focus_mode = 0
+text = "继续"
+
+[node name="PauseMainMenuButton" type="Button" parent="PauseMenu"]
+offset_left = 500.0
+offset_top = 376.0
+offset_right = 780.0
+offset_bottom = 416.0
+focus_mode = 0
+text = "返回主菜单"

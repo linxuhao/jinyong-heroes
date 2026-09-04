@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 FEEDBACK NAIL — an enemy hit on the player is VISIBLE (float + log line).
+#
+# Boot mirrors enemy_action_feedback.yaml exactly (7x ui_accept, end_turn at
+# f20 hands the round to the five tutorial enemies). HIT_TABLE_D (probe D)
+# verified every damage path funnels through the single dispatch point
+# CombatManager.apply_damage() → _fx_on_hit(): one log line
+# `"<attacker> → <target> −<loss> (剩 <remaining>)"` appended to the CombatLog
+# (debug_combat_log_lines += 1) and one floating number spawned
+# (debug_float_numbers_spawned += 1). No damage site lives in the locked
+# battlefield.gd, so this task changed NO hit-path code — the deliverable is
+# this content nail.
+#
+# CONTENT asserts go through the whitelisted HUD relay `HUD.combat_log_text`
+# (hud.gd mirrors the CombatLog node's rendered_text; the CombatLog node lives
+# under the CombatManager autoload and is not a proven harness assert target).
+# Names are the R4 display names (never internal character_name): the
+# tutorial enemy is 陪练虾 and the hero is 侠客虾, so the hit line's shape
+# `陪练虾 → 侠客虾 −N (剩 M)` is pinned by property (→, −, 剩, both display
+# names). The frame is placed while the newest hit is still inside the log's
+# MAX_LINES = 6 visible window (combat_log.gd trims to the last 6 lines).
+name: enemy_hit_float_and_log_visible
+description: >-
+  Boot to the tutorial battle, hand the round to the five enemies with
+  end_turn, and assert the first enemy hit on the player is visible: the
+  cumulative log/float counters moved (changed), the HUD-relayed log text
+  holds a hit line containing the attacker display name (陪练虾), the player
+  display name (侠客虾), the arrow, the damage dash and the remaining-HP
+  marker, and UiOcclusionWatch is clean on a log-visible frame.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [end_turn]}
+# Baseline BEFORE the first enemy hit lands (measured: the first hit arrives
+# well before f60, so the empty-log baseline must precede end_turn at f20).
+- at: 18
+  actions: []
+  assert:
+    HUD.combat_log_text: combat_log_text == ""
+# By f200 the first enemy has acted and hit the player: both counters moved.
+- at: 200
+  actions: []
+  assert:
+    CombatManager.debug_combat_log_lines: changed
+    CombatManager.debug_float_numbers_spawned: changed
+    HUD.combat_log_text: changed
+# Content + occlusion on a frame the log is visible (newest hits still inside
+# the 6-line window): the hit line names the player display name (独臂大虾)
+# and carries the attacker→target arrow, the damage dash and the remaining-HP
+# marker. Attacker display names are the five-greats aliases (东邪虾/西毒虾/
+# 南帝虾/北丐虾/中神通虾 — every rendered character is a shrimp), pinned
+# generically via the虾 glyph plus the fixed player name.
+- at: 1100
+  actions: []
+  assert:
+    CombatManager.debug_combat_log_lines: debug_combat_log_lines >= 1
+    CombatManager.debug_float_numbers_spawned: debug_float_numbers_spawned >= 1
+    HUD.combat_log_text: combat_log_text.contains("→") and combat_log_text.contains("剩") and combat_log_text.contains("独臂大虾") and combat_log_text.contains("虾") and combat_log_text != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

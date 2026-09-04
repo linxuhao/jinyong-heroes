@@ -31,16 +31,30 @@ func _ready() -> void:
 # Signal handlers
 # ---------------------------------------------------------------------------
 
-## Toggle pause/unpause via CombatManager.
+## Toggle pause/unpause via CombatManager. (Contract unchanged.)
 func _on_toggle_pause() -> void:
 	CombatManager.toggle_pause()
 
 
-## Update button text when paused.
+## Update button text when paused. ONE R5 addition: opening the pause menu.
+## The menu is resolved FRESH each call (`../PauseMenu` — PauseButton is a
+## direct child of the HUD root, where the sibling PauseMenu node lives), so
+## the two files cannot disagree on the path. open_menu() writes zero combat
+## state — is_paused semantics stay owned by toggle_pause().
 func _on_paused() -> void:
 	text = "继续"
+	var menu: Control = get_node_or_null("../PauseMenu") as Control
+	if menu != null and menu.has_method("open_menu"):
+		menu.open_menu()
 
 
-## Update button text when unpaused.
+## Update button text when unpaused. R5: close the pause menu (the Continue
+## button's second toggle lands here — net effect identical to today's second
+## press, and is_paused is still written only by toggle_pause()).
 func _on_unpaused() -> void:
 	text = "暂停"
+	var menu: Control = get_node_or_null("../PauseMenu") as Control
+	if menu != null and menu.has_method("close_menu"):
+		menu.close_menu()
+
+

@@ -78,6 +78,22 @@ var undo_desc_overlap: bool = false
 ## entry button is hidden while open, so reading it would report a false close).
 var roster_panel_open: bool = false
 
+## R5 pause-menu mirrors (playtest surface). Both resolved FRESH every frame,
+## before the player null-check, so they are readable pre-battle too:
+##   - pause_menu_open — true while the PauseMenu panel is visible;
+##   - pause_menu_armed — true while 返回主菜单's two-press arm is set.
+## The menu itself never writes combat state; these are mirrors only.
+var pause_menu_open: bool = false
+var pause_menu_armed: bool = false
+
+## R5 combat-log relay: mirrors the CombatLog node's `rendered_text` (a child
+## of the CombatManager autoload — not a proven assert target in the harness,
+## so the content lands on the proven-resolvable HUD surface instead). The
+## node is created lazily by CombatManager's first fx hook, so this reads ""
+## until the first hit/no-move — the feedback scenario asserts during an
+## enemy round, after hits, which is safely post-creation.
+var combat_log_text: String = ""
+
 ## Round-2 top-strip observables (playtest surface under HUD.): the five top
 ## texts (RoundLabel / ActiveLabel / OrderLabel / EnergyLabel, plus
 ## ActionHintLabel ONLY while visible) must be pairwise non-overlapping and
@@ -764,6 +780,24 @@ func _process(_delta: float) -> void:
 	# (never RosterOpenButton.visible — the entry button is hidden while open,
 	# so reading it would report a false close).
 	roster_panel_open = _roster_is_open()
+
+	# R5 pause-menu mirrors + combat-log relay: published BEFORE the player
+	# null-check so they are readable on every frame. All three are null-safe
+	# mirrors — the menu node and the log node may not exist (pre-battle /
+	# before the first hit), in which case they read their falsy defaults.
+	var pause_menu: Control = get_node_or_null("PauseMenu") as Control
+	if pause_menu != null and is_instance_valid(pause_menu):
+		pause_menu_open = bool(pause_menu.visible)
+		pause_menu_armed = bool(pause_menu.confirm_armed)
+	else:
+		pause_menu_open = false
+		pause_menu_armed = false
+	var combat_log_node: Node = CombatManager.get_node_or_null("CombatLog")
+	if combat_log_node != null and is_instance_valid(combat_log_node) \
+			and "rendered_text" in combat_log_node:
+		combat_log_text = String(combat_log_node.rendered_text)
+	else:
+		combat_log_text = ""
 
 	# Battle action buttons: disabled whenever the battle input gate is closed
 	# (not the player's turn, or paused). Must run BEFORE the player null-check

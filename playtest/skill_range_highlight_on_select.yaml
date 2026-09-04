@@ -1,0 +1,59 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 VERIFICATION-ONLY NAIL — skill-range highlight on SELECTION (before cast).
+#
+# Playtest #5 red: selecting 大巧不工 and pressing J yielded only 「射程不够」,
+# with no range highlight before the cast. The probe (VERDICT_B / HIT_TABLE_D)
+# verified the fix ALREADY EXISTS and is pinned green by
+# skill_hint_and_range_highlight.yaml: scripts/ui/range_highlight.gd is a
+# self-driving poller that every _process reads
+# GameManager.get_player().selected_skill_index and, for a valid selection,
+# sets visible = true and computes tile_count / target_count from
+# player.can_skill_hit — i.e. selecting a skill highlights its reachable
+# tiles BEFORE any cast.
+#
+# This scenario therefore makes ZERO source edits (player.gd / skill_button.gd
+# untouched) and re-proves the behavior on a dedicated nail: select skill 1
+# (skill_1 selects player skill index 0 — 重剑无锋, cost 0, always castable),
+# and BEFORE any attack_confirm / J press assert the highlight node is visible
+# with a non-empty tile set. No absolute pixel/coordinate literals.
+name: skill_range_highlight_on_select
+description: >-
+  Boot to the tutorial battle, select a skill (skill_1), and BEFORE any cast
+  assert the range highlight is already active: RangeHighlight.visible == true
+  (differential from the pre-selection frame) and RangeHighlight.tile_count > 0
+  — selecting a skill highlights its reachable tiles without a cast.
+  Verification-only: the existing selection-driven highlighter
+  (range_highlight.gd over player.selected_skill_index) is the carrier; this
+  nail pins it independently of skill_hint_and_range_highlight.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+# Player turn live, nothing selected yet — highlight inactive (or its tile set
+# empty; the differential on visible below is the load-bearing leg).
+- at: 40
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    Player.health: health >= 1
+    RangeHighlight.tile_count: tile_count == 0
+# SELECT a skill — the highlight must appear on selection, before any cast.
+# (Measured: the selection's effects are visible on the FOLLOWING frame, so
+# the tile_count floor is asserted at f90, not same-frame at f60.)
+- at: 60
+  actions: [skill_1]
+  assert:
+    RangeHighlight.visible: changed
+- at: 90
+  actions: []
+  assert:
+    RangeHighlight.visible: visible == true
+    RangeHighlight.tile_count: tile_count > 0
+    CombatManager.phase: phase == "PLAYER_TURN"

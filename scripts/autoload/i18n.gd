@@ -614,6 +614,12 @@ const EN: Dictionary = {
 	"（战斗中只读）": "(Read-only in battle)",
 	"查看角色": "View Character",
 
+	# --- R5 battle pause menu (pause_menu.gd) --------------------------------
+	# (`继续` already has an EN entry in this table's earlier section — only-add
+	# means no duplicate key.)
+	"返回主菜单": "Return to Main Menu",
+	"⚠ 再按一次确认返回主菜单，本局进度将丢失": "Press again to confirm returning to the main menu; this run's progress will be lost",
+
 	# --- R5 C1 consequence renderer (cultivation.gd + sect_select.gd) ---------
 	"练功：本月在所选功法上 +%d 练度": "Train: +%d practice on the chosen art this month",
 	"做工：本月 银两 +%d": "Work: +%d silver this month",

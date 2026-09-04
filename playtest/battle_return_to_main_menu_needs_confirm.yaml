@@ -1,0 +1,78 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 BATTLE PAUSE MENU — 返回主菜单 two-press confirm nail.
+#
+# Press #1 on PauseMainMenuButton only ARMS the confirm (confirm_armed true,
+# a visible warning line, ZERO writes — GameManager.current_state stays
+# BATTLE, differential `unchanged`). Press #2 confirms and routes via the
+# probe's VERDICT_A public route `GameManager.enter_menu()` (guard-free; lands
+# current_state == "MENU" → menu_panel.tscn) — the VERDICT_A landing is the
+# exact thing this nail records. A Continue press between arming and
+# confirming would close the menu and clear the arm (close_menu resets
+# confirm_armed), so the menu cannot accidentally commit.
+#
+# The pause is triggered by a real click on PauseButton (the keyboard
+# pause_game path is tutorial-gated and may be a silent no-op).
+name: battle_return_to_main_menu_needs_confirm
+description: >-
+  Boot to the tutorial battle, pause via PauseButton (menu opens), press
+  PauseMainMenuButton once: the confirm arms (HUD.pause_menu_armed true) and
+  GameManager.current_state stays BATTLE (zero writes). Press it again: the
+  VERDICT_A landing — GameManager.current_state becomes "MENU" (enter_menu()
+  → menu_panel.tscn). The confirm copy 本局进度将丢失 matches enter_menu's
+  abandon-in-progress semantics.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- at: 40
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    GameManager.current_state: current_state == "BATTLE"
+    HUD.pause_menu_open: pause_menu_open == false
+- at: 60
+  actions: []
+  clicks:
+  - PauseButton
+# The click's effects are visible on the FOLLOWING frame (same-frame asserts
+# read pre-dispatch state — measured f60 observed=false).
+- at: 90
+  actions: []
+  assert:
+    HUD.pause_menu_open: pause_menu_open == true
+    CombatManager.is_paused: is_paused == true
+    HUD.pause_menu_armed: pause_menu_armed == false
+    GameManager.current_state: current_state == "BATTLE"
+# Press #1 — arms only. No state write: still BATTLE, still paused, and the
+# arming does not un-pause or advance anything (>100 ms past the pause click).
+# current_state is pinned by equality to "BATTLE" — the `unchanged` token
+# compares to frame 0, where current_state is not yet "BATTLE".
+- at: 180
+  actions: []
+  clicks:
+  - PauseMainMenuButton
+- at: 210
+  actions: []
+  assert:
+    HUD.pause_menu_armed: pause_menu_armed == true
+    GameManager.current_state: current_state == "BATTLE"
+    CombatManager.is_paused: is_paused == true
+    PauseMainMenuButton.text: text != ""
+# Press #2 — confirms. The VERDICT_A landing: enter_menu() → current_state
+# "MENU" (SceneManager swaps to menu_panel.tscn).
+- at: 300
+  actions: []
+  clicks:
+  - PauseMainMenuButton
+- at: 330
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "MENU"
+

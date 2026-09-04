@@ -1,0 +1,79 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# R5 BATTLE PAUSE MENU — continue leg (zero-delta nail).
+#
+# Boot: 7x ui_accept through the menu/creation/tutorial flow (same boot as
+# enemy_action_feedback / roster_panel_battle_open_close) — the player is in
+# the tutorial battle, round 1, player turn. The pause is triggered with a
+# real hit-test CLICK on PauseButton (keyboard `pause_game` is gated by
+# TutorialManager.is_input_allowed("pause") while the tutorial is active, so
+# it may be a silent no-op; the click reaches pause_button.gd →
+# CombatManager.toggle_pause() directly). Landing PAUSED also opens the new
+# PauseMenu (pause_button._on_paused → PauseMenu.open_menu()).
+#
+# Baseline frame f40 captures current_round / Player.health before the pause.
+# Pause at f60 (menu open + is_paused true), Continue at f150 — well past the
+# 100 ms pause debounce (a frame is ~16.7 ms, so 90 frames >> 100 ms), so the
+# Continue click's toggle_pause() is NOT swallowed by the debounce.
+# After Continue: menu closed, unpaused, and current_round / Player.health are
+# `unchanged` vs the f40 baseline — the zero-diff assertion the task pins.
+#
+# The menu never writes combat state; only CombatManager.toggle_pause() does.
+name: battle_pause_menu_continue_zero_delta
+description: >-
+  Boot to the tutorial battle, click PauseButton (menu opens, game pauses),
+  then click PauseContinueButton: the menu closes, the game unpauses, and
+  CombatManager.current_round and Player.health are zero-diff vs their
+  pre-pause baseline — 继续 is exactly today's second press, plus a visible
+  menu. UiOcclusionWatch stays clean on the menu-open frame.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+# Baseline: player turn live, round 1, menu closed. (current_round is pinned
+# by `>= 1` here and `== 1` after Continue — the `unchanged` token compares to
+# frame 0 where the round is still 0, so a round differential there is
+# structurally impossible; the zero-delta is pinned by equality instead.)
+- at: 40
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.current_round: current_round == 1
+    CombatManager.is_paused: is_paused == false
+    Player.health: health >= 1
+    HUD.pause_menu_open: pause_menu_open == false
+- at: 60
+  actions: []
+  clicks:
+  - PauseButton
+# The click's effects are visible on the FOLLOWING frame (same-frame asserts
+# read pre-dispatch state — measured f60 observed=false, f90 green).
+- at: 90
+  actions: []
+  assert:
+    HUD.pause_menu_open: pause_menu_open == true
+    CombatManager.is_paused: is_paused == true
+    PauseContinueButton.visible: visible == true
+    PauseMainMenuButton.visible: visible == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+# 继续 — the menu's Continue button (>100 ms after the pause click, past the
+# pause debounce).
+- at: 180
+  actions: []
+  clicks:
+  - PauseContinueButton
+- at: 210
+  actions: []
+  assert:
+    HUD.pause_menu_open: pause_menu_open == false
+    CombatManager.is_paused: is_paused == false
+    CombatManager.current_round: current_round == 1
+    Player.health: unchanged
+    CombatManager.phase: phase == "PLAYER_TURN"

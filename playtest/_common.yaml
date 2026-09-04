@@ -433,6 +433,19 @@ surface:
   - nameplate_pairwise_overlap
   - undo_desc_overlap
   - roster_panel_open
+  - pause_menu_open
+  - pause_menu_armed
+  - combat_log_text
+  PauseContinueButton:
+  - visible
+  - size
+  - text
+  - focus_mode
+  PauseMainMenuButton:
+  - visible
+  - size
+  - text
+  - focus_mode
   MoveHintLabel:
   - state
   - text
@@ -1247,3 +1260,7 @@ scenario_order:
 - sect_join_needs_confirm
 - year_end_switch_needs_confirm
 - event_phase_no_exit_reaffirmed
+- battle_pause_menu_continue_zero_delta
+- battle_return_to_main_menu_needs_confirm
+- skill_range_highlight_on_select
+- enemy_hit_float_and_log_visible

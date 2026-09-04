@@ -170,6 +170,10 @@ ROUND_SCENARIOS: list[str] = [
     "sect_join_needs_confirm",
     "year_end_switch_needs_confirm",
     "event_phase_no_exit_reaffirmed",
+    "battle_pause_menu_continue_zero_delta",
+    "battle_return_to_main_menu_needs_confirm",
+    "skill_range_highlight_on_select",
+    "enemy_hit_float_and_log_visible",
 ]
 
 # The 4 observables the jinyong-nav R5 C3 back/confirm round appends to the
@@ -181,6 +185,61 @@ R5_C3_SURFACE_VARS: tuple[str, ...] = (
     "back_target_phase",           # CultivationScreen (back target)
     "switch_confirm_armed",        # CultivationScreen (year-end sect-switch arm)
 )
+
+# The 3 observables the R5 battle-pause-menu round appends to the HUD surface
+# block (in playtest/_common.yaml), ONLY-ADD — never removed or renamed.
+R5_PAUSE_SURFACE_VARS: tuple[str, ...] = (
+    "pause_menu_open",             # Hud (menu visibility mirror)
+    "pause_menu_armed",            # Hud (返回主菜单 two-press arm mirror)
+    "combat_log_text",             # Hud (CombatLog rendered_text relay)
+)
+
+
+def test_battle_pause_menu_surface_contract() -> None:
+    """Static contract pin for the R5 battle pause-menu / feedback round."""
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    hud_items = blocks.get("HUD", [])
+    for var in R5_PAUSE_SURFACE_VARS:
+        assert var in hud_items, (
+            "HUD.%s not whitelisted on the surface" % (var,)
+        )
+    # The menu buttons are click targets in the new scenarios, so each must be
+    # a whitelisted surface block (the clicks-ownership guard reads these).
+    for node in ("PauseButton", "PauseContinueButton", "PauseMainMenuButton"):
+        assert node in blocks, (
+            "surface missing %s block (clicks: target ownership)" % (node,)
+        )
+    # All four new scenarios exist, are name==basename, and the arm/zero-delta
+    # nails carry their mandatory differential lines.
+    mandatory = {
+        "battle_pause_menu_continue_zero_delta": [
+            "HUD.pause_menu_open: pause_menu_open == true",
+            "CombatManager.is_paused: is_paused == true",
+            "CombatManager.current_round: current_round == 1",
+            "Player.health: unchanged",
+        ],
+        "battle_return_to_main_menu_needs_confirm": [
+            "HUD.pause_menu_armed: pause_menu_armed == true",
+            "GameManager.current_state: current_state == \"BATTLE\"",
+            "GameManager.current_state: current_state == \"MENU\"",
+        ],
+        "skill_range_highlight_on_select": [
+            "RangeHighlight.visible: changed",
+            "RangeHighlight.tile_count: tile_count > 0",
+        ],
+        "enemy_hit_float_and_log_visible": [
+            "CombatManager.debug_combat_log_lines: changed",
+            "HUD.combat_log_text: changed",
+            'combat_log_text.contains("独臂大虾")',
+        ],
+    }
+    for name, lines in mandatory.items():
+        ftext = (PLAYTEST_DIR / (name + ".yaml")).read_text(encoding="utf-8")
+        for line in lines:
+            assert line in ftext, (
+                "%s.yaml missing mandatory assert line: %s" % (name, line)
+            )
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
 # surface block (in playtest/_common.yaml), in the same order they are appended.

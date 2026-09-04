@@ -36,6 +36,13 @@ const _MARGIN_Y: float = 16.0
 var _label: Label = null
 var _lines: PackedStringArray = PackedStringArray()
 
+## Presentation-only mirror of the rendered log text (the same string the
+## visible label shows, last MAX_LINES lines joined by "\n"). Published so the
+## HUD can relay the content onto its own whitelisted surface (the CombatLog
+## node itself lives under the CombatManager autoload and is not a proven
+## assert target in the harness). Read-only copy — no behavior change.
+var rendered_text: String = ""
+
 
 func _ready() -> void:
 	layer = 100
@@ -61,6 +68,7 @@ func append(text: String) -> void:
 	while _lines.size() > MAX_LINES:
 		_lines.remove_at(0)
 	_label.text = "\n".join(_lines)
+	rendered_text = _label.text
 	_label.visible = _lines.size() > 0
 	_dock_bottom_left()
 
@@ -75,6 +83,7 @@ func line_count() -> int:
 ## Clear all lines (e.g. battle teardown) and hide the dock.
 func clear() -> void:
 	_lines.clear()
+	rendered_text = ""
 	if _label != null:
 		_label.text = ""
 		_label.visible = false
