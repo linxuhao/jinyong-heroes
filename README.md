@@ -11,41 +11,42 @@ three in-game years (36 cultivation periods) training, and finally walk the
 jianghu map to an ending. Visuals use placeholder art; UI text is Chinese
 (NotoSansSC, SIL OFL) with a full English translation.
 
-## 本轮变更（R4，2026-09-03）
+## 本轮变更（R5，2026-09-04）
 
-- **江湖不称名,只称号 — shrimp nicknames on screen.** Display layer only:
-  杨过→独臂大虾, 五绝→东邪虾/西毒虾/南帝虾/北丐虾/中神通虾; walk-ons coined
-  侠客→侠客虾 (Wanderer Shrimp), 陪练弟子→陪练虾 (Sparring Shrimp), plus two
-  `_DISPLAY_ALIASES`/`_ORDER_TOKENS` entries that stop raw `ProgressionHero` /
-  `Sparring Partner` from leaking to screen. `character_name`, node names,
-  `turn_order` tokens and the three verbatim gates untouched; exactly two gate
-  literals flipped (`round_one_snapshot_and_turn_order.yaml:41`,
-  `ui_geometry_readability.yaml:42`). `tests/test_display_no_personal_names.py`
-  scans every display-layer string for the six personal names (red-first
-  recorded), and the settings screen now shows a build stamp (`版本 R4 · 2026-09-03`).
-- **Card 0 (L1) — enemy turns are fast.** Three wall-clock observables
-  (`debug_enemy_turn_msec`, `debug_enemy_round_msec`, `debug_enemy_turn_index`)
-  + `playtest/enemy_turn_wall_clock.yaml` pin a full 5-enemy round ≤ 10 s and a
-  single enemy ≤ 2 s; measured variants 1792/1417/1600 ms round, 659/583/499 ms
-  per enemy. Waits shortened only (frame-counted poll → 0.05 s SceneTreeTimer);
-  camera follower is a snap, so nothing was parallelized away. Web wall-clock
-  ships as console prints (`enemy_turn <name> <ms>` / `enemy_round <ms>`) —
-  read them in the browser devtools of the fresh build; not fabricated in-round.
-- **Enemy-turn feedback (presentation only).** New `CombatLog`, `FloatingNumber`,
-  acting-unit marker; wall-clock Tween fades, no frame-counted waits; three
-  additive surface observables. No damage/AI/turn-order value changed.
-- **design/ ledger slimming.** `90_decisions.md` 97,131 → 7,152 B and
-  `40_ux_backlog.md` 109,879 → 17,056 B; superseded/CLOSED content moved
-  verbatim to `design/archive/`; `tests/test_design_ledger_budget.py` enforces
-  the per-file and total budgets (≤ 340 KB excl. append-only `99_changelog.md`).
-  Quick-ref headers (≤ 15 lines) added atop `30_presentation.md` and
-  `40_progression.md`; one append-only `99_changelog.md` line.
-- **Roadmap record (record-only).** Owner's six 2026-09-02 playtest items logged
-  verbatim in `design/00_roadmap.md` backlog + the R4→R5→R6 queue; the line-3
-  broken link now points to `01_process.md`.
-- **README/ROUNDS bookkeeping.** README stays a manual (68 lines, ≤ 200 cap
-  pinned by `tests/test_readme_is_a_manual.py`); round history lives in
-  `docs/ROUNDS.md` (12 original headings verbatim + the R4 append).
+- **C1 — 点之前知道后果.** Focused options now show their consequence, composed
+  from data: monthly cards (effect fields), travel events (cost/gain, 银两不足
+  visible before the click), sect selection (gongfa + three-year teaching),
+  year-end sect switch (keeps learned gongfa; next-year grade from the new sect),
+  work (exact 10+3×月数 numbers), training goals (what 大成 grants), and point
+  cost beside the +/- buttons in creation; map travel labels the node type
+  (华山=战斗 · 少林/武当=门派设施 · 事件 · 此去即结局) via a scene-layer
+  sibling (`map_travel_hints.gd` — `map.gd` untouched); selecting a skill
+  highlights its range tiles before casting.
+- **C2 — no more burned month.** With every gongfa mastered, the practice
+  screen's 返回行动 returns to ACTION_PICK with month/silver zero delta; the
+  three nails were re-derived to pin return + zero delta
+  (`softlock_empty_practice_returns` renamed from `…_month_advances`;
+  `clicks_only_gongfa_empty_exit`, `gongfa_pick_empty_keyboard_return`; change
+  tables in each yaml header, no burned-month assertion kept).
+- **C3 — returnable screens, confirmed commits.** A visible 返回 button +
+  ui_cancel on attribute/gongfa/card pick, year-end and sect switch (zero
+  phase/month/silver delta); EVENT keeps its no-exit ruling (reaffirmed in code,
+  pinned by `event_phase_no_exit_reaffirmed`); sect join, year-end switch and
+  travel-to-ending require a confirming second press; the battle pause button
+  opens a real menu (继续 / 返回主菜单, second press to confirm).
+- **C4 — character panel on battle & ending.** The roster panel is instanced
+  read-only into `hud.tscn` and `ending.tscn` (HUD/panel layer;
+  `battlefield.gd` untouched) and closes with zero battle-state diff.
+- **Battle feedback.** Floating damage numbers + combat-log lines (attacker →
+  target, damage, remaining HP; status-caused 移动 0 explained).
+- **Honest status.** Occlusion net `consequence_screens_occlusion` 62/62 green
+  on this tree (violations 0 / scan_ok true); the C2 and C4 nails are green.
+  Open integration blockers tracked in `final/verify_report.json`: F1
+  `cultivation.gd:1108` EVENT-renderer crash on real profiles
+  (save_load_roundtrip 10/14), F4 the two-press sect join leaves the three
+  verbatim gates red (0/49, 1/32, 5/41), F2 `event_travel_effects` 1/19 +
+  `action_yield_differential` 24/44; the R5 design-ledger rows and the official
+  compile/vision/test gates land downstream.
 
 ## Requirements
 
@@ -65,10 +66,13 @@ main menu (新的冒险 / 读取存档 / 设置 / 退出). Headless: `godot --pa
 
 Flow: main menu → character creation (30-point budget, traits, confirm) →
 tutorial battle as 独臂大虾 vs the five grandmaster shrimp → overlay →
-transition → sect choice → 36-month cultivation → the jianghu map → tiered
-ending → restart. The whole storyline is playable with pointer/touch alone;
-keyboard paths sit alongside (camera follows the acting unit; left-click to
-move/attack, 结束回合 to end turn).
+transition → sect choice (join now needs a confirming second press) →
+36-month cultivation (every pick shows its consequence and can be backed out
+of before committing) → the jianghu map (travel hints; the ending node asks
+确认) → tiered ending (查看角色 opens the read-only panel) → restart.
+The whole storyline is playable with pointer/touch alone; keyboard paths sit
+alongside (camera follows the acting unit; left-click to move/attack,
+结束回合 to end turn; ui_cancel backs out of uncommitted screens).
 
 ## Tests
 
@@ -81,11 +85,15 @@ python3 -m pytest tests/   # static pins (denylist, budgets, README contract…)
 godot --headless --path . -s res://tests/unit_test_runner.gd  # unit suite
 ```
 
-Static pins worth knowing: `test_display_no_personal_names.py` (no personal
-name in any display-layer string), `test_design_ledger_budget.py`
-(`90_decisions.md` ≤ 25 KB, `40_ux_backlog.md` ≤ 20 KB, `design/*.md` total
-≤ 340 KB excl. append-only changelog), `test_readme_is_a_manual.py` (≤ 200
-lines, one 本轮变更 section, 12 round headings verbatim in `docs/ROUNDS.md`).
+Static pins worth knowing: `test_playtest_contract_smoke.py` (scenario registry
+sync — every new R5 scenario is registered in both `playtest/_common.yaml` and
+`ROUND_SCENARIOS`), `test_display_no_personal_names.py` (no personal name in
+any display-layer string), `test_design_ledger_budget.py` (`90_decisions.md`
+≤ 25 KB, `40_ux_backlog.md` ≤ 20 KB, `design/*.md` total ≤ 340 KB excl.
+append-only changelog), `test_readme_is_a_manual.py` (≤ 200 lines, one
+本轮变更 section, round headings verbatim in `docs/ROUNDS.md`). The R5
+occlusion net lives at `playtest/consequence_screens_occlusion.yaml` (62
+asserts) with the map leg in `playtest/consequence_screens_occlusion_map.yaml`.
 
 ## Key interfaces
 
@@ -106,3 +114,17 @@ lines, one 本轮变更 section, 12 round headings verbatim in `docs/ROUNDS.md`)
 - **Coord** — pure statics `world_to_screen` / `screen_to_world` over the canvas transform.
 - **GridManager** — grid / movement planning, `world_to_grid`, `grid_to_world`,
   `board_rect()`.
+- **CultivationScreen** (R5) — `consequence_text`, `consequence_matches_focus`,
+  `back_button_visible`, `back_target_phase`, `switch_confirm_armed`;
+  `_consequence_text(phase, index)` composes consequence copy from
+  CardData/EventData/ProgressionGongfaData/ProgressionMath.
+- **SectSelectScreen** (R5) — `consequence_text`, `consequence_matches_focus`,
+  `confirm_armed` (two-press join: first press arms with zero writes, second
+  commits).
+- **MapTravelHints** (R5, `map.tscn` sibling) — `travel_hint_text`,
+  `travel_gate_visible`, `travel_gate_armed`; end-node travel gate with
+  确认启程/返回 dialog.
+- **Hud** (R5) — `pause_menu_open`, `pause_menu_armed`, `roster_panel_open`;
+  hosts the read-only `RosterPanel` instance and `PauseMenu`.
+- **RosterPanel** (R5) — `read_only` export (interactive in
+  cultivation/map, read-only in hud/ending: equip pool binds zero buttons).
