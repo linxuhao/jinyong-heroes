@@ -54,6 +54,13 @@ jianghu map to an ending. Visuals use placeholder art; UI text is Chinese
   and `final/delivery_notes_fix_f4_sect_join_single_press.md`; the official
   post-fix full sweep and the compile/vision/test gate reports are produced by
   the downstream steps (5_compile / 5_vision / 5_test) and are not claimed here.
+  Known remaining reds (pre-R5 fixed-frame route pins, sidecar-measured
+  2026-09-04; owner decision requested in `design/90_decisions.md` Open
+  questions): `huashan_winnable_normal_route` 23/47,
+  `cultivation_year_end_stay` 5/8, `sect_switch_same_school_connects` 4/8
+  (needs one inserted confirm press), `ending_last_month_choice` 31/38 —
+  none is an R5 acceptance nail, but they keep the playtest hard gate red
+  until the owner rules on the fixed-frame click-path grammar.
 
 ## Requirements
 
