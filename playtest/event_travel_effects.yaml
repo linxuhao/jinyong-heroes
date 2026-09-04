@@ -22,6 +22,11 @@ timeline:
 - {at: 90, actions: [move_right]}
 - {at: 100, actions: [ui_accept]}
 - {at: 110, actions: [ui_accept]}
+# R5 C3 re-derivation (append-only, no assertion changed): the sect join is now
+# a two-press confirm (first press arms, second commits — same input-contract
+# change as the kunlun travel-to-ending gate). Insert exactly one ui_accept so
+# the join commits before the CULTIVATION/CARD_PICK assertion below.
+- {at: 115, actions: [ui_accept]}
 - at: 130
   assert:
     GameManager.current_state: current_state == "CULTIVATION"

@@ -15,9 +15,9 @@
 #   sect SectConsequenceLabel ..... feat_c1_cultivation_sect_sect ... f390
 #   cultivation ConsequenceLabel CARD_PICK + CultBackButton ......... f450
 #   cultivation ConsequenceLabel ACTION_PICK work ....... W2 ......... f505
-#   cultivation ConsequenceLabel EVENT ....... W2 ..................... f550
-#   cultivation ConsequenceLabel GONGFA_PICK ... W2 ................... f660
-#   cultivation YEAR_END consequence + SECT_SWITCH arm status ...... f1160/f1250
+#   cultivation ConsequenceLabel GONGFA_PICK ... W2 .................. f590
+#   cultivation ConsequenceLabel EVENT ............ W2 ................ f660
+#   cultivation YEAR_END consequence + SECT_SWITCH arm status .... f1090/f1180
 #   map TravelHintLabel + TravelGatePanel ... covered by
 #     consequence_screens_occlusion_map (map.tscn cannot be booted from the
 #     main.tscn spine in one scenario — one scene per scenario harness limit).
@@ -194,10 +194,11 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── MONTH 1: 做工 (focus already 2) -> month 2 ─────────────────────────────
-# (The EVENT consequence surface is covered by the owning W2 nail
-#  consequence_event_option_visible; this net's month-1 shaolin-profile event
-#  trips a pre-existing renderer runtime error at cultivation.gd:1108 —
-#  reported as a finding, not patched here.)
+# The EVENT consequence surface is covered by the owning W2 nail
+# consequence_event_option_visible AND by this net's month-3 游历 leg (below,
+# f660). The month-1 EVENT renderer crash at cultivation.gd:1108 (Finding F1)
+# was fixed this step (opt.effects typed property, not dict-2-arg Object.get),
+# so 游历/EVENT is now reachable on the spine.
 - at: 510
   actions:
   - ui_accept
@@ -220,11 +221,23 @@ timeline:
 - at: 600
   actions:
   - ui_accept
-# ── MONTHS 3–11: 做工 4-frame month cycle (consequence_year_end_switch) ────
+# ── MONTH 3: card -> 游历 (focus 3) -> EVENT consequence surface (W2) ───────
 - {at: 630, actions: [ui_accept]}
 - {at: 640, actions: [move_down]}
 - {at: 650, actions: [move_down]}
-- {at: 660, actions: [ui_accept]}
+- {at: 652, actions: [move_down]}
+- {at: 655, actions: [ui_accept]}
+- at: 660
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "EVENT"
+    CultivationScreen.event_id: 'event_id != ""'
+    CultivationScreen.consequence_text: 'consequence_text != ""'
+    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- {at: 665, actions: [ui_accept]}
+# ── MONTHS 4–11: 做工 4-frame month cycle (consequence_year_end_switch) ─────
 - {at: 670, actions: [ui_accept]}
 - {at: 680, actions: [move_down]}
 - {at: 690, actions: [move_down]}

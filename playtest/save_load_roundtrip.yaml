@@ -49,6 +49,13 @@ timeline:
 - at: 110
   actions:
   - ui_accept
+# R5 C3 re-derivation (append-only, no assertion changed): the sect join is now
+# a two-press confirm (first arms, second commits — same input-contract change
+# as the kunlun travel-to-ending gate and the event_travel_effects re-point).
+# Insert exactly one ui_accept so the join commits before the cultivation drives.
+- at: 115
+  actions:
+  - ui_accept
 - at: 120
   actions:
   - ui_accept
