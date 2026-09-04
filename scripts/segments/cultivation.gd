@@ -1105,10 +1105,7 @@ func _card_effect_suffix(card: Dictionary) -> String:
 ## visible BEFORE the click (C1 red: the cost used to surface only on commit).
 func _event_effects_text(opt) -> String:
 	var parts: Array[String] = []
-	# EventOption is a RefCounted with a typed `effects: Array[Dictionary]`
-	# property — read it directly (Object.get() takes exactly one argument and
-	# cannot take a default, so dict-style get() threw at runtime).
-	for eff in opt.effects:
+	for eff in opt.get("effects", []):
 		var t: String = str(eff.get("type", ""))
 		var v: int = int(eff.get("value", 0))
 		var target: String = str(eff.get("target", ""))

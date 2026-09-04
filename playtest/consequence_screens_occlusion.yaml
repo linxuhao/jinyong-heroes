@@ -16,7 +16,9 @@
 #   cultivation ConsequenceLabel CARD_PICK + CultBackButton ......... f450
 #   cultivation ConsequenceLabel ACTION_PICK work ....... W2 ......... f505
 #   cultivation ConsequenceLabel GONGFA_PICK ... W2 .................. f590
-#   cultivation ConsequenceLabel EVENT ............ W2 ................ f660
+#   cultivation ConsequenceLabel EVENT ..... W2 (owning nail only — see note
+#     at month 1; this net's months route 做工 so the reverted F1 crash cannot
+#     fire here)
 #   cultivation YEAR_END consequence + SECT_SWITCH arm status .... f1090/f1180
 #   map TravelHintLabel + TravelGatePanel ... covered by
 #     consequence_screens_occlusion_map (map.tscn cannot be booted from the
@@ -40,9 +42,10 @@ name: consequence_screens_occlusion
 description: >-
   Full-round occlusion net: battle RosterPanel open, battle PauseMenu open,
   creation AttrCostLabel, sect consequence area, cultivation ConsequenceLabel in
-  CARD_PICK / ACTION_PICK(work) / EVENT / GONGFA_PICK / YEAR_END, the visible
+  CARD_PICK / ACTION_PICK(work) / GONGFA_PICK / YEAR_END, the visible
   back button, and the SECT_SWITCH arm status line — each frame with
-  UiOcclusionWatch.violations == 0 and scan_ok == true.
+  UiOcclusionWatch.violations == 0 and scan_ok == true. (The EVENT surface is
+  framed by the owning W2 nail consequence_event_option_visible, not here.)
 timeline:
 # ── BATTLE BOOT (battle_pause_menu_continue_zero_delta grammar) ────────────
 - {at: 3, actions: [ui_accept]}
@@ -194,11 +197,13 @@ timeline:
     UiOcclusionWatch.violations: violations == 0
     UiOcclusionWatch.scan_ok: scan_ok == true
 # ── MONTH 1: 做工 (focus already 2) -> month 2 ─────────────────────────────
-# The EVENT consequence surface is covered by the owning W2 nail
-# consequence_event_option_visible AND by this net's month-3 游历 leg (below,
-# f660). The month-1 EVENT renderer crash at cultivation.gd:1108 (Finding F1)
-# was fixed this step (opt.effects typed property, not dict-2-arg Object.get),
-# so 游历/EVENT is now reachable on the spine.
+# NOTE (scope correction, 2026-09-04): the EVENT consequence surface is NOT
+# framed by this net — the cultivation.gd EVENT renderer crash (Finding F1,
+# `_event_effects_text` dict-2-arg Object.get on a RefCounted EventOption)
+# belongs to the owning card feat_c1_cultivation_sect_consequences and was
+# REVERTED from this step's tree per the t_impl review. The EVENT surface is
+# covered by the owning W2 nail consequence_event_option_visible (9/9 on the
+# owning card's tree). Months 3–12 all route the proven 做工 4-frame cycle.
 - at: 510
   actions:
   - ui_accept
@@ -221,22 +226,11 @@ timeline:
 - at: 600
   actions:
   - ui_accept
-# ── MONTH 3: card -> 游历 (focus 3) -> EVENT consequence surface (W2) ───────
+# ── MONTH 3: card -> 做工 (focus 0 -> 2), same proven 4-frame cycle ────────
 - {at: 630, actions: [ui_accept]}
 - {at: 640, actions: [move_down]}
 - {at: 650, actions: [move_down]}
-- {at: 652, actions: [move_down]}
-- {at: 655, actions: [ui_accept]}
-- at: 660
-  actions: []
-  assert:
-    CultivationScreen.phase: phase == "EVENT"
-    CultivationScreen.event_id: 'event_id != ""'
-    CultivationScreen.consequence_text: 'consequence_text != ""'
-    CultivationScreen.consequence_matches_focus: consequence_matches_focus == true
-    UiOcclusionWatch.violations: violations == 0
-    UiOcclusionWatch.scan_ok: scan_ok == true
-- {at: 665, actions: [ui_accept]}
+- {at: 660, actions: [ui_accept]}
 # ── MONTHS 4–11: 做工 4-frame month cycle (consequence_year_end_switch) ─────
 - {at: 670, actions: [ui_accept]}
 - {at: 680, actions: [move_down]}

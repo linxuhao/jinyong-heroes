@@ -166,15 +166,6 @@ timeline:
   actions: []
   clicks:
   - SectButton0
-# R5 C3 re-derivation (append-only, no assertion changed): the initial sect
-# join is now a two-press confirm (first press arms the sect, second commits —
-# same input-contract change as the kunlun travel-to-ending gate and the
-# event_travel_effects / save_load_roundtrip re-points). Insert one more
-# SectButton0 press so the join commits before the CULTIVATION assert at f345.
-- at: 315
-  actions: []
-  clicks:
-  - SectButton0
 - at: 345
   actions: []
   assert:
