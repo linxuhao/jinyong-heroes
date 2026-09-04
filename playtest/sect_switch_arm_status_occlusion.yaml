@@ -1,0 +1,66 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries consequence_screens_occlusion (retired, maxF 1180), the ONE surface
+# no remaining nail frames with the occlusion pair: the YEAR_END -> SECT_SWITCH
+# arm status line. Seeded no-sect CULTIVATION save (the debug_seed_save
+# grammar), months 1-11 via debug_step_month, month 12 played (card -> 做工 ->
+# YEAR_END), 另投他派 -> SECT_SWITCH, first accept ARMS; the f1180 assertion
+# block is verbatim. Every other surface of the retired net is framed by its
+# owning nail (see playtest/RETIRED.md).
+name: sect_switch_arm_status_occlusion
+description: >-
+  Year-end sect switch: 另投他派 -> SECT_SWITCH, the first accept arms the
+  confirm (switch_confirm_armed true, month 12 / year 1 unchanged), the back
+  button is visible and the frame is occlusion-clean.
+scene: res://scenes/menu.tscn
+timeline:
+- {at: 10, actions: [debug_delete_save]}
+- {at: 40, actions: [debug_seed_save]}
+- {at: 70, actions: [move_down]}
+- {at: 90, actions: [ui_accept]}
+- at: 130
+  actions: []
+  assert:
+    GameManager.current_state: current_state == "CULTIVATION"
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 1
+- {at: 132, actions: [debug_step_month]}
+- {at: 134, actions: [debug_step_month]}
+- {at: 136, actions: [debug_step_month]}
+- {at: 138, actions: [debug_step_month]}
+- {at: 140, actions: [debug_step_month]}
+- {at: 142, actions: [debug_step_month]}
+- {at: 144, actions: [debug_step_month]}
+- {at: 146, actions: [debug_step_month]}
+- {at: 148, actions: [debug_step_month]}
+- {at: 150, actions: [debug_step_month]}
+- {at: 152, actions: [debug_step_month]}
+- at: 158
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "CARD_PICK"
+    CultivationScreen.month: month == 12
+- {at: 160, actions: [ui_accept]}
+- {at: 165, actions: [move_down]}
+- {at: 170, actions: [move_down]}
+- {at: 175, actions: [ui_accept]}
+- at: 180
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "YEAR_END"
+- {at: 183, actions: [move_down]}
+- {at: 188, actions: [ui_accept]}
+- {at: 193, actions: [ui_accept]}
+- at: 200
+  actions: []
+  assert:
+    CultivationScreen.phase: phase == "SECT_SWITCH"
+    CultivationScreen.month: month == 12
+    CultivationScreen.year: year == 1
+    CultivationScreen.switch_confirm_armed: switch_confirm_armed == true
+    CultivationScreen.back_button_visible: back_button_visible == true
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

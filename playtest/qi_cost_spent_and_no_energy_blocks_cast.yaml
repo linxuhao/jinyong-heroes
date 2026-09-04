@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries qi_cost_blocks_cast_no_energy (retired, maxF 1100), the round-1
+# half: a real skill_2 (大巧不工, cost > 0) cast deducts the pool; after
+# debug_spend_player_qi drains it through the shared spend path, button 4
+# (never phase-locked, never cast, no HP gate) enters no_energy — NOT
+# phase_locked — and is disabled; the hotkey select is refused with the visible
+# reason 内力不足 and selection is unchanged; a confirm attempt consumes nothing.
+# The round-2 never-disarmed basic attack is carried by
+# basic_attack_free_at_zero_qi. Assertion expressions verbatim.
+name: qi_cost_spent_and_no_energy_blocks_cast
+description: >-
+  Casting spends inner qi and insufficient qi blocks the move: a real skill_2
+  cast deducts the pool (energy < energy_max, acted, still round 1); after
+  debug_spend_player_qi drains it to 0, button 4 is no_energy (not
+  phase_locked) and disabled, the hotkey select is refused with 内力不足 and
+  selection unchanged, and a confirm attempt consumes nothing.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- at: 20
+  actions: []
+  assert:
+    Player.energy: 'energy == energy_max'
+    SkillButton4.state_text: 'state_text != "no_energy"'
+    SkillButton4.disabled: 'disabled == false'
+- {at: 25, actions: [move_up]}
+- {at: 35, actions: [move_up]}
+- {at: 45, actions: [move_up]}
+- {at: 55, actions: [skill_2]}
+- {at: 65, actions: [attack_confirm]}
+- at: 100
+  actions: []
+  assert:
+    Player.energy: 'energy < energy_max'
+    Player.acted: 'acted == true'
+    CombatManager.current_round: 'current_round == 1'
+- {at: 110, actions: [debug_spend_player_qi]}
+- at: 140
+  actions: []
+  assert:
+    Player.energy: 'energy >= 0 and energy < energy_max'
+    SkillButton4.state_text: 'state_text == "no_energy" and state_text != "phase_locked"'
+    SkillButton4.disabled: 'disabled == true'
+    SkillButton4.state_tag_text: 'state_tag_text == "内力不足"'
+    SkillButton1.disabled: 'disabled == false'
+    SkillButton1.state_text: 'state_text == "ready"'
+- {at: 150, actions: [skill_4]}
+- at: 165
+  actions: []
+  assert:
+    ActionHintLabel.text: 'text == "内力不足"'
+    Player.selected_skill_index: 'selected_skill_index != 3'
+- {at: 175, actions: [attack_confirm]}
+- at: 200
+  actions: []
+  assert:
+    Player.energy: 'energy == 0'
+    SkillButton4.cooldown_remaining: 'cooldown_remaining == 0'
+    SkillButton4.state_text: 'state_text == "no_energy"'

@@ -1,0 +1,45 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries enemy_hit_float_and_log_visible (retired, maxF 1100): an enemy hit
+# on the player is VISIBLE — one log line `<attacker> → <target> −<loss> (剩
+# <remaining>)` through the HUD relay HUD.combat_log_text plus one floating
+# number. Content pinned by property (→, 剩, the player display name 独臂大虾,
+# the 虾 glyph) on a frame inside the log's 6-line window (f200, the round-2
+# player turn). Assertions verbatim.
+name: enemy_hit_float_and_log_round_one
+description: >-
+  Boot to the tutorial battle, hand the round to the five enemies with
+  end_turn, and assert the first enemy hit on the player is visible: the
+  cumulative log/float counters moved (changed), the HUD-relayed log text holds
+  a hit line with the attacker/player display names, the arrow, the damage dash
+  and the remaining-HP marker, and UiOcclusionWatch is clean on that frame.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- at: 18
+  actions: []
+  assert:
+    HUD.combat_log_text: combat_log_text == ""
+- {at: 20, actions: [end_turn]}
+- at: 100
+  actions: []
+  assert:
+    CombatManager.debug_combat_log_lines: changed
+    CombatManager.debug_float_numbers_spawned: changed
+    HUD.combat_log_text: changed
+- at: 200
+  actions: []
+  assert:
+    CombatManager.debug_combat_log_lines: debug_combat_log_lines >= 1
+    CombatManager.debug_float_numbers_spawned: debug_float_numbers_spawned >= 1
+    HUD.combat_log_text: combat_log_text.contains("→") and combat_log_text.contains("剩") and combat_log_text.contains("独臂大虾") and combat_log_text.contains("虾") and combat_log_text != ""
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

@@ -1260,3 +1260,15 @@ scenario_order:
 - battle_return_to_main_menu_needs_confirm
 - skill_range_highlight_on_select
 
+- player_death_mid_round_ends_battle
+- end_turn_button_click_hands_over_turn
+- attack_button_click_fires_basic_attack
+- initiative_order_round_two
+- attack_once_per_turn_rejected
+- enemy_action_feedback_counters
+- enemy_hit_float_and_log_round_one
+- enemy_round_wall_clock
+- qi_cost_spent_and_no_energy_blocks_cast
+- basic_attack_free_at_zero_qi
+- portrait_ink_on_own_tile
+- sect_switch_arm_status_occlusion

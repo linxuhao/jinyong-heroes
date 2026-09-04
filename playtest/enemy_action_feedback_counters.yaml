@@ -1,0 +1,41 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries enemy_action_feedback (retired, maxF 1100): every landed enemy hit
+# appends a log line and spawns a floating number, and every acting enemy shows
+# the pulsing marker. Asserts ONLY the three additive CombatManager counters and
+# the standing UiOcclusionWatch pair. The `changed` differential and the `>= 1`
+# floor live on DIFFERENT frames (a YAML mapping cannot carry a key twice); the
+# round-2 player turn is live by f200 (probe 2026-09-04). Assertions verbatim.
+name: enemy_action_feedback_counters
+description: >-
+  Boot to the tutorial battle, hand the turn over with end_turn, let the
+  five-enemy round run, and assert the three R4 presentation counters both
+  moved (differential) and cleared their floors (>= 1), while phase returns to
+  PLAYER_TURN and the frame is occlusion-clean.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [end_turn]}
+- at: 100
+  actions: []
+  assert:
+    CombatManager.debug_combat_log_lines: changed
+    CombatManager.debug_float_numbers_spawned: changed
+    CombatManager.debug_acting_marker_shown: changed
+- at: 200
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.debug_combat_log_lines: debug_combat_log_lines >= 1
+    CombatManager.debug_float_numbers_spawned: debug_float_numbers_spawned >= 1
+    CombatManager.debug_acting_marker_shown: debug_acting_marker_shown >= 1
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true

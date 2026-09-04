@@ -1,0 +1,70 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries portrait_grid_alignment (retired, maxF 820): a portrait's drawn ink
+# stands on the tile the unit occupies — abs(ink_world_dx) <= 1.0 and
+# abs(ink_world_dy) <= 1.0 for the player and all five enemies, derived from
+# the published portrait_ink_rect. Static leg at f40 (all six at spawn; the
+# row-1 unit Central_Divine (7,1) is the one the removed top-row clamp used to
+# push off its tile, measured dy 124.0 pre-removal). Walk leg: the player
+# clicks Player +64,-192 and walks (7,5) -> (8,2), exactly 4 steps, and the
+# same 12 ink lines are re-asserted on the arrival frame. The retired
+# scenario's round-2 row-1 player leg ((6,2) -> (6,1)) is not reachable in a
+# unit budget; row 1 stays covered by Central_Divine's static line. 1.0 px is
+# the sub-pixel slack of an exact equality, not a tolerance.
+name: portrait_ink_on_own_tile
+description: >-
+  Portrait-on-its-own-tile alignment pin (abs(ink_world_dx) <= 1.0 and
+  abs(ink_world_dy) <= 1.0 for the player and all five enemies, derived from
+  the published portrait_ink_rect — never a second rect computation). Static
+  leg at f40 (all six units at spawn, Central_Divine on row 1); walk leg: the
+  player clicks Player +64,-192 and walks (7,5) -> (8,2) — exactly 4 steps,
+  spending the whole 4-move budget — and the same 12 ink lines hold on arrival.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [tutorial_next]}
+- {at: 25, actions: [tutorial_next]}
+- {at: 30, actions: [tutorial_next]}
+- at: 40
+  assert:
+    Player.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Player.ink_world_dy: abs(ink_world_dy) <= 1.0
+    Central_Divine.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Central_Divine.ink_world_dy: abs(ink_world_dy) <= 1.0
+    East_Heretic.ink_world_dx: abs(ink_world_dx) <= 1.0
+    East_Heretic.ink_world_dy: abs(ink_world_dy) <= 1.0
+    West_Poison.ink_world_dx: abs(ink_world_dx) <= 1.0
+    West_Poison.ink_world_dy: abs(ink_world_dy) <= 1.0
+    South_Emperor.ink_world_dx: abs(ink_world_dx) <= 1.0
+    South_Emperor.ink_world_dy: abs(ink_world_dy) <= 1.0
+    North_Beggar.ink_world_dx: abs(ink_world_dx) <= 1.0
+    North_Beggar.ink_world_dy: abs(ink_world_dy) <= 1.0
+- at: 75
+  actions: []
+  clicks:
+  - Player +64,-192
+- at: 135
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(8, 2)
+    Player.moves_left: moves_left == 0
+    Player.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Player.ink_world_dy: abs(ink_world_dy) <= 1.0
+    Central_Divine.ink_world_dx: abs(ink_world_dx) <= 1.0
+    Central_Divine.ink_world_dy: abs(ink_world_dy) <= 1.0
+    East_Heretic.ink_world_dx: abs(ink_world_dx) <= 1.0
+    East_Heretic.ink_world_dy: abs(ink_world_dy) <= 1.0
+    West_Poison.ink_world_dx: abs(ink_world_dx) <= 1.0
+    West_Poison.ink_world_dy: abs(ink_world_dy) <= 1.0
+    South_Emperor.ink_world_dx: abs(ink_world_dx) <= 1.0
+    South_Emperor.ink_world_dy: abs(ink_world_dy) <= 1.0
+    North_Beggar.ink_world_dx: abs(ink_world_dx) <= 1.0
+    North_Beggar.ink_world_dy: abs(ink_world_dy) <= 1.0

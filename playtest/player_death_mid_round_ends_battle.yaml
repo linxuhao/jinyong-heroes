@@ -1,0 +1,68 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries player_death_ends_battle (retired, maxF 2999): an in-flight round loop
+# halts on player death and LOST PERSISTS. The player spends a real turn (move,
+# strike, end_turn), the enemy round is turning, and debug_lose_tutorial lands
+# MID-ROUND at f120 (CombatManager.debug_kill_player -> apply_damage, the same
+# death path a killing blow takes). Persistence is sampled at f140/f170/f200
+# (the retired scenario sampled f700..f2999). Assertion expressions verbatim.
+name: player_death_mid_round_ends_battle
+description: >-
+  Round invariant: the battle must be ABLE to end. After a real player turn the
+  enemy round is turning; a mid-round injected death (debug_lose_tutorial ->
+  debug_kill_player -> apply_damage) stops the loop, sets LOST with the 战败
+  overlay, classifies the death as the player's, and stays there across three
+  later samples — never a silently continuing BATTLE.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [move_up]}
+- {at: 30, actions: [move_up]}
+- {at: 40, actions: [move_up]}
+- {at: 50, actions: [skill_1]}
+- {at: 60, actions: [attack_confirm]}
+- {at: 70, actions: [end_turn]}
+- at: 110
+  actions: []
+  assert:
+    CombatManager.phase: phase == "ENEMY_TURN"
+    Player.health: health > 0
+    GameManager.current_state: current_state != "LOST"
+- {at: 120, actions: [debug_lose_tutorial]}
+# No input from here on. LOST must PERSIST — a battle that ends and then
+# quietly resumes is the bug.
+- at: 140
+  actions: []
+  assert:
+    Player.health: health == 0
+    GameManager.current_state: current_state == "LOST"
+    GameManager.end_overlay_text: end_overlay_text.contains("战败") == true
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    CombatManager.debug_death_classified_player: debug_death_classified_player == true
+    CombatManager.debug_death_target_name: debug_death_target_name == "Player"
+- at: 170
+  actions: []
+  assert:
+    Player.health: health == 0
+    GameManager.current_state: current_state == "LOST"
+    GameManager.end_overlay_text: end_overlay_text.contains("战败") == true
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    CombatManager.debug_death_classified_player: debug_death_classified_player == true
+    CombatManager.debug_death_target_name: debug_death_target_name == "Player"
+- at: 200
+  actions: []
+  assert:
+    Player.health: health == 0
+    GameManager.current_state: current_state == "LOST"
+    GameManager.end_overlay_text: end_overlay_text.contains("战败") == true
+    CombatManager.empty_round_stalls: empty_round_stalls == 0
+    CombatManager.debug_death_classified_player: debug_death_classified_player == true
+    CombatManager.debug_death_target_name: debug_death_target_name == "Player"

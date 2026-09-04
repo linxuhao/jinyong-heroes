@@ -1,0 +1,51 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries enemy_turn_wall_clock (retired, maxF 1100): a full enemy round
+# <= 10 s and a single enemy turn <= 2 s (debug_enemy_turn_msec /
+# debug_enemy_round_msec / debug_enemy_turn_index), the acting-unit marker
+# hidden pre-battle and visible mid-round, the per-segment split sanity, and
+# UiOcclusionWatch clean on a marker-visible frame. The round-2 player turn is
+# live by f200 (probe 2026-09-04: round_msec 1581, turn_msec 492). Verbatim.
+name: enemy_round_wall_clock
+description: >-
+  Boot to the tutorial battle, hand the turn over with end_turn, let the
+  five-enemy round run, and on the round-2 player turn assert the enemy-run
+  wall-clock pin: a full enemy round <= 10 s, a single enemy turn <= 2 s, all
+  five enemies acted (index >= 5 plus an earlier `changed` differential),
+  round_msec > 0 (never vacuous), the marker absent pre-battle and visible
+  mid-round, the split-observable sanity, and UiOcclusionWatch clean.
+timeline:
+- at: 2
+  actions: []
+  assert:
+    CombatManager.acting_marker_visible: acting_marker_visible == false
+    CombatManager.acting_marker_unit_name: acting_marker_unit_name == ""
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [end_turn]}
+- at: 100
+  actions: []
+  assert:
+    CombatManager.debug_enemy_turn_index: changed
+    CombatManager.acting_marker_visible: acting_marker_visible == true
+    CombatManager.acting_marker_unit_name: changed
+    CombatManager.debug_enemy_move_msec: debug_enemy_move_msec >= 0
+    UiOcclusionWatch.violations: violations == 0
+    UiOcclusionWatch.scan_ok: scan_ok == true
+- at: 200
+  actions: []
+  assert:
+    CombatManager.phase: phase == "PLAYER_TURN"
+    CombatManager.debug_enemy_turn_index: debug_enemy_turn_index >= 5
+    CombatManager.debug_enemy_round_msec: debug_enemy_round_msec > 0 and debug_enemy_round_msec <= 10000
+    CombatManager.debug_enemy_turn_msec: debug_enemy_turn_msec <= 2000
+    CombatManager.acting_marker_unit_name: acting_marker_unit_name != ""
+    CombatManager.debug_enemy_move_msec: debug_enemy_move_msec >= 0 and debug_enemy_attack_msec >= 0 and debug_enemy_other_msec >= 0 and debug_enemy_move_msec + debug_enemy_attack_msec + debug_enemy_other_msec <= debug_enemy_turn_msec

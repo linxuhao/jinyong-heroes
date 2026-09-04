@@ -1,0 +1,42 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries qi_cost_blocks_cast_no_energy (retired, maxF 1100), the never-
+# disarmed negative control: with the pool drained to 0 BEFORE acting and no
+# skill selected, a single attack_confirm fires the basic attack (普攻, cost 0)
+# — acted set, energy still 0, selection still -1, the adjacent enemy loses 39
+# (probe 2026-09-04: Central_Divine 130 -> 91). The retired leg ran this in
+# round 2; the expressions are verbatim.
+name: basic_attack_free_at_zero_qi
+description: >-
+  The basic attack is never disarmed: at 0 qi with no skill selected a single
+  attack_confirm fires the basic attack at zero cost — Player.acted true,
+  energy still 0, selected_skill_index still -1, Central_Divine loses 39.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [move_up]}
+- {at: 30, actions: [move_up]}
+- {at: 40, actions: [move_up]}
+- {at: 50, actions: [debug_spend_player_qi]}
+- at: 70
+  actions: []
+  assert:
+    Player.energy: 'energy == 0'
+    Player.acted: 'acted == false'
+    Player.selected_skill_index: 'selected_skill_index == -1'
+- {at: 80, actions: [attack_confirm]}
+- at: 120
+  actions: []
+  assert:
+    Player.acted: 'acted == true'
+    Player.energy: 'energy == 0'
+    Player.selected_skill_index: 'selected_skill_index == -1'
+    Central_Divine.health: health == max_health - 39

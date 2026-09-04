@@ -35,7 +35,7 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[1]
 COMMON: Path = REPO_ROOT / "playtest" / "_common.yaml"
 PLAYTEST_DIR: Path = REPO_ROOT / "playtest"
 
-def test_enemy_turn_wall_clock_surface_contract() -> None:
+def test_enemy_round_wall_clock_surface_contract() -> None:
     """CARD 0b (R5) two-place sync + surface-sync pin for the wall-clock nail.
 
     Hard pins, all property/shape based (no line numbers):
@@ -45,7 +45,7 @@ def test_enemy_turn_wall_clock_surface_contract() -> None:
          / acting_marker_visible / acting_marker_unit_name) each appear EXACTLY
          ONCE in the ``CombatManager`` surface block of
          ``playtest/_common.yaml`` — ONLY-ADD, never removed or renamed;
-      2. the scenario name ``enemy_turn_wall_clock`` appears in BOTH registries
+      2. the scenario name ``enemy_round_wall_clock`` appears in BOTH registries
          (``scenario_order`` in _common.yaml AND ``ROUND_SCENARIOS`` here) at the
          same relative tail position;
       3. the scenario file exists with ``name:`` equal to its basename and
@@ -72,7 +72,7 @@ def test_enemy_turn_wall_clock_surface_contract() -> None:
             % (var, cm_items.count(var))
         )
 
-    name = "enemy_turn_wall_clock"
+    name = "enemy_round_wall_clock"
     order = _items_under(text, "scenario_order")
     assert name in order, f"{name} not in _common.yaml scenario_order (two-place sync)"
     assert name in ROUND_SCENARIOS, f"{name} not in ROUND_SCENARIOS (two-place sync)"
@@ -166,6 +166,18 @@ ROUND_SCENARIOS: list[str] = [
     "battle_pause_menu_continue_zero_delta",
     "battle_return_to_main_menu_needs_confirm",
     "skill_range_highlight_on_select",
+    "player_death_mid_round_ends_battle",
+    "end_turn_button_click_hands_over_turn",
+    "attack_button_click_fires_basic_attack",
+    "initiative_order_round_two",
+    "attack_once_per_turn_rejected",
+    "enemy_action_feedback_counters",
+    "enemy_hit_float_and_log_round_one",
+    "enemy_round_wall_clock",
+    "qi_cost_spent_and_no_energy_blocks_cast",
+    "basic_attack_free_at_zero_qi",
+    "portrait_ink_on_own_tile",
+    "sect_switch_arm_status_occlusion",
 ]
 
 
@@ -234,7 +246,7 @@ def test_battle_pause_menu_surface_contract() -> None:
             "RangeHighlight.visible: changed",
             "RangeHighlight.tile_count: tile_count > 0",
         ],
-        "enemy_hit_float_and_log_visible": [
+        "enemy_hit_float_and_log_round_one": [
             "CombatManager.debug_combat_log_lines: changed",
             "HUD.combat_log_text: changed",
             'combat_log_text.contains("独臂大虾")',
@@ -1030,7 +1042,7 @@ def test_qi_cost_surface_contract() -> None:
     """Static contract pin for the jinyong-spend-qi round.
 
     Pins the qi-cost surface contract against ``playtest/_common.yaml`` and the
-    new ``qi_cost_blocks_cast_no_energy.yaml`` scenario: ``Player.energy_max`` is
+    new ``qi_cost_spent_and_no_energy_blocks_cast.yaml`` scenario: ``Player.energy_max`` is
     whitelisted on the surface (cap-relative qi asserts), ``debug_spend_player_qi``
     is in the actions list (the shared spend-path injection), the scenario file
     exists with ``name:`` equal to its basename, every timeline ``at:`` is a single
@@ -1052,7 +1064,7 @@ def test_qi_cost_surface_contract() -> None:
         "debug_spend_player_qi not in _common.yaml actions list"
     )
 
-    name = "qi_cost_blocks_cast_no_energy"
+    name = "qi_cost_spent_and_no_energy_blocks_cast"
     path = PLAYTEST_DIR / (name + ".yaml")
     assert path.is_file(), f"{name}.yaml missing"
     ftext = path.read_text(encoding="utf-8")

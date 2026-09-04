@@ -1,0 +1,43 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries each_unit_acts_once_per_round_initiative_order (retired, maxF 1610),
+# the appended budget proof: the first attack_confirm LANDS (acted flips, hint
+# cleared, target loses HP) and the same-turn second is REJECTED with 本回合已行动
+# and no further damage. Round 1: 3x move_up to (7,2), Central_Divine (7,1)
+# adjacent; basic attack 39 (probe 2026-09-04: 130 -> 91). The retired leg hit
+# South Emperor in round 2 (`round(100.0 * health / float(max_health)) == 61`);
+# here the target is Central_Divine, pinned as max_health - 39.
+name: attack_once_per_turn_rejected
+description: >-
+  One action per turn: the first attack_confirm lands (Player.acted true, hint
+  cleared, Central_Divine loses 39); the same-turn second attack_confirm is
+  rejected (visible 本回合已行动, Central_Divine unchanged).
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 20, actions: [move_up]}
+- {at: 30, actions: [move_up]}
+- {at: 40, actions: [move_up]}
+- {at: 50, actions: [attack_confirm]}
+- at: 80
+  actions: []
+  assert:
+    Player.acted: acted == true
+    ActionHintLabel.text: text == ""
+    Central_Divine.health: health == max_health - 39
+- {at: 90, actions: [attack_confirm]}
+- at: 120
+  actions: []
+  assert:
+    Player.acted: acted == true
+    ActionHintLabel.visible: visible == true
+    ActionHintLabel.text: text == "本回合已行动"
+    Central_Divine.health: health == max_health - 39

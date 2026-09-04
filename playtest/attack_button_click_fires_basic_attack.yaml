@@ -1,0 +1,60 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries battle_end_turn_attack_buttons (retired, maxF 1750), AttackButton
+# half: a real click on AttackButton with NO skill selected fires the J path —
+# a basic attack at the nearest adjacent enemy. Round 1: 3x move_up puts the
+# player at (7,2), adjacent to Central_Divine (7,1); the click flips
+# Player.acted and deals 30 basic x fa_hui_du 1.3 = 39 (probe 2026-09-04:
+# 130 -> 91). The retired scenario measured the same 39 on East_Heretic in
+# round 2; the expression `health == max_health - 39` is verbatim.
+name: attack_button_click_fires_basic_attack
+description: >-
+  The battle action buttons are wired and non-overlapping, and clicking
+  AttackButton with no skill selected fires the basic attack at the nearest
+  adjacent enemy — Player.acted flips true and Central_Divine takes 39.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 17, actions: [tutorial_next]}
+- {at: 18, actions: [tutorial_next]}
+- {at: 19, actions: [tutorial_next]}
+- at: 20
+  actions: []
+  assert:
+    EndTurnButton.visible: visible == true
+    EndTurnButton.size: size.x > 0 and size.y > 0
+    EndTurnButton.mouse_filter: mouse_filter == 0
+    EndTurnButton.disabled: disabled == false
+    AttackButton.visible: visible == true
+    AttackButton.size: size.x > 0 and size.y > 0
+    AttackButton.mouse_filter: mouse_filter == 0
+    AttackButton.disabled: disabled == false
+    HUD.pressed_connected: pressed_connected["EndTurnButton"] == true and pressed_connected["AttackButton"] == true
+    HUD.hud_button_overlap: hud_button_overlap == false
+    HUD.hud_desc_overlap: hud_desc_overlap == false
+- {at: 25, actions: [move_up]}
+- {at: 35, actions: [move_up]}
+- {at: 45, actions: [move_up]}
+- at: 55
+  actions: []
+  assert:
+    Player.grid_pos: grid_pos == Vector2i(7, 2)
+    Player.selected_skill_index: selected_skill_index == -1
+    Player.acted: acted == false
+- at: 60
+  actions: []
+  clicks:
+  - AttackButton
+- at: 100
+  actions: []
+  assert:
+    Player.acted: acted == true
+    Central_Divine.health: health == max_health - 39

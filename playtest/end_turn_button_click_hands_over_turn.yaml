@@ -1,0 +1,57 @@
+# One play-test scenario. Loaded by playtest/_common.yaml's sibling scan —
+# scene / actions / surface live there, this file is only the scenario.
+# The basename must equal `name:`.
+#
+# UNIT SCENARIO (route retirement, owner ruling 2026-09-04; see playtest/RETIRED.md).
+# Carries battle_end_turn_attack_buttons (retired, maxF 1750), EndTurnButton
+# half: both battle buttons are clickable / wired / non-overlapping; a real
+# click on EndTurnButton hands the turn to the enemies, the button is disabled
+# while the gate is closed, and the round-2 player turn re-enables it.
+name: end_turn_button_click_hands_over_turn
+description: >-
+  The two battle action buttons are clickable, wired (pressed_connected both
+  true), non-overlapping (hud_button_overlap / hud_desc_overlap false), and
+  clicking EndTurnButton ends the player turn (ENEMY_TURN, button disabled
+  while the gate is closed); the round-2 player turn re-enables it.
+timeline:
+- {at: 3, actions: [ui_accept]}
+- {at: 5, actions: [ui_accept]}
+- {at: 7, actions: [ui_accept]}
+- {at: 9, actions: [ui_accept]}
+- {at: 11, actions: [ui_accept]}
+- {at: 13, actions: [ui_accept]}
+- {at: 15, actions: [ui_accept]}
+- {at: 17, actions: [tutorial_next]}
+- {at: 18, actions: [tutorial_next]}
+- {at: 19, actions: [tutorial_next]}
+- at: 20
+  actions: []
+  assert:
+    EndTurnButton.visible: visible == true
+    EndTurnButton.size: size.x > 0 and size.y > 0
+    EndTurnButton.mouse_filter: mouse_filter == 0
+    EndTurnButton.disabled: disabled == false
+    AttackButton.visible: visible == true
+    AttackButton.size: size.x > 0 and size.y > 0
+    AttackButton.mouse_filter: mouse_filter == 0
+    AttackButton.disabled: disabled == false
+    HUD.pressed_connected: pressed_connected["EndTurnButton"] == true and pressed_connected["AttackButton"] == true
+    HUD.hud_button_overlap: hud_button_overlap == false
+    HUD.hud_desc_overlap: hud_desc_overlap == false
+- at: 22
+  actions: []
+  clicks:
+  - EndTurnButton
+- at: 100
+  actions: []
+  assert:
+    CombatManager.phase: phase == "ENEMY_TURN"
+    CombatManager.active_unit_name: active_unit_name != "Yang Guo"
+    EndTurnButton.disabled: disabled == true
+- at: 200
+  actions: []
+  assert:
+    CombatManager.current_round: changed
+    CombatManager.phase: phase == "PLAYER_TURN"
+    EndTurnButton.disabled: disabled == false
+    HUD.hud_button_overlap: hud_button_overlap == false
