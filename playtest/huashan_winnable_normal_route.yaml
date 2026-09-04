@@ -186,13 +186,17 @@ timeline:
     CultivationScreen.month: month == 1
     CultivationScreen.gongfa_count: gongfa_count == 2
     CultivationScreen.phase: phase == "CARD_PICK"
-# ══ 36 PRACTICE MONTHS (real-save route; every action driven by clicks).
-#    Month grammar (practice_target_receipt.yaml): CultOptionButton0 = draw the
-#    card, then CultOptionButton0 = 练功, then CultOptionButton0 = row-1 gongfa.
-#    Open-year month 1 carries an extra leading CultOptionButton0 (attribute
-#    augment); a year-end month 12 carries a trailing CultOptionButton0 (留在本门
-#    stay). Year 3 month 12 completes the run to MAP (no stay). ONE click per
-#    `at:` frame — bundling drops the month-boundary click (measured). ─═════
+# ══ 36 CALENDAR MONTHS (real-save route; every action driven by clicks).
+#    Month grammar: CultOptionButton0 = draw the card; while a trainable art
+#    remains, CultOptionButton0 = 练功 then CultOptionButton0 = row-1 gongfa.
+#    R5 month-leg re-derivation (2026-09-04): after both starting arts master,
+#    the empty 练功 RETURNs to ACTION_PICK without burning the month (C2), so
+#    every post-mastery month uses 做工 = CultOptionButton2 from ACTION_PICK,
+#    which does burn the month. Open-year month 1 carries an extra leading
+#    CultOptionButton0 (attribute augment); a year-end month 12 carries a
+#    trailing CultOptionButton0 (留在本门 stay). Year 3 month 12 completes the
+#    run to MAP (no stay). ONE click per `at:` frame — bundling drops the
+#    month-boundary click (measured). ─═════
 # ── YEAR 1 ─ m1 (no augment): card + 练功 + row
 - at: 390
   actions: []
@@ -253,11 +257,7 @@ timeline:
 - at: 455
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 460
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # m6
 - at: 465
   actions: []
@@ -266,11 +266,7 @@ timeline:
 - at: 470
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 475
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # m7
 - at: 480
   actions: []
@@ -279,11 +275,7 @@ timeline:
 - at: 485
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 490
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # m8
 - at: 495
   actions: []
@@ -292,11 +284,7 @@ timeline:
 - at: 500
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 505
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # m9
 - at: 510
   actions: []
@@ -305,11 +293,7 @@ timeline:
 - at: 515
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 520
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # m10
 - at: 525
   actions: []
@@ -318,11 +302,7 @@ timeline:
 - at: 530
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 535
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # m11
 - at: 540
   actions: []
@@ -331,12 +311,8 @@ timeline:
 - at: 545
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 550
-  actions: []
-  clicks:
-  - CultOptionButton0
-# m12: card + 练功 + row, then the year-end stay
+  - CultOptionButton2
+# m12: card + 做工, then the year-end stay
 - at: 555
   actions: []
   clicks:
@@ -344,12 +320,8 @@ timeline:
 - at: 560
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 565
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 570
   actions: []
   clicks:
   - CultOptionButton0
@@ -422,16 +394,17 @@ timeline:
 - at: 650
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m6
 - at: 655
   actions: []
   clicks:
   - CultOptionButton0
-# m6
 - at: 660
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m7
 - at: 665
   actions: []
   clicks:
@@ -439,8 +412,8 @@ timeline:
 - at: 670
   actions: []
   clicks:
-  - CultOptionButton0
-# m7
+  - CultOptionButton2
+# m8
 - at: 675
   actions: []
   clicks:
@@ -448,16 +421,17 @@ timeline:
 - at: 680
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m9
 - at: 685
   actions: []
   clicks:
   - CultOptionButton0
-# m8
 - at: 690
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m10
 - at: 695
   actions: []
   clicks:
@@ -465,8 +439,8 @@ timeline:
 - at: 700
   actions: []
   clicks:
-  - CultOptionButton0
-# m9
+  - CultOptionButton2
+# m11
 - at: 705
   actions: []
   clicks:
@@ -474,51 +448,17 @@ timeline:
 - at: 710
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m12: card + 做工, then the year-end stay
 - at: 715
   actions: []
   clicks:
   - CultOptionButton0
-# m10
 - at: 720
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 - at: 725
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 730
-  actions: []
-  clicks:
-  - CultOptionButton0
-# m11
-- at: 735
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 740
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 745
-  actions: []
-  clicks:
-  - CultOptionButton0
-# m12: card + 练功 + row, then the year-end stay
-- at: 750
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 755
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 760
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 765
   actions: []
   clicks:
   - CultOptionButton0
@@ -630,16 +570,17 @@ timeline:
 - at: 890
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m9
 - at: 895
   actions: []
   clicks:
   - CultOptionButton0
-# m9
 - at: 900
   actions: []
   clicks:
-  - CultOptionButton0
+  - CultOptionButton2
+# m10
 - at: 905
   actions: []
   clicks:
@@ -647,46 +588,24 @@ timeline:
 - at: 910
   actions: []
   clicks:
-  - CultOptionButton0
-# m10
+  - CultOptionButton2
+# m11
 - at: 915
   actions: []
   clicks:
   - CultOptionButton0
 - at: 920
-  actions: []
-  clicks:
-  - CultOptionButton0
+  actions:
+  - []
+# m12: card + 做工 → run finishes to MAP
 - at: 925
   actions: []
   clicks:
   - CultOptionButton0
-# m11
 - at: 930
   actions: []
   clicks:
-  - CultOptionButton0
-- at: 935
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 940
-  actions: []
-  clicks:
-  - CultOptionButton0
-# m12: card + 练功 + row → run finishes to MAP
-- at: 945
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 950
-  actions: []
-  clicks:
-  - CultOptionButton0
-- at: 955
-  actions: []
-  clicks:
-  - CultOptionButton0
+  - CultOptionButton2
 # ══ HUASHAN SEGMENT (f1070 → f2220): clicks ONLY — zero actions:, zero debug,
 #    zero keyboard. Travel onto 华山, fight the five greats with real skill /
 #    target / end-turn clicks, WIN, return to MAP. ═══════════════════════════

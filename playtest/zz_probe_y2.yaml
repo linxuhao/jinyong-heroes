@@ -1,0 +1,285 @@
+# TEMP probe (deleted before delivery) — impossible asserts to read observed month.
+name: zz_probe_y2
+description: probe
+scene: res://scenes/menu.tscn
+timeline:
+- at: 40
+  actions: []
+  clicks: [MenuEntry0]
+- at: 70
+  actions: []
+  clicks: [AttrNextButton]
+- at: 100
+  actions: []
+  clicks: [TraitNextButton]
+- at: 130
+  actions: []
+  clicks: [ConfirmButton]
+- at: 155
+  actions: []
+  clicks: [Next]
+- at: 160
+  actions: []
+  clicks: [Next]
+- at: 165
+  actions: []
+  clicks: [Next]
+- at: 170
+  actions: []
+  clicks: [Next]
+- at: 175
+  actions: []
+  clicks: [Next]
+- at: 180
+  actions: []
+  clicks: [Next]
+- at: 185
+  actions: []
+  clicks: [Next]
+- at: 205
+  actions: []
+  clicks: [AttackButton]
+- at: 220
+  actions: [debug_win_tutorial]
+- at: 250
+  actions: []
+  clicks: [ContinueButton]
+- at: 280
+  actions: []
+  clicks: [NextButton]
+- at: 300
+  actions: []
+  clicks: [NextButton]
+- at: 330
+  actions: []
+  clicks: [SectButton0]
+- at: 390
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 395
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 400
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 405
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 410
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 415
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 420
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 425
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 430
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 435
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 440
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 445
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 447
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 450
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 455
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 457
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 465
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 470
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 480
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 485
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 495
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 500
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 510
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 515
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 525
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 530
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 540
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 545
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 555
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 560
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 565
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 570
+  actions: []
+  assert:
+    CultivationScreen.year: year == -999
+    CultivationScreen.month: month == -999
+- at: 580
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 585
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 590
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 595
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 597
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 600
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 605
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 610
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 612
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 615
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 620
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 625
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 627
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 630
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 635
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 640
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 642
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 645
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 650
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 655
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 657
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 660
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 665
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 670
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 672
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+    CultivationScreen.phase: phase == "ZZZ"
+- at: 675
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 680
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 690
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 695
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 705
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 710
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 720
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 725
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 735
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 740
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 742
+  actions: []
+  assert:
+    CultivationScreen.month: month == -999
+- at: 750
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 755
+  actions: []
+  clicks: [CultOptionButton2]
+- at: 760
+  actions: []
+  clicks: [CultOptionButton0]
+- at: 770
+  actions: []
+  assert:
+    CultivationScreen.year: year == -999
+    CultivationScreen.month: month == -999

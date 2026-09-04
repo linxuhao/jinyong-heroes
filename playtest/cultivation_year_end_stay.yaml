@@ -52,6 +52,13 @@ timeline:
 - at: 120
   actions:
   - ui_accept
+# R5 month-leg re-derivation (2026-09-04): both starting 丁 arts master in
+# month 4 (2 practice months each, +2 练度 per 练功); after that the empty
+# 练功 RETURNs to ACTION_PICK without burning the month (C2), so months 5-12
+# burn the month with 修习 根骨 (card ui_accept → move_down to 修习 →
+# ui_accept into the attr pick → ui_accept on 根骨, which advances the month).
+# The year-end 留在本门 stay is one ui_accept.
+# ── m1-m4: card + 练功 + row (practice months) ──
 - at: 135
   actions:
   - ui_accept
@@ -88,88 +95,108 @@ timeline:
 - at: 300
   actions:
   - ui_accept
+# ── m5-m12: card, move_down to 修习, accept, accept 根骨 (burns the month) ──
 - at: 315
   actions:
   - ui_accept
-- at: 330
+- at: 327
+  actions:
+  - move_down
+- at: 339
   actions:
   - ui_accept
-- at: 345
+- at: 351
   actions:
   - ui_accept
-- at: 360
+- at: 363
   actions:
   - ui_accept
 - at: 375
   actions:
-  - ui_accept
-- at: 390
+  - move_down
+- at: 387
   actions:
   - ui_accept
-- at: 405
+- at: 399
   actions:
   - ui_accept
-- at: 420
+- at: 411
   actions:
   - ui_accept
+- at: 423
+  actions:
+  - move_down
 - at: 435
   actions:
   - ui_accept
-- at: 450
+- at: 447
   actions:
   - ui_accept
-- at: 465
+- at: 459
   actions:
   - ui_accept
-- at: 480
+- at: 471
+  actions:
+  - move_down
+- at: 483
   actions:
   - ui_accept
 - at: 495
   actions:
+  - ui_accept
+- at: 507
+  actions:
+  - ui_accept
+- at: 519
+  actions:
   - move_down
-- at: 510
+- at: 531
   actions:
   - ui_accept
-- at: 525
-  actions:
-  - ui_accept
-- at: 540
+- at: 543
   actions:
   - ui_accept
 - at: 555
   actions:
+  - ui_accept
+- at: 567
+  actions:
   - move_down
-- at: 570
+- at: 579
   actions:
   - ui_accept
-- at: 585
+- at: 591
   actions:
   - ui_accept
-- at: 600
+- at: 603
   actions:
   - ui_accept
 - at: 615
   actions:
   - move_down
-- at: 630
+- at: 627
   actions:
   - ui_accept
-- at: 645
+- at: 639
   actions:
   - ui_accept
-- at: 660
+- at: 651
   actions:
   - ui_accept
-- at: 675
+- at: 663
   actions:
   - move_down
-- at: 690
+- at: 675
   actions:
   - ui_accept
-- at: 705
+- at: 687
   actions:
   - ui_accept
-- at: 720
+# ── year-end stay: ui_accept on 留在本门 → year 2, month 1 ──
+- at: 700
+  actions:
+  - ui_accept
+- at: 713
   actions:
   - ui_accept
 - at: 760
