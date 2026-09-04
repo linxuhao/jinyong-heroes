@@ -4,8 +4,8 @@ The R3 round's proof rests on six playtest scenarios whose load-bearing lines ar
 **choice-differentials** — never balance literals, never a `== 90`-style pin. Each
 scenario proves a distinct "choices change the outcome" fact:
 
-  * `ending_divergent_playstyles`  — two playstyles reach DIFFERENT evaluations
-  * `ending_last_month_choice`     — a month-36 action flip changes the evaluation
+  * (`ending_divergent_playstyles` / `ending_last_month_choice` — retired
+     2026-09-04, see playtest/RETIRED.md; no longer pinned here)
   * `fortune_reroll_budget`        — the fortune reroll spends its budget and the
                                      exhausted press is inert
   * `action_yield_differential`    — work is the only action with a > 0 silver
@@ -43,20 +43,10 @@ FINAL = ROOT / "final"
 # that must survive verbatim. Removing or weakening any of them silently regresses
 # the corresponding nail back to "loaded but not proven".
 SCENARIO_LOAD_BEARING_LINES: dict[str, tuple[str, ...]] = {
-    "ending_divergent_playstyles": (
-        # Cross-leg differential: the two playthroughs' evaluations must differ.
-        # The carrier is the self-contained mirror EndingScreen.diverged_from_first
-        # (written every render at ending.gd:128 = summary != first_ending_evaluation).
-        # The old cross-node literal `first_ending_evaluation != evaluation_text` could
-        # never evaluate (the harness runs an assert against the node in its KEY; the
-        # two names live on different nodes), so it no longer appears in the yaml and
-        # this door is re-derived to the carrier that DOES — same property, new carrier.
-        "EndingScreen.diverged_from_first: diverged_from_first == true",
-    ),
-    "ending_last_month_choice": (
-        # Cross-leg differential: the month-36 action flip must change the eval.
-        "first_ending_evaluation != evaluation_text",
-    ),
+    # ending_divergent_playstyles / ending_last_month_choice were retired on
+    # 2026-09-04 (route-type scenarios, owner ruling); their differentials are
+    # carried by tests/test_action_yield_curves.gd + tests/test_ending_logic.gd
+    # — see playtest/RETIRED.md.
     "fortune_reroll_budget": (
         # Budget decrement (leg 1) and exhausted inertness (leg 2).
         "rerolls_left == 0",

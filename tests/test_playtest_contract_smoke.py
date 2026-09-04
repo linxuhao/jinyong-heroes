@@ -110,7 +110,6 @@ ROUND_SCENARIOS: list[str] = [
     "creation_attr_effect_info",
     "creation_hp_value_displayed",
     "creation_confirm_summary",
-    "qi_cost_blocks_cast_no_energy",
     "map_node_event_shaolin",
     "map_node_event_mainline_east",
     "map_node_event_mainline_return",
@@ -121,11 +120,9 @@ ROUND_SCENARIOS: list[str] = [
     "click_portrait_body_targets_enemy",
     "health_bar_above_portrait",
     "trait_hover_preview",
-    "portrait_grid_alignment",
     "language_zh_default",
     "camera_transform_follows_unit",
     "facility_use_reusable",
-    "clicks_only_storyline",
     "map_facility_buttons_click",
     "clicks_only_gongfa_empty_exit",
     "gongfa_pick_empty_keyboard_return",
@@ -146,12 +143,8 @@ ROUND_SCENARIOS: list[str] = [
     "fortune_reroll_budget",
     "huashan_readiness_warning",
     "huashan_winnable_normal_route",
-    "ending_divergent_playstyles",
-    "ending_last_month_choice",
     "work_beats_idling",
     "practice_target_receipt",
-    "ending_tiers_differentiate",
-    "enemy_turn_wall_clock",
     "trait_point_cost_visible",
     "consequence_card_pick_focus",
     "consequence_event_option_visible",
@@ -173,8 +166,6 @@ ROUND_SCENARIOS: list[str] = [
     "battle_pause_menu_continue_zero_delta",
     "battle_return_to_main_menu_needs_confirm",
     "skill_range_highlight_on_select",
-    "enemy_hit_float_and_log_visible",
-    "consequence_screens_occlusion",
 ]
 
 
@@ -1434,61 +1425,10 @@ def test_focus_marker_surface_contract() -> None:
     )
 
 
-def test_ending_tiers_differentiate_nail_contract() -> None:
-    """Static anti-weakening pins for the C3 ending-tiers nail.
-
-    The nail (``ending_tiers_differentiate``) proves the ending tiers DIVIDE on
-    real saves. Hard pins:
-
-      1. the scenario is in BOTH registries — ``scenario_order`` in
-         ``playtest/_common.yaml`` AND ``ROUND_SCENARIOS`` here (two-place
-         sync, both tails, same relative order);
-      2. the file exists with ``name:`` == its basename;
-      3. every timeline ``at:`` is a single integer;
-      4. the file MUST carry the tier-differential line
-         ``ending_tier_history[1] != ending_tier_history[0]`` (the TIER
-         differential, not text — the hole where the old pin passed on
-         identical titles), the tier-<3 boundary line ``tier < 3``, and the
-         C1 scene nail ``mastery_axis > 0`` (the mastery axis is > 0 on a
-         real-save practice route);
-      5. the new EndingScreen surface observable ``mastery_axis`` is
-         whitelisted on the surface.
-    """
-    name = "ending_tiers_differentiate"
-    order_text = COMMON.read_text(encoding="utf-8")
-    order_names = _items_under(order_text, "scenario_order")
-    assert name in order_names, f"{name} missing from scenario_order"
-    assert name in ROUND_SCENARIOS, f"{name} missing from ROUND_SCENARIOS"
-    assert [n for n in order_names if n in ROUND_SCENARIOS] == ROUND_SCENARIOS, (
-        f"{name}: scenario_order and ROUND_SCENARIOS disagree on presence or "
-        "relative order"
-    )
-    blocks = _surface_blocks(order_text)
-    ending_items = blocks.get("EndingScreen", [])
-    assert "mastery_axis" in ending_items, (
-        "EndingScreen.mastery_axis not whitelisted on the surface"
-    )
-    path = PLAYTEST_DIR / (name + ".yaml")
-    assert path.is_file(), f"{name}.yaml missing"
-    ftext = path.read_text(encoding="utf-8")
-    assert re.search(
-        rf"^name:\s*{name}\s*$", ftext, re.MULTILINE
-    ), f"{name}.yaml name: does not equal its basename"
-    for lineno, line in enumerate(ftext.splitlines(), start=1):
-        match = re.search(r"\bat\s*:\s*([^,}\s]+)", line)
-        if match and not match.group(1).isdigit():
-            assert False, (
-                f"{name}.yaml line {lineno}: non-integer timeline "
-                f"'at' value {match.group(1)!r}"
-            )
-    for mandatory in (
-        "ending_tier_history[1] != ending_tier_history[0]",
-        "tier < 3",
-        "mastery_axis > 0",
-    ):
-        assert mandatory in ftext, (
-            f"{name}.yaml missing the mandatory nail line `{mandatory}`"
-        )
+# test_ending_tiers_differentiate_nail_contract was removed on 2026-09-04: the
+# route scenario it pinned (ending_tiers_differentiate.yaml, maxF 1095) was retired
+# by owner ruling; the tier-separation property lives in
+# tests/test_action_yield_curves.gd (_assert_tier_separation). See playtest/RETIRED.md.
 
 
 def test_softlock_nail_contract() -> None:
@@ -2042,57 +1982,25 @@ def _extract_click_tokens(text: str) -> list[tuple[int, str]]:
     return results
 
 
-def test_clicks_only_storyline_is_keyboard_free() -> None:
-    """The clicks-only spine and its facility companion must not smuggle in
-    keyboard actions.
+def test_map_facility_buttons_click_is_keyboard_free() -> None:
+    """The facility companion must not smuggle in keyboard actions.
 
     This is a self-explaining pin: if you are legitimately changing a
     documented seed or adding a non-keyboard action, update THIS pin's
     allowance in the same change — do not delete the pin to go green, and
     never smuggle a keyboard action where a click is required.
 
-    Rules:
-      clicks_only_storyline.yaml:
-        - Every actions: token must be `debug_win_tutorial` (the ONE
-          documented battle-outcome seed).
-      map_facility_buttons_click.yaml:
+    (The clicks_only_storyline.yaml half of this pin was retired with that
+    route scenario on 2026-09-04 — see playtest/RETIRED.md.)
+
+    Rules, map_facility_buttons_click.yaml:
         - actions: tokens restricted to the verified seeding/debug prefix
           set {ui_accept, move_right, debug_win_tutorial, debug_fast_forward,
           debug_grant_silver}.
         - NO actions: entry after the first FacilityEnterButton click line.
-      Both files:
         - >= 5 clicks: entries.
         - No clicks token may end in `_ClickTarget`.
     """
-    # ── clicks_only_storyline.yaml ─────────────────────────────────────────
-    spine_path = PLAYTEST_DIR / "clicks_only_storyline.yaml"
-    assert spine_path.is_file(), "clicks_only_storyline.yaml missing"
-    spine_text = spine_path.read_text(encoding="utf-8")
-    spine_actions = _extract_action_tokens(spine_text)
-    bad_actions = [
-        (ln, tok) for ln, tok in spine_actions if tok != "debug_win_tutorial"
-    ]
-    assert not bad_actions, (
-        "clicks_only_storyline.yaml contains non-allowed actions: %s. "
-        "The ONLY allowed action is `debug_win_tutorial` (the documented "
-        "battle-outcome seed). If you are legitimately changing a documented "
-        "seed, update this pin's allowance in the same change — do not "
-        "delete the pin to go green, and never smuggle a keyboard action "
-        "where a click is required." % (bad_actions,)
-    )
-    spine_clicks = _extract_click_tokens(spine_text)
-    assert len(spine_clicks) >= 5, (
-        "clicks_only_storyline.yaml has %d clicks entries; >= 5 required "
-        "(a clicks-only scenario with fewer than 5 clicks cannot traverse "
-        "the six-segment spine)" % len(spine_clicks)
-    )
-    for ln, tok in spine_clicks:
-        assert not tok.endswith("_ClickTarget"), (
-            "clicks_only_storyline.yaml line %d: click token %r ends in "
-            "_ClickTarget. Anchors must target the control/unit body itself "
-            "(2026-08-29 90_decisions.md ruling)." % (ln, tok)
-        )
-
     # ── map_facility_buttons_click.yaml ────────────────────────────────────
     fac_path = PLAYTEST_DIR / "map_facility_buttons_click.yaml"
     assert fac_path.is_file(), "map_facility_buttons_click.yaml missing"

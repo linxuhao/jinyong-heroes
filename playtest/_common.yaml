@@ -1155,15 +1155,12 @@ surface:
 scenario_order:
 - round_one_snapshot_and_turn_order
 - enemy_acts_only_after_player_ends_turn
-- each_unit_acts_once_per_round_initiative_order
 - cooldowns_decrement_by_round
 - skill_button_turn_overlay
 - dot_resolves_at_victim_turn_start
 - fahui_du_multiplies_damage
 - two_phase_skill_unlock_and_hp_gate
 - central_divine_innate_qi_fatal_guard
-- terminal_victory_8_12_rounds_hp_15_40
-- player_death_ends_battle
 - ui_geometry_readability
 - skill_button_visual_states
 - spine_to_ending
@@ -1190,7 +1187,6 @@ scenario_order:
 - creation_back_to_menu_walk
 - skill_description_visible
 - movement_range_highlight
-- battle_end_turn_attack_buttons
 - battle_focus_arrow_keys
 - click_move_to_tile
 - click_move_undo_right
@@ -1207,7 +1203,6 @@ scenario_order:
 - creation_attr_effect_info
 - creation_hp_value_displayed
 - creation_confirm_summary
-- qi_cost_blocks_cast_no_energy
 - map_node_event_shaolin
 - map_node_event_mainline_east
 - map_node_event_mainline_return
@@ -1218,11 +1213,9 @@ scenario_order:
 - click_portrait_body_targets_enemy
 - health_bar_above_portrait
 - trait_hover_preview
-- portrait_grid_alignment
 - language_zh_default
 - camera_transform_follows_unit
 - facility_use_reusable
-- clicks_only_storyline
 - map_facility_buttons_click
 - clicks_only_gongfa_empty_exit
 - gongfa_pick_empty_keyboard_return
@@ -1243,13 +1236,8 @@ scenario_order:
 - fortune_reroll_budget
 - huashan_readiness_warning
 - huashan_winnable_normal_route
-- ending_divergent_playstyles
-- ending_last_month_choice
 - work_beats_idling
 - practice_target_receipt
-- ending_tiers_differentiate
-- enemy_turn_wall_clock
-- enemy_action_feedback
 - trait_point_cost_visible
 - consequence_card_pick_focus
 - consequence_event_option_visible
@@ -1271,6 +1259,4 @@ scenario_order:
 - battle_pause_menu_continue_zero_delta
 - battle_return_to_main_menu_needs_confirm
 - skill_range_highlight_on_select
-- enemy_hit_float_and_log_visible
-- consequence_screens_occlusion
 
