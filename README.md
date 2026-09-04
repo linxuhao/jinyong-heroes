@@ -31,22 +31,29 @@ jianghu map to an ending. Visuals use placeholder art; UI text is Chinese
 - **C3 — returnable screens, confirmed commits.** A visible 返回 button +
   ui_cancel on attribute/gongfa/card pick, year-end and sect switch (zero
   phase/month/silver delta); EVENT keeps its no-exit ruling (reaffirmed in code,
-  pinned by `event_phase_no_exit_reaffirmed`); sect join, year-end switch and
-  travel-to-ending require a confirming second press; the battle pause button
-  opens a real menu (继续 / 返回主菜单, second press to confirm).
+  pinned by `event_phase_no_exit_reaffirmed`); year-end switch and
+  travel-to-ending require a confirming second press; the initial sect join
+  stays single-press on every input path (the three verbatim gates pin it for
+  the game; safety comes from the on-screen consequence preview and a visible
+  返回主菜单 back button); the battle pause button opens a real menu
+  (继续 / 返回主菜单, second press to confirm).
 - **C4 — character panel on battle & ending.** The roster panel is instanced
   read-only into `hud.tscn` and `ending.tscn` (HUD/panel layer;
   `battlefield.gd` untouched) and closes with zero battle-state diff.
 - **Battle feedback.** Floating damage numbers + combat-log lines (attacker →
   target, damage, remaining HP; status-caused 移动 0 explained).
-- **Honest status.** Occlusion net `consequence_screens_occlusion` 62/62 green
-  on this tree (violations 0 / scan_ok true); the C2 and C4 nails are green.
-  Open integration blockers tracked in `final/verify_report.json`: F1
-  `cultivation.gd:1108` EVENT-renderer crash on real profiles
-  (save_load_roundtrip 10/14), F4 the two-press sect join leaves the three
-  verbatim gates red (0/49, 1/32, 5/41), F2 `event_travel_effects` 1/19 +
-  `action_yield_differential` 24/44; the R5 design-ledger rows and the official
-  compile/vision/test gates land downstream.
+- **Honest status.** Both main-round integration blockers are fixed on this
+  tree: F1 — the EVENT renderer reads the typed `opt.effects` (sidecar re-runs:
+  save_load_roundtrip 14/14, consequence_event_option_visible 9/9,
+  event_phase_no_exit_reaffirmed 8/8, event_travel_effects 19/19); F4 — the
+  initial sect join is single-press on every input path and the three verbatim
+  gates are back to byte-identical green (facility_use_reusable 49/49,
+  map_node_event_shaolin 32/32, map_battle_node_huashan 41/41), with the
+  re-derived sect nail `sect_join_needs_confirm` 8/8. Evidence = per-scenario
+  sidecar runs quoted in `final/delivery_notes_fix_f1_event_option_effects_read.md`
+  and `final/delivery_notes_fix_f4_sect_join_single_press.md`; the official
+  post-fix full sweep and the compile/vision/test gate reports are produced by
+  the downstream steps (5_compile / 5_vision / 5_test) and are not claimed here.
 
 ## Requirements
 
@@ -66,7 +73,7 @@ main menu (新的冒险 / 读取存档 / 设置 / 退出). Headless: `godot --pa
 
 Flow: main menu → character creation (30-point budget, traits, confirm) →
 tutorial battle as 独臂大虾 vs the five grandmaster shrimp → overlay →
-transition → sect choice (join now needs a confirming second press) →
+transition → sect choice (single-press join, consequence preview + 返回主菜单 back) →
 36-month cultivation (every pick shows its consequence and can be backed out
 of before committing) → the jianghu map (travel hints; the ending node asks
 确认) → tiered ending (查看角色 opens the read-only panel) → restart.
@@ -119,8 +126,9 @@ asserts) with the map leg in `playtest/consequence_screens_occlusion_map.yaml`.
   `_consequence_text(phase, index)` composes consequence copy from
   CardData/EventData/ProgressionGongfaData/ProgressionMath.
 - **SectSelectScreen** (R5) — `consequence_text`, `consequence_matches_focus`,
-  `confirm_armed` (two-press join: first press arms with zero writes, second
-  commits).
+  `back_button_visible` (single-press join per the F4 ruling: the three
+  verbatim gates pin it for the game, preview-before-press + back make it safe;
+  the year-end sect switch keeps its two-press confirm).
 - **MapTravelHints** (R5, `map.tscn` sibling) — `travel_hint_text`,
   `travel_gate_visible`, `travel_gate_armed`; end-node travel gate with
   确认启程/返回 dialog.
