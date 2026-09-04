@@ -49,9 +49,9 @@
 
 > 本节记录**问题**,不是裁决。所有者回答前,现行裁决表(上方)不变。
 
-- **2026-09-04 · 华山路线钉(huashan_winnable_normal_route / cultivation_year_end_stay)的持久形态?(向所有者提问,非裁决)**
+- **2026-09-04 · 固定帧路线钉(huashan_winnable_normal_route / cultivation_year_end_stay / sect_switch_same_school_connects)的持久形态?(向所有者提问,非裁决;post-fix 官方复跑后补入第三条)**
   本轮(R5)因 C2 把「空练功」从烧月改为返回行动,这条钉的固定帧点击语法(36 个月腿 = card/练功/行 的 CultOptionButton0 连点)在大成后不再推月,遂死循环。已按卡内裁定把大成后各月改用**烧月的做工/修习**重推导月腿(断言逐字节不变、里程碑帧 year2·m1 / year3·m1 现已恢复),但**这条钉的月份语法已被 R3、R3b(5 次提交)、R5 三次重推导**——因为它钉的是一条约 2200 帧的固定点击 PATH,任何上游屏改动(焦点顺序、返回按钮、确认闸、卡片是否每月初现)都会挪动里程碑帧,使后段 travel/battle/year-end 帧再次错过。**提议的持久形态(择一或并用,请所有者裁决,本轮不决定):**
   (a) **路线腿改为「节点可见时点击」驱动**(harness 支持条件点击,而非固定 `at:` 帧),使月数推进与屏幕改动解耦;或
   (b) **华山决斗腿从一份真实存档经「读取存档」启动**,跳过 36 月固定点击语法,只钉决斗本身(诚实 LOST 尾)。
-  证据:本轮第三次重推导 + 官方 5_compile 实测 huashan 19/47(卡历卡在 year1·m5、28 个 aim 错误全属此场景)、cultivation_year_end_stay 5/8(f760 observed year1·month12:重推导后里程碑已能推进到月末,但固定帧仍无法稳定把「年关停留」提交落在 f760)。见 `final/delivery_notes_fix_r5_huashan_route_drift.md`。
+  证据(post-fix 官方 5_compile 复跑,2026-09-04,119 场景,本步上下文 `playtest_summary.md`):huashan **23/47**(重推导后历法里程碑恢复,但 **27 条 aim runtime error** 全属此场景——到达 MAP 晚一个月,其后 travel/battle 断言连锁落空;硬闸门 `passed: false` 的唯一来源)、`cultivation_year_end_stay` **5/8**(f760 observed year1·month12:重推导后里程碑已能推进到月末,但固定帧仍无法稳定把「年关停留」提交落在 f760)、同族 `sect_switch_same_school_connects` **4/8**(R5 年末两按确认需在固定时间线插入一次确认按压,按卡裁定 STOP 未改)。见 `final/delivery_notes_fix_r5_huashan_route_drift.md`。
 

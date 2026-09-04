@@ -15,7 +15,7 @@
 5. 数值精调      —— 放到最后
 ```
 
-**当前位置(2026-09-04 校准):R5 navigation-and-consequence 已落地并经修复轮收口——C1 后果由数据渲染(遮挡网 `consequence_screens_occlusion` 62/62)、C2 软锁返回零差分(三钉 16/16·19/19·16/16)、C3 五相位可返回 + 确认、C4 战斗/结局只读角色面板(两钉 27/27)、战斗反馈钉绿;F1/F4 修复后三条逐字闸门回字节一致绿(49/49·32/32·41/41)。** 下一项 = **外号**(编号队列第 2 项,见下;R6「江湖有人」随后)。第 2 阶段(交互)与第 3 阶段(内容)是**并行**的,
+**当前位置(2026-09-04 校准):R5 navigation-and-consequence 已落地并经修复轮 + post-fix 官方复跑收口——C1 后果由数据渲染(遮挡证据:pre-fix 官方主网 62/62;post-fix 官方 `occlusion_no_button_over_text` 22/22 + map 腿 9/9)、C2 软锁返回零差分(三钉 16/16·19/19·16/16)、C3 五相位可返回 + 确认、C4 战斗/结局只读角色面板(两钉 27/27)、战斗反馈钉绿;F1/F4 修复后三条逐字闸门回字节一致绿(49/49·32/32·41/41,官方实测)。** 下一项 = **外号**(编号队列第 2 项,见下;R6「江湖有人」随后)。第 2 阶段(交互)与第 3 阶段(内容)是**并行**的,
 不是顺序推进——上面那张表没说清这一点,记在这里。
 
 - **第 1 阶段(逻辑)** 完成:六段骨架接通(教程→养成→遭遇→江湖→结局),结局可达。
@@ -265,9 +265,13 @@ R3b(数值真的绑上)已落地(c1–c7 代码/数据/场景全交付,C5 升级
    未提交选择屏可返回(五相位返回按钮 + ui_cancel,零差分)、不可逆提交两按确认(拜师/年末改投/结局行程/战斗回主菜单)、
    软锁裁决反转(无可练功法 → 返回行动重选、月份零差分;取代 jinyong-loop R2 烧月出口)、
    战斗与结局屏的角色总览面板(read-only RosterPanel 实例,battlefield.gd 零改动)、
-   战斗命中飘字 + 顶栏日志(谁对谁/伤害/剩多少);证据 = 本轮 62/62 遮挡网、C2 三钉与 C4 两钉官方绿
-   (`playtest_summary.md: softlock_empty_practice_returns 16/16` 等);F1(cultivation.gd:1108 两参 get 崩溃)/
-   F4(两按拜师 × 三逐字闸门单按 boot 停留 SECT_SELECTION)修复后官方复跑收口 —— **队列自第 2 项(外号)继续**
+   战斗命中飘字 + 顶栏日志(谁对谁/伤害/剩多少);证据 = 本轮遮挡证据(pre-fix 官方主网 62/62;post-fix 官方复跑由
+   `occlusion_no_button_over_text` 22/22 + map 腿 9/9 承载——主网与 `ending_last_month_choice` 不在复跑注册表,
+   见 99_changelog 2026-09-04 行)、C2 三钉与 C4 两钉官方绿(`playtest_summary.md: softlock_empty_practice_returns 16/16` 等);
+   F1(cultivation.gd:1108 两参 get 崩溃)/F4(两按拜师 × 三逐字闸门单按 boot 停留 SECT_SELECTION)修复后官方复跑
+   **已落盘收口**(2026-09-04 post-fix 官方 119 场景:R5 全部新钉绿、三逐字闸门 49/49·32/32·41/41 与 RNG 生命线
+   14/14·19/19 官方实测;断言红 3/119 全为已入档 pre-R5 固定帧路线钉,owner 裁决待决见 `90_decisions.md` Open questions)
+   —— **队列自第 2 项(外号)继续**
 2. 外号(nicknames)       —— 替 ProgressionHero / Sparring Partner 裸 id
    (显示层已由 R4 改名侠客虾/陪练虾,R5 `enemy_hit_float_and_log_visible` 钉住屏上显示名;残余 = 内部键,与 UX-15 去名化同轮处理)
 3. 回执/结算              —— 结局回顾与结算页(UX-30)
