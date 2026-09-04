@@ -717,6 +717,12 @@ func _next_turn() -> void:
 	# enemy of a run, the start of the whole enemy round). Additive observables
 	# only; the AI still decides exactly once.
 	_enemy_turn_start_msec = Time.get_ticks_msec()
+	# R5 split-bound fix: zero the move/attack buckets at each enemy turn start
+	# so a turn that skips one segment does not inherit the previous enemy's
+	# residual (sum <= turn_msec holds by construction). debug_enemy_other_msec
+	# is deliberately NOT reset — it is always recomputed below.
+	debug_enemy_move_msec = 0
+	debug_enemy_attack_msec = 0
 	if not _enemy_round_active:
 		_enemy_round_active = true
 		_enemy_round_start_msec = _enemy_turn_start_msec
