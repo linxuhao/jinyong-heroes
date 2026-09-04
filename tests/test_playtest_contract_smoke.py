@@ -201,6 +201,14 @@ R5_PAUSE_SURFACE_VARS: tuple[str, ...] = (
     "combat_log_text",             # Hud (CombatLog rendered_text relay)
 )
 
+# The one observable the R5 year-end silver-baseline fix appends to the
+# CultivationScreen surface block (in playtest/_common.yaml), ONLY-ADD — never
+# removed or renamed. The var-name string literal appears EXACTLY ONCE in this
+# file (here, inside the tuple); the test body references the tuple NAME only.
+R5_YEAR_END_BASELINE_SURFACE_VARS: tuple[str, ...] = (
+    "year_end_entry_silver",       # CultivationScreen (year-end back zero-delta baseline)
+)
+
 
 def test_battle_pause_menu_surface_contract() -> None:
     """Static contract pin for the R5 battle pause-menu / feedback round."""
@@ -247,6 +255,24 @@ def test_battle_pause_menu_surface_contract() -> None:
             assert line in ftext, (
                 "%s.yaml missing mandatory assert line: %s" % (name, line)
             )
+
+
+def test_year_end_baseline_surface_contract() -> None:
+    """Static contract pin for the R5 year-end silver-baseline surface key.
+
+    The var is whitelisted exactly once in the CultivationScreen surface block
+    of playtest/_common.yaml. The body references the tuple NAME only, never the
+    var-name string literal, so the literal appears exactly once in this file.
+    """
+    text = COMMON.read_text(encoding="utf-8")
+    blocks = _surface_blocks(text)
+    assert "CultivationScreen" in blocks, "surface has no CultivationScreen block"
+    cult_items = blocks["CultivationScreen"]
+    assert cult_items, "CultivationScreen surface block parsed empty (vacuous pass guard)"
+    for var in R5_YEAR_END_BASELINE_SURFACE_VARS:
+        assert var in cult_items, (
+            f"CultivationScreen.{var} not whitelisted on the surface"
+        )
 
 # The 12 observables the jinyong-map-events round appends to the MapScreen
 # surface block (in playtest/_common.yaml), in the same order they are appended.

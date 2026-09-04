@@ -116,6 +116,13 @@ var month_before_accept: int = 1
 ## _sync_surface, so it survives as a snapshot).
 var silver_before_accept: int = 0
 
+## Surface: silver captured at the moment _after_action() enters YEAR_END (month 12),
+## i.e. AFTER the committed action's income has landed. Baseline for the YEAR_END
+## back zero-delta nail (silver_before_accept is captured at _on_accept start,
+## BEFORE the last commit's income, so it can never equal post-income silver).
+## Written ONLY at the _after_action month-12 entry, never in _sync_surface.
+var year_end_entry_silver: int = 0
+
 ## Surface: an on-screen notice for the current accept ("", nothing to say).
 ## Rendered by _render() as an appended body line whenever non-empty. Cleared at
 ## the top of _on_accept() and written by the branches that need to explain
@@ -706,6 +713,7 @@ func _after_action() -> void:
 		_finish_to_map()
 		return
 	if month == 12:
+		year_end_entry_silver = silver
 		phase = "YEAR_END"
 		_year_choice = 0
 		_render()

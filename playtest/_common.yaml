@@ -823,6 +823,7 @@ surface:
   - focus_marker_active
   - month_before_accept
   - silver_before_accept
+  - year_end_entry_silver
   - status_text
   - last_action_kind
   - last_action_silver

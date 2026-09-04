@@ -18,12 +18,38 @@
 #                                  the pre-fix tree never published the var.
 #   exact error .................. surface var absent (back_button_visible == false)
 #   green asserts before red ..... 3 (phase + month + consequence checks pass)
+#
+# R5 baseline re-point (2026-09-04) — measured-quantity change, NOT an assert
+# weakening. The property "back does not change silver" is unchanged; the measured
+# quantity changes so the property is actually testable.
+#   measured red ......... 9/10 (this cycle's playtest_summary.md)
+#   failing frame ......... f690
+#   first failing assert .. CultivationScreen.silver: silver == silver_before_accept
+#   observed .............. 928
+#   green before red ...... 9
+#   delta-cause diagnosis . the scenario drives 11 months of committed 做工 to reach
+#                           month 12; every 做工 legitimately earns silver, and
+#                           silver_before_accept is published at _on_accept START
+#                           (before the LAST 做工's income lands), so it can never
+#                           equal the post-income silver at the YEAR_END back frame.
+#                           The BACK itself is zero-delta (_on_back performs only
+#                           phase/focus writes, never silver); the assert's baseline
+#                           was captured too early. Expected delta = the last
+#                           committed 做工's income (ProgressionMath.work_income at
+#                           that month) == 928 minus the pre-commit silver — a
+#                           baseline-capture-point defect, NOT a leak.
+#   change ................ f690 assert `silver == silver_before_accept` ->
+#                           `silver == year_end_entry_silver` (zero-delta now
+#                           measured from the YEAR_END ENTRY state, i.e. after the
+#                           committed income, before the back). Every other assert
+#                           byte-identical.
 name: back_button_year_end_zero_delta
 description: >-
   C3 back from YEAR_END: at month 12 the year-end screen shows back_button_visible
   true / back_target_phase "ACTION_PICK"; clicking CultBackButton returns to
-  ACTION_PICK with month == 12 unchanged and silver == silver_before_accept (zero
-  delta). Second leg: one committed 做工 action re-enters YEAR_END (month 12,
+  ACTION_PICK with month == 12 unchanged and silver == year_end_entry_silver (zero
+  delta measured from the year-end ENTRY state, after the committed income, before
+  the back). Second leg: one committed 做工 action re-enters YEAR_END (month 12,
   year-end re-offered — proving backing out cannot skip it).
 scene: res://scenes/menu.tscn
 timeline:
@@ -203,7 +229,7 @@ timeline:
   assert:
     CultivationScreen.phase: phase == "ACTION_PICK"
     CultivationScreen.month: month == 12
-    CultivationScreen.silver: silver == silver_before_accept
+    CultivationScreen.silver: silver == year_end_entry_silver
     CultivationScreen.back_button_visible: back_button_visible == false
 # ── SECOND LEG: one committed 做工 action re-enters YEAR_END (month stays 12) ─
 - at: 700
