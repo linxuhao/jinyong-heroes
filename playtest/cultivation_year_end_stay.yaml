@@ -192,15 +192,27 @@ timeline:
 - at: 687
   actions:
   - ui_accept
-# ── year-end stay: ui_accept on 留在本门 → year 2, month 1 ──
-# (R5 revision: 3 trailing accepts so the year-end stay commits regardless of
-# which sub-phase — YEAR_END / year-2 开年际遇 augment / card — the last 修习
-# month-12 leg settles into; extra accepts on the new-year card/augment screens
-# stay at year 2 month 1.)
+# ── burn month 12, then year-end 留在本门 stay -> year 2, month 1 ──
+# R5 re-anchor (2026-09-04). Measured: after the m5-m11 修习 legs the screen
+# sits at CARD_PICK of month 12 (f690 observed phase CARD_PICK, Y1 M12), so the
+# old three plain ui_accepts fired on ACTION_PICK / GONGFA_PICK(empty-return) /
+# ACTION_PICK and NEVER committed month 12 -> YEAR_END was not reached and the
+# stay did not land by f760 (red 5/8: f760 observed year1 month12 gongfa_count2).
+# Re-anchored: burn month 12 with one 修习 leg (card accept -> move_down 修习 ->
+# attr-pick -> 根骨 accept commits M12 and re-enters YEAR_END without advancing,
+# measured f733 phase YEAR_END M12), then a single ui_accept on the 留在本门
+# stay row -> YEAR_AUGMENT (measured f743/f755 year2 month1 gongfa_count4
+# mastered_count2). Only at:/action placement changed; assert block byte-identical.
 - at: 700
   actions:
   - ui_accept
+- at: 710
+  actions:
+  - move_down
 - at: 720
+  actions:
+  - ui_accept
+- at: 730
   actions:
   - ui_accept
 - at: 740

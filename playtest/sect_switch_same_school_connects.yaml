@@ -117,6 +117,15 @@ timeline:
 - at: 490
   actions:
   - ui_accept
+# R5 re-anchor (2026-09-04): the year-end 换门派 switch is two-press (R5 C3).
+# The single ui_accept at f490 only ARMS the still-focused 峨眉 row (measured
+# f495: phase SECT_SWITCH, sect_id still "shaolin", zero writes). Insert exactly
+# ONE confirming ui_accept on the same row to commit (_resolve_sect_switch ->
+# sect_id "emei" + _advance_year). Measured f515: YEAR_AUGMENT year2 month1
+# sect emei gongfa_count 4. All assert lines byte-identical.
+- at: 505
+  actions:
+  - ui_accept
 - at: 520
   actions: []
   assert:

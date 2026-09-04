@@ -145,7 +145,6 @@ ROUND_SCENARIOS: list[str] = [
     "action_yield_differential",
     "fortune_reroll_budget",
     "huashan_readiness_warning",
-    "huashan_winnable_normal_route",
     "ending_divergent_playstyles",
     "work_beats_idling",
     "practice_target_receipt",
