@@ -1,7 +1,7 @@
 {
   "note": "sha256 of the bytes tools/publish_public.py last wrote at the Pages root; a root file matching one of these is our own superseded publication, anything else is archived first.",
   "sha256": {
-    "2026-09-15-progress.md": "54db9e8698d34d57331ad063ff920cff8a2ae60f09549c30e34d09b342586c74",
+    "2026-09-15-progress.md": "f224dee261318527c34f086cf9ad25dbf0c321ad72d6442aa9d9aede90ff9809",
     "README.md": "87f3cbf5e8375ed0044218a2eaad6c2445afd63b85940dfce605109a19c8400c",
     "index.md": "c4baf79d80b4a4a158297fef2778095294342af8938a33647d10f76ee891afb6"
   }
