@@ -14,5 +14,3 @@ title: 武虾传奇 · Myth of Kungfu Shrimp
 合作游玩是开发目标，目前尚未推出。此前公开过的原型属于历史版本，本站不承诺收回已经公开的内容。
 
 [Development notes / 开发记录](README.md)
-
-[2026-09-15 开发进展 / development note](2026-09-15-progress.md)

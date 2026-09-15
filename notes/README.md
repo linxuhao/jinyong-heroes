@@ -12,3 +12,5 @@ We are fixing progress-loss and repeat-reward problems, tightening playtest isol
 ## Development update — 2026-09-15
 
 Ten days of merged work, with a checkable commit for every claim: [2026-09-15 development note](2026-09-15-progress.md). Text only this time — the playable demo is not republished yet.
+
+此前公开过的根目录前言（2026-09-05 版）已逐字归档并附 sha256：[notes/archive/ARCHIVE.md](https://github.com/linxuhao/jinyong-heroes/blob/public-info/notes/archive/ARCHIVE.md)。Previously published root front matter is kept verbatim there, with digests — nothing that was published is dropped.
