@@ -26,3 +26,17 @@ Nothing on this page repairs a publication or makes one lawful in retrospect.
 - `index.wasm` sha256 `fc74679e3b97f76878947fcd4fbe1268cbfa6188182a2e33bbc3f5dc9bfa57d0`
 - The publication commit carries no gate ticket, no gated commit and no mainline
   tip, so none of the above can be read from it alone.
+
+## 00a243e35429a866e3bc2471dbb8b9627c597c20
+
+- Published 2026-09-16T18:32:48+00:00; this is the payload the branch serves now.
+- Built from `516ce0a92e7027b63e6a113f3baede01eaf6f385`.
+- Gate `gq-20260916T173218Z-67f14212`: `gate.gate.head` = that candidate,
+  `gate.gate.exit` = 0, finished 2026-09-16T18:32:39Z.
+- The mainline first contained the candidate at
+  `1f2efe74a633ecc72394ed34344dc4f87a5db0f0`, committed 2026-09-16T21:42:51+00:00
+  -- **after** the publication.
+- `index.pck` sha256 `9354f10d77aa58a50ec8050db06e1620b56b7f617167268a067034ac83ac668a`
+- `index.wasm` sha256 `fc74679e3b97f76878947fcd4fbe1268cbfa6188182a2e33bbc3f5dc9bfa57d0`
+- The publication commit carries no gate ticket, no gated commit and no mainline
+  tip, so none of the above can be read from it alone.
