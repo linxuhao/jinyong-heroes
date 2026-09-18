@@ -9,16 +9,16 @@
     "index.html": "a477d37404bd6b4ce5590de3a90a0b735a82e185634aa6d7e14c71cf819cc795",
     "index.icon.png": "ad3c35ad0facf487c618204bd98db543034fc95224eadc7f08c7a9ff38d5b3b5",
     "index.js": "33c94cb3175f3333b82e2a3be5e8e86f77986f0aa2042b1631f6367a4e5bb6ba",
-    "index.pck": "b2c45da8c077c2a7aaffa4fb640d53cfefbf4936c024a360d7f9a36a1d33c70b",
+    "index.pck": "93aa520b648b6aca7c1fe641bb0c070f26ce73f09e44f20a0f11c6b92678c123",
     "index.png": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e",
     "index.wasm": "fc74679e3b97f76878947fcd4fbe1268cbfa6188182a2e33bbc3f5dc9bfa57d0"
   },
   "reports": {
-    "browser": "3523333466b50a0cb71bbd1f28f1f58f81805b4b0319d40e7648836e578fd581",
-    "package": "4992b3599ddc1e63b887fbbc73d7fb949cb94b8a032cbea90a9ab6a9d6a7db27"
+    "browser": "7b6c5e5bb0b27616597412ab366341163036819cc74911338c9b5d70d0708dba",
+    "package": "71c2bd2dbb1e472c693a7002bd9686dbe35bc118a1d7d42a0eb0d82b2a33e714"
   },
   "schema": 1,
-  "source_commit": "a6d4071b51e30a7a8eeff49307945a93599e140c",
-  "source_digest": "92203d872c78465b51c43da9de3e5a0e8993b416eda4ac87873c5af3cce8dc70",
+  "source_commit": "fded8eec58cef01fea4f8dc40a47381e3d511f5f",
+  "source_digest": "0cd2f5e65dcea0eb87aa7743c55c628b1334735f69dc1020518854f92ac2f3f3",
   "web_template_sha256": "d3ee2f08cef0cf3cf6678a6355a92a8db48ccdd35cbd2e8bfd5f0e8a0b4032a0"
 }
